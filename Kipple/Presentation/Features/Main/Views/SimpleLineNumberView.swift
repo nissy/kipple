@@ -150,8 +150,18 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 8, height: verticalPadding)
         if let textContainer = textView.textContainer {
             textContainer.lineFragmentPadding = 0
-            textContainer.size = NSSize(width: textContainer.size.width, height: 100000)
+            textContainer.size = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            // 折り返しを有効にする設定
+            textContainer.widthTracksTextView = true
+            textContainer.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         }
+        
+        // テキストビューの折り返しを明示的に有効化
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = true
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.autoresizingMask = .width
     }
     
     private func setupParagraphStyle(textView: NSTextView, paragraphStyle: NSParagraphStyle) {
@@ -344,6 +354,7 @@ private struct DrawLineNumberParams {
     let visibleRect: NSRect
     let containerOrigin: NSPoint
     let textContainerInset: NSSize
+    var previousCharacterLocation: Int = -1  // 前の行フラグメントの終了位置を追跡
 }
 
 // シンプルな行番号ルーラービュー
@@ -483,15 +494,37 @@ class SimpleLineNumberRulerView: NSRulerView {
         let relativePoint = self.convert(NSPoint.zero, from: textView)
         let containerOrigin = textView.textContainerOrigin
         
+        // 論理行番号を追跡
+        var currentLineNumber = 1
+        if extendedGlyphRange.location > 0 {
+            let textBefore = fullText.substring(to: min(extendedGlyphRange.location, fullText.length))
+            currentLineNumber = textBefore.components(separatedBy: "\n").count
+        }
+        
+        var isHighlightingLine = false
+        
         layoutManager.enumerateLineFragments(forGlyphRange: extendedGlyphRange) { lineRect, _, _, glyphRange, _ in
             let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
             
-            // この行フラグメントの行番号を正確に計算
-            let textBeforeRange = fullText.substring(to: min(characterRange.location, fullText.length))
-            let thisLineNumber = textBeforeRange.components(separatedBy: "\n").count
+            // この行フラグメントが論理行の開始かどうか判定
+            let isNewLogicalLine: Bool
+            if characterRange.location == 0 {
+                isNewLogicalLine = true
+                isHighlightingLine = (currentLineNumber == selectedLineNumber)
+            } else if characterRange.location > 0 && characterRange.location <= fullText.length {
+                let previousCharIndex = characterRange.location - 1
+                let previousChar = fullText.substring(with: NSRange(location: previousCharIndex, length: 1))
+                isNewLogicalLine = (previousChar == "\n")
+                if isNewLogicalLine {
+                    // 改行を検出したら、ハイライト状態を更新
+                    isHighlightingLine = (currentLineNumber == selectedLineNumber)
+                }
+            } else {
+                isNewLogicalLine = false
+            }
             
-            // 選択された行番号と一致するかチェック
-            if thisLineNumber == selectedLineNumber {
+            // 選択された論理行に属するすべての行フラグメントをハイライト
+            if isHighlightingLine {
                 // 正しい Y 位置計算
                 let lineY = lineRect.minY + containerOrigin.y + relativePoint.y
                 
@@ -503,6 +536,19 @@ class SimpleLineNumberRulerView: NSRulerView {
                     height: lineRect.height
                 ))
                 path.fill()
+            }
+            
+            // 行番号を更新（この行フラグメントに改行が含まれている場合）
+            if characterRange.location + characterRange.length <= fullText.length {
+                let lineText = fullText.substring(with: characterRange)
+                if lineText.contains("\n") {
+                    let newlineCount = lineText.components(separatedBy: "\n").count - 1
+                    currentLineNumber += newlineCount
+                    // 改行が含まれていたら、ハイライトを終了
+                    if newlineCount > 0 {
+                        isHighlightingLine = false
+                    }
+                }
             }
         }
     }
@@ -578,6 +624,9 @@ class SimpleLineNumberRulerView: NSRulerView {
         // 描画済み行番号を記録（重複描画を防ぐ）
         var drawnLineNumbers = Set<Int>()
         
+        // 最後の空行処理用にインスタンス変数に保存
+        self.drawnLines = drawnLineNumbers
+        
         // 行番号を計算するための初期値
         var currentLineNumber = 1
         if extendedGlyphRange.location > 0 {
@@ -588,6 +637,7 @@ class SimpleLineNumberRulerView: NSRulerView {
         }
         
         // 各行フラグメントに対して処理
+        var previousCharLocation = -1
         context.layoutManager.enumerateLineFragments(
             forGlyphRange: extendedGlyphRange
         ) { lineRect, _, _, glyphRange, _ in
@@ -599,12 +649,23 @@ class SimpleLineNumberRulerView: NSRulerView {
                 lineNumberFont: lineNumberFont,
                 visibleRect: visibleRect,
                 containerOrigin: containerOrigin,
-                textContainerInset: textContainerInset
+                textContainerInset: textContainerInset,
+                previousCharacterLocation: previousCharLocation
             )
             self.drawLineNumber(context: context, params: &params)
             currentLineNumber = params.currentLineNumber
             drawnLineNumbers = params.drawnLineNumbers
+            
+            // 次の反復のために文字位置を更新
+            let characterRange = context.layoutManager.characterRange(
+                forGlyphRange: glyphRange,
+                actualGlyphRange: nil
+            )
+            previousCharLocation = characterRange.location + characterRange.length
         }
+        
+        // 描画済み行番号をインスタンス変数に保存
+        self.drawnLines = drawnLineNumbers
     }
     
     private func calculateInitialLineNumber(
@@ -632,13 +693,29 @@ class SimpleLineNumberRulerView: NSRulerView {
             actualGlyphRange: nil
         )
         
+        // この行フラグメントが論理行の開始かどうかを判定
+        let isNewLogicalLine: Bool
+        if characterRange.location == 0 {
+            // 文書の最初は必ず論理行の開始
+            isNewLogicalLine = true
+        } else if characterRange.location > 0 && characterRange.location <= context.fullText.length {
+            // 直前の文字が改行文字かチェック
+            let previousCharIndex = characterRange.location - 1
+            let previousChar = context.fullText.substring(
+                with: NSRange(location: previousCharIndex, length: 1)
+            )
+            isNewLogicalLine = (previousChar == "\n")
+        } else {
+            isNewLogicalLine = false
+        }
+        
         // Y位置の計算
         let lineY = params.lineRect.origin.y + params.containerOrigin.y - params.visibleRect.origin.y
         
         // 描画範囲内かチェック
         if lineY + self.fixedLineHeight >= -50 && lineY <= context.rect.height + 50 {
-            // 重複描画を防ぐ
-            if !params.drawnLineNumbers.contains(params.currentLineNumber) {
+            // 論理行の開始の場合のみ行番号を描画
+            if isNewLogicalLine && !params.drawnLineNumbers.contains(params.currentLineNumber) {
                 params.drawnLineNumbers.insert(params.currentLineNumber)
                 
                 let lineString = "\(params.currentLineNumber)"
@@ -662,11 +739,13 @@ class SimpleLineNumberRulerView: NSRulerView {
             }
         }
         
-        // 次の行番号を計算（改行文字の数を数える）
+        // 次の行番号を計算（この行フラグメントに改行文字が含まれている場合のみインクリメント）
         if characterRange.location + characterRange.length <= context.fullText.length {
             let lineText = context.fullText.substring(with: characterRange)
-            let newlineCount = lineText.components(separatedBy: "\n").count - 1
-            params.currentLineNumber += max(1, newlineCount)
+            if lineText.contains("\n") {
+                let newlineCount = lineText.components(separatedBy: "\n").count - 1
+                params.currentLineNumber += newlineCount
+            }
         }
     }
     
