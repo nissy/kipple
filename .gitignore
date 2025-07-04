@@ -1,0 +1,81 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+**/.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
+
+# Build directories
+build/
+DerivedData/
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods
+Pods/
+!Podfile
+!Podfile.lock
+
+# Carthage
+Carthage/Build/
+Carthage/Checkouts/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+!Package.swift
+
+# XcodeGen
+!project.yml
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+fastlane/README.md
+
+# Code coverage
+*.xcresult
+*.profraw
+*.profdata
+default.profraw
+
+# Logs
+*.log
+build_output.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+
+# Archives
+*.ipa
+*.app.zip
+*.xcarchive
+
+# Other
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Kipple specific
+# User preferences that shouldn't be shared
+UserDefaults.plist
+
+# Analysis files
+*_analysis.md

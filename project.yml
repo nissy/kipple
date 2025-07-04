@@ -1,0 +1,109 @@
+name: Kipple
+options:
+  bundleIdPrefix: com.nissy
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+  groupSortPosition: bottom
+  developmentLanguage: en
+  usesTabs: false
+  indentWidth: 4
+  tabWidth: 4
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: R7LKF73J2W
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+    PRODUCT_NAME: Kipple
+    MACOSX_DEPLOYMENT_TARGET: 13.0
+    SWIFT_VERSION: 5.9
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    COMBINE_HIDPI_IMAGES: YES
+
+targets:
+  Kipple:
+    type: application
+    platform: macOS
+    sources:
+      - path: Kipple
+        excludes:
+          - "**/.DS_Store"
+          - "**/Thumbs.db"
+          - "Resources/**/*.gitkeep"
+    resources:
+      - path: Kipple/Resources
+        includes:
+          - "**/*.xcassets"
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleName: Kipple
+        INFOPLIST_KEY_CFBundleDisplayName: Kipple
+        INFOPLIST_KEY_NSHumanReadableCopyright: Copyright © 2025 Kipple. All rights reserved.
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_LSUIElement: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.nissy.Kipple
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Kipple/Kipple.entitlements
+        ENABLE_PREVIEWS: YES
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+        Release:
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
+    dependencies: []
+    preBuildScripts: []
+    postBuildScripts: []
+
+  KippleTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: KippleTests
+        includes:
+          - "**/*.swift"
+    dependencies:
+      - target: Kipple
+    settings:
+      base:
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Kipple.app/Contents/MacOS/Kipple
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.nissy.KippleTests
+        PRODUCT_MODULE_NAME: KippleTests
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+
+
+schemes:
+  Kipple:
+    build:
+      targets:
+        Kipple: all
+        KippleTests: [test]
+    run:
+      config: Debug
+      commandLineArguments:
+        "-com.apple.CoreData.SQLDebug 1": false
+    test:
+      config: Debug
+      targets:
+        - KippleTests
+        # UI tests are temporarily disabled due to runner crash
+        # - KippleUITests
+      gatherCoverageData: true
+      coverageTargets:
+        - Kipple
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+      revealArchiveInOrganizer: true
