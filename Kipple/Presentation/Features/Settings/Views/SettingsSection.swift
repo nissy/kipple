@@ -39,7 +39,6 @@ struct SettingsSection<Content: View>: View {
             
             // Content
             content()
-                .padding(.leading, 40)
         }
     }
 }

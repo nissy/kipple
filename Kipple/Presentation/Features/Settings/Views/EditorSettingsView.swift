@@ -15,20 +15,20 @@ struct EditorSettingsView: View {
     @State private var tempClearModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     
     var body: some View {
-        VStack(spacing: 14) {
-            // Font Settings for Editor
-            SimpleFontSettingsView()
-            
-            Divider()
-            
-            // Editor Copy Hotkey Settings - Matching Editor Insert UI style
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Editor Copy Hotkey", systemImage: "doc.on.doc")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Font Settings
+                SimpleFontSettingsView()
                 
-                Toggle("Enable editor copy hotkey", isOn: $appSettings.enableEditorCopyHotkey)
-                    .toggleStyle(SwitchToggleStyle())
+                Divider()
+                
+                // Editor Copy Hotkey
+                SettingsGroup("Editor Copy Hotkey") {
+                    SettingsRow(
+                        label: "Enable editor copy hotkey",
+                        description: "Quickly copy editor content to clipboard",
+                        isOn: $appSettings.enableEditorCopyHotkey
+                    )
                     .onChange(of: appSettings.enableEditorCopyHotkey) { newValue in
                         NotificationCenter.default.post(
                             name: NSNotification.Name("EditorCopyHotkeySettingsChanged"),
@@ -36,39 +36,28 @@ struct EditorSettingsView: View {
                             userInfo: ["enabled": newValue]
                         )
                     }
-                
-                HStack {
-                    Text("Copy editor content:")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
                     
-                    HotkeyRecorderField(
-                        keyCode: $tempCopyKeyCode,
-                        modifierFlags: $tempCopyModifierFlags
-                    )
-                    .disabled(!appSettings.enableEditorCopyHotkey)
-                    .opacity(appSettings.enableEditorCopyHotkey ? 1.0 : 0.5)
-                    .onChange(of: tempCopyKeyCode) { _ in updateCopyHotkey() }
-                    .onChange(of: tempCopyModifierFlags) { _ in updateCopyHotkey() }
+                    SettingsRow(label: "Copy editor content") {
+                        HotkeyRecorderField(
+                            keyCode: $tempCopyKeyCode,
+                            modifierFlags: $tempCopyModifierFlags
+                        )
+                        .disabled(!appSettings.enableEditorCopyHotkey)
+                        .opacity(appSettings.enableEditorCopyHotkey ? 1.0 : 0.5)
+                        .onChange(of: tempCopyKeyCode) { _ in updateCopyHotkey() }
+                        .onChange(of: tempCopyModifierFlags) { _ in updateCopyHotkey() }
+                    }
                 }
-                .padding(.leading, 20)
                 
-                Text("Quickly copy editor content to clipboard")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 20)
-            }
-            
-            Divider()
-            
-            // Editor Clear Hotkey Settings - Matching Editor Insert UI style
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Editor Clear Hotkey", systemImage: "trash")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
+                Divider()
                 
-                Toggle("Enable editor clear hotkey", isOn: $appSettings.enableEditorClearHotkey)
-                    .toggleStyle(SwitchToggleStyle())
+                // Editor Clear Hotkey
+                SettingsGroup("Editor Clear Hotkey") {
+                    SettingsRow(
+                        label: "Enable editor clear hotkey",
+                        description: "Quickly clear editor content",
+                        isOn: $appSettings.enableEditorClearHotkey
+                    )
                     .onChange(of: appSettings.enableEditorClearHotkey) { newValue in
                         NotificationCenter.default.post(
                             name: NSNotification.Name("EditorClearHotkeySettingsChanged"),
@@ -76,30 +65,23 @@ struct EditorSettingsView: View {
                             userInfo: ["enabled": newValue]
                         )
                     }
-                
-                HStack {
-                    Text("Clear editor content:")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
                     
-                    HotkeyRecorderField(
-                        keyCode: $tempClearKeyCode,
-                        modifierFlags: $tempClearModifierFlags
-                    )
-                    .disabled(!appSettings.enableEditorClearHotkey)
-                    .opacity(appSettings.enableEditorClearHotkey ? 1.0 : 0.5)
-                    .onChange(of: tempClearKeyCode) { _ in updateClearHotkey() }
-                    .onChange(of: tempClearModifierFlags) { _ in updateClearHotkey() }
+                    SettingsRow(label: "Clear editor content") {
+                        HotkeyRecorderField(
+                            keyCode: $tempClearKeyCode,
+                            modifierFlags: $tempClearModifierFlags
+                        )
+                        .disabled(!appSettings.enableEditorClearHotkey)
+                        .opacity(appSettings.enableEditorClearHotkey ? 1.0 : 0.5)
+                        .onChange(of: tempClearKeyCode) { _ in updateClearHotkey() }
+                        .onChange(of: tempClearModifierFlags) { _ in updateClearHotkey() }
+                    }
                 }
-                .padding(.leading, 20)
                 
-                Text("Quickly clear editor content")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 20)
+                Spacer()
             }
-            
-            Spacer()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
         .onAppear {
             tempCopyKeyCode = UInt16(appSettings.editorCopyHotkeyKeyCode)

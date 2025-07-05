@@ -12,49 +12,38 @@ struct ClipboardFontSettingsView: View {
     @ObservedObject var fontManager = FontManager.shared
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("History Font Settings")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        SettingsGroup("History Font") {
+            SettingsRow(label: "Font") {
+                SearchableFontPicker(selectedFont: fontNameBinding)
+                    .frame(width: 200)
+            }
             
-            // Font Settings
-            VStack(alignment: .leading, spacing: 16) {
-                // Font Family
+            SettingsRow(label: "Fallback font") {
+                SearchableFontPicker(selectedFont: fallbackFontBinding, includeNone: true)
+                    .frame(width: 200)
+            }
+            
+            SettingsRow(label: "Font size") {
                 HStack {
-                    Text("Font:")
-                        .frame(width: 80, alignment: .trailing)
-                    
-                    SearchableFontPicker(selectedFont: fontNameBinding)
-                }
-                
-                // Fallback Font
-                HStack {
-                    Text("Fallback:")
-                        .frame(width: 80, alignment: .trailing)
-                    
-                    SearchableFontPicker(selectedFont: fallbackFontBinding, includeNone: true)
-                }
-                
-                // Font Size
-                HStack {
-                    Text("Size:")
-                        .frame(width: 80, alignment: .trailing)
-                    
                     TextField("", value: fontSizeBinding, formatter: NumberFormatter())
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
+                        .frame(width: 50)
                     
                     Stepper("", value: fontSizeBinding, in: 10...24, step: 1)
                         .labelsHidden()
+                    
+                    Text("pt")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                 }
             }
             
             Divider()
+                .padding(.vertical, 8)
             
             // Preview
             VStack(alignment: .leading, spacing: 8) {
-                Text("Preview:")
+                Text("Preview")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
                 
@@ -109,21 +98,5 @@ struct ClipboardFontSettingsView: View {
         } else {
             return Font.custom(fontName, size: fontSize)
         }
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func availableMonospacedFonts() -> [String] {
-        FontManager.availableMonospacedFonts()
-    }
-    
-    private func availableFallbackFonts() -> [String] {
-        // Filter out the currently selected primary font
-        let primaryFont = fontManager.historySettings.primaryFontName
-        return FontManager.availableMonospacedFonts().filter { $0 != primaryFont }
-    }
-    
-    private func fontDisplayName(for fontName: String) -> String {
-        return FontNameMappings.displayName(for: fontName)
     }
 }

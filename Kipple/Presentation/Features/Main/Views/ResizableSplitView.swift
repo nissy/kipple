@@ -43,14 +43,14 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
                     // Background area
                     Rectangle()
                         .fill(Color(NSColor.windowBackgroundColor))
-                        .frame(height: 12)
+                        .frame(height: 16)  // 高さを少し増やす
                     
-                    // Visual handle
-                    HStack(spacing: 4) {
+                    // Visual handle - 中央に配置
+                    HStack(spacing: 3) {
                         ForEach(0..<3) { _ in
                             Circle()
-                                .fill(isDragging ? Color.accentColor : Color.gray.opacity(0.3))
-                                .frame(width: 4, height: 4)
+                                .fill(isDragging ? Color.accentColor : Color.gray.opacity(0.4))
+                                .frame(width: 5, height: 5)  // サイズを少し大きく
                         }
                     }
                     .scaleEffect(isDragging ? 1.2 : 1.0)
@@ -69,7 +69,7 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
                             .onChanged { value in
                                 isDragging = true
                                 let newHeight = topHeight + Double(value.translation.height)
-                                let availableHeight = Double(geometry.size.height) - 12 // ハンドルの高さを引く
+                                let availableHeight = Double(geometry.size.height) - 16 // ハンドルの高さを引く
                                 
                                 // 制約をチェック
                                 if newHeight >= minTopHeight && 
