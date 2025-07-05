@@ -24,228 +24,101 @@ struct DataSettingsView: View {
     private let clipboardService = ClipboardService.shared
     
     var body: some View {
-        VStack(spacing: 14) {
-            // Font Settings
-            ClipboardFontSettingsView()
-            
-            Divider()
-                .padding(.vertical, 8)
-            
-            // Category Filter Settings Section
-            SettingsSection(
-                icon: "tag.fill",
-                iconColor: .blue,
-                title: "Category Filter Settings"
-            ) {
-                VStack(spacing: 14) {
-                    Text("Choose which categories can be filtered in the history view")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    VStack(spacing: 10) {
-                        // URL Filter Toggle
-                        Toggle(isOn: $filterCategoryURL) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.url.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.blue)
-                                    .frame(width: 20)
-                                Text("URL")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        
-                        // Email Filter Toggle
-                        Toggle(isOn: $filterCategoryEmail) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.email.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.green)
-                                    .frame(width: 20)
-                                Text("Email")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        
-                        // Code Filter Toggle
-                        Toggle(isOn: $filterCategoryCode) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.code.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.purple)
-                                    .frame(width: 20)
-                                Text("Code")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        
-                        // File Path Filter Toggle
-                        Toggle(isOn: $filterCategoryFilePath) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.filePath.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.orange)
-                                    .frame(width: 20)
-                                Text("File Path")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        
-                        // Short Text Filter Toggle
-                        Toggle(isOn: $filterCategoryShortText) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.shortText.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.orange)
-                                    .frame(width: 20)
-                                Text("Short Text")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        
-                        // Long Text Filter Toggle
-                        Toggle(isOn: $filterCategoryLongText) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.longText.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.indigo)
-                                    .frame(width: 20)
-                                Text("Long Text")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                        
-                        // General Filter Toggle
-                        Toggle(isOn: $filterCategoryGeneral) {
-                            HStack(spacing: 8) {
-                                Image(systemName: ClipItemCategory.general.icon)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.gray)
-                                    .frame(width: 20)
-                                Text("General")
-                                    .font(.system(size: 12))
-                                Spacer()
-                            }
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
-                    }
-                }
-            }
-            
-            Divider()
-                .padding(.vertical, 8)
-            
-            // Storage Limits Section
-            SettingsSection(
-                icon: "externaldrive",
-                iconColor: .orange,
-                title: "Storage Limits"
-            ) {
-                VStack(spacing: 14) {
-                    // Maximum history items
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Font Settings
+                ClipboardFontSettingsView()
+                
+                // Category Filter Settings Section
+                SettingsGroup("Category Filter Settings") {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Maximum History Items:")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.primary)
-                            
-                            TextField(
-                                "",
-                                value: Binding(
-                                    get: { Double(maxHistoryItems) },
-                                    set: { maxHistoryItems = Int($0) }
-                                ),
-                                formatter: NumberFormatter()
-                            )
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 80)
-                            
-                            Stepper(
-                                "",
-                                value: Binding(
-                                    get: { Double(maxHistoryItems) },
-                                    set: { maxHistoryItems = Int($0) }
-                                ),
-                                in: 10...1000,
-                                step: 10
-                            )
-                                .labelsHidden()
-                            
-                            Spacer()
-                        }
-                        
-                        Text("Maximum number of clipboard history items to keep")
+                        Text("Choose which categories can be filtered in the history view")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
-                    }
-                    
-                    // Maximum pinned items
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Maximum Pinned Items:")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.primary)
-                            
-                            TextField(
-                                "",
-                                value: Binding(
-                                    get: { Double(maxPinnedItems) },
-                                    set: { maxPinnedItems = Int($0) }
-                                ),
-                                formatter: NumberFormatter()
-                            )
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 80)
-                            
-                            Stepper(
-                                "",
-                                value: Binding(
-                                    get: { Double(maxPinnedItems) },
-                                    set: { maxPinnedItems = Int($0) }
-                                ),
-                                in: 1...100,
-                                step: 1
-                            )
-                                .labelsHidden()
-                            
-                            Spacer()
-                        }
+                            .padding(.bottom, 8)
                         
-                        Text("Maximum number of items that can be pinned")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                        VStack(spacing: 0) {
+                            SettingsRow(label: "URL", isOn: $filterCategoryURL)
+                            SettingsRow(label: "Email", isOn: $filterCategoryEmail)
+                            SettingsRow(label: "Code", isOn: $filterCategoryCode)
+                            SettingsRow(label: "File Path", isOn: $filterCategoryFilePath)
+                            SettingsRow(label: "Short Text", isOn: $filterCategoryShortText)
+                            SettingsRow(label: "Long Text", isOn: $filterCategoryLongText)
+                            SettingsRow(label: "General", isOn: $filterCategoryGeneral)
+                        }
                     }
                 }
-            }
-            
-            Divider()
-                .padding(.vertical, 8)
-            
-            // Data Management Section
-            SettingsSection(
-                icon: "trash",
-                iconColor: .red,
-                title: "Data Management"
-            ) {
-                VStack(spacing: 14) {
-                    // Clear History
+                
+                // Storage Limits Section
+                SettingsGroup("Storage Limits") {
+                    VStack(spacing: 0) {
+                        SettingsRow(
+                            label: "Maximum History Items",
+                            description: "Maximum number of clipboard history items to keep"
+                        ) {
+                            HStack {
+                                TextField(
+                                    "",
+                                    value: Binding(
+                                        get: { Double(maxHistoryItems) },
+                                        set: { maxHistoryItems = Int($0) }
+                                    ),
+                                    formatter: NumberFormatter()
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 80)
+                                
+                                Stepper(
+                                    "",
+                                    value: Binding(
+                                        get: { Double(maxHistoryItems) },
+                                        set: { maxHistoryItems = Int($0) }
+                                    ),
+                                    in: 10...1000,
+                                    step: 10
+                                )
+                                .labelsHidden()
+                            }
+                        }
+                        
+                        SettingsRow(
+                            label: "Maximum Pinned Items",
+                            description: "Maximum number of items that can be pinned"
+                        ) {
+                            HStack {
+                                TextField(
+                                    "",
+                                    value: Binding(
+                                        get: { Double(maxPinnedItems) },
+                                        set: { maxPinnedItems = Int($0) }
+                                    ),
+                                    formatter: NumberFormatter()
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 80)
+                                
+                                Stepper(
+                                    "",
+                                    value: Binding(
+                                        get: { Double(maxPinnedItems) },
+                                        set: { maxPinnedItems = Int($0) }
+                                    ),
+                                    in: 1...100,
+                                    step: 1
+                                )
+                                .labelsHidden()
+                            }
+                        }
+                    }
+                }
+                
+                // Data Management Section
+                SettingsGroup("Data Management") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Clear Clipboard History")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.primary)
+                        Text("Permanently remove all clipboard history items")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 8)
                         
                         HStack {
                             Button(action: {
@@ -292,15 +165,10 @@ struct DataSettingsView: View {
                                 }
                             }
                         }
-                        
-                        Text("Permanently remove all clipboard history items")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
                     }
                 }
             }
-            
-            Spacer()
+            .padding(20)
         }
         .alert("Clear Clipboard History?", isPresented: $showClearHistoryAlert) {
             Button("Cancel", role: .cancel) { }

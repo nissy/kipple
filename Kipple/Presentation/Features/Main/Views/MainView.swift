@@ -209,14 +209,6 @@ struct MainView: View {
         .safeAreaInset(edge: .bottom) {
             // 設定アイコンを下部に配置（ピンアイテムと重ならないように）
             VStack(spacing: 0) {
-                // Gradient divider
-                Rectangle()
-                    .fill(LinearGradient(
-                        colors: [Color.clear, Color.gray.opacity(0.2), Color.clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ))
-                    .frame(height: 1)
                 
                 HStack {
                     Spacer()

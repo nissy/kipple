@@ -78,27 +78,27 @@ struct SettingsView: View {
     
     // MARK: - Content Area
     private var contentArea: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Content Header
-                HStack {
-                    Image(systemName: viewModel.tabIcon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(viewModel.tabColor)
-                    
-                    Text(viewModel.tabTitle)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                }
-                .padding(.bottom, 8)
+        VStack(alignment: .leading, spacing: 0) {
+            // Content Header
+            HStack {
+                Image(systemName: viewModel.tabIcon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(viewModel.tabColor)
                 
-                // Tab Content
-                tabContent
+                Text(viewModel.tabTitle)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.primary)
+                
+                Spacer()
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            
+            Divider()
+            
+            // Tab Content
+            tabContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color(NSColor.windowBackgroundColor))
     }
