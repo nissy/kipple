@@ -263,10 +263,17 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         }
     }
     
-    private func getActiveAppInfo() -> (appName: String?, windowTitle: String?, bundleId: String?, pid: Int32?) {
+    private struct AppInfo {
+        let appName: String?
+        let windowTitle: String?
+        let bundleId: String?
+        let pid: Int32?
+    }
+    
+    private func getActiveAppInfo() -> AppInfo {
         // フロントモストアプリケーションを取得
         guard let frontApp = NSWorkspace.shared.frontmostApplication else {
-            return (nil, nil, nil, nil)
+            return AppInfo(appName: nil, windowTitle: nil, bundleId: nil, pid: nil)
         }
         
         let appName = frontApp.localizedName
@@ -279,7 +286,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             windowTitle = getWindowTitle(for: bundleId, processId: pid)
         }
         
-        return (appName, windowTitle, bundleId, pid)
+        return AppInfo(appName: appName, windowTitle: windowTitle, bundleId: bundleId, pid: pid)
     }
     
     private func getWindowTitle(for bundleId: String, processId: Int32) -> String? {
@@ -293,9 +300,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         var value: AnyObject?
         let result = AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value)
         
-        if result == .success, let window = value {
+        if result == .success, let window = value as? AXUIElement {
             var titleValue: AnyObject?
-            let titleResult = AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &titleValue)
+            let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
             
             if titleResult == .success, let title = titleValue as? String {
                 return title

@@ -80,7 +80,11 @@ struct MainView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.top, 12)
                             
-                            ForEach([ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general].filter { isCategoryFilterEnabled($0) }, id: \.self) { category in
+                            ForEach(
+                                [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general]
+                                    .filter { isCategoryFilterEnabled($0) },
+                                id: \.self
+                            ) { category in
                                 Button(action: {
                                     withAnimation(.spring(response: 0.3)) {
                                         viewModel.toggleCategoryFilter(category)
