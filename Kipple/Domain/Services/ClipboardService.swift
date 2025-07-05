@@ -300,7 +300,12 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         var value: AnyObject?
         let result = AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value)
         
-        if result == .success, let window = value as? AXUIElement {
+        if result == .success, let windowValue = value {
+            // CFTypeIDを使用して安全にキャスト
+            guard CFGetTypeID(windowValue) == AXUIElementGetTypeID() else {
+                return nil
+            }
+            let window = unsafeBitCast(windowValue, to: AXUIElement.self)
             var titleValue: AnyObject?
             let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
             

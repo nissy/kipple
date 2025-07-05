@@ -182,12 +182,9 @@ struct MainViewPinnedSection: View {
                                 withAnimation(.spring(response: 0.3)) {
                                     onDelete?(item)
                                 }
-                            } : nil
-                        )                            {
-                                withAnimation(.spring(response: 0.3)) {
-                                    onCategoryFilter?(item.category)
-                                }
-                            }
+                            } : nil,
+                            onCategoryTap: nil // カテゴリタップは無効化
+                        )
                         .onDrag {
                             NSItemProvider(object: item.id.uuidString as NSString)
                         }

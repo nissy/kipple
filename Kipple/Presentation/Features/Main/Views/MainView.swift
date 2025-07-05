@@ -153,8 +153,7 @@ struct MainView: View {
                                             onCategoryFilter: { category in
                                                 viewModel.toggleCategoryFilter(category)
                                             },
-                                            selectedCategory: $viewModel.selectedCategory,
-                                            showCategoryPanel: false
+                                            selectedCategory: $viewModel.selectedCategory
                                         )
                                         .id(historyRefreshID)
                                     },
@@ -193,8 +192,7 @@ struct MainView: View {
                                     onCategoryFilter: { category in
                                         viewModel.toggleCategoryFilter(category)
                                     },
-                                    selectedCategory: $viewModel.selectedCategory,
-                                    showCategoryPanel: false
+                                    selectedCategory: $viewModel.selectedCategory
                                 )
                                 .id(historyRefreshID)
                             }

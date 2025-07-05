@@ -21,74 +21,12 @@ struct MainViewHistorySection: View {
     let onDelete: ((ClipItem) -> Void)?
     let onCategoryFilter: ((ClipItemCategory) -> Void)?
     @Binding var selectedCategory: ClipItemCategory?
-    var showCategoryPanel: Bool = true
-    
-    @ObservedObject private var appSettings = AppSettings.shared
-    private let categories: [ClipItemCategory] = [.url, .email, .code, .filePath, .shortText, .longText, .general]
     
     var body: some View {
         let filteredHistory = debouncedSearchText.isEmpty ? history : 
             history.filter { $0.content.localizedCaseInsensitiveContains(debouncedSearchText) }
         
-        return HStack(spacing: 0) {
-            // カテゴリフィルターパネル
-            if showCategoryPanel {
-                VStack(spacing: 8) {
-                Text("Category")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
-                    .padding(.top, 12)
-                
-                ForEach(categories.filter { isCategoryFilterEnabled($0) }, id: \.self) { category in
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3)) {
-                            onCategoryFilter?(category)
-                        }
-                    }) {
-                        VStack(spacing: 4) {
-                            ZStack {
-                                Circle()
-                                    .fill(selectedCategory == category ? 
-                                        Color.accentColor : 
-                                        Color.secondary.opacity(0.1))
-                                    .frame(width: 36, height: 36)
-                                    .shadow(
-                                        color: selectedCategory == category ? 
-                                            Color.accentColor.opacity(0.3) : .clear,
-                                        radius: 4,
-                                        y: 2
-                                    )
-                                
-                                Image(systemName: category.icon)
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(selectedCategory == category ? 
-                                        .white : .secondary)
-                            }
-                            
-                            Text(category.rawValue)
-                                .font(.system(size: 10))
-                                .foregroundColor(selectedCategory == category ? 
-                                    .primary : .secondary)
-                                .lineLimit(1)
-                        }
-                        .frame(width: 60)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .scaleEffect(selectedCategory == category ? 1.05 : 1.0)
-                    .animation(.spring(response: 0.3), value: selectedCategory)
-                }
-                
-                Spacer()
-                }
-                .frame(width: 80)
-                .padding(.vertical, 8)
-                .background(
-                    Color(NSColor.controlBackgroundColor).opacity(0.5)
-                )
-            }
-            
-            // 既存の履歴セクション
-            VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             // ヘッダー
             HStack(spacing: 10) {
                 // Icon with gradient background
@@ -283,7 +221,6 @@ struct MainViewHistorySection: View {
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.3)
                 )
-            }
         }
         .onChange(of: searchText) { newValue in
             // 検索テキストの変更をデバウンス（パフォーマンス最適化）
@@ -293,25 +230,6 @@ struct MainViewHistorySection: View {
                 .sink { value in
                     debouncedSearchText = value
                 }
-        }
-    }
-    
-    private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
-        switch category {
-        case .url:
-            return appSettings.filterCategoryURL
-        case .email:
-            return appSettings.filterCategoryEmail
-        case .code:
-            return appSettings.filterCategoryCode
-        case .filePath:
-            return appSettings.filterCategoryFilePath
-        case .shortText:
-            return appSettings.filterCategoryShortText
-        case .longText:
-            return appSettings.filterCategoryLongText
-        case .general:
-            return appSettings.filterCategoryGeneral
         }
     }
 }
