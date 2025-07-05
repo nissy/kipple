@@ -60,24 +60,28 @@ struct SimpleLineNumberView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         
-        // フォントを更新
-        textView.font = font
+        // テキストが変更された場合のみ更新
+        if textView.string != text {
+            textView.string = text
+        }
         
-        // 段落スタイルを設定
-        let lineHeight = calculateFixedLineHeight(for: font)
-        let paragraphStyle = createParagraphStyle(lineHeight: lineHeight)
-        context.coordinator.paragraphStyle = paragraphStyle
-        
-        // テキストビューに適用
-        applyParagraphStyle(
-            to: textView,
-            paragraphStyle: paragraphStyle,
-            text: text,
-            font: font
-        )
-        
-        // 行番号ビューを更新
-        updateLineNumberView(scrollView: scrollView, lineHeight: lineHeight)
+        // フォントが変更された場合のみ更新
+        if textView.font != font {
+            textView.font = font
+            
+            let lineHeight = calculateFixedLineHeight(for: font)
+            let paragraphStyle = createParagraphStyle(lineHeight: lineHeight)
+            context.coordinator.paragraphStyle = paragraphStyle
+            
+            applyParagraphStyle(
+                to: textView,
+                paragraphStyle: paragraphStyle,
+                text: text,
+                font: font
+            )
+            
+            updateLineNumberView(scrollView: scrollView, lineHeight: lineHeight)
+        }
     }
     
     private func createParagraphStyle(lineHeight: CGFloat) -> NSMutableParagraphStyle {
@@ -203,6 +207,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         var paragraphStyle = NSMutableParagraphStyle()
         var fontManager: FontManager?
         private var notificationObserver: NSObjectProtocol?
+        private var lastSelectedLine: Int = 1
         
         init(_ parent: SimpleLineNumberView) {
             self.parent = parent
@@ -261,37 +266,30 @@ struct SimpleLineNumberView: NSViewRepresentable {
             }
             
             parent.text = textView.string
-            
-            // 日本語対応の段落スタイルを維持
-            let font = textView.font ?? NSFont.systemFont(ofSize: 14)
-            let lineHeight = calculateFixedLineHeight(for: font)
-            let paragraphStyle = parent.createParagraphStyle(lineHeight: lineHeight)
-            
-            if !textView.string.isEmpty {
-                let range = NSRange(location: 0, length: textView.string.count)
-                textView.textStorage?.beginEditing()
-                textView.textStorage?.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
-                textView.textStorage?.endEditing()
-            }
-            
-            // デフォルトスタイルも更新
-            textView.defaultParagraphStyle = paragraphStyle
-            self.paragraphStyle = paragraphStyle
-            
-            // タイピング属性も維持
-            textView.typingAttributes = [
-                .font: font,
-                .paragraphStyle: paragraphStyle,
-                .foregroundColor: NSColor.labelColor
-            ]
-            
-            // 行番号を更新
-            scrollView?.verticalRulerView?.needsDisplay = true
         }
         
         func textViewDidChangeSelection(_ notification: Notification) {
-            // 選択範囲が変更されたときに行番号エリアを再描画
-            scrollView?.verticalRulerView?.needsDisplay = true
+            // 選択行が変わった場合のみ行番号エリアを再描画
+            guard let textView = notification.object as? NSTextView else { return }
+            let newLine = calculateSelectedLineNumber(textView: textView)
+            if newLine != lastSelectedLine {
+                lastSelectedLine = newLine
+                scrollView?.verticalRulerView?.needsDisplay = true
+            }
+        }
+        
+        private func calculateSelectedLineNumber(textView: NSTextView) -> Int {
+            let selectedRange = textView.selectedRange()
+            if selectedRange.location == 0 {
+                return 1
+            }
+            let textBeforeSelection = (textView.string as NSString).substring(to: min(selectedRange.location, textView.string.count))
+            return textBeforeSelection.components(separatedBy: "\n").count
+        }
+        
+        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            // デフォルトの動作を維持
+            return true
         }
         
         // MARK: - NSLayoutManagerDelegate
