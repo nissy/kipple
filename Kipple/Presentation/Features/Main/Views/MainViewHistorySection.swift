@@ -51,32 +51,6 @@ struct MainViewHistorySection: View {
                 
                 Spacer()
                 
-                // フィルタ表示
-                if let category = selectedCategory {
-                    HStack(spacing: 4) {
-                        Image(systemName: category.icon)
-                            .font(.system(size: 10))
-                        Text(category.rawValue)
-                            .font(.system(size: 11, weight: .medium))
-                        
-                        Button(action: {
-                            onCategoryFilter?(category)
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule()
-                            .fill(Color.accentColor)
-                    )
-                    .transition(.scale.combined(with: .opacity))
-                }
-                
                 // 履歴数を表示
                 if !history.isEmpty {
                     Text("\(history.count)")
