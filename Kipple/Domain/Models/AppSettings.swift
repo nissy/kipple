@@ -47,6 +47,15 @@ final class AppSettings: ObservableObject {
     // Launch Settings
     @AppStorage("autoLaunchAtLogin") var autoLaunchAtLogin: Bool = false
     
+    // Category Filter Settings
+    @AppStorage("filterCategoryURL") var filterCategoryURL: Bool = true
+    @AppStorage("filterCategoryEmail") var filterCategoryEmail: Bool = true
+    @AppStorage("filterCategoryCode") var filterCategoryCode: Bool = true
+    @AppStorage("filterCategoryFilePath") var filterCategoryFilePath: Bool = true
+    @AppStorage("filterCategoryShortText") var filterCategoryShortText: Bool = true
+    @AppStorage("filterCategoryLongText") var filterCategoryLongText: Bool = true
+    @AppStorage("filterCategoryGeneral") var filterCategoryGeneral: Bool = true
+    
     private init() {}
     
     // Settings Keys for consistency
@@ -70,5 +79,12 @@ final class AppSettings: ObservableObject {
         static let editorClearHotkeyKeyCode = "editorClearHotkeyKeyCode"
         static let editorClearHotkeyModifierFlags = "editorClearHotkeyModifierFlags"
         static let launchAtLogin = "launchAtLogin"
+        static let filterCategoryURL = "filterCategoryURL"
+        static let filterCategoryEmail = "filterCategoryEmail"
+        static let filterCategoryCode = "filterCategoryCode"
+        static let filterCategoryFilePath = "filterCategoryFilePath"
+        static let filterCategoryShortText = "filterCategoryShortText"
+        static let filterCategoryLongText = "filterCategoryLongText"
+        static let filterCategoryGeneral = "filterCategoryGeneral"
     }
 }

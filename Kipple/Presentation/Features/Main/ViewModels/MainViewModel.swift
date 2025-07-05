@@ -19,11 +19,12 @@ class MainViewModel: ObservableObject {
     
     private let saveDebouncer = PassthroughSubject<String, Never>()
     
-    private let clipboardService: ClipboardServiceProtocol
+    let clipboardService: ClipboardServiceProtocol
     private var cancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
     @Published var pinnedItems: [ClipItem] = []
+    @Published var selectedCategory: ClipItemCategory?
     
     init(clipboardService: ClipboardServiceProtocol = ClipboardService.shared) {
         // 保存されたエディタテキストを読み込む（なければ空文字）
@@ -68,11 +69,21 @@ class MainViewModel: ObservableObject {
         updateFilteredItems(clipboardService.history)
     }
     
-    private func updateFilteredItems(_ items: [ClipItem]) {
+    func updateFilteredItems(_ items: [ClipItem]) {
         // 変更がない場合は早期リターン（パフォーマンス最適化）
         if items.isEmpty && history.isEmpty && pinnedItems.isEmpty {
             return
         }
+        
+        // UserDefaultsから設定を直接取得（デフォルトtrue）
+        let defaults = UserDefaults.standard
+        let filterCategoryURL = defaults.object(forKey: "filterCategoryURL") as? Bool ?? true
+        let filterCategoryEmail = defaults.object(forKey: "filterCategoryEmail") as? Bool ?? true
+        let filterCategoryCode = defaults.object(forKey: "filterCategoryCode") as? Bool ?? true
+        let filterCategoryFilePath = defaults.object(forKey: "filterCategoryFilePath") as? Bool ?? true
+        let filterCategoryShortText = defaults.object(forKey: "filterCategoryShortText") as? Bool ?? true
+        let filterCategoryLongText = defaults.object(forKey: "filterCategoryLongText") as? Bool ?? true
+        let filterCategoryGeneral = defaults.object(forKey: "filterCategoryGeneral") as? Bool ?? true
         
         // 1回のループで分類（パフォーマンス最適化）
         var unpinnedItems: [ClipItem] = []
@@ -81,6 +92,33 @@ class MainViewModel: ObservableObject {
         pinnedItems.reserveCapacity(min(items.count, 10))
         
         for item in items {
+            // カテゴリフィルタ（すべてのアイテムに適用）
+            if let selectedCategory = selectedCategory {
+                var shouldFilter = false
+                
+                switch selectedCategory {
+                case .url:
+                    shouldFilter = filterCategoryURL
+                case .email:
+                    shouldFilter = filterCategoryEmail
+                case .code:
+                    shouldFilter = filterCategoryCode
+                case .filePath:
+                    shouldFilter = filterCategoryFilePath
+                case .shortText:
+                    shouldFilter = filterCategoryShortText
+                case .longText:
+                    shouldFilter = filterCategoryLongText
+                case .general:
+                    shouldFilter = filterCategoryGeneral
+                }
+                
+                if shouldFilter && item.category != selectedCategory {
+                    continue
+                }
+            }
+            
+            // フィルタを通過したアイテムを振り分け
             if item.isPinned {
                 pinnedItems.append(item)
             } else {
@@ -160,5 +198,16 @@ class MainViewModel: ObservableObject {
         } else {
             clipboardService.copyToClipboard(item.content, fromEditor: false)
         }
+    }
+    
+    /// カテゴリフィルタの切り替え
+    func toggleCategoryFilter(_ category: ClipItemCategory) {
+        if selectedCategory == category {
+            selectedCategory = nil
+        } else {
+            selectedCategory = category
+        }
+        // フィルタを適用
+        updateFilteredItems(clipboardService.history)
     }
 }

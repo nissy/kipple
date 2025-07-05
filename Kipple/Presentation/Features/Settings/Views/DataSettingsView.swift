@@ -10,6 +10,13 @@ import SwiftUI
 struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 100
     @AppStorage("maxPinnedItems") private var maxPinnedItems = 10
+    @AppStorage("filterCategoryURL") private var filterCategoryURL = true
+    @AppStorage("filterCategoryEmail") private var filterCategoryEmail = true
+    @AppStorage("filterCategoryCode") private var filterCategoryCode = true
+    @AppStorage("filterCategoryFilePath") private var filterCategoryFilePath = true
+    @AppStorage("filterCategoryShortText") private var filterCategoryShortText = true
+    @AppStorage("filterCategoryLongText") private var filterCategoryLongText = true
+    @AppStorage("filterCategoryGeneral") private var filterCategoryGeneral = true
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
@@ -20,6 +27,123 @@ struct DataSettingsView: View {
         VStack(spacing: 14) {
             // Font Settings
             ClipboardFontSettingsView()
+            
+            Divider()
+                .padding(.vertical, 8)
+            
+            // Category Filter Settings Section
+            SettingsSection(
+                icon: "tag.fill",
+                iconColor: .blue,
+                title: "Category Filter Settings"
+            ) {
+                VStack(spacing: 14) {
+                    Text("Choose which categories can be filtered in the history view")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    VStack(spacing: 10) {
+                        // URL Filter Toggle
+                        Toggle(isOn: $filterCategoryURL) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.url.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text("URL")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        
+                        // Email Filter Toggle
+                        Toggle(isOn: $filterCategoryEmail) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.email.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.green)
+                                    .frame(width: 20)
+                                Text("Email")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        
+                        // Code Filter Toggle
+                        Toggle(isOn: $filterCategoryCode) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.code.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.purple)
+                                    .frame(width: 20)
+                                Text("Code")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        
+                        // File Path Filter Toggle
+                        Toggle(isOn: $filterCategoryFilePath) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.filePath.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.orange)
+                                    .frame(width: 20)
+                                Text("File Path")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        
+                        // Short Text Filter Toggle
+                        Toggle(isOn: $filterCategoryShortText) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.shortText.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.orange)
+                                    .frame(width: 20)
+                                Text("Short Text")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        
+                        // Long Text Filter Toggle
+                        Toggle(isOn: $filterCategoryLongText) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.longText.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.indigo)
+                                    .frame(width: 20)
+                                Text("Long Text")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                        
+                        // General Filter Toggle
+                        Toggle(isOn: $filterCategoryGeneral) {
+                            HStack(spacing: 8) {
+                                Image(systemName: ClipItemCategory.general.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 20)
+                                Text("General")
+                                    .font(.system(size: 12))
+                                Spacer()
+                            }
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .accentColor))
+                    }
+                }
+            }
             
             Divider()
                 .padding(.vertical, 8)

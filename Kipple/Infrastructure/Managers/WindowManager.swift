@@ -242,6 +242,13 @@ final class WindowManager: NSObject {
         mainWindow = nil
         isAlwaysOnTop = false
         removeMainWindowObservers()
+        
+        // ウィンドウクローズ時にカテゴリフィルタをリセット
+        if let viewModel = mainViewModel {
+            viewModel.selectedCategory = nil
+            // フィルタ解除後に履歴を再更新
+            viewModel.updateFilteredItems(viewModel.clipboardService.history)
+        }
     }
     
     // MARK: - Public Methods

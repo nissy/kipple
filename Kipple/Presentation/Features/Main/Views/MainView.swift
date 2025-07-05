@@ -72,12 +72,109 @@ struct MainView: View {
                     .id(editorRefreshID) // エディタセクションの部分更新用
                 },
                 bottomContent: {
-                    if !viewModel.pinnedItems.isEmpty {
-                        ResizableSplitView(
-                            topHeight: $historySectionHeight,
-                            minTopHeight: 100,
-                            minBottomHeight: 80,
-                            topContent: {
+                    HStack(spacing: 0) {
+                        // カテゴリフィルターパネル
+                        VStack(spacing: 8) {
+                            Text("Filter")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.secondary)
+                                .padding(.top, 12)
+                            
+                            ForEach([ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general].filter { isCategoryFilterEnabled($0) }, id: \.self) { category in
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        viewModel.toggleCategoryFilter(category)
+                                    }
+                                }) {
+                                    VStack(spacing: 4) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(viewModel.selectedCategory == category ? 
+                                                    Color.accentColor : 
+                                                    Color.secondary.opacity(0.1))
+                                                .frame(width: 36, height: 36)
+                                                .shadow(
+                                                    color: viewModel.selectedCategory == category ? 
+                                                        Color.accentColor.opacity(0.3) : .clear,
+                                                    radius: 4,
+                                                    y: 2
+                                                )
+                                            
+                                            Image(systemName: category.icon)
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundColor(viewModel.selectedCategory == category ? 
+                                                    .white : .secondary)
+                                        }
+                                        
+                                        Text(category.rawValue)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(viewModel.selectedCategory == category ? 
+                                                .primary : .secondary)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(width: 60)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
+                                .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
+                            }
+                            
+                            Spacer()
+                        }
+                        .frame(width: 80)
+                        .padding(.vertical, 8)
+                        .background(
+                            Color(NSColor.controlBackgroundColor).opacity(0.5)
+                        )
+                        
+                        // メインコンテンツ（履歴とピン留めセクション）
+                        VStack(spacing: 0) {
+                            if !viewModel.pinnedItems.isEmpty {
+                                ResizableSplitView(
+                                    topHeight: $historySectionHeight,
+                                    minTopHeight: 100,
+                                    minBottomHeight: 80,
+                                    topContent: {
+                                        MainViewHistorySection(
+                                            history: viewModel.history,
+                                            selectedHistoryItem: $selectedHistoryItem,
+                                            hoveredHistoryItem: $hoveredHistoryItem,
+                                            onSelectItem: handleItemSelection,
+                                            onTogglePin: { item in
+                                                viewModel.togglePin(for: item)
+                                            },
+                                            onDelete: { item in
+                                                viewModel.deleteItem(item)
+                                            },
+                                            onCategoryFilter: { category in
+                                                viewModel.toggleCategoryFilter(category)
+                                            },
+                                            selectedCategory: $viewModel.selectedCategory,
+                                            showCategoryPanel: false
+                                        )
+                                        .id(historyRefreshID)
+                                    },
+                                    bottomContent: {
+                                        MainViewPinnedSection(
+                                            pinnedItems: viewModel.pinnedItems,
+                                            onSelectItem: handleItemSelection,
+                                            onTogglePin: { item in
+                                                viewModel.togglePin(for: item)
+                                            },
+                                            onDelete: { item in
+                                                viewModel.deleteItem(item)
+                                            },
+                                            onReorderPins: { newOrder in
+                                                viewModel.reorderPinnedItems(newOrder)
+                                            },
+                                            onCategoryFilter: { category in
+                                                viewModel.toggleCategoryFilter(category)
+                                            },
+                                            selectedItem: $selectedHistoryItem
+                                        )
+                                    }
+                                )
+                            } else {
                                 MainViewHistorySection(
                                     history: viewModel.history,
                                     selectedHistoryItem: $selectedHistoryItem,
@@ -88,40 +185,16 @@ struct MainView: View {
                                     },
                                     onDelete: { item in
                                         viewModel.deleteItem(item)
-                                    }
-                                )
-                                .id(historyRefreshID) // 履歴セクションの部分更新用
-                            },
-                            bottomContent: {
-                                MainViewPinnedSection(
-                                    pinnedItems: viewModel.pinnedItems,
-                                    onSelectItem: handleItemSelection,
-                                    onTogglePin: { item in
-                                        viewModel.togglePin(for: item)
                                     },
-                                    onDelete: { item in
-                                        viewModel.deleteItem(item)
+                                    onCategoryFilter: { category in
+                                        viewModel.toggleCategoryFilter(category)
                                     },
-                                    onReorderPins: { newOrder in
-                                        viewModel.reorderPinnedItems(newOrder)
-                                    }
+                                    selectedCategory: $viewModel.selectedCategory,
+                                    showCategoryPanel: false
                                 )
+                                .id(historyRefreshID)
                             }
-                        )
-                    } else {
-                        MainViewHistorySection(
-                            history: viewModel.history,
-                            selectedHistoryItem: $selectedHistoryItem,
-                            hoveredHistoryItem: $hoveredHistoryItem,
-                            onSelectItem: handleItemSelection,
-                            onTogglePin: { item in
-                                viewModel.togglePin(for: item)
-                            },
-                            onDelete: { item in
-                                viewModel.deleteItem(item)
-                            }
-                        )
-                        .id(historyRefreshID) // 履歴セクションの部分更新用
+                        }
                     }
                 }
             )
@@ -193,6 +266,27 @@ struct MainView: View {
             // 履歴セクションのみを更新（デバウンス適用）
             historyRefreshID = UUID()
         }
+        .onAppear {
+            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                // Enter キーでアクションを実行
+                if event.keyCode == 36 { // Enter key
+                    if let selectedItem = selectedHistoryItem,
+                       selectedItem.isActionable {
+                        selectedItem.performAction()
+                        return nil // イベントを消費
+                    }
+                }
+                // Cmd+O でアクションを実行
+                else if event.keyCode == 31 && event.modifierFlags.contains(.command) { // O key with Cmd
+                    if let selectedItem = selectedHistoryItem,
+                       selectedItem.isActionable {
+                        selectedItem.performAction()
+                        return nil // イベントを消費
+                    }
+                }
+                return event
+            }
+        }
     }
     
     // MARK: - Actions
@@ -222,5 +316,24 @@ struct MainView: View {
         
         // 状態の変更を通知（WindowManagerがウィンドウレベルを更新する）
         onAlwaysOnTopChanged?(isAlwaysOnTop)
+    }
+    
+    private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
+        switch category {
+        case .url:
+            return appSettings.filterCategoryURL
+        case .email:
+            return appSettings.filterCategoryEmail
+        case .code:
+            return appSettings.filterCategoryCode
+        case .filePath:
+            return appSettings.filterCategoryFilePath
+        case .shortText:
+            return appSettings.filterCategoryShortText
+        case .longText:
+            return appSettings.filterCategoryLongText
+        case .general:
+            return appSettings.filterCategoryGeneral
+        }
     }
 }
