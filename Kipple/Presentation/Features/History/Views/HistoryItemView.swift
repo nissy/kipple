@@ -13,6 +13,7 @@ struct HistoryItemView: View {
     let onTap: () -> Void
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
+    let onCategoryTap: (() -> Void)?
     
     @State private var isHovered = false
     @State private var isShowingPopover = false
@@ -20,6 +21,55 @@ struct HistoryItemView: View {
     
     var body: some View {
         HStack(spacing: 12) {
+            // カテゴリアイコン（アクション可能な場合はボタンとして機能）
+            if item.isActionable {
+                Button(action: {
+                    item.performAction()
+                }) {
+                    Image(systemName: item.category.icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isSelected ? .white : .accentColor)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(isSelected ? 
+                                    Color.white.opacity(0.2) : 
+                                    Color.accentColor.opacity(0.15)
+                                )
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help(item.actionTitle ?? "")
+            } else if let onCategoryTap = onCategoryTap {
+                Button(action: onCategoryTap) {
+                    Image(systemName: item.category.icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isSelected ? .white : .secondary)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(isSelected ? 
+                                    Color.white.opacity(0.2) : 
+                                    Color.secondary.opacity(0.1)
+                                )
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .help("「\(item.category.rawValue)」でフィルタ")
+            } else {
+                Image(systemName: item.category.icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .secondary)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        Circle()
+                            .fill(isSelected ? 
+                                Color.white.opacity(0.2) : 
+                                Color.secondary.opacity(0.1)
+                            )
+                    )
+            }
+            
             Button(action: onTogglePin) {
                 ZStack {
                     Circle()
@@ -60,7 +110,7 @@ struct HistoryItemView: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 
                 if isHovered {
-                    Text("\(item.characterCount) characters • \(item.timeAgo)")
+                    Text("\(item.category.rawValue) • \(item.characterCount) characters • \(item.timeAgo)")
                         .font(historyMetadataFont)
                         .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
                         .transition(.asymmetric(
@@ -89,7 +139,7 @@ struct HistoryItemView: View {
                 ))
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -188,14 +238,65 @@ struct ClipboardItemPopover: View {
     let item: ClipItem
     
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // カテゴリバッジとアプリ情報
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: item.category.icon)
+                        .font(.system(size: 12))
+                    Text(item.category.rawValue)
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(categoryColor)
+                )
+                
+                Spacer()
+                
+                // アプリケーション情報
+                if item.sourceApp != nil || item.windowTitle != nil {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if let appName = item.sourceApp {
+                            HStack(spacing: 4) {
+                                Image(systemName: "app.badge.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.accentColor)
+                                Text(appName)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                        
+                        if let windowTitle = item.windowTitle {
+                            HStack(spacing: 4) {
+                                Image(systemName: "macwindow")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                Text(windowTitle)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+            
             ScrollView {
                 Text(item.fullContent)
                     .font(popoverFont)
                     .lineSpacing(4)
-                    .lineLimit(10) // 10行で制限
+                    .lineLimit(15) // 15行で制限
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .multilineTextAlignment(.leading)
                     .textSelection(.enabled)
@@ -204,24 +305,33 @@ struct ClipboardItemPopover: View {
             }
             .background(Color(NSColor.textBackgroundColor))
             
-            // Footer with metadata
-            HStack(spacing: 16) {
-                if let appName = item.sourceApp {
-                    Label(appName, systemImage: "app.badge.fill")
-                        .font(.system(size: 11, weight: .medium))
+            // 詳細情報セクション
+            VStack(alignment: .leading, spacing: 12) {
+                Divider()
+                
+                // 詳細メタデータ
+                HStack(spacing: 16) {
+                    // 文字数
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Characters")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Text("\(item.characterCount)")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    
+                    // 時刻
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Copied")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Text(item.formattedTimestamp)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
                 }
-                
-                Label(item.timeAgo, systemImage: "clock.fill")
-                    .font(.system(size: 11, weight: .medium))
-                
-                Spacer()
-                
-                Text("\(item.characterCount)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.accentColor)
-                + Text(" chars")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(.secondary)
             }
             .padding(16)
             .background(Color(NSColor.windowBackgroundColor))
@@ -238,6 +348,18 @@ struct ClipboardItemPopover: View {
     private var popoverFont: Font {
         Font(fontManager.historyFont)
     }
+    
+    private var categoryColor: Color {
+        switch item.category {
+        case .url: return .blue
+        case .email: return .green
+        case .code: return .purple
+        case .filePath: return .orange
+        case .shortText: return .orange
+        case .longText: return .indigo
+        case .general: return .gray
+        }
+    }
 }
 
 // MARK: - HistoryItemView Helper Properties
@@ -252,6 +374,31 @@ extension HistoryItemView {
             return Font(font)
         } else {
             return .system(size: metadataSize)
+        }
+    }
+    
+    private var actionIcon: String {
+        switch item.category {
+        case .url:
+            return "safari"
+        case .email:
+            return "envelope"
+        default:
+            return "arrow.right.circle"
+        }
+    }
+}
+
+// ClipboardItemPopover Extension
+extension ClipboardItemPopover {
+    private var actionIcon: String {
+        switch item.category {
+        case .url:
+            return "safari"
+        case .email:
+            return "envelope"
+        default:
+            return "arrow.right.circle"
         }
     }
 }

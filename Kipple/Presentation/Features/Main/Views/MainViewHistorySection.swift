@@ -19,6 +19,8 @@ struct MainViewHistorySection: View {
     let onSelectItem: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
+    let onCategoryFilter: ((ClipItemCategory) -> Void)?
+    @Binding var selectedCategory: ClipItemCategory?
     
     var body: some View {
         let filteredHistory = debouncedSearchText.isEmpty ? history : 
@@ -154,44 +156,45 @@ struct MainViewHistorySection: View {
                 ))
             }
             
-            // 履歴リスト
-            ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(filteredHistory) { item in
-                        HistoryItemView(
-                            item: item,
-                            isSelected: selectedHistoryItem?.id == item.id,
-                            onTap: {
-                                withAnimation(.spring(response: 0.3)) {
-                                    onSelectItem(item)
-                                }
-                            },
-                            onTogglePin: {
-                                withAnimation(.spring(response: 0.4)) {
-                                    onTogglePin(item)
-                                }
-                            },
-                            onDelete: onDelete != nil ? {
-                                withAnimation(.spring(response: 0.3)) {
-                                    onDelete?(item)
-                                }
-                            } : nil
-                        )
-                        .onHover { hovering in
-                            hoveredHistoryItem = hovering ? item : nil
+                // 履歴リスト
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(filteredHistory) { item in
+                            HistoryItemView(
+                                item: item,
+                                isSelected: selectedHistoryItem?.id == item.id,
+                                onTap: {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        onSelectItem(item)
+                                    }
+                                },
+                                onTogglePin: {
+                                    withAnimation(.spring(response: 0.4)) {
+                                        onTogglePin(item)
+                                    }
+                                },
+                                onDelete: onDelete != nil ? {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        onDelete?(item)
+                                    }
+                                } : nil,
+                                onCategoryTap: nil // カテゴリタップは無効化
+                            )
+                            .onHover { hovering in
+                                hoveredHistoryItem = hovering ? item : nil
+                            }
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .scale.combined(with: .opacity)
+                            ))
                         }
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .scale.combined(with: .opacity)
-                        ))
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .background(
-                Color(NSColor.controlBackgroundColor).opacity(0.3)
-            )
+                .background(
+                    Color(NSColor.controlBackgroundColor).opacity(0.3)
+                )
         }
         .onChange(of: searchText) { newValue in
             // 検索テキストの変更をデバウンス（パフォーマンス最適化）

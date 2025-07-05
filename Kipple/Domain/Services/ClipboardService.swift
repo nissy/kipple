@@ -8,6 +8,7 @@
 import Cocoa
 import Foundation
 import Combine
+import ApplicationServices
 
 class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     static let shared = ClipboardService()
@@ -110,8 +111,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         serialQueue.async { [weak self] in
             guard let self = self else { return }
             
-            // 現在のアプリケーション名を取得（バックグラウンドで）
-            let sourceApp = self.getActiveAppName()
+            // 現在のアプリケーション情報を取得（バックグラウンドで）
+            let appInfo = self.getActiveAppInfo()
             
             // 履歴の更新と保存
             DispatchQueue.main.async {
@@ -129,7 +130,13 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                     }
                 } else {
                     // 新しいアイテムを追加
-                    let newItem = ClipItem(content: content, sourceApp: sourceApp)
+                    let newItem = ClipItem(
+                        content: content, 
+                        sourceApp: appInfo.appName,
+                        windowTitle: appInfo.windowTitle,
+                        bundleIdentifier: appInfo.bundleId,
+                        processID: appInfo.pid
+                    )
                     self.history.insert(newItem, at: 0)
                     
                     // ハッシュセットを更新
@@ -142,7 +149,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                         }
                     }
                     
-                    Logger.shared.debug("Added new item to history from app: \(sourceApp ?? "unknown")")
+                    Logger.shared.debug("Added new item to history from app: \(appInfo.appName ?? "unknown")")
                 }
                 
                 // 履歴の上限を設定
@@ -256,11 +263,57 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         }
     }
     
-    private func getActiveAppName() -> String? {
+    private struct AppInfo {
+        let appName: String?
+        let windowTitle: String?
+        let bundleId: String?
+        let pid: Int32?
+    }
+    
+    private func getActiveAppInfo() -> AppInfo {
         // フロントモストアプリケーションを取得
-        if let frontApp = NSWorkspace.shared.frontmostApplication {
-            return frontApp.localizedName
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else {
+            return AppInfo(appName: nil, windowTitle: nil, bundleId: nil, pid: nil)
         }
+        
+        let appName = frontApp.localizedName
+        let bundleId = frontApp.bundleIdentifier
+        let pid = frontApp.processIdentifier
+        
+        // ウィンドウタイトルを取得（AppleScript経由）
+        var windowTitle: String?
+        if let bundleId = bundleId {
+            windowTitle = getWindowTitle(for: bundleId, processId: pid)
+        }
+        
+        return AppInfo(appName: appName, windowTitle: windowTitle, bundleId: bundleId, pid: pid)
+    }
+    
+    private func getWindowTitle(for bundleId: String, processId: Int32) -> String? {
+        // NSWorkspaceを使用してウィンドウ情報を取得
+        // 注: macOSのセキュリティ制限により、他のアプリのウィンドウタイトルを
+        // 直接取得することは制限されている場合があります
+        
+        // AXUIElementを使用してアクセシビリティAPIからウィンドウタイトルを取得
+        let app = AXUIElementCreateApplication(processId)
+        
+        var value: AnyObject?
+        let result = AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value)
+        
+        if result == .success, let windowValue = value {
+            // CFTypeIDを使用して安全にキャスト
+            guard CFGetTypeID(windowValue) == AXUIElementGetTypeID() else {
+                return nil
+            }
+            let window = unsafeBitCast(windowValue, to: AXUIElement.self)
+            var titleValue: AnyObject?
+            let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
+            
+            if titleResult == .success, let title = titleValue as? String {
+                return title
+            }
+        }
+        
         return nil
     }
     

@@ -31,14 +31,19 @@ struct FontSettings: Codable, Equatable {
     }
     
     static let `default` = FontSettings(
-        primaryFontName: "SFMono-Regular",
-        primaryFontSize: 14,
-        fallbackFontNames: ["Menlo-Regular"],
+        primaryFontName: "System",
+        primaryFontSize: 13,
+        fallbackFontNames: [],
         lineHeightMultiple: 1.4
     )
     
     // 利用可能なフォントを取得（存在チェック）
     func getAvailableFont() -> NSFont {
+        // Systemフォントの場合
+        if primaryFontName == "System" || primaryFontName == "system" {
+            return NSFont.systemFont(ofSize: primaryFontSize)
+        }
+        
         // プライマリフォントを試す
         if let font = NSFont(name: primaryFontName, size: primaryFontSize) {
             return font
@@ -52,7 +57,7 @@ struct FontSettings: Codable, Equatable {
         }
         
         // すべて失敗した場合はシステムフォントを返す
-        return NSFont.monospacedSystemFont(ofSize: primaryFontSize, weight: .regular)
+        return NSFont.systemFont(ofSize: primaryFontSize)
     }
     
     // フォント名リストから実際のフォントを構築
@@ -62,6 +67,11 @@ struct FontSettings: Codable, Equatable {
     
     // 設定が有効かチェック
     var isValid: Bool {
+        // Systemフォントは常に有効
+        if primaryFontName == "System" || primaryFontName == "system" {
+            return true
+        }
+        
         // 少なくとも一つのフォントが利用可能であること
         if NSFont(name: primaryFontName, size: primaryFontSize) != nil {
             return true
@@ -126,8 +136,8 @@ class FontManager: ObservableObject {
             let historyFallbackFontName = UserDefaults.standard.string(forKey: "historyFallbackFontName") ?? ""
             let historyFontSize = UserDefaults.standard.double(forKey: "historyFontSize")
             
-            let fontName = historyFontName == "System" ? "SFMono-Regular" : historyFontName
-            let fallbacks = historyFallbackFontName.isEmpty ? ["Menlo-Regular"] : [historyFallbackFontName]
+            let fontName = historyFontName
+            let fallbacks = historyFallbackFontName.isEmpty ? [] : [historyFallbackFontName]
             let size = historyFontSize > 0 ? CGFloat(historyFontSize) : 13
             
             return FontSettings(
