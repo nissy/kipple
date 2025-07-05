@@ -48,7 +48,7 @@ final class SettingsInputBehaviorTests: XCTestCase {
         XCTAssertEqual(historyMaxDisplayCount, 6, "Value should be adjusted to initial count when smaller")
     }
     
-    func testRangedNumberFieldInputBehavior() {
+    func testNumberFieldInputBehavior() {
         // Given
         var testValue = 10
         let binding = Binding<Int>(
@@ -58,7 +58,7 @@ final class SettingsInputBehaviorTests: XCTestCase {
         
         let range = 1...50
         
-        // When - RangedNumberFieldのvalidateAndUpdate関数をシミュレート
+        // When - NumberFieldのvalidateAndUpdate関数をシミュレート
         func simulateValidateAndUpdate(_ text: String) {
             // 空の場合は最小値を設定
             if text.isEmpty {
@@ -118,7 +118,7 @@ final class SettingsInputBehaviorTests: XCTestCase {
         XCTAssertEqual(historyMaxDisplayCount, 3, "Max should remain 3 after fix")
     }
     
-    func testRangedNumberFieldWarning() {
+    func testNumberFieldWarning() {
         // Given - 新しい警告機能をテスト
         var testValue = 10
         var showWarning = false

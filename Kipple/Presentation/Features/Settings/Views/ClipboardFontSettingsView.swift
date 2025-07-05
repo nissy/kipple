@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AppKit
 
 struct ClipboardFontSettingsView: View {
     @ObservedObject var fontManager = FontManager.shared

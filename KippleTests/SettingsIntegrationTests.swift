@@ -66,26 +66,6 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertGreaterThan(viewModel.pinnedItems.count, 0, "Pinned items should contain items")
     }
     
-    func testRangedNumberFieldEmptyInput() {
-        // Given
-        var testValue = 5
-        let binding = Binding<Int>(
-            get: { testValue },
-            set: { testValue = $0 }
-        )
-        
-        // When - simulate empty text input
-        let view = RangedNumberField(
-            title: "Test",
-            value: binding,
-            range: 1...10
-        )
-        
-        // The validateAndUpdate with empty string should set to range.lowerBound
-        // This needs UI testing to fully validate, but we can test the logic
-        XCTAssertNotNil(view)
-    }
-    
     func testSettingsChangeReflectsInViewModel() {
         // Given
         let viewModel = MainViewModel()
