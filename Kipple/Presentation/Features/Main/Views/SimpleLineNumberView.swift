@@ -60,8 +60,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         
-        // テキストが変更された場合のみ更新
-        if textView.string != text {
+        // テキストが変更された場合のみ更新（IME入力中は除く）
+        if textView.string != text && !textView.hasMarkedText() {
             textView.string = text
         }
         

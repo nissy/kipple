@@ -73,63 +73,65 @@ struct MainView: View {
                 },
                 bottomContent: {
                     HStack(spacing: 0) {
-                        // カテゴリフィルターパネル
-                        VStack(spacing: 8) {
-                            Text("Filter")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.secondary)
-                                .padding(.top, 12)
-                            
-                            ForEach(
-                                [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general]
-                                    .filter { isCategoryFilterEnabled($0) },
-                                id: \.self
-                            ) { category in
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3)) {
-                                        viewModel.toggleCategoryFilter(category)
-                                    }
-                                }) {
-                                    VStack(spacing: 4) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(viewModel.selectedCategory == category ? 
-                                                    Color.accentColor : 
-                                                    Color.secondary.opacity(0.1))
-                                                .frame(width: 36, height: 36)
-                                                .shadow(
-                                                    color: viewModel.selectedCategory == category ? 
-                                                        Color.accentColor.opacity(0.3) : .clear,
-                                                    radius: 4,
-                                                    y: 2
-                                                )
-                                            
-                                            Image(systemName: category.icon)
-                                                .font(.system(size: 16, weight: .medium))
-                                                .foregroundColor(viewModel.selectedCategory == category ? 
-                                                    .white : .secondary)
+                        // 有効なフィルターを取得
+                        let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general]
+                            .filter { isCategoryFilterEnabled($0) }
+                        
+                        // 有効なフィルターがある場合のみカテゴリフィルターパネルを表示
+                        if !enabledCategories.isEmpty {
+                            VStack(spacing: 8) {
+                                Text("Filter")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 12)
+                                
+                                ForEach(enabledCategories, id: \.self) { category in
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.3)) {
+                                            viewModel.toggleCategoryFilter(category)
                                         }
-                                        
-                                        Text(category.rawValue)
-                                            .font(.system(size: 10))
-                                            .foregroundColor(viewModel.selectedCategory == category ? 
-                                                .primary : .secondary)
-                                            .lineLimit(1)
+                                    }) {
+                                        VStack(spacing: 4) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(viewModel.selectedCategory == category ? 
+                                                        Color.accentColor : 
+                                                        Color.secondary.opacity(0.1))
+                                                    .frame(width: 36, height: 36)
+                                                    .shadow(
+                                                        color: viewModel.selectedCategory == category ? 
+                                                            Color.accentColor.opacity(0.3) : .clear,
+                                                        radius: 4,
+                                                        y: 2
+                                                    )
+                                                
+                                                Image(systemName: category.icon)
+                                                    .font(.system(size: 16, weight: .medium))
+                                                    .foregroundColor(viewModel.selectedCategory == category ? 
+                                                        .white : .secondary)
+                                            }
+                                            
+                                            Text(category.rawValue)
+                                                .font(.system(size: 10))
+                                                .foregroundColor(viewModel.selectedCategory == category ? 
+                                                    .primary : .secondary)
+                                                .lineLimit(1)
+                                        }
+                                        .frame(width: 60)
                                     }
-                                    .frame(width: 60)
+                                    .buttonStyle(PlainButtonStyle())
+                                    .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
+                                    .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
-                                .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
+                                
+                                Spacer()
                             }
-                            
-                            Spacer()
+                            .frame(width: 80)
+                            .padding(.vertical, 8)
+                            .background(
+                                Color(NSColor.controlBackgroundColor).opacity(0.5)
+                            )
                         }
-                        .frame(width: 80)
-                        .padding(.vertical, 8)
-                        .background(
-                            Color(NSColor.controlBackgroundColor).opacity(0.5)
-                        )
                         
                         // メインコンテンツ（履歴とピン留めセクション）
                         VStack(spacing: 0) {
