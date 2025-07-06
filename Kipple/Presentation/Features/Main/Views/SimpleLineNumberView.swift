@@ -157,7 +157,10 @@ struct SimpleLineNumberView: NSViewRepresentable {
             textContainer.size = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
             // 折り返しを有効にする設定
             textContainer.widthTracksTextView = true
-            textContainer.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.containerSize = NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
         }
         
         // テキストビューの折り返しを明示的に有効化
@@ -266,6 +269,11 @@ struct SimpleLineNumberView: NSViewRepresentable {
             }
             
             parent.text = textView.string
+            
+            // テキストが変更された後、特に空になった場合は再描画
+            if textView.string.isEmpty {
+                scrollView?.verticalRulerView?.needsDisplay = true
+            }
         }
         
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -276,14 +284,27 @@ struct SimpleLineNumberView: NSViewRepresentable {
                 lastSelectedLine = newLine
                 scrollView?.verticalRulerView?.needsDisplay = true
             }
+            
+            // 空のテキストまたは最後の空行の場合も常に再描画
+            if textView.string.isEmpty || (textView.selectedRange().location == textView.string.count && textView.string.hasSuffix("\n")) {
+                scrollView?.verticalRulerView?.needsDisplay = true
+            }
         }
         
         private func calculateSelectedLineNumber(textView: NSTextView) -> Int {
             let selectedRange = textView.selectedRange()
+            let text = textView.string as NSString
+            
             if selectedRange.location == 0 {
                 return 1
             }
-            let textBeforeSelection = (textView.string as NSString).substring(to: min(selectedRange.location, textView.string.count))
+            
+            // カーソルが最後の位置にあり、テキストが改行で終わっている場合
+            if selectedRange.location == text.length && text.length > 0 && text.hasSuffix("\n") {
+                return text.components(separatedBy: "\n").count
+            }
+            
+            let textBeforeSelection = text.substring(to: min(selectedRange.location, text.length))
             return textBeforeSelection.components(separatedBy: "\n").count
         }
         
@@ -389,6 +410,10 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         // テキストが空の場合でも行番号1を表示
         if fullText.length == 0 {
+            // 空のテキストのハイライトを描画
+            drawEmptyTextHighlight(textView: textView)
+            
+            // 行番号を描画
             drawEmptyTextLineNumber(
                 textView: textView,
                 layoutManager: layoutManager,
@@ -405,6 +430,7 @@ class SimpleLineNumberRulerView: NSRulerView {
             fullText: fullText,
             selectedRange: selectedRange
         )
+        
         
         drawSelectedLineBackground(
             textView: textView,
@@ -470,9 +496,16 @@ class SimpleLineNumberRulerView: NSRulerView {
             return 1
         }
         
+        // カーソルが最後の位置にあり、テキストが改行で終わっている場合
+        if selectedRange.location == fullText.length && fullText.length > 0 && fullText.hasSuffix("\n") {
+            let lineCount = fullText.components(separatedBy: "\n").count
+            return lineCount
+        }
+        
         // 改行を直接カウント（配列作成を回避）
         let textBeforeSelection = fullText.substring(to: min(selectedRange.location, fullText.length))
-        return textBeforeSelection.components(separatedBy: "\n").count
+        let lineNumber = textBeforeSelection.components(separatedBy: "\n").count
+        return lineNumber
     }
     
     private func drawSelectedLineBackground(
@@ -481,6 +514,12 @@ class SimpleLineNumberRulerView: NSRulerView {
         fullText: NSString,
         selectedLineNumber: Int
     ) {
+        // 空のテキストの場合の特別処理
+        if fullText.length == 0 {
+            drawEmptyTextHighlight(textView: textView)
+            return
+        }
+        
         let visibleRect = textView.visibleRect
         let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textView.textContainer!)
         let extendedGlyphRange = NSRange(
@@ -500,6 +539,8 @@ class SimpleLineNumberRulerView: NSRulerView {
         }
         
         var isHighlightingLine = false
+        var lastLineProcessed = currentLineNumber
+        var lastLineRect: NSRect?
         
         layoutManager.enumerateLineFragments(forGlyphRange: extendedGlyphRange) { lineRect, _, _, glyphRange, _ in
             let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
@@ -514,7 +555,7 @@ class SimpleLineNumberRulerView: NSRulerView {
                 let previousChar = fullText.substring(with: NSRange(location: previousCharIndex, length: 1))
                 isNewLogicalLine = (previousChar == "\n")
                 if isNewLogicalLine {
-                    // 改行を検出したら、ハイライト状態を更新
+                    currentLineNumber += 1
                     isHighlightingLine = (currentLineNumber == selectedLineNumber)
                 }
             } else {
@@ -536,19 +577,94 @@ class SimpleLineNumberRulerView: NSRulerView {
                 path.fill()
             }
             
-            // 行番号を更新（この行フラグメントに改行が含まれている場合）
-            if characterRange.location + characterRange.length <= fullText.length {
-                let lineText = fullText.substring(with: characterRange)
-                if lineText.contains("\n") {
-                    let newlineCount = lineText.components(separatedBy: "\n").count - 1
-                    currentLineNumber += newlineCount
-                    // 改行が含まれていたら、ハイライトを終了
-                    if newlineCount > 0 {
-                        isHighlightingLine = false
+            // 最後の行のrectを保存
+            lastLineRect = lineRect
+            lastLineProcessed = currentLineNumber
+        }
+        
+        // 最終行が空行で選択されている場合の特別な処理
+        drawLastLineHighlightIfNeeded(
+            fullText: fullText,
+            selectedLineNumber: selectedLineNumber,
+            lastLineProcessed: lastLineProcessed,
+            layoutManager: layoutManager,
+            containerOrigin: containerOrigin,
+            relativePoint: relativePoint,
+            lastLineRect: lastLineRect
+        )
+    }
+    
+    private func drawLastLineHighlightIfNeeded(
+        fullText: NSString,
+        selectedLineNumber: Int,
+        lastLineProcessed: Int,
+        layoutManager: NSLayoutManager,
+        containerOrigin: NSPoint,
+        relativePoint: NSPoint,
+        lastLineRect: NSRect?
+    ) {
+        // テキストが改行で終わっている場合
+        if fullText.length > 0 && fullText.hasSuffix("\n") {
+            let totalLineCount = fullText.components(separatedBy: "\n").count
+            let lastLineNumber = totalLineCount
+            
+            // 最終行が選択されている場合
+            if selectedLineNumber == lastLineNumber {
+                var lineY: CGFloat
+                
+                // lastLineRectがある場合はそれを使用
+                if let lastRect = lastLineRect {
+                    // 最後の実際の行の下に空行のハイライトを描画
+                    lineY = lastRect.maxY + containerOrigin.y + relativePoint.y
+                } else {
+                    // なければ最後のグリフから計算
+                    if fullText.length > 0 {
+                        // 最後の改行文字の前の文字位置を使用
+                        let lastCharIndex = max(0, fullText.length - 2)
+                        let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: lastCharIndex)
+                        if lastGlyphIndex < layoutManager.numberOfGlyphs {
+                            let rect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+                            lineY = rect.maxY + containerOrigin.y + relativePoint.y
+                        } else {
+                            // デフォルト位置
+                            lineY = containerOrigin.y + relativePoint.y
+                        }
+                    } else {
+                        lineY = containerOrigin.y + relativePoint.y
                     }
                 }
+                
+                
+                NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
+                let path = NSBezierPath(rect: NSRect(
+                    x: 0,
+                    y: lineY,
+                    width: self.ruleThickness,
+                    height: fixedLineHeight
+                ))
+                path.fill()
             }
         }
+    }
+    
+    private func drawEmptyTextHighlight(textView: NSTextView) {
+        // 空のテキストの場合、最初の行をハイライト
+        let relativePoint = self.convert(NSPoint.zero, from: textView)
+        let containerOrigin = textView.textContainerOrigin
+        _ = textView.textContainerInset
+        
+        // エディタの最初の行の位置に合わせてハイライトを描画
+        let highlightY = containerOrigin.y + relativePoint.y
+        
+        
+        NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
+        let path = NSBezierPath(rect: NSRect(
+            x: 0,
+            y: highlightY,
+            width: self.ruleThickness,
+            height: fixedLineHeight
+        ))
+        path.fill()
     }
     
     private func drawEmptyTextLineNumber(
@@ -563,7 +679,7 @@ class SimpleLineNumberRulerView: NSRulerView {
         let lineNumberFont = textAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: fontSize)
         
         // 基準点の計算（drawLineNumbersと同じ）
-        let visibleRect = textView.visibleRect
+        _ = textView.visibleRect
         let containerOrigin = textView.textContainerOrigin
         let textContainerInset = textView.textContainerInset
         
