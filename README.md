@@ -1,8 +1,12 @@
 # Kipple
 
+![icon_128x128](https://github.com/user-attachments/assets/46335243-c964-489d-a1dc-d3db40f443b9)
+
 A powerful clipboard manager for macOS with smart editing capabilities.
 
 ## Key Features
+
+<img width="914" src="https://github.com/user-attachments/assets/0d7c42fb-31f2-493e-a0db-89e6e642bd10" />
 
 ### 🔖 Use Cases
 - **Reading List**: Pin articles and URLs to read later
