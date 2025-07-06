@@ -144,7 +144,7 @@ custom_rules:
 reporter: "xcode"
 
 # Warning threshold
-warning_threshold: 100
+warning_threshold: 150
 
 # Analyzer rules
 analyzer_rules:

@@ -270,24 +270,31 @@ struct SimpleLineNumberView: NSViewRepresentable {
             
             parent.text = textView.string
             
-            // テキストが変更された後、特に空になった場合は再描画
-            if textView.string.isEmpty {
-                scrollView?.verticalRulerView?.needsDisplay = true
+            // パフォーマンス最適化: 行数が変わった場合のみ再描画
+            if let rulerView = scrollView?.verticalRulerView as? SimpleLineNumberRulerView {
+                let newLineCount = SimpleLineNumberRulerView.countLines(in: textView.string as NSString)
+                if newLineCount != rulerView.cachedLineCount || textView.string.isEmpty {
+                    rulerView.cachedLineCount = newLineCount
+                    rulerView.cachedTextLength = textView.string.count
+                    rulerView.needsDisplay = true
+                }
             }
         }
         
         func textViewDidChangeSelection(_ notification: Notification) {
             // 選択行が変わった場合のみ行番号エリアを再描画
-            guard let textView = notification.object as? NSTextView else { return }
+            guard let textView = notification.object as? NSTextView,
+                  let rulerView = scrollView?.verticalRulerView as? SimpleLineNumberRulerView else { return }
+            
             let newLine = calculateSelectedLineNumber(textView: textView)
             if newLine != lastSelectedLine {
+                // 前の選択行と新しい選択行の矩形のみを無効化
+                let oldLine = lastSelectedLine
                 lastSelectedLine = newLine
-                scrollView?.verticalRulerView?.needsDisplay = true
-            }
-            
-            // 空のテキストまたは最後の空行の場合も常に再描画
-            if textView.string.isEmpty || (textView.selectedRange().location == textView.string.count && textView.string.hasSuffix("\n")) {
-                scrollView?.verticalRulerView?.needsDisplay = true
+                
+                // 変更された行のみを再描画
+                rulerView.invalidateLineNumber(oldLine)
+                rulerView.invalidateLineNumber(newLine)
             }
         }
         
@@ -382,6 +389,23 @@ class SimpleLineNumberRulerView: NSRulerView {
     var fixedLineHeight: CGFloat = 20 // 固定行高
     let fontManager = FontManager.shared
     
+    // パフォーマンス最適化用のキャッシュ
+    private var lastSelectedLine: Int = 1
+    fileprivate var cachedLineCount: Int = 0
+    fileprivate var cachedTextLength: Int = 0
+    
+    // 特定の行番号の矩形のみを再描画
+    func invalidateLineNumber(_ lineNumber: Int) {
+        guard let textView = textView else { return }
+        
+        // 行番号の矩形を計算
+        let lineY = CGFloat(lineNumber - 1) * fixedLineHeight + textView.textContainerOrigin.y
+        let lineRect = NSRect(x: 0, y: lineY, width: ruleThickness, height: fixedLineHeight)
+        
+        // この矩形のみを再描画
+        setNeedsDisplay(lineRect)
+    }
+    
     init(textView: NSTextView) {
         self.textView = textView
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
@@ -398,9 +422,13 @@ class SimpleLineNumberRulerView: NSRulerView {
               let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer else { return }
         
+        // パフォーマンス最適化: 描画が必要な部分のみを処理
+        let dirtyRect = rect.intersection(self.bounds)
+        guard !dirtyRect.isEmpty else { return }
+        
         // 背景と境界線を描画
-        drawBackground(in: rect)
-        drawBorder(in: rect)
+        drawBackground(in: dirtyRect)
+        drawBorder(in: dirtyRect)
         
         // フォント設定
         let (fontSize, textAttributes) = setupFontAttributes(textView: textView)
@@ -498,14 +526,16 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         // カーソルが最後の位置にあり、テキストが改行で終わっている場合
         if selectedRange.location == fullText.length && fullText.length > 0 && fullText.hasSuffix("\n") {
-            let lineCount = fullText.components(separatedBy: "\n").count
+            // キャッシュを使用して高速化
+            if cachedTextLength == fullText.length {
+                return cachedLineCount
+            }
+            let lineCount = SimpleLineNumberRulerView.countLines(in: fullText)
             return lineCount
         }
         
-        // 改行を直接カウント（配列作成を回避）
-        let textBeforeSelection = fullText.substring(to: min(selectedRange.location, fullText.length))
-        let lineNumber = textBeforeSelection.components(separatedBy: "\n").count
-        return lineNumber
+        // 改行を効率的にカウント
+        return SimpleLineNumberRulerView.countLines(in: fullText, upTo: selectedRange.location)
     }
     
     private func drawSelectedLineBackground(
@@ -522,9 +552,11 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         let visibleRect = textView.visibleRect
         let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textView.textContainer!)
+        // パフォーマンス最適化: 必要最小限のバッファのみを追加
+        let lineBuffer = Int(fixedLineHeight * 2) // 2行分のバッファ
         let extendedGlyphRange = NSRange(
             location: max(0, visibleGlyphRange.location),
-            length: min(visibleGlyphRange.length + 1000, layoutManager.numberOfGlyphs - visibleGlyphRange.location)
+            length: min(visibleGlyphRange.length + lineBuffer, layoutManager.numberOfGlyphs - visibleGlyphRange.location)
         )
         
         // 基準点を正しく計算
@@ -534,8 +566,8 @@ class SimpleLineNumberRulerView: NSRulerView {
         // 論理行番号を追跡
         var currentLineNumber = 1
         if extendedGlyphRange.location > 0 {
-            let textBefore = fullText.substring(to: min(extendedGlyphRange.location, fullText.length))
-            currentLineNumber = textBefore.components(separatedBy: "\n").count
+            // 効率的な行数カウント
+            currentLineNumber = SimpleLineNumberRulerView.countLines(in: fullText, upTo: extendedGlyphRange.location)
         }
         
         var isHighlightingLine = false
@@ -792,10 +824,8 @@ class SimpleLineNumberRulerView: NSRulerView {
             actualGlyphRange: nil
         )
         
-        let textBeforeVisible = context.fullText.substring(
-            to: min(characterRange.location, context.fullText.length)
-        )
-        return textBeforeVisible.components(separatedBy: "\n").count
+        // 効率的な行数カウントを使用
+        return SimpleLineNumberRulerView.countLines(in: context.fullText, upTo: characterRange.location)
     }
     
     private func drawLineNumber(
@@ -857,7 +887,20 @@ class SimpleLineNumberRulerView: NSRulerView {
         if characterRange.location + characterRange.length <= context.fullText.length {
             let lineText = context.fullText.substring(with: characterRange)
             if lineText.contains("\n") {
-                let newlineCount = lineText.components(separatedBy: "\n").count - 1
+                // 効率的な改行カウント
+                var newlineCount = 0
+                let nsLineText = lineText as NSString
+                var searchRange = NSRange(location: 0, length: nsLineText.length)
+                while searchRange.length > 0 {
+                    let foundRange = nsLineText.range(of: "\n", options: [], range: searchRange)
+                    if foundRange.location != NSNotFound {
+                        newlineCount += 1
+                        searchRange.location = foundRange.location + foundRange.length
+                        searchRange.length = nsLineText.length - searchRange.location
+                    } else {
+                        break
+                    }
+                }
                 params.currentLineNumber += newlineCount
             }
         }
@@ -875,7 +918,7 @@ class SimpleLineNumberRulerView: NSRulerView {
         guard fullText.length > 0 && fullText.hasSuffix("\n") else { return }
         
         // 最後の改行までの行数を効率的に計算
-        let totalLineCount = fullText.components(separatedBy: "\n").count
+        let totalLineCount = SimpleLineNumberRulerView.countLines(in: fullText)
         
         // 最後の空行の処理（テキストが改行で終わる場合）
         if fullText.length > 0 && fullText.hasSuffix("\n") {
@@ -923,6 +966,28 @@ class SimpleLineNumberRulerView: NSRulerView {
     
     // 描画済みの行番号を記録するための一時的なプロパティ
     private var drawnLines: Set<Int>?
+    
+    // 効率的な行数カウント
+    static func countLines(in string: NSString, upTo location: Int? = nil) -> Int {
+        let searchLength = location ?? string.length
+        if searchLength == 0 { return 1 }
+        
+        var lineCount = 1
+        var searchRange = NSRange(location: 0, length: searchLength)
+        
+        while searchRange.length > 0 {
+            let foundRange = string.range(of: "\n", options: [], range: searchRange)
+            if foundRange.location != NSNotFound {
+                lineCount += 1
+                searchRange.location = foundRange.location + foundRange.length
+                searchRange.length = searchLength - searchRange.location
+            } else {
+                break
+            }
+        }
+        
+        return lineCount
+    }
     
     // 日本語フォントかどうかを判定
     private func isJapaneseFont(_ font: NSFont) -> Bool {
