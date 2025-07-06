@@ -28,12 +28,6 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 - Adjustable editor and history section heights
 - Clean up text formatting before saving
 
-### ⚡ Quick Access
-- Global hotkey: `⌃⌥V` (customizable)
-- Editor copy: `⌘⇧Z`
-- Editor clear: `⌘⇧X`
-- Menu bar icon for easy access
-
 ### 🎨 Customization
 - Choose your preferred fonts
 - Adjustable window animations
