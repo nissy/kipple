@@ -26,7 +26,21 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private let serialQueue = DispatchQueue(label: "com.nissy.Kipple.clipboard", qos: .userInitiated)
     private var timerRunLoop: RunLoop?
     private var timerThread: Thread?
-    private var isInternalCopy: Bool = false
+    // Thread-safe internal copy flag
+    private let internalCopyLock = NSLock()
+    private var _isInternalCopy: Bool = false
+    private var isInternalCopy: Bool {
+        get {
+            internalCopyLock.lock()
+            defer { internalCopyLock.unlock() }
+            return _isInternalCopy
+        }
+        set {
+            internalCopyLock.lock()
+            defer { internalCopyLock.unlock() }
+            _isInternalCopy = newValue
+        }
+    }
     
     // パフォーマンス最適化: 高速な重複チェック用
     private var recentContentHashes: Set<Int> = []
@@ -38,7 +52,12 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     
     // アプリ切り替え監視用
     private var appActivationObserver: NSObjectProtocol?
-    private var lastActiveNonKippleApp: (name: String?, bundleId: String?, pid: Int32?)?
+    private struct LastActiveApp {
+        let name: String?
+        let bundleId: String?
+        let pid: Int32?
+    }
+    private var lastActiveNonKippleApp: LastActiveApp?
     
     private init() {
         // Load saved history
@@ -59,40 +78,54 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     func startMonitoring() {
-        // Prevent duplicate timers
-        stopMonitoring()
-        
-        lastChangeCount = NSPasteboard.general.changeCount
-        
-        // アプリ切り替えの監視を開始
-        setupAppActivationMonitoring()
-        
-        // タイマーを専用スレッドで実行
-        timerThread = Thread { [weak self] in
+        serialQueue.async { [weak self] in
             guard let self = self else { return }
             
-            self.timerRunLoop = RunLoop.current
-            self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-                self.checkClipboard()
+            // Prevent duplicate timers
+            self.stopMonitoringInternal()
+            
+            self.lastChangeCount = NSPasteboard.general.changeCount
+            
+            // アプリ切り替えの監視を開始
+            DispatchQueue.main.async { [weak self] in
+                self?.setupAppActivationMonitoring()
             }
             
-            // RunLoopを実行（停止可能な方法で）
-            while !Thread.current.isCancelled && self.timerRunLoop != nil {
-                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
+            // タイマーを専用スレッドで実行
+            self.timerThread = Thread { [weak self] in
+                guard let self = self else { return }
+                
+                self.timerRunLoop = RunLoop.current
+                self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+                    self.checkClipboard()
+                }
+                
+                // RunLoopを実行（停止可能な方法で）
+                while !Thread.current.isCancelled && self.timerRunLoop != nil {
+                    RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
+                }
             }
+            self.timerThread?.start()
         }
-        timerThread?.start()
     }
     
     func stopMonitoring() {
+        serialQueue.async { [weak self] in
+            self?.stopMonitoringInternal()
+        }
+        
+        // アプリ切り替えの監視を停止
+        DispatchQueue.main.async { [weak self] in
+            self?.stopAppActivationMonitoring()
+        }
+    }
+    
+    private func stopMonitoringInternal() {
         timer?.invalidate()
         timer = nil
         timerRunLoop = nil
         timerThread?.cancel()
         timerThread = nil
-        
-        // アプリ切り替えの監視を停止
-        stopAppActivationMonitoring()
     }
     
     private func checkClipboard() {
@@ -345,11 +378,12 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         }
         
         if result == .success, let windowValue = value {
-            // CFTypeIDを使用して安全にキャスト
+            // Safe cast to AXUIElement
             guard CFGetTypeID(windowValue) == AXUIElementGetTypeID() else {
                 return nil
             }
             let window = unsafeBitCast(windowValue, to: AXUIElement.self)
+            
             var titleValue: AnyObject?
             let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
             
@@ -379,7 +413,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                   let bundleId = app.bundleIdentifier,
                   bundleId != Bundle.main.bundleIdentifier else { return }
             
-            self?.lastActiveNonKippleApp = (
+            self?.lastActiveNonKippleApp = LastActiveApp(
                 name: app.localizedName,
                 bundleId: bundleId,
                 pid: app.processIdentifier
@@ -423,7 +457,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     private func hasAccessibilityPermission() -> Bool {
-        return AXIsProcessTrusted()
+        return AccessibilityManager.shared.hasPermission
     }
     
     private func getWindowTitleViaCGWindowList(processId: Int32) -> String? {
