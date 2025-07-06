@@ -442,7 +442,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         return nil
     }
     
-    
     deinit {
         stopMonitoring()
     }

@@ -459,7 +459,6 @@ class SimpleLineNumberRulerView: NSRulerView {
             selectedRange: selectedRange
         )
         
-        
         drawSelectedLineBackground(
             textView: textView,
             layoutManager: layoutManager,
@@ -666,7 +665,6 @@ class SimpleLineNumberRulerView: NSRulerView {
                     }
                 }
                 
-                
                 NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
                 let path = NSBezierPath(rect: NSRect(
                     x: 0,
@@ -687,7 +685,6 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         // エディタの最初の行の位置に合わせてハイライトを描画
         let highlightY = containerOrigin.y + relativePoint.y
-        
         
         NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
         let path = NSBezierPath(rect: NSRect(

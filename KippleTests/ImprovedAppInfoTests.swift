@@ -138,7 +138,7 @@ final class ImprovedAppInfoTests: XCTestCase {
         // イベントタップの作成
         let eventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
         
-        let callback: CGEventTapCallBack = { proxy, type, event, refcon in
+        let callback: CGEventTapCallBack = { _, type, event, _ in
             if type == .keyDown {
                 let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
                 let flags = event.flags
