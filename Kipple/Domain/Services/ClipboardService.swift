@@ -36,6 +36,10 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private let saveSubject = PassthroughSubject<[ClipItem], Never>()
     private var saveSubscription: AnyCancellable?
     
+    // アプリ切り替え監視用
+    private var appActivationObserver: NSObjectProtocol?
+    private var lastActiveNonKippleApp: (name: String?, bundleId: String?, pid: Int32?)?
+    
     private init() {
         // Load saved history
         history = repository.load()
@@ -49,6 +53,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             .sink { [weak self] items in
                 self?.saveHistoryToRepository(items)
             }
+        
+        // アプリ切り替えの監視を開始
+        setupAppActivationMonitoring()
     }
     
     func startMonitoring() {
@@ -56,6 +63,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         stopMonitoring()
         
         lastChangeCount = NSPasteboard.general.changeCount
+        
+        // アプリ切り替えの監視を開始
+        setupAppActivationMonitoring()
         
         // タイマーを専用スレッドで実行
         timerThread = Thread { [weak self] in
@@ -80,6 +90,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         timerRunLoop = nil
         timerThread?.cancel()
         timerThread = nil
+        
+        // アプリ切り替えの監視を停止
+        stopAppActivationMonitoring()
     }
     
     private func checkClipboard() {
@@ -88,19 +101,23 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         if currentChangeCount != lastChangeCount {
             lastChangeCount = currentChangeCount
             
+            // アプリ情報を即座に取得（遅延させない）
+            let appInfo = getActiveAppInfo()
+            
             // 内部コピーの場合はフラグをリセット
             if isInternalCopy {
                 isInternalCopy = false
+                return // 内部コピーは履歴に追加しない
             }
             
             if let content = NSPasteboard.general.string(forType: .string),
                !content.isEmpty {
-                addToHistory(content)
+                addToHistoryWithAppInfo(content, appInfo: appInfo)
             }
         }
     }
     
-    private func addToHistory(_ content: String) {
+    private func addToHistoryWithAppInfo(_ content: String, appInfo: AppInfo) {
         // サイズ検証（10MBを上限）
         let maxContentSize = 10 * 1024 * 1024
         guard content.utf8.count <= maxContentSize else {
@@ -110,9 +127,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         
         serialQueue.async { [weak self] in
             guard let self = self else { return }
-            
-            // 現在のアプリケーション情報を取得（バックグラウンドで）
-            let appInfo = self.getActiveAppInfo()
             
             // 履歴の更新と保存
             DispatchQueue.main.async {
@@ -159,6 +173,12 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 self.saveSubject.send(self.history)
             }
         }
+    }
+    
+    private func addToHistory(_ content: String) {
+        // 廃止予定: addToHistoryWithAppInfoを使用してください
+        let appInfo = getActiveAppInfo()
+        addToHistoryWithAppInfo(content, appInfo: appInfo)
     }
     
     func copyToClipboard(_ content: String, fromEditor: Bool = false) {
@@ -276,29 +296,53 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             return AppInfo(appName: nil, windowTitle: nil, bundleId: nil, pid: nil)
         }
         
+        // Kipple自身の場合は、最後にアクティブだった他のアプリを取得
+        if frontApp.bundleIdentifier == Bundle.main.bundleIdentifier {
+            return getLastActiveNonKippleApp()
+        }
+        
         let appName = frontApp.localizedName
         let bundleId = frontApp.bundleIdentifier
         let pid = frontApp.processIdentifier
         
-        // ウィンドウタイトルを取得（AppleScript経由）
+        // ウィンドウタイトルを複数の方法で取得
         var windowTitle: String?
-        if let bundleId = bundleId {
-            windowTitle = getWindowTitle(for: bundleId, processId: pid)
+        
+        // アクセシビリティ権限をチェック
+        if hasAccessibilityPermission() {
+            windowTitle = getWindowTitle(for: bundleId ?? "", processId: pid)
         }
+        
+        // CGWindowList経由でも試す（権限不要）
+        if windowTitle == nil {
+            windowTitle = getWindowTitleViaCGWindowList(processId: pid)
+        }
+        
+        Logger.shared.debug("Captured app info: \(appName ?? "unknown") (\(bundleId ?? "unknown"))")
         
         return AppInfo(appName: appName, windowTitle: windowTitle, bundleId: bundleId, pid: pid)
     }
     
     private func getWindowTitle(for bundleId: String, processId: Int32) -> String? {
-        // NSWorkspaceを使用してウィンドウ情報を取得
-        // 注: macOSのセキュリティ制限により、他のアプリのウィンドウタイトルを
-        // 直接取得することは制限されている場合があります
-        
         // AXUIElementを使用してアクセシビリティAPIからウィンドウタイトルを取得
         let app = AXUIElementCreateApplication(processId)
         
+        // まずフォーカスされたウィンドウを試す
         var value: AnyObject?
-        let result = AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value)
+        var result = AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value)
+        
+        // フォーカスされたウィンドウがない場合、メインウィンドウを試す
+        if result != .success {
+            result = AXUIElementCopyAttributeValue(app, kAXMainWindowAttribute as CFString, &value)
+        }
+        
+        // それでもダメな場合、すべてのウィンドウから最初のものを取得
+        if result != .success {
+            result = AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value)
+            if result == .success, let windows = value as? [AXUIElement], !windows.isEmpty {
+                value = windows[0] as AnyObject
+            }
+        }
         
         if result == .success, let windowValue = value {
             // CFTypeIDを使用して安全にキャスト
@@ -309,7 +353,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             var titleValue: AnyObject?
             let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
             
-            if titleResult == .success, let title = titleValue as? String {
+            if titleResult == .success, let title = titleValue as? String, !title.isEmpty {
                 return title
             }
         }
@@ -322,6 +366,82 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         let recentItems = history.prefix(maxRecentHashes)
         recentContentHashes = Set(recentItems.map { $0.content.hashValue })
     }
+    
+    // MARK: - App Activation Monitoring
+    
+    private func setupAppActivationMonitoring() {
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  let bundleId = app.bundleIdentifier,
+                  bundleId != Bundle.main.bundleIdentifier else { return }
+            
+            self?.lastActiveNonKippleApp = (
+                name: app.localizedName,
+                bundleId: bundleId,
+                pid: app.processIdentifier
+            )
+            
+            Logger.shared.debug("Recorded non-Kipple app: \(app.localizedName ?? "unknown")")
+        }
+    }
+    
+    private func stopAppActivationMonitoring() {
+        if let observer = appActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            appActivationObserver = nil
+        }
+    }
+    
+    private func getLastActiveNonKippleApp() -> AppInfo {
+        if let lastApp = lastActiveNonKippleApp {
+            Logger.shared.debug("Using last active non-Kipple app: \(lastApp.name ?? "unknown")")
+            
+            // 最後のアプリのウィンドウタイトルを取得
+            var windowTitle: String?
+            if let lastPid = lastApp.pid {
+                if hasAccessibilityPermission() {
+                    windowTitle = getWindowTitle(for: lastApp.bundleId ?? "", processId: lastPid)
+                }
+                if windowTitle == nil {
+                    windowTitle = getWindowTitleViaCGWindowList(processId: lastPid)
+                }
+            }
+            
+            return AppInfo(
+                appName: lastApp.name,
+                windowTitle: windowTitle,
+                bundleId: lastApp.bundleId,
+                pid: lastApp.pid
+            )
+        }
+        
+        return AppInfo(appName: nil, windowTitle: nil, bundleId: nil, pid: nil)
+    }
+    
+    private func hasAccessibilityPermission() -> Bool {
+        return AXIsProcessTrusted()
+    }
+    
+    private func getWindowTitleViaCGWindowList(processId: Int32) -> String? {
+        // CGWindowListでウィンドウ情報を取得（権限不要）
+        let windowList = CGWindowListCopyWindowInfo([.excludeDesktopElements, .optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        
+        for window in windowList {
+            guard let windowPid = window[kCGWindowOwnerPID as String] as? Int32,
+                  windowPid == processId,
+                  let windowName = window[kCGWindowName as String] as? String,
+                  !windowName.isEmpty else { continue }
+            
+            return windowName
+        }
+        
+        return nil
+    }
+    
     
     deinit {
         stopMonitoring()

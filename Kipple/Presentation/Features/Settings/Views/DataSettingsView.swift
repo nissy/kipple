@@ -61,9 +61,9 @@ struct DataSettingsView: View {
                                     "",
                                     value: Binding(
                                         get: { Double(maxHistoryItems) },
-                                        set: { maxHistoryItems = Int($0) }
+                                        set: { maxHistoryItems = Int(max(10, min(1000, $0))) }
                                     ),
-                                    formatter: NumberFormatter()
+                                    formatter: makeNumberFormatter(minimum: 10, maximum: 1000)
                                 )
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 80)
@@ -90,9 +90,9 @@ struct DataSettingsView: View {
                                     "",
                                     value: Binding(
                                         get: { Double(maxPinnedItems) },
-                                        set: { maxPinnedItems = Int($0) }
+                                        set: { maxPinnedItems = Int(max(1, min(100, $0))) }
                                     ),
-                                    formatter: NumberFormatter()
+                                    formatter: makeNumberFormatter(minimum: 1, maximum: 100)
                                 )
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 80)
@@ -214,5 +214,15 @@ struct DataSettingsView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             showClearSuccessAlert = true
         }
+    }
+    
+    private func makeNumberFormatter(minimum: Double, maximum: Double) -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimum = NSNumber(value: minimum)
+        formatter.maximum = NSNumber(value: maximum)
+        formatter.generatesDecimalNumbers = false
+        formatter.allowsFloats = false
+        return formatter
     }
 }

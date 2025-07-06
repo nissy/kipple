@@ -30,8 +30,8 @@ final class HotkeyManager {
     init() {
         HotkeyManager.shared = self
         setupSettingsObserver()
-        // ホットキーの登録を遅延実行
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // ホットキーの登録を遅延実行（短い遅延で十分）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.registerAllHotkeys()
         }
     }

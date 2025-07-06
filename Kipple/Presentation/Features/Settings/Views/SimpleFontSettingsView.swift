@@ -24,7 +24,7 @@ struct SimpleFontSettingsView: View {
             
             SettingsRow(label: "Font size") {
                 HStack {
-                    TextField("", value: fontSizeBinding, formatter: NumberFormatter())
+                    TextField("", value: fontSizeBinding, formatter: makeFontSizeFormatter())
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 50)
                     
@@ -97,5 +97,15 @@ struct SimpleFontSettingsView: View {
         } else {
             return Font.custom(fontName, size: fontSize)
         }
+    }
+    
+    private func makeFontSizeFormatter() -> NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimum = 10
+        formatter.maximum = 24
+        formatter.generatesDecimalNumbers = false
+        formatter.allowsFloats = false
+        return formatter
     }
 }

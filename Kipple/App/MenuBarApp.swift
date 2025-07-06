@@ -72,11 +72,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     private func startServices() {
         clipboardService.startMonitoring()
         
-        // アプリケーション起動完了後にホットキーを再登録
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            Logger.shared.log("Refreshing hotkeys after app launch")
-            self?.hotkeyManager.refreshHotkeys()
-        }
+        // HotkeyManagerは既に初期化時に登録を行うため、追加の登録は不要
     }
     
     @objc private func openMainWindow() {
