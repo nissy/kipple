@@ -43,6 +43,10 @@ struct MainView: View {
             // エディタ挿入の場合はウィンドウを閉じない
         } else {
             viewModel.selectHistoryItem(item)
+            
+            // コピー通知を表示
+            showCopiedNotification()
+            
             // ピン（常に最前面）が有効でない場合のみウィンドウを閉じる
             if !isAlwaysOnTop {
                 onClose?()
@@ -283,6 +287,9 @@ struct MainView: View {
                 return event
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
+            showCopiedNotification()
+        }
     }
     
     // MARK: - Actions
@@ -290,17 +297,9 @@ struct MainView: View {
         viewModel.copyEditor()
         
         // コピー通知を表示
-        isShowingCopiedNotification = true
+        showCopiedNotification()
         
-        // 2秒後に通知を非表示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isShowingCopiedNotification = false
-        }
-        
-        // ピン（常に最前面）が有効でない場合のみウィンドウを閉じる
-        if !isAlwaysOnTop {
-            onClose?()
-        }
+        // Copyボタンではウィンドウを閉じない（ピンの状態に関わらず）
     }
     
     private func clearAction() {
@@ -312,6 +311,26 @@ struct MainView: View {
         
         // 状態の変更を通知（WindowManagerがウィンドウレベルを更新する）
         onAlwaysOnTopChanged?(isAlwaysOnTop)
+    }
+    
+    private func showCopiedNotification() {
+        // 既に表示中の場合は一旦非表示にしてから再表示（アニメーションのリセット）
+        if isShowingCopiedNotification {
+            isShowingCopiedNotification = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.isShowingCopiedNotification = true
+                self.hideCopiedNotificationAfterDelay()
+            }
+        } else {
+            isShowingCopiedNotification = true
+            hideCopiedNotificationAfterDelay()
+        }
+    }
+    
+    private func hideCopiedNotificationAfterDelay() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            self.isShowingCopiedNotification = false
+        }
     }
     
     private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {

@@ -153,16 +153,20 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             // アプリ情報を即座に取得（遅延させない）
             let appInfo = getActiveAppInfo()
             
-            // 内部コピーの場合はフラグをリセット
+            // スレッドセーフにフラグを処理
+            var shouldSkip = false
+            var fromEditor = false
+            
             if isInternalCopy {
                 isInternalCopy = false
-                return // 内部コピーは履歴に追加しない
+                shouldSkip = true
+            } else if isFromEditor {
+                fromEditor = true
+                isFromEditor = false
             }
             
-            // エディタからのコピーかどうかを記録
-            let fromEditor = isFromEditor
-            if fromEditor {
-                isFromEditor = false
+            if shouldSkip {
+                return // 内部コピーは履歴に追加しない
             }
             
             if let content = NSPasteboard.general.string(forType: .string),
@@ -201,10 +205,10 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                     // 新しいアイテムを追加
                     let newItem = ClipItem(
                         content: content, 
-                        sourceApp: appInfo.appName,
-                        windowTitle: appInfo.windowTitle,
-                        bundleIdentifier: appInfo.bundleId,
-                        processID: appInfo.pid,
+                        sourceApp: isFromEditor ? "Kipple" : appInfo.appName,  // エディタからの場合は "Kipple" に固定
+                        windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,  // エディタからの場合は "Quick Editor" に固定
+                        bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
+                        processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
                         isFromEditor: isFromEditor
                     )
                     self.history.insert(newItem, at: 0)
@@ -219,7 +223,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                         }
                     }
                     
-                    Logger.shared.debug("Added new item to history from app: \(appInfo.appName ?? "unknown")")
+                    let appName = isFromEditor ? "Kipple" : (appInfo.appName ?? "unknown")
+                    Logger.shared.debug("Added new item to history from app: \(appName)")
                 }
                 
                 // 履歴の上限を設定
@@ -238,12 +243,16 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     func copyToClipboard(_ content: String, fromEditor: Bool = false) {
-        // エディタからのコピーでない場合のみ内部コピーフラグを設定
+        // スレッドセーフにフラグを設定
         if !fromEditor {
+            // エディタからのコピーでない場合のみ内部コピーフラグを設定
             isInternalCopy = true
+            isFromEditor = false
         } else {
             // エディタからのコピーの場合、次のクリップボード項目がエディタ由来であることを記録
             isFromEditor = true
+            // エディタからのコピーは内部コピーではないことを明示
+            isInternalCopy = false
         }
         
         // クリップボードには常にコピーする

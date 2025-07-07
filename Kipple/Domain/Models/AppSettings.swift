@@ -40,7 +40,7 @@ final class AppSettings: ObservableObject {
     
     // Editor Clear Hotkey Settings
     @AppStorage("enableEditorClearHotkey") var enableEditorClearHotkey: Bool = false
-    @AppStorage("editorClearHotkeyKeyCode") var editorClearHotkeyKeyCode: Int = 12  // Q key
+    @AppStorage("editorClearHotkeyKeyCode") var editorClearHotkeyKeyCode: Int = 37  // L key
     @AppStorage("editorClearHotkeyModifierFlags") var editorClearHotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
     

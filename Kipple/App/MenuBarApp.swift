@@ -165,10 +165,9 @@ extension MenuBarApp: HotkeyManagerDelegate {
         if let mainViewModel = windowManager.getMainViewModel() {
             Task { @MainActor in
                 mainViewModel.copyEditor()
-                // ピン（常に最前面）が有効でない場合のみウィンドウを閉じる
-                if !windowManager.isWindowAlwaysOnTop() {
-                    windowManager.closeMainWindow()
-                }
+                // コピー通知を表示
+                windowManager.showCopiedNotification()
+                // Copyボタンのショートカットキーでもウィンドウを閉じない（ピンの状態に関わらず）
             }
         }
     }

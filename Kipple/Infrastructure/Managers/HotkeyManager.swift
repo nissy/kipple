@@ -247,8 +247,14 @@ final class HotkeyManager {
         
         // ホットキーを登録
         Logger.shared.log("Registering editor copy hotkey with keyCode: \(keyCode), modifiers: \(modifierFlags)")
-        RegisterEventHotKey(UInt32(keyCode), carbonModifiers, hotKeyID, 
-                          GetApplicationEventTarget(), 0, &editorCopyHotKey)
+        RegisterEventHotKey(
+            UInt32(keyCode),
+            carbonModifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &editorCopyHotKey
+        )
     }
     
     private func unregisterEditorCopyHotkey() {
@@ -300,8 +306,14 @@ final class HotkeyManager {
         
         // ホットキーを登録
         Logger.shared.log("Registering editor clear hotkey with keyCode: \(keyCode), modifiers: \(modifierFlags)")
-        RegisterEventHotKey(UInt32(keyCode), carbonModifiers, hotKeyID, 
-                          GetApplicationEventTarget(), 0, &editorClearHotKey)
+        RegisterEventHotKey(
+            UInt32(keyCode),
+            carbonModifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &editorClearHotKey
+        )
     }
     
     private func unregisterEditorClearHotkey() {

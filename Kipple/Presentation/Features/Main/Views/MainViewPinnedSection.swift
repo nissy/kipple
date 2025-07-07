@@ -167,10 +167,10 @@ struct MainViewPinnedSection: View {
                     ForEach(filteredPinnedItems) { item in
                         HistoryItemView(
                             item: item,
-                            isSelected: selectedItem?.id == item.id,
+                            isSelected: false,  // ピンアイテムは選択状態を表示しない
                             onTap: {
                                 withAnimation(.spring(response: 0.3)) {
-                                    selectedItem = item
+                                    // selectedItemは設定しない（背景を青くしない）
                                     onSelectItem(item)
                                 }
                             },

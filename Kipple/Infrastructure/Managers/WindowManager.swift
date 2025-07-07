@@ -8,6 +8,10 @@
 import SwiftUI
 import AppKit
 
+extension Notification.Name {
+    static let showCopiedNotification = Notification.Name("showCopiedNotification")
+}
+
 final class WindowManager: NSObject {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
@@ -266,6 +270,14 @@ final class WindowManager: NSObject {
     
     func isWindowAlwaysOnTop() -> Bool {
         return isAlwaysOnTop
+    }
+    
+    func showCopiedNotification() {
+        // MainViewにコピー通知を表示する
+        // ウィンドウが開いている場合のみ通知を送信
+        if mainWindow != nil {
+            NotificationCenter.default.post(name: .showCopiedNotification, object: nil)
+        }
     }
     
     // MARK: - Settings Window
