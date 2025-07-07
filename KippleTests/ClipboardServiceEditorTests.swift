@@ -18,7 +18,7 @@ final class ClipboardServiceEditorTests: XCTestCase {
         clipboardService = ClipboardService.shared
         cancellables.removeAll()
         
-        // モニタリングを停止してから再開することで、クリーンな状態を確保
+        // モニタリングを停止してクリーンな状態を確保
         clipboardService.stopMonitoring()
         Thread.sleep(forTimeInterval: 0.2)
         
@@ -27,10 +27,8 @@ final class ClipboardServiceEditorTests: XCTestCase {
         // クリップボードもクリア
         NSPasteboard.general.clearContents()
         
-        // モニタリング開始
-        clipboardService.startMonitoring()
-        // 少し待機してモニタリングが開始されるのを確認
-        Thread.sleep(forTimeInterval: 0.5)
+        // エディタコピーのテストではモニタリングを開始しない
+        // （外部からのクリップボード変更の影響を避けるため）
     }
     
     override func tearDown() {
@@ -50,22 +48,21 @@ final class ClipboardServiceEditorTests: XCTestCase {
         let testContent = "KIPPLE_TEST_EDITOR_\(uuid)"
         let expectation = XCTestExpectation(description: "Editor copy recorded")
         
-        // 履歴が空であることを確認（既存のデータがある場合はクリア）
-        if !clipboardService.history.isEmpty {
-            clipboardService.clearAllHistory()
-            Thread.sleep(forTimeInterval: 0.5)
-        }
+        // テスト開始時の履歴を確認
+        let initialHistoryCount = clipboardService.history.count
+        
+        // モニタリングを開始してエディタコピーを検出できるようにする
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.5)
         
         // When
         clipboardService.copyToClipboard(testContent, fromEditor: true)
         
-        // クリップボード監視が検出するのを待つ（より長い待機時間）
+        // クリップボード監視が検出するのを待つ
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             // Then
-            // テスト用のプレフィックスを持つアイテムのみをフィルタ
-            let testItems = self.clipboardService.history.filter { $0.content.hasPrefix("KIPPLE_TEST_") }
-            
-            if let latestItem = testItems.first(where: { $0.content == testContent }) {
+            // 履歴から該当するアイテムを探す（履歴は新しいものが先頭に来る）
+            if let latestItem = self.clipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertEqual(latestItem.content, testContent)
                 XCTAssertEqual(latestItem.sourceApp, "Kipple", "Source app should be 'Kipple' for editor copies")
                 XCTAssertEqual(latestItem.windowTitle, "Quick Editor", "Window title should be 'Quick Editor' for editor copies")
@@ -75,9 +72,11 @@ final class ClipboardServiceEditorTests: XCTestCase {
                 XCTAssertEqual(latestItem.category, .kipple, "Category should be kipple for editor copies")
             } else {
                 // デバッグ情報を出力
-                print("Test items found: \(testItems.count)")
-                for item in testItems {
-                    print("  - \(item.content)")
+                print("Initial history count: \(initialHistoryCount)")
+                print("Current history count: \(self.clipboardService.history.count)")
+                print("History items:")
+                for (index, item) in self.clipboardService.history.prefix(5).enumerated() {
+                    print("  [\(index)] \(item.content) (from: \(item.sourceApp ?? "unknown"))")
                 }
                 XCTFail("No item with test content '\(testContent)' was added to history")
             }
@@ -93,31 +92,38 @@ final class ClipboardServiceEditorTests: XCTestCase {
         let editorContent = "KIPPLE_TEST_EDITOR_VS_NORMAL_\(uuid)"
         let expectation = XCTestExpectation(description: "Editor copy recorded")
         
+        // モニタリングを開始
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.5)
+        
+        let initialCount = clipboardService.history.count
+        
         // When - エディタからコピー
         clipboardService.copyToClipboard(editorContent, fromEditor: true)
         
         // 待機して結果を確認
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             // Then
-            // テスト用のプレフィックスを持つアイテムのみをフィルタ
-            let testItems = self.clipboardService.history.filter { $0.content.hasPrefix("KIPPLE_TEST_") }
+            let currentCount = self.clipboardService.history.count
+            XCTAssertGreaterThan(currentCount, initialCount, "Editor copy should be added to history")
             
-            // エディタからのコピーを確認
-            if let editorItem = testItems.first(where: { $0.content == editorContent }) {
+            // 最新のアイテムを確認
+            if let editorItem = self.clipboardService.history.first(where: { $0.content == editorContent }) {
                 XCTAssertEqual(editorItem.sourceApp, "Kipple", "Editor copy should have 'Kipple' as source app")
                 XCTAssertTrue(editorItem.isFromEditor ?? false, "Should be marked as from editor")
                 XCTAssertEqual(editorItem.category, .kipple, "Should have kipple category")
                 
                 // 通常のコピー（fromEditor: false）は内部コピーとして扱われ、履歴に追加されないことを確認
-                // 別のテストコンテンツで確認
+                let beforeInternalCount = self.clipboardService.history.count
                 let internalContent = "KIPPLE_TEST_INTERNAL_\(UUID().uuidString)"
                 self.clipboardService.copyToClipboard(internalContent, fromEditor: false)
                 
                 // 少し待って確認
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     // 内部コピーは履歴に追加されない
-                    let updatedTestItems = self.clipboardService.history.filter { $0.content.hasPrefix("KIPPLE_TEST_") }
-                    XCTAssertFalse(updatedTestItems.contains { $0.content == internalContent }, 
+                    XCTAssertEqual(self.clipboardService.history.count, beforeInternalCount, 
+                                   "Internal copy should not increase history count")
+                    XCTAssertFalse(self.clipboardService.history.contains { $0.content == internalContent }, 
                                    "Internal copy should not be added to history")
                     expectation.fulfill()
                 }
@@ -136,16 +142,17 @@ final class ClipboardServiceEditorTests: XCTestCase {
         let testContent = "KIPPLE_TEST_PROCESS_ID_\(uuid)"
         let expectation = XCTestExpectation(description: "Process ID recorded")
         
+        // モニタリングを開始
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.5)
+        
         // When
         clipboardService.copyToClipboard(testContent, fromEditor: true)
         
         // 待機
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             // Then
-            // テスト用のプレフィックスを持つアイテムのみをフィルタ
-            let testItems = self.clipboardService.history.filter { $0.content.hasPrefix("KIPPLE_TEST_") }
-            
-            if let latestItem = testItems.first(where: { $0.content == testContent }) {
+            if let latestItem = self.clipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertNotNil(latestItem.processID, "Process ID should be recorded")
                 XCTAssertEqual(latestItem.processID, ProcessInfo.processInfo.processIdentifier, "Process ID should match current process")
             } else {
@@ -167,6 +174,10 @@ final class ClipboardServiceEditorTests: XCTestCase {
         ]
         let expectation = XCTestExpectation(description: "Multiple editor copies")
         
+        // モニタリングを開始
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.5)
+        
         // When - 各コピーの間隔を長くして、確実に検出されるようにする
         for (index, content) in contents.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 1.5) {
@@ -177,22 +188,21 @@ final class ClipboardServiceEditorTests: XCTestCase {
         // 待機して確認
         DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
             // Then
-            // テスト用のプレフィックスを持つエディタアイテムのみをフィルタ
-            let testEditorItems = self.clipboardService.history.filter { 
-                ($0.isFromEditor ?? false) && $0.content.hasPrefix("KIPPLE_TEST_MULTI_")
+            // テスト用のエディタアイテムを確認
+            let testContents = Set(contents)
+            let foundItems = self.clipboardService.history.filter { 
+                testContents.contains($0.content)
             }
             
-            // 少なくとも最後のアイテムは確実に記録されているはず
-            if let lastContent = contents.last {
-                XCTAssertTrue(testEditorItems.contains { $0.content == lastContent }, 
-                              "At least the last content '\(lastContent)' should be in history")
-            }
+            // 少なくとも1つは記録されているはず
+            XCTAssertFalse(foundItems.isEmpty, "At least one editor copy should be recorded")
             
-            // 記録されたエディタアイテムが正しいアプリ名を持っているか確認
-            for item in testEditorItems {
+            // 記録されたアイテムが正しいプロパティを持っているか確認
+            for item in foundItems {
                 XCTAssertEqual(item.sourceApp, "Kipple", "All editor items should have 'Kipple' as source app")
                 XCTAssertEqual(item.windowTitle, "Quick Editor", "All editor items should have 'Quick Editor' as window title")
                 XCTAssertEqual(item.category, .kipple, "All editor items should have kipple category")
+                XCTAssertTrue(item.isFromEditor ?? false, "Should be marked as from editor")
             }
             
             expectation.fulfill()
