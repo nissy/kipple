@@ -243,6 +243,7 @@ struct HistoryItemView: View {
 // MARK: - Popover Content
 struct ClipboardItemPopover: View {
     let item: ClipItem
+    @StateObject private var fontManager = FontManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -298,7 +299,7 @@ struct ClipboardItemPopover: View {
             
             // コンテンツを直接表示（シンプル化してパフォーマンス向上）
             Text(String(item.content.prefix(500))) // 最大50０文字に制限
-                .font(.system(size: 13))
+                .font(Font(fontManager.historyFont))
                 .lineSpacing(4)
                 .lineLimit(10) // 10行に制限
                 .frame(maxWidth: .infinity, alignment: .leading)
