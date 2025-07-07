@@ -129,7 +129,7 @@ struct HistoryItemView: View {
             
             if hovering {
                 // ポップオーバーの遅延表示
-                popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+                popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
                     if isHovered && !isScrolling {
                         windowPosition = checkWindowPosition()
                         isShowingPopover = true
@@ -149,6 +149,15 @@ struct HistoryItemView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification)) { _ in
             isScrolling = false
+            // スクロール終了後、ホバー中ならポップオーバーを再開
+            if isHovered {
+                popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+                    if isHovered && !isScrolling {
+                        windowPosition = checkWindowPosition()
+                        isShowingPopover = true
+                    }
+                }
+            }
         }
         .popover(
             isPresented: $isShowingPopover,
