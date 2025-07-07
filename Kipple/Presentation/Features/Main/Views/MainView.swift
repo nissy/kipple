@@ -253,13 +253,13 @@ struct MainView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
-            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)) { _ in
-            // エディタセクションのみを更新（デバウンス適用）
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
+            // エディタセクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             editorRefreshID = UUID()
         }
         .onReceive(NotificationCenter.default.publisher(for: .historyFontSettingsChanged)
-            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)) { _ in
-            // 履歴セクションのみを更新（デバウンス適用）
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
+            // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
         }
         .onAppear {

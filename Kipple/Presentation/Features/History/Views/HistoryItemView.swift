@@ -14,10 +14,13 @@ struct HistoryItemView: View {
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
     let onCategoryTap: (() -> Void)?
+    let historyFont: Font // フォントをパラメータとして受け取る
     
     @State private var isHovered = false
     @State private var isShowingPopover = false
-    @ObservedObject private var fontManager = FontManager.shared
+    @State private var popoverTimer: Timer?
+    @State private var windowPosition: Bool = true // キャッシュされたウィンドウ位置
+    @State private var isScrolling = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -73,34 +76,16 @@ struct HistoryItemView: View {
             Button(action: onTogglePin) {
                 ZStack {
                     Circle()
-                        .fill(item.isPinned ? 
-                            LinearGradient(
-                                colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
-                            LinearGradient(
-                                colors: [Color.clear, Color.clear],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
+                        .fill(item.isPinned ? Color.accentColor : Color.clear)
                         .frame(width: 28, height: 28)
-                        .shadow(
-                            color: item.isPinned ? Color.accentColor.opacity(0.3) : .clear,
-                            radius: item.isPinned ? 4 : 0,
-                            y: 2
-                        )
                     
                     Image(systemName: item.isPinned ? "pin.fill" : "pin")
                         .foregroundColor(item.isPinned ? .white : .secondary)
                         .font(.system(size: 12, weight: .medium))
                         .rotationEffect(.degrees(item.isPinned ? 0 : -45))
-                        .animation(.spring(response: 0.3), value: item.isPinned)
                 }
             }
             .buttonStyle(PlainButtonStyle())
-            .scaleEffect(isHovered ? 1.1 : 1.0)
-            .animation(.spring(response: 0.3), value: isHovered)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayContent)
@@ -108,16 +93,6 @@ struct HistoryItemView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundColor(isSelected ? .white : .primary)
-                
-                if isHovered {
-                    Text("\(item.category.rawValue) • \(item.characterCount) characters • \(item.timeAgo)")
-                        .font(historyMetadataFont)
-                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .opacity
-                        ))
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
@@ -125,18 +100,14 @@ struct HistoryItemView: View {
                 onTap()
             }
             
-            if let onDelete = onDelete, isHovered {
+            if let onDelete = onDelete, isHovered && !isScrolling {
                 Button(action: onDelete) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
                         .foregroundColor(.secondary)
-                        .background(Circle().fill(Color(NSColor.windowBackgroundColor)))
                 }
                 .buttonStyle(PlainButtonStyle())
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .opacity
-                ))
+                .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
         }
         .padding(.horizontal, 10)
@@ -144,14 +115,23 @@ struct HistoryItemView: View {
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            // スクロール中はポップオーバーを表示しない
+            guard !isScrolling else {
                 isHovered = hovering
+                return
             }
             
+            isHovered = hovering
+            
+            // タイマーをキャンセル
+            popoverTimer?.invalidate()
+            popoverTimer = nil
+            
             if hovering {
-                // 0.5秒後にポップオーバーを表示
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if isHovered {
+                // ポップオーバーの遅延表示
+                popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+                    if isHovered && !isScrolling {
+                        windowPosition = checkWindowPosition()
                         isShowingPopover = true
                     }
                 }
@@ -159,17 +139,30 @@ struct HistoryItemView: View {
                 isShowingPopover = false
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
+            isScrolling = true
+            if isShowingPopover {
+                isShowingPopover = false
+            }
+            popoverTimer?.invalidate()
+            popoverTimer = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification)) { _ in
+            isScrolling = false
+        }
         .popover(
             isPresented: $isShowingPopover,
             attachmentAnchor: popoverAttachmentAnchor,
             arrowEdge: popoverArrowEdge
         ) {
-            ClipboardItemPopover(item: item)
-                .interactiveDismissDisabled() // ポップオーバー内のクリックで閉じないようにする
+            if isShowingPopover {
+                ClipboardItemPopover(item: item)
+                    .interactiveDismissDisabled() // ポップオーバー内のクリックで閉じないようにする
+            }
         }
     }
     
-    private var isWindowOnLeftSide: Bool {
+    private func checkWindowPosition() -> Bool {
         if let mainWindow = NSApplication.shared.windows.first(where: { 
             $0.title == "Kipple" || $0.contentViewController != nil
         }) {
@@ -192,53 +185,45 @@ struct HistoryItemView: View {
     
     private var popoverAttachmentAnchor: PopoverAttachmentAnchor {
         // プレビューをできるだけウィンドウの外側に表示するための設定
-        if isWindowOnLeftSide {
-            return .rect(.bounds)  // アイテムの境界に基づいて配置
-        } else {
-            return .rect(.bounds)  // アイテムの境界に基づいて配置
-        }
+        return .rect(.bounds)  // アイテムの境界に基づいて配置
     }
     
     private var popoverArrowEdge: Edge {
         // プレビューの矢印の向きを調整（ウィンドウの位置に基づいて左右に表示）
-        if isWindowOnLeftSide {
-            return .trailing  // ウィンドウが左側にある場合、ポップオーバーは右側に表示
-        } else {
-            return .leading   // ウィンドウが右側にある場合、ポップオーバーは左側に表示
-        }
+        return windowPosition ? .trailing : .leading
     }
     
+    @ViewBuilder
     private var backgroundView: some View {
-        ZStack {
-            if isSelected {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(
+                isSelected ? 
+                AnyShapeStyle(LinearGradient(
+                    colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )) :
+                AnyShapeStyle(Color(isHovered ? 
+                    NSColor.controlBackgroundColor : 
+                    NSColor.controlBackgroundColor.withAlphaComponent(0.3)
+                ))
+            )
+            .overlay(
+                isHovered && !isSelected ?
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .shadow(color: Color.accentColor.opacity(0.3), radius: 8, y: 4)
-            } else if isHovered {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(NSColor.controlBackgroundColor))
-                    .shadow(color: Color.black.opacity(0.1), radius: 5, y: 2)
-                
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-            } else {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(NSColor.controlBackgroundColor).opacity(0.3))
-            }
-        }
+                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1) : nil
+            )
+            .shadow(
+                color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
+                radius: isSelected ? 8 : 0,
+                y: isSelected ? 4 : 0
+            )
     }
 }
 
 // MARK: - Popover Content
 struct ClipboardItemPopover: View {
     let item: ClipItem
-    
-    @ObservedObject private var fontManager = FontManager.shared
-    @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -292,18 +277,16 @@ struct ClipboardItemPopover: View {
             .padding(16)
             .background(Color(NSColor.textBackgroundColor).opacity(0.5))
             
-            ScrollView {
-                Text(item.fullContent)
-                    .font(popoverFont)
-                    .lineSpacing(4)
-                    .lineLimit(15) // 15行で制限
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .multilineTextAlignment(.leading)
-                    .textSelection(.enabled)
-                    .padding(16)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .background(Color(NSColor.textBackgroundColor))
+            // コンテンツを直接表示（シンプル化してパフォーマンス向上）
+            Text(String(item.content.prefix(500))) // 最大50０文字に制限
+                .font(.system(size: 13))
+                .lineSpacing(4)
+                .lineLimit(10) // 10行に制限
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
+                .padding(16)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(Color(NSColor.textBackgroundColor))
             
             // 詳細情報セクション
             VStack(alignment: .leading, spacing: 12) {
@@ -336,18 +319,13 @@ struct ClipboardItemPopover: View {
             .padding(16)
             .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(width: 380)
+        .frame(width: 320) // サイズを小さく
         .background(Color(NSColor.windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(color: Color.black.opacity(0.2), radius: 20, y: 10)
-        .allowsHitTesting(false)
+        .shadow(color: Color.black.opacity(0.1), radius: 6, y: 3)
     }
     
     // MARK: - Helper Properties
-    
-    private var popoverFont: Font {
-        Font(fontManager.historyFont)
-    }
     
     private var categoryColor: Color {
         switch item.category {
@@ -364,18 +342,6 @@ struct ClipboardItemPopover: View {
 
 // MARK: - HistoryItemView Helper Properties
 extension HistoryItemView {
-    private var historyFont: Font {
-        Font(fontManager.historyFont)
-    }
-    
-    private var historyMetadataFont: Font {
-        let metadataSize = max(10, fontManager.historySettings.primaryFontSize - 3)
-        if let font = NSFont(name: fontManager.historySettings.primaryFontName, size: metadataSize) {
-            return Font(font)
-        } else {
-            return .system(size: metadataSize)
-        }
-    }
     
     private var actionIcon: String {
         switch item.category {

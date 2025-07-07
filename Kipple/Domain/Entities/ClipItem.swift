@@ -55,6 +55,20 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let bundleIdentifier: String?
     let processID: Int32?
     
+    // パフォーマンス最適化用の静的フォーマッタ
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+    
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+    
     // Computed properties
     var fullContent: String {
         content
@@ -74,16 +88,11 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     var timeAgo: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: timestamp, relativeTo: Date())
+        Self.relativeDateFormatter.localizedString(for: timestamp, relativeTo: Date())
     }
     
     var formattedTimestamp: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: timestamp)
+        Self.timestampFormatter.string(from: timestamp)
     }
     
     var category: ClipItemCategory {

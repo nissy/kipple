@@ -20,6 +20,7 @@ struct MainViewPinnedSection: View {
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var searchCancellable: AnyCancellable?
+    @ObservedObject private var fontManager = FontManager.shared
     
     var body: some View {
         let filteredPinnedItems = debouncedSearchText.isEmpty ? pinnedItems : 
@@ -183,8 +184,10 @@ struct MainViewPinnedSection: View {
                                     onDelete?(item)
                                 }
                             } : nil,
-                            onCategoryTap: nil // カテゴリタップは無効化
+                            onCategoryTap: nil, // カテゴリタップは無効化
+                            historyFont: Font(fontManager.historyFont)
                         )
+                        .frame(height: 44) // 固定高さでパフォーマンス向上
                         .onDrag {
                             NSItemProvider(object: item.id.uuidString as NSString)
                         }
