@@ -84,6 +84,7 @@ class MainViewModel: ObservableObject {
         let filterCategoryShortText = defaults.object(forKey: "filterCategoryShortText") as? Bool ?? true
         let filterCategoryLongText = defaults.object(forKey: "filterCategoryLongText") as? Bool ?? true
         let filterCategoryGeneral = defaults.object(forKey: "filterCategoryGeneral") as? Bool ?? true
+        let filterCategoryKipple = defaults.object(forKey: "filterCategoryKipple") as? Bool ?? true
         
         // 1回のループで分類（パフォーマンス最適化）
         var unpinnedItems: [ClipItem] = []
@@ -111,6 +112,8 @@ class MainViewModel: ObservableObject {
                     shouldFilter = filterCategoryLongText
                 case .general:
                     shouldFilter = filterCategoryGeneral
+                case .kipple:
+                    shouldFilter = filterCategoryKipple
                 }
                 
                 if shouldFilter && item.category != selectedCategory {

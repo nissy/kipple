@@ -296,6 +296,25 @@ final class ClipItemCategoryTests: XCTestCase {
         }
     }
     
+    // MARK: - Kippleカテゴリのテスト
+    
+    func testKippleCategory() {
+        // エディタからコピーされたアイテムはKippleカテゴリになる
+        let editorItem = ClipItem(content: "This was copied from Kipple editor", isFromEditor: true)
+        XCTAssertEqual(editorItem.category, .kipple, "Items copied from editor should be categorized as Kipple")
+        
+        // エディタから作成されたアイテムは内容に関わらずKippleカテゴリ
+        let editorURL = ClipItem(content: "https://example.com", isFromEditor: true)
+        XCTAssertEqual(editorURL.category, .kipple, "URL from editor should still be categorized as Kipple")
+        
+        let editorCode = ClipItem(content: "func test() { print(\"hello\") }", isFromEditor: true)
+        XCTAssertEqual(editorCode.category, .kipple, "Code from editor should still be categorized as Kipple")
+        
+        // エディタ以外からのアイテムは通常のカテゴリ
+        let normalItem = ClipItem(content: "https://example.com", isFromEditor: false)
+        XCTAssertEqual(normalItem.category, .url, "Items not from editor should follow normal categorization")
+    }
+    
     // MARK: - エッジケースと優先順位のテスト
     
     func testCategoryPriority() {

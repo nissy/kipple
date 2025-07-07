@@ -356,6 +356,7 @@ struct ClipboardItemPopover: View {
         case .shortText: return .orange
         case .longText: return .indigo
         case .general: return .gray
+        case .kipple: return .accentColor
         }
     }
 }

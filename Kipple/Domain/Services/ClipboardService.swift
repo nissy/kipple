@@ -42,6 +42,22 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         }
     }
     
+    // Thread-safe editor copy flag
+    private let editorCopyLock = NSLock()
+    private var _isFromEditor: Bool = false
+    private var isFromEditor: Bool {
+        get {
+            editorCopyLock.lock()
+            defer { editorCopyLock.unlock() }
+            return _isFromEditor
+        }
+        set {
+            editorCopyLock.lock()
+            defer { editorCopyLock.unlock() }
+            _isFromEditor = newValue
+        }
+    }
+    
     // パフォーマンス最適化: 高速な重複チェック用
     private var recentContentHashes: Set<Int> = []
     private let maxRecentHashes = 50
@@ -143,14 +159,20 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 return // 内部コピーは履歴に追加しない
             }
             
+            // エディタからのコピーかどうかを記録
+            let fromEditor = isFromEditor
+            if fromEditor {
+                isFromEditor = false
+            }
+            
             if let content = NSPasteboard.general.string(forType: .string),
                !content.isEmpty {
-                addToHistoryWithAppInfo(content, appInfo: appInfo)
+                addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: fromEditor)
             }
         }
     }
     
-    private func addToHistoryWithAppInfo(_ content: String, appInfo: AppInfo) {
+    private func addToHistoryWithAppInfo(_ content: String, appInfo: AppInfo, isFromEditor: Bool = false) {
         // サイズ検証（10MBを上限）
         let maxContentSize = 10 * 1024 * 1024
         guard content.utf8.count <= maxContentSize else {
@@ -182,7 +204,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                         sourceApp: appInfo.appName,
                         windowTitle: appInfo.windowTitle,
                         bundleIdentifier: appInfo.bundleId,
-                        processID: appInfo.pid
+                        processID: appInfo.pid,
+                        isFromEditor: isFromEditor
                     )
                     self.history.insert(newItem, at: 0)
                     
@@ -211,13 +234,16 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private func addToHistory(_ content: String) {
         // 廃止予定: addToHistoryWithAppInfoを使用してください
         let appInfo = getActiveAppInfo()
-        addToHistoryWithAppInfo(content, appInfo: appInfo)
+        addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: false)
     }
     
     func copyToClipboard(_ content: String, fromEditor: Bool = false) {
         // エディタからのコピーでない場合のみ内部コピーフラグを設定
         if !fromEditor {
             isInternalCopy = true
+        } else {
+            // エディタからのコピーの場合、次のクリップボード項目がエディタ由来であることを記録
+            isFromEditor = true
         }
         
         // クリップボードには常にコピーする

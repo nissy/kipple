@@ -23,6 +23,7 @@ enum ClipItemCategory: String {
     case shortText = "Short"
     case longText = "Long"
     case general = "General"
+    case kipple = "Kipple"
     
     var icon: String {
         switch self {
@@ -40,6 +41,8 @@ enum ClipItemCategory: String {
             return "doc.text"
         case .general:
             return "doc"
+        case .kipple:
+            return "square.and.pencil"
         }
     }
 }
@@ -54,6 +57,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let windowTitle: String?
     let bundleIdentifier: String?
     let processID: Int32?
+    let isFromEditor: Bool?
     
     // パフォーマンス最適化用の静的フォーマッタ
     private static let relativeDateFormatter: RelativeDateTimeFormatter = {
@@ -96,6 +100,11 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     var category: ClipItemCategory {
+        // エディタからコピーされたアイテムは常にKippleカテゴリ
+        if isFromEditor == true {
+            return .kipple
+        }
+        
         // パフォーマンス最適化: 大量テキストは早期にlongTextとして分類
         if content.count > 1000 {
             return .longText
@@ -380,7 +389,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     init(content: String, isPinned: Bool = false, kind: ClipItemKind = .text, 
          sourceApp: String? = nil, windowTitle: String? = nil, 
-         bundleIdentifier: String? = nil, processID: Int32? = nil) {
+         bundleIdentifier: String? = nil, processID: Int32? = nil,
+         isFromEditor: Bool = false) {
         self.id = UUID()
         self.content = content
         self.timestamp = Date()
@@ -390,6 +400,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.windowTitle = windowTitle
         self.bundleIdentifier = bundleIdentifier
         self.processID = processID
+        self.isFromEditor = isFromEditor
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {

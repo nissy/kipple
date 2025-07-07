@@ -17,6 +17,7 @@ struct DataSettingsView: View {
     @AppStorage("filterCategoryShortText") private var filterCategoryShortText = true
     @AppStorage("filterCategoryLongText") private var filterCategoryLongText = true
     @AppStorage("filterCategoryGeneral") private var filterCategoryGeneral = true
+    @AppStorage("filterCategoryKipple") private var filterCategoryKipple = true
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
@@ -45,6 +46,7 @@ struct DataSettingsView: View {
                             SettingsRow(label: "Short Text", isOn: $filterCategoryShortText)
                             SettingsRow(label: "Long Text", isOn: $filterCategoryLongText)
                             SettingsRow(label: "General", isOn: $filterCategoryGeneral)
+                            SettingsRow(label: "Kipple", isOn: $filterCategoryKipple)
                         }
                     }
                 }

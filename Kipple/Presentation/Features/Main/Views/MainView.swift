@@ -74,7 +74,7 @@ struct MainView: View {
                 bottomContent: {
                     HStack(spacing: 0) {
                         // 有効なフィルターを取得
-                        let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general]
+                        let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general, .kipple]
                             .filter { isCategoryFilterEnabled($0) }
                         
                         // 有効なフィルターがある場合のみカテゴリフィルターパネルを表示
@@ -330,6 +330,8 @@ struct MainView: View {
             return appSettings.filterCategoryLongText
         case .general:
             return appSettings.filterCategoryGeneral
+        case .kipple:
+            return appSettings.filterCategoryKipple
         }
     }
 }

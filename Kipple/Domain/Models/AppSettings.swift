@@ -55,6 +55,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("filterCategoryShortText") var filterCategoryShortText: Bool = false
     @AppStorage("filterCategoryLongText") var filterCategoryLongText: Bool = false
     @AppStorage("filterCategoryGeneral") var filterCategoryGeneral: Bool = false
+    @AppStorage("filterCategoryKipple") var filterCategoryKipple: Bool = true
     
     private init() {}
     
