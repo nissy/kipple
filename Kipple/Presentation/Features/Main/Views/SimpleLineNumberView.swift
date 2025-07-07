@@ -13,7 +13,6 @@ struct SimpleLineNumberView: NSViewRepresentable {
     @Binding var text: String
     let font: NSFont
     let onScrollChange: ((CGFloat) -> Void)?
-    @ObservedObject private var fontManager = FontManager.shared
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -51,7 +50,6 @@ struct SimpleLineNumberView: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
         context.coordinator.paragraphStyle = paragraphStyle
-        context.coordinator.fontManager = fontManager
         context.coordinator.setupNotifications()
         
         return scrollView
@@ -62,7 +60,10 @@ struct SimpleLineNumberView: NSViewRepresentable {
         
         // テキストが変更された場合のみ更新（IME入力中は除く）
         if textView.string != text && !textView.hasMarkedText() {
+            // 循環更新を防ぐためにフラグを設定
+            context.coordinator.isUpdatingText = true
             textView.string = text
+            context.coordinator.isUpdatingText = false
         }
         
         // フォントが変更された場合のみ更新
@@ -103,6 +104,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         
         // IME入力中はテキストの同期をスキップ
         if !textView.hasMarkedText() && textView.string != text {
+            // 循環更新を防ぐためにフラグを設定（Coordinatorにアクセスできないため、ここではテキストを直接設定）
             textView.string = text
         }
         
@@ -150,7 +152,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         }
         
         // テキストコンテナの設定
-        let verticalPadding = fontManager.editorLayoutSettings.verticalPadding
+        let verticalPadding = FontManager.shared.editorLayoutSettings.verticalPadding
         textView.textContainerInset = NSSize(width: 8, height: verticalPadding)
         if let textContainer = textView.textContainer {
             textContainer.lineFragmentPadding = 0
@@ -208,9 +210,9 @@ struct SimpleLineNumberView: NSViewRepresentable {
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
         var paragraphStyle = NSMutableParagraphStyle()
-        var fontManager: FontManager?
         private var notificationObserver: NSObjectProtocol?
         private var lastSelectedLine: Int = 1
+        var isUpdatingText = false
         
         init(_ parent: SimpleLineNumberView) {
             self.parent = parent
@@ -245,7 +247,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             self.paragraphStyle = paragraphStyle
             
             // テキストコンテナのパディングを更新
-            let verticalPadding = fontManager?.editorLayoutSettings.verticalPadding ?? 4.0
+            let verticalPadding = FontManager.shared.editorLayoutSettings.verticalPadding
             textView.textContainerInset = NSSize(width: 8, height: verticalPadding)
             
             if !textView.string.isEmpty {
@@ -263,11 +265,17 @@ struct SimpleLineNumberView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             
+            // 更新中の場合は処理をスキップ（循環更新を防ぐ）
+            if isUpdatingText {
+                return
+            }
+            
             // IME入力中（marked text がある場合）は処理をスキップ
             if textView.hasMarkedText() {
                 return
             }
             
+            // 同期的に親のテキストを更新（英数字入力時の問題を解決）
             parent.text = textView.string
             
             // パフォーマンス最適化: 行数が変わった場合のみ再描画
@@ -345,7 +353,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             }
             
             // テキストのベースラインオフセットを調整
-            let textBaselineOffset = fontManager?.editorLayoutSettings.textBaselineOffset ?? 0.0
+            let textBaselineOffset = FontManager.shared.editorLayoutSettings.textBaselineOffset
             
             // ベースラインを行の中央に配置
             let lineCenter = fixedLineHeight / 2.0

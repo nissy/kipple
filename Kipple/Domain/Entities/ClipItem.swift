@@ -96,9 +96,35 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     var category: ClipItemCategory {
+        // パフォーマンス最適化: 大量テキストは早期にlongTextとして分類
+        if content.count > 1000 {
+            return .longText
+        }
+        
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // 判定優先順位：ファイルパス > メール > URL > コード > 文字数
+        // 判定優先順位：文字数チェック > ファイルパス > メール > URL > コード
+        
+        // 短いテキストの早期分類
+        if content.count <= 50 {
+            // 短いテキストでも特殊なパターンをチェック
+            if isFilePath(trimmed) {
+                return .filePath
+            }
+            if isValidEmail(trimmed) {
+                return .email
+            }
+            if isValidURL(trimmed) {
+                return .url
+            }
+            // 短いテキストでもコードの可能性をチェック
+            if isCodeSnippet(trimmed) {
+                return .code
+            }
+            return .shortText
+        }
+        
+        // 中程度のテキスト（50-1000文字）のみ詳細な判定
         
         // ファイルパス判定（最優先）
         if isFilePath(trimmed) {
@@ -115,15 +141,13 @@ struct ClipItem: Identifiable, Codable, Equatable {
             return .url
         }
         
-        // コード判定
+        // コード判定（重い処理なので最後に）
         if isCodeSnippet(trimmed) {
             return .code
         }
         
         // 文字数による分類
-        if content.count <= 50 {
-            return .shortText
-        } else if content.count <= 500 {
+        if content.count <= 500 {
             return .general
         } else {
             return .longText
@@ -239,56 +263,68 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     // コード判定を改善
     private func isCodeSnippet(_ text: String) -> Bool {
+        // パフォーマンス最適化: 大量テキストは最初の一部のみをチェック
+        let checkText = text.count > 500 ? String(text.prefix(500)) : text
+        
         // 自然言語の文章を除外（文末がピリオドで終わる場合）
-        if text.hasSuffix(".") || text.hasSuffix("。") || text.hasSuffix("!") || text.hasSuffix("?") {
+        if checkText.hasSuffix(".") || checkText.hasSuffix("。") || checkText.hasSuffix("!") || checkText.hasSuffix("?") {
             // ただし、コードの可能性がある場合は続行
             let codeSymbols = ["{", "}", "[", "]", ";", "=>", "->", "==", "!=", "&&", "||", "++", "--", "()", "<>", "::", ":="]
-            let symbolCount = codeSymbols.filter { text.contains($0) }.count
+            let symbolCount = codeSymbols.filter { checkText.contains($0) }.count
             if symbolCount < 2 {
                 return false
             }
         }
         
-        // プログラミング言語の典型的なパターン（単語境界を考慮）
-        let codePatterns = [
-            // 関数・メソッド定義
-            "\\bfunc\\s+\\w+", "\\bfunction\\s+\\w+", "\\bdef\\s+\\w+",
-            // クラス・構造体定義
-            "\\bclass\\s+\\w+", "\\bstruct\\s+\\w+", "\\binterface\\s+\\w+",
-            // 変数定義
-            "\\bvar\\s+\\w+", "\\blet\\s+\\w+", "\\bconst\\s+\\w+",
-            // 制御構造
-            "\\bif\\s*\\(", "\\bfor\\s*\\(", "\\bwhile\\s*\\(",
-            "\\bif\\s+\\w+\\s*:", "\\bfor\\s+\\w+\\s+in\\s+", // Python風
-            // その他の言語構造
-            "\\bimport\\s+\\w+", "#include\\s*[<\"]", "\\busing\\s+namespace",
-            "\\breturn\\s+", "\\bthrow\\s+", "\\btry\\s*\\{", "\\bcatch\\s*\\(",
-            // 型定義
-            "\\bpublic\\s+class", "\\bprivate\\s+", "\\bprotected\\s+",
-            // コメント
-            "^\\s*//", "^\\s*/\\*", "^\\s*#",
-            // SQL
-            "\\bSELECT\\s+.*\\sFROM\\b", "\\bINSERT\\s+INTO\\b", "\\bUPDATE\\s+.*\\sSET\\b", "\\bDELETE\\s+FROM\\b",
-            // アロー関数とメソッドチェーン
-            "=>", "\\.\\w+\\(.*\\)"
-        ]
+        // 静的な正規表現パターン（コンパイル済み）
+        struct CodePatterns {
+            static let patterns: [(String, NSRegularExpression?)] = {
+                let patternStrings = [
+                    // 関数・メソッド定義
+                    "\\bfunc\\s+\\w+", "\\bfunction\\s+\\w+", "\\bdef\\s+\\w+",
+                    // クラス・構造体定義
+                    "\\bclass\\s+\\w+", "\\bstruct\\s+\\w+", "\\binterface\\s+\\w+",
+                    // 変数定義
+                    "\\bvar\\s+\\w+", "\\blet\\s+\\w+", "\\bconst\\s+\\w+",
+                    // 制御構造
+                    "\\bif\\s*\\(", "\\bfor\\s*\\(", "\\bwhile\\s*\\(",
+                    "\\bif\\s+\\w+\\s*:", "\\bfor\\s+\\w+\\s+in\\s+", // Python風
+                    // その他の言語構造
+                    "\\bimport\\s+\\w+", "#include\\s*[<\"]", "\\busing\\s+namespace",
+                    "\\breturn\\s+", "\\bthrow\\s+", "\\btry\\s*\\{", "\\bcatch\\s*\\(",
+                    // 型定義
+                    "\\bpublic\\s+class", "\\bprivate\\s+", "\\bprotected\\s+",
+                    // コメント
+                    "^\\s*//", "^\\s*/\\*", "^\\s*#",
+                    // SQL
+                    "\\bSELECT\\s+.*\\sFROM\\b", "\\bINSERT\\s+INTO\\b", "\\bUPDATE\\s+.*\\sSET\\b", "\\bDELETE\\s+FROM\\b",
+                    // アロー関数とメソッドチェーン
+                    "=>", "\\.\\w+\\(.*\\)"
+                ]
+                return patternStrings.map { pattern in
+                    (pattern, try? NSRegularExpression(pattern: pattern, options: .caseInsensitive))
+                }
+            }()
+        }
         
-        for pattern in codePatterns {
-            if text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+        // コンパイル済み正規表現を使用
+        for (_, regex) in CodePatterns.patterns {
+            if let regex = regex,
+               regex.firstMatch(in: checkText, options: [], range: NSRange(checkText.startIndex..., in: checkText)) != nil {
                 return true
             }
         }
         
         // 複数のコード記号を含む場合
         let codeSymbols = ["{", "}", "[", "]", ";", "=>", "->", "==", "!=", "&&", "||", "++", "--", "::", ":=", "<=", ">="]
-        let symbolCount = codeSymbols.filter { text.contains($0) }.count
+        let symbolCount = codeSymbols.filter { checkText.contains($0) }.count
         if symbolCount >= 2 {
             return true
         }
         
         // インデントされたコード（4スペースまたはタブで始まる）
         // ただし、非常に短いテキストは除外
-        if (text.hasPrefix("    ") || text.hasPrefix("\t")) && text.count > 10 {
+        if (checkText.hasPrefix("    ") || checkText.hasPrefix("\t")) && checkText.count > 10 {
             return true
         }
         
