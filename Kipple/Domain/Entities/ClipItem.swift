@@ -247,15 +247,62 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     // ファイルパス判定を改善
     private func isFilePath(_ text: String) -> Bool {
-        // 絶対パスまたは相対パス
-        if text.hasPrefix("/") || text.hasPrefix("~/") || 
-           text.hasPrefix("./") || text.hasPrefix("../") {
-            return true
+        // スペースを含む場合は基本的にファイルパスではない（ただし、エスケープされている場合を除く）
+        if text.contains(" ") && !text.contains("\\ ") {
+            return false
         }
         
-        // Windowsパス
-        if text.count > 2 && text.dropFirst().hasPrefix(":\\") {
-            return true
+        // 改行を含む場合はファイルパスではない
+        if text.contains("\n") || text.contains("\r") {
+            return false
+        }
+        
+        // Unix/Mac絶対パス
+        if text.hasPrefix("/") {
+            // ただし、単なるスラッシュや短すぎるパスは除外
+            if text.count < 3 || text == "/" {
+                return false
+            }
+            // パス区切り文字を含むかチェック
+            let components = text.components(separatedBy: "/")
+            // 少なくとも2つ以上のコンポーネントが必要
+            if components.count >= 2 {
+                // 各コンポーネントが妥当かチェック（空文字や特殊文字のみは除外）
+                for component in components {
+                    if component.isEmpty { continue }
+                    // ファイル名として妥当な文字を含むかチェック
+                    let validChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
+                    if component.rangeOfCharacter(from: validChars) == nil {
+                        return false
+                    }
+                }
+                return true
+            }
+        }
+        
+        // ホームディレクトリ
+        if text.hasPrefix("~/") {
+            // ~/の後に何か続く必要がある
+            return text.count > 2
+        }
+        
+        // 相対パス
+        if text.hasPrefix("./") || text.hasPrefix("../") {
+            // ./や../の後に何か続く必要がある
+            return text.count > (text.hasPrefix("./") ? 2 : 3)
+        }
+        
+        // Windowsパス（より厳密なチェック）
+        if text.count > 3 {
+            // ドライブレターのチェック（A-Z, a-z）
+            let firstChar = text.first!
+            if (firstChar >= "A" && firstChar <= "Z") || (firstChar >= "a" && firstChar <= "z") {
+                let secondIndex = text.index(text.startIndex, offsetBy: 1)
+                let thirdIndex = text.index(text.startIndex, offsetBy: 2)
+                if text[secondIndex] == ":" && text[thirdIndex] == "\\" {
+                    return true
+                }
+            }
         }
         
         return false
