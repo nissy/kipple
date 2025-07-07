@@ -21,6 +21,7 @@ struct MainViewHistorySection: View {
     let onDelete: ((ClipItem) -> Void)?
     let onCategoryFilter: ((ClipItemCategory) -> Void)?
     @Binding var selectedCategory: ClipItemCategory?
+    @ObservedObject private var fontManager = FontManager.shared
     
     var body: some View {
         let filteredHistory = debouncedSearchText.isEmpty ? history : 
@@ -90,8 +91,7 @@ struct MainViewHistorySection: View {
                     }
                 })
                 .buttonStyle(PlainButtonStyle())
-                .scaleEffect(isSearching ? 1.1 : 1.0)
-                .animation(.spring(response: 0.3), value: isSearching)
+                .scaleEffect(isSearching ? 1.05 : 1.0)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -158,35 +158,24 @@ struct MainViewHistorySection: View {
             
                 // 履歴リスト
                 ScrollView {
-                    LazyVStack(spacing: 6) {
+                    LazyVStack(spacing: 6, pinnedViews: []) {
                         ForEach(filteredHistory) { item in
                             HistoryItemView(
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
                                 onTap: {
-                                    withAnimation(.spring(response: 0.3)) {
-                                        onSelectItem(item)
-                                    }
+                                    onSelectItem(item)
                                 },
                                 onTogglePin: {
-                                    withAnimation(.spring(response: 0.4)) {
-                                        onTogglePin(item)
-                                    }
+                                    onTogglePin(item)
                                 },
                                 onDelete: onDelete != nil ? {
-                                    withAnimation(.spring(response: 0.3)) {
-                                        onDelete?(item)
-                                    }
+                                    onDelete?(item)
                                 } : nil,
-                                onCategoryTap: nil // カテゴリタップは無効化
+                                onCategoryTap: nil, // カテゴリタップは無効化
+                                historyFont: Font(fontManager.historyFont)
                             )
-                            .onHover { hovering in
-                                hoveredHistoryItem = hovering ? item : nil
-                            }
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .scale.combined(with: .opacity)
-                            ))
+                            .frame(height: 44) // 固定高さでパフォーマンス向上
                         }
                     }
                     .padding(.horizontal, 16)

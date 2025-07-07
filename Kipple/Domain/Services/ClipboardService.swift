@@ -223,6 +223,24 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         // クリップボードには常にコピーする
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(content, forType: .string)
+        
+        // 履歴からのコピーの場合、既存のアイテムを最上位に移動
+        if !fromEditor {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                
+                // 既存のアイテムを探して最上位に移動
+                if let existingIndex = self.history.firstIndex(where: { $0.content == content }) {
+                    let existingItem = self.history.remove(at: existingIndex)
+                    self.history.insert(existingItem, at: 0)
+                    
+                    // 変更を保存
+                    self.saveSubject.send(self.history)
+                    
+                    Logger.shared.debug("Moved Kipple-copied item to top")
+                }
+            }
+        }
     }
     
     func togglePin(for item: ClipItem) {

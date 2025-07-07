@@ -62,7 +62,8 @@ final class WindowCloseTests: XCTestCase {
             },
             onTogglePin: {},
             onDelete: nil,
-            onCategoryTap: nil
+            onCategoryTap: nil,
+            historyFont: .system(size: 12)
         )
         
         // When - onTapを直接呼び出し（実際のタップをシミュレート）

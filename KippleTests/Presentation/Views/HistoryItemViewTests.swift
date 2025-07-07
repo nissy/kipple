@@ -24,7 +24,8 @@ final class HistoryItemViewTests: XCTestCase {
             onTap: { tapCalled = true },
             onTogglePin: { togglePinCalled = true },
             onDelete: nil,
-            onCategoryTap: nil
+            onCategoryTap: nil,
+            historyFont: .system(size: 12)
         )
         
         // Then
@@ -44,7 +45,8 @@ final class HistoryItemViewTests: XCTestCase {
             onTap: {},
             onTogglePin: {},
             onDelete: nil,
-            onCategoryTap: nil
+            onCategoryTap: nil,
+            historyFont: .system(size: 12)
         )
         
         // Then
