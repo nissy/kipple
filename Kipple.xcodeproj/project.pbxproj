@@ -75,6 +75,7 @@
 		F36B0FD36599630729120071 /* HistoryItemViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D4CCBADC0062B5F9F4784A8 /* HistoryItemViewTests.swift */; };
 		F50D990F3C9223E7040B6E88 /* ClipboardRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F55BFC35057CCC7E120F79 /* ClipboardRepositoryTests.swift */; };
 		FB1BCF2185DA68F62529EAAE /* MainViewControlSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */; };
+		FB9D3338A86658CEC827EFC0 /* ClearButtonRegressionTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */; };
 		FC6F95815A0E3BDD680FDA59 /* SearchableFontPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */; };
 		FCE770890167AE86972B9B78 /* SimpleFontSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D4179B0C1405E38A94135F /* SimpleFontSettingsView.swift */; };
 		FD2257A01775EBF6AFBFF297 /* TestUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03132BE081C4F4DD5B430EB3 /* TestUserDefaults.swift */; };
@@ -126,6 +127,7 @@
 		5D6095F731C177B070E9D834 /* ClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardService.swift; sourceTree = "<group>"; };
 		608B586ED93A0164F0DC68E7 /* SettingsInputBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsInputBehaviorTests.swift; sourceTree = "<group>"; };
 		68AE691F1C10B06D450798F8 /* KippleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KippleApp.swift; sourceTree = "<group>"; };
+		6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearButtonRegressionTest.swift; sourceTree = "<group>"; };
 		7077BB0F24641D773661D25B /* DataSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSettingsView.swift; sourceTree = "<group>"; };
 		744EFD983380BA9F4014C37E /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		74ED56E8888BBC7EF54BB602 /* ClipboardFontSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardFontSettingsView.swift; sourceTree = "<group>"; };
@@ -503,6 +505,7 @@
 			isa = PBXGroup;
 			children = (
 				A4BEF7B90DD1B82EB331B31C /* AppInfoRetrievalTests.swift */,
+				6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */,
 				2F8ADF9534C07458432F307B /* ClipboardServiceAppInfoTests.swift */,
 				3F9ADC31B9E6B37397B6C954 /* ClipboardServiceTests.swift */,
 				E01220BA172B95E6A30D9395 /* ErrorHandlingTests.swift */,
@@ -699,6 +702,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9E2E66E284FB0F5EDA984E5D /* AppInfoRetrievalTests.swift in Sources */,
+				FB9D3338A86658CEC827EFC0 /* ClearButtonRegressionTest.swift in Sources */,
 				B49CEFA22A41ADF6429EC6EC /* ClipItemCategoryTests.swift in Sources */,
 				CDF35C2C4B849ADD16A715FE /* ClipItemTests.swift in Sources */,
 				F50D990F3C9223E7040B6E88 /* ClipboardRepositoryTests.swift in Sources */,

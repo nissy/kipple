@@ -58,6 +58,14 @@ struct SimpleLineNumberView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         
+        // テキストが変更された場合のみ更新（IME入力中は除く）
+        if textView.string != text && !textView.hasMarkedText() {
+            // 循環更新を防ぐためにフラグを設定
+            context.coordinator.isUpdatingText = true
+            textView.string = text
+            context.coordinator.isUpdatingText = false
+        }
+        
         // フォントが変更された場合のみ更新
         if textView.font != font {
             textView.font = font
@@ -96,6 +104,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         
         // IME入力中はテキストの同期をスキップ
         if !textView.hasMarkedText() && textView.string != text {
+            // 循環更新を防ぐためにフラグを設定（Coordinatorにアクセスできないため、ここではテキストを直接設定）
             textView.string = text
         }
         
@@ -203,6 +212,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         var paragraphStyle = NSMutableParagraphStyle()
         private var notificationObserver: NSObjectProtocol?
         private var lastSelectedLine: Int = 1
+        var isUpdatingText = false
         
         init(_ parent: SimpleLineNumberView) {
             self.parent = parent
@@ -255,15 +265,18 @@ struct SimpleLineNumberView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             
+            // 更新中の場合は処理をスキップ（循環更新を防ぐ）
+            if isUpdatingText {
+                return
+            }
+            
             // IME入力中（marked text がある場合）は処理をスキップ
             if textView.hasMarkedText() {
                 return
             }
             
-            // 非同期で親のテキストを更新
-            DispatchQueue.main.async { [weak self] in
-                self?.parent.text = textView.string
-            }
+            // 同期的に親のテキストを更新（英数字入力時の問題を解決）
+            parent.text = textView.string
             
             // パフォーマンス最適化: 行数が変わった場合のみ再描画
             if let rulerView = scrollView?.verticalRulerView as? SimpleLineNumberRulerView {

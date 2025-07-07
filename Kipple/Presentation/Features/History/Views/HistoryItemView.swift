@@ -19,7 +19,7 @@ struct HistoryItemView: View {
     @State private var isHovered = false
     @State private var isShowingPopover = false
     @State private var popoverTimer: Timer?
-    @State private var windowPosition: Bool = true // キャッシュされたウィンドウ位置
+    @State private var windowPosition: Bool? // 初期値をnilに設定
     @State private var isScrolling = false
     
     var body: some View {
@@ -131,7 +131,10 @@ struct HistoryItemView: View {
                 // ポップオーバーの遅延表示
                 popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
                     if isHovered && !isScrolling {
-                        windowPosition = checkWindowPosition()
+                        // 初回のみウィンドウ位置を確認
+                        if windowPosition == nil {
+                            windowPosition = checkWindowPosition()
+                        }
                         isShowingPopover = true
                     }
                 }
@@ -153,7 +156,10 @@ struct HistoryItemView: View {
             if isHovered {
                 popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
                     if isHovered && !isScrolling {
-                        windowPosition = checkWindowPosition()
+                        // 初回のみウィンドウ位置を確認
+                        if windowPosition == nil {
+                            windowPosition = checkWindowPosition()
+                        }
                         isShowingPopover = true
                     }
                 }
@@ -172,24 +178,27 @@ struct HistoryItemView: View {
     }
     
     private func checkWindowPosition() -> Bool {
-        if let mainWindow = NSApplication.shared.windows.first(where: { 
-            $0.title == "Kipple" || $0.contentViewController != nil
-        }) {
-            // ウィンドウが表示されている画面を取得
-            let windowScreen = NSScreen.screens.first { screen in
-                screen.frame.intersects(mainWindow.frame)
-            } ?? NSScreen.main
-            
-            guard let currentScreen = windowScreen else { return true }
-            
-            let screenFrame = currentScreen.frame
-            let windowFrame = mainWindow.frame
-            let screenCenter = screenFrame.midX
-            
-            // ウィンドウの中心がスクリーンの中心より左にあるかどうか
-            return windowFrame.midX < screenCenter
+        // メインウィンドウを取得（より確実な方法）
+        guard let mainWindow = NSApp.windows.first(where: { window in
+            window.isVisible && 
+            window.level == .normal &&
+            window.contentViewController != nil
+        }) else {
+            // ウィンドウが見つからない場合はデフォルトで左側
+            return true
         }
-        return true // デフォルトは左側として扱う
+        
+        // ウィンドウが表示されている画面を取得
+        guard let currentScreen = mainWindow.screen ?? NSScreen.main else {
+            return true
+        }
+        
+        let screenFrame = currentScreen.frame
+        let windowFrame = mainWindow.frame
+        let screenCenter = screenFrame.midX
+        
+        // ウィンドウの中心がスクリーンの中心より左にあるかどうか
+        return windowFrame.midX < screenCenter
     }
     
     private var popoverAttachmentAnchor: PopoverAttachmentAnchor {
@@ -199,7 +208,8 @@ struct HistoryItemView: View {
     
     private var popoverArrowEdge: Edge {
         // プレビューの矢印の向きを調整（ウィンドウの位置に基づいて左右に表示）
-        return windowPosition ? .trailing : .leading
+        // 初期値がnilの場合はデフォルトで右側に表示
+        return (windowPosition ?? true) ? .trailing : .leading
     }
     
     @ViewBuilder
