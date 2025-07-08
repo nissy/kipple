@@ -278,7 +278,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         }
     }
     
-    func togglePin(for item: ClipItem) {
+    func togglePin(for item: ClipItem) -> Bool {
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             let isPinning = !history[index].isPinned
             
@@ -288,8 +288,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 let currentPinnedCount = history.filter { $0.isPinned }.count
                 
                 if currentPinnedCount >= (maxPinnedItems > 0 ? maxPinnedItems : 10) {
-                    // 最大数に達している場合は何もしない
-                    return
+                    // 最大数に達している場合はfalseを返す
+                    return false
                 }
             }
             
@@ -305,7 +305,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             }
             
             saveSubject.send(history)
+            return true
         }
+        return false
     }
     
     private func cleanupHistory() {

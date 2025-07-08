@@ -21,6 +21,8 @@ struct HistoryItemView: View {
     @State private var popoverTimer: Timer?
     @State private var windowPosition: Bool? // 初期値をnilに設定
     @State private var isScrolling = false
+    @State private var isPinButtonHovered = false
+    @State private var isCategoryButtonHovered = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -31,18 +33,21 @@ struct HistoryItemView: View {
                 }) {
                     Image(systemName: item.category.icon)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isSelected ? .white : .accentColor)
+                        .foregroundColor(isSelected ? .white : (isCategoryButtonHovered ? .white : .accentColor))
                         .frame(width: 24, height: 24)
                         .background(
                             Circle()
                                 .fill(isSelected ? 
                                     Color.white.opacity(0.2) : 
-                                    Color.accentColor.opacity(0.15)
+                                    (isCategoryButtonHovered ? Color.accentColor : Color.accentColor.opacity(0.15))
                                 )
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
                 .help(item.actionTitle ?? "")
+                .onHover { hovering in
+                    isCategoryButtonHovered = hovering
+                }
             } else if let onCategoryTap = onCategoryTap {
                 Button(action: onCategoryTap) {
                     Image(systemName: item.category.icon)
@@ -76,16 +81,19 @@ struct HistoryItemView: View {
             Button(action: onTogglePin) {
                 ZStack {
                     Circle()
-                        .fill(item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1))
+                        .fill(pinButtonBackground)
                         .frame(width: 28, height: 28)
                     
-                    Image(systemName: item.isPinned ? "pin.fill" : "pin")
-                        .foregroundColor(item.isPinned ? .white : .secondary)
+                    Image(systemName: pinButtonIcon)
+                        .foregroundColor(pinButtonForeground)
                         .font(.system(size: 12, weight: .medium))
-                        .rotationEffect(.degrees(item.isPinned ? 0 : -45))
+                        .rotationEffect(.degrees(pinButtonRotation))
                 }
             }
             .buttonStyle(PlainButtonStyle())
+            .onHover { hovering in
+                isPinButtonHovered = hovering
+            }
             
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
@@ -116,13 +124,7 @@ struct HistoryItemView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(
-            backgroundView
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onTap()
-                }
-        )
+        .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in
             // スクロール中はポップオーバーを表示しない
@@ -382,6 +384,38 @@ extension HistoryItemView {
             return "envelope"
         default:
             return "arrow.right.circle"
+        }
+    }
+    
+    private var pinButtonBackground: Color {
+        if isPinButtonHovered {
+            return item.isPinned ? Color.secondary.opacity(0.1) : Color.accentColor
+        } else {
+            return item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1)
+        }
+    }
+    
+    private var pinButtonIcon: String {
+        if isPinButtonHovered {
+            return item.isPinned ? "pin" : "pin.fill"
+        } else {
+            return item.isPinned ? "pin.fill" : "pin"
+        }
+    }
+    
+    private var pinButtonForeground: Color {
+        if isPinButtonHovered {
+            return item.isPinned ? .secondary : .white
+        } else {
+            return item.isPinned ? .white : .secondary
+        }
+    }
+    
+    private var pinButtonRotation: Double {
+        if isPinButtonHovered {
+            return item.isPinned ? -45 : 0
+        } else {
+            return item.isPinned ? 0 : -45
         }
     }
 }

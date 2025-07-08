@@ -12,6 +12,7 @@ struct MainView: View {
     @State private var selectedHistoryItem: ClipItem?
     @State private var hoveredHistoryItem: ClipItem?
     @State private var isShowingCopiedNotification = false
+    @State private var currentNotificationType: CopiedNotificationView.NotificationType = .copied
     @State private var isAlwaysOnTop = false
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
@@ -45,7 +46,7 @@ struct MainView: View {
             viewModel.selectHistoryItem(item)
             
             // コピー通知を表示
-            showCopiedNotification()
+            showCopiedNotification(.copied)
             
             // ピン（常に最前面）が有効でない場合のみウィンドウを閉じる
             if !isAlwaysOnTop {
@@ -151,7 +152,10 @@ struct MainView: View {
                                             hoveredHistoryItem: $hoveredHistoryItem,
                                             onSelectItem: handleItemSelection,
                                             onTogglePin: { item in
-                                                viewModel.togglePin(for: item)
+                                                if !viewModel.togglePin(for: item) {
+                                                    // ピン留め失敗（最大数に達している）
+                                                    showCopiedNotification(.pinLimitReached)
+                                                }
                                             },
                                             onDelete: { item in
                                                 viewModel.deleteItem(item)
@@ -168,7 +172,10 @@ struct MainView: View {
                                             pinnedItems: viewModel.pinnedItems,
                                             onSelectItem: handleItemSelection,
                                             onTogglePin: { item in
-                                                viewModel.togglePin(for: item)
+                                                if !viewModel.togglePin(for: item) {
+                                                    // ピン留め失敗（最大数に達している）
+                                                    showCopiedNotification(.pinLimitReached)
+                                                }
                                             },
                                             onDelete: { item in
                                                 viewModel.deleteItem(item)
@@ -190,7 +197,10 @@ struct MainView: View {
                                     hoveredHistoryItem: $hoveredHistoryItem,
                                     onSelectItem: handleItemSelection,
                                     onTogglePin: { item in
-                                        viewModel.togglePin(for: item)
+                                        if !viewModel.togglePin(for: item) {
+                                            // ピン留め失敗（最大数に達している）
+                                            showCopiedNotification(.pinLimitReached)
+                                        }
                                     },
                                     onDelete: { item in
                                         viewModel.deleteItem(item)
@@ -211,7 +221,7 @@ struct MainView: View {
         .background(
             Color(NSColor.windowBackgroundColor)
         )
-        .overlay(CopiedNotificationView(showNotification: $isShowingCopiedNotification), alignment: .top)
+        .overlay(CopiedNotificationView(showNotification: $isShowingCopiedNotification, notificationType: currentNotificationType), alignment: .top)
         .safeAreaInset(edge: .bottom) {
             // 設定アイコンを下部に配置（ピンアイテムと重ならないように）
             VStack(spacing: 0) {
@@ -288,7 +298,7 @@ struct MainView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
-            showCopiedNotification()
+            showCopiedNotification(.copied)
         }
     }
     
@@ -297,7 +307,7 @@ struct MainView: View {
         viewModel.copyEditor()
         
         // コピー通知を表示
-        showCopiedNotification()
+        showCopiedNotification(.copied)
         
         // Copyボタンではウィンドウを閉じない（ピンの状態に関わらず）
     }
@@ -313,7 +323,10 @@ struct MainView: View {
         onAlwaysOnTopChanged?(isAlwaysOnTop)
     }
     
-    private func showCopiedNotification() {
+    private func showCopiedNotification(_ type: CopiedNotificationView.NotificationType) {
+        // 通知タイプを設定
+        currentNotificationType = type
+        
         // 既に表示中の場合は一旦非表示にしてから再表示（アニメーションのリセット）
         if isShowingCopiedNotification {
             isShowingCopiedNotification = false

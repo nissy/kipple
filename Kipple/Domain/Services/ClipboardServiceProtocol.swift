@@ -17,7 +17,7 @@ protocol ClipboardServiceProtocol: AnyObject {
     func stopMonitoring()
     func copyToClipboard(_ content: String, fromEditor: Bool)
     func clearAllHistory()
-    func togglePin(for item: ClipItem)
+    func togglePin(for item: ClipItem) -> Bool
     func deleteItem(_ item: ClipItem)
     func reorderPinnedItems(_ items: [ClipItem])
 }
