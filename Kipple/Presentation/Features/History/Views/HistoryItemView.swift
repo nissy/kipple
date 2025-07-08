@@ -76,7 +76,7 @@ struct HistoryItemView: View {
             Button(action: onTogglePin) {
                 ZStack {
                     Circle()
-                        .fill(item.isPinned ? Color.accentColor : Color.clear)
+                        .fill(item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1))
                         .frame(width: 28, height: 28)
                     
                     Image(systemName: item.isPinned ? "pin.fill" : "pin")
@@ -87,14 +87,16 @@ struct HistoryItemView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
                 Text(item.displayContent)
                     .font(historyFont)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundColor(isSelected ? .white : .primary)
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture {
                 onTap()
