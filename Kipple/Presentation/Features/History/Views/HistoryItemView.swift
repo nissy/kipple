@@ -25,7 +25,15 @@ struct HistoryItemView: View {
     @State private var isCategoryButtonHovered = false
     
     var body: some View {
-        HStack(spacing: 12) {
+        ZStack {
+            // 背景全体をクリック可能にするための透明レイヤー（パディングを含む全体）
+            backgroundView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap()
+                }
+            
+            HStack(spacing: 12) {
             // カテゴリアイコン（アクション可能な場合はボタンとして機能）
             if item.isActionable {
                 Button(action: {
@@ -82,11 +90,11 @@ struct HistoryItemView: View {
                 ZStack {
                     Circle()
                         .fill(pinButtonBackground)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 24, height: 24)
                     
                     Image(systemName: pinButtonIcon)
                         .foregroundColor(pinButtonForeground)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .rotationEffect(.degrees(pinButtonRotation))
                 }
             }
@@ -107,10 +115,6 @@ struct HistoryItemView: View {
             .padding(.vertical, 6)
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onTap()
-            }
             
             if let onDelete = onDelete, isHovered && !isScrolling {
                 Button(action: onDelete) {
@@ -121,10 +125,10 @@ struct HistoryItemView: View {
                 .buttonStyle(PlainButtonStyle())
                 .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in
             // スクロール中はポップオーバーを表示しない
