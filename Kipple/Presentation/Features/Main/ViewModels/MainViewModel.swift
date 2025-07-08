@@ -152,8 +152,8 @@ class MainViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "lastEditorText")
     }
     
-    func togglePin(for item: ClipItem) {
-        clipboardService.togglePin(for: item)
+    func togglePin(for item: ClipItem) -> Bool {
+        return clipboardService.togglePin(for: item)
     }
     
     func deleteItem(_ item: ClipItem) {

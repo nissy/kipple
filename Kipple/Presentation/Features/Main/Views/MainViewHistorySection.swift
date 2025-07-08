@@ -164,18 +164,28 @@ struct MainViewHistorySection: View {
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
                                 onTap: {
-                                    onSelectItem(item)
+                                    withAnimation(.spring(response: 0.3)) {
+                                        onSelectItem(item)
+                                    }
                                 },
                                 onTogglePin: {
-                                    onTogglePin(item)
+                                    withAnimation(.spring(response: 0.4)) {
+                                        onTogglePin(item)
+                                    }
                                 },
                                 onDelete: onDelete != nil ? {
-                                    onDelete?(item)
+                                    withAnimation(.spring(response: 0.3)) {
+                                        onDelete?(item)
+                                    }
                                 } : nil,
                                 onCategoryTap: nil, // カテゴリタップは無効化
                                 historyFont: Font(fontManager.historyFont)
                             )
                             .frame(height: 44) // 固定高さでパフォーマンス向上
+                            .transition(.asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .scale.combined(with: .opacity)
+                            ))
                         }
                     }
                     .padding(.horizontal, 16)

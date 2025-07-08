@@ -21,43 +21,62 @@ struct HistoryItemView: View {
     @State private var popoverTimer: Timer?
     @State private var windowPosition: Bool? // 初期値をnilに設定
     @State private var isScrolling = false
+    @State private var isPinButtonHovered = false
+    @State private var isCategoryButtonHovered = false
     
     var body: some View {
-        HStack(spacing: 12) {
+        ZStack {
+            // 背景全体をクリック可能にするための透明レイヤー（パディングを含む全体）
+            backgroundView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap()
+                }
+            
+            HStack(spacing: 12) {
             // カテゴリアイコン（アクション可能な場合はボタンとして機能）
             if item.isActionable {
-                Button(action: {
-                    item.performAction()
-                }) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? 
+                            Color.white.opacity(0.2) : 
+                            (isCategoryButtonHovered ? Color.accentColor : Color.accentColor.opacity(0.15))
+                        )
+                        .frame(width: 24, height: 24)
+                    
                     Image(systemName: item.category.icon)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isSelected ? .white : .accentColor)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(isSelected ? 
-                                    Color.white.opacity(0.2) : 
-                                    Color.accentColor.opacity(0.15)
-                                )
-                        )
+                        .foregroundColor(isSelected ? .white : (isCategoryButtonHovered ? .white : .accentColor))
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+                .onTapGesture {
+                    item.performAction()
+                }
                 .help(item.actionTitle ?? "")
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.3)) {
+                        isCategoryButtonHovered = hovering
+                    }
+                }
             } else if let onCategoryTap = onCategoryTap {
-                Button(action: onCategoryTap) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? 
+                            Color.white.opacity(0.2) : 
+                            Color.secondary.opacity(0.1)
+                        )
+                        .frame(width: 24, height: 24)
+                    
                     Image(systemName: item.category.icon)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(isSelected ? .white : .secondary)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(isSelected ? 
-                                    Color.white.opacity(0.2) : 
-                                    Color.secondary.opacity(0.1)
-                                )
-                        )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+                .onTapGesture {
+                    onCategoryTap()
+                }
                 .help("「\(item.category.rawValue)」でフィルタ")
             } else {
                 Image(systemName: item.category.icon)
@@ -73,46 +92,58 @@ struct HistoryItemView: View {
                     )
             }
             
-            Button(action: onTogglePin) {
-                ZStack {
-                    Circle()
-                        .fill(item.isPinned ? Color.accentColor : Color.clear)
-                        .frame(width: 28, height: 28)
-                    
-                    Image(systemName: item.isPinned ? "pin.fill" : "pin")
-                        .foregroundColor(item.isPinned ? .white : .secondary)
-                        .font(.system(size: 12, weight: .medium))
-                        .rotationEffect(.degrees(item.isPinned ? 0 : -45))
+            ZStack {
+                Circle()
+                    .fill(pinButtonBackground)
+                    .frame(width: 24, height: 24)
+                
+                Image(systemName: pinButtonIcon)
+                    .foregroundColor(pinButtonForeground)
+                    .font(.system(size: 11, weight: .medium))
+                    .rotationEffect(.degrees(pinButtonRotation))
+            }
+            .frame(width: 24, height: 24)
+            .contentShape(Circle())
+            .onTapGesture {
+                onTogglePin()
+            }
+            .onHover { hovering in
+                withAnimation(.spring(response: 0.3)) {
+                    isPinButtonHovered = hovering
                 }
             }
-            .buttonStyle(PlainButtonStyle())
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
                 Text(item.displayContent)
                     .font(historyFont)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .foregroundColor(isSelected ? .white : .primary)
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture {
                 onTap()
             }
             
             if let onDelete = onDelete, isHovered && !isScrolling {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.secondary)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        onDelete()
+                    }
+                    .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in
             // スクロール中はポップオーバーを表示しない
@@ -372,6 +403,38 @@ extension HistoryItemView {
             return "envelope"
         default:
             return "arrow.right.circle"
+        }
+    }
+    
+    private var pinButtonBackground: Color {
+        if isPinButtonHovered {
+            return item.isPinned ? Color.secondary.opacity(0.1) : Color.accentColor
+        } else {
+            return item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1)
+        }
+    }
+    
+    private var pinButtonIcon: String {
+        if isPinButtonHovered {
+            return item.isPinned ? "pin" : "pin.fill"
+        } else {
+            return item.isPinned ? "pin.fill" : "pin"
+        }
+    }
+    
+    private var pinButtonForeground: Color {
+        if isPinButtonHovered {
+            return item.isPinned ? .secondary : .white
+        } else {
+            return item.isPinned ? .white : .secondary
+        }
+    }
+    
+    private var pinButtonRotation: Double {
+        if isPinButtonHovered {
+            return item.isPinned ? -45 : 0
+        } else {
+            return item.isPinned ? 0 : -45
         }
     }
 }

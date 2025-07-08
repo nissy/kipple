@@ -255,13 +255,15 @@ class MockClipboardServiceForViewModel: ObservableObject, ClipboardServiceProtoc
         self.fromEditor = fromEditor
     }
     
-    func togglePin(for item: ClipItem) {
+    func togglePin(for item: ClipItem) -> Bool {
         togglePinCalled = true
         lastToggledItem = item
         
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             history[index].isPinned.toggle()
+            return true
         }
+        return false
     }
     
     func clearAllHistory() {

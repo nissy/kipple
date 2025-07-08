@@ -164,7 +164,7 @@ private class MockClipboardService: ClipboardServiceProtocol {
         pinnedItems.removeAll()
     }
     
-    func togglePin(for item: ClipItem) {
+    func togglePin(for item: ClipItem) -> Bool {
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             var updatedItem = history[index]
             updatedItem.isPinned.toggle()
@@ -177,7 +177,9 @@ private class MockClipboardService: ClipboardServiceProtocol {
                 pinnedItems.removeAll { $0.id == item.id }
             }
             onPinnedItemsChanged?(pinnedItems)
+            return true
         }
+        return false
     }
     
     func deleteItem(_ item: ClipItem) {
