@@ -43,6 +43,27 @@ final class WindowManager: NSObject {
     func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
         
+        // 既存のウィンドウがある場合は再利用
+        if let existingWindow = mainWindow {
+            // ウィンドウが最小化されている場合は復元
+            if existingWindow.isMiniaturized {
+                existingWindow.deminiaturize(nil)
+            }
+            
+            // ウィンドウが画面に表示されていない場合は中央に配置
+            if !existingWindow.isVisible {
+                existingWindow.center()
+            }
+            
+            // ウィンドウを最前面に表示してフォーカスを当てる
+            existingWindow.makeKeyAndOrderFront(nil)
+            
+            // カーソル位置に再配置
+            positionWindowAtCursor(existingWindow)
+            return
+        }
+        
+        // 新規ウィンドウ作成
         let window = createMainWindow()
         guard let window = window else { return }
         
