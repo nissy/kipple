@@ -36,41 +36,47 @@ struct HistoryItemView: View {
             HStack(spacing: 12) {
             // カテゴリアイコン（アクション可能な場合はボタンとして機能）
             if item.isActionable {
-                Button(action: {
-                    item.performAction()
-                }) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? 
+                            Color.white.opacity(0.2) : 
+                            (isCategoryButtonHovered ? Color.accentColor : Color.accentColor.opacity(0.15))
+                        )
+                        .frame(width: 24, height: 24)
+                    
                     Image(systemName: item.category.icon)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(isSelected ? .white : (isCategoryButtonHovered ? .white : .accentColor))
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(isSelected ? 
-                                    Color.white.opacity(0.2) : 
-                                    (isCategoryButtonHovered ? Color.accentColor : Color.accentColor.opacity(0.15))
-                                )
-                        )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+                .onTapGesture {
+                    item.performAction()
+                }
                 .help(item.actionTitle ?? "")
                 .onHover { hovering in
-                    isCategoryButtonHovered = hovering
+                    withAnimation(.spring(response: 0.3)) {
+                        isCategoryButtonHovered = hovering
+                    }
                 }
             } else if let onCategoryTap = onCategoryTap {
-                Button(action: onCategoryTap) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? 
+                            Color.white.opacity(0.2) : 
+                            Color.secondary.opacity(0.1)
+                        )
+                        .frame(width: 24, height: 24)
+                    
                     Image(systemName: item.category.icon)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(isSelected ? .white : .secondary)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(isSelected ? 
-                                    Color.white.opacity(0.2) : 
-                                    Color.secondary.opacity(0.1)
-                                )
-                        )
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+                .onTapGesture {
+                    onCategoryTap()
+                }
                 .help("「\(item.category.rawValue)」でフィルタ")
             } else {
                 Image(systemName: item.category.icon)
@@ -86,21 +92,25 @@ struct HistoryItemView: View {
                     )
             }
             
-            Button(action: onTogglePin) {
-                ZStack {
-                    Circle()
-                        .fill(pinButtonBackground)
-                        .frame(width: 24, height: 24)
-                    
-                    Image(systemName: pinButtonIcon)
-                        .foregroundColor(pinButtonForeground)
-                        .font(.system(size: 11, weight: .medium))
-                        .rotationEffect(.degrees(pinButtonRotation))
-                }
+            ZStack {
+                Circle()
+                    .fill(pinButtonBackground)
+                    .frame(width: 24, height: 24)
+                
+                Image(systemName: pinButtonIcon)
+                    .foregroundColor(pinButtonForeground)
+                    .font(.system(size: 11, weight: .medium))
+                    .rotationEffect(.degrees(pinButtonRotation))
             }
-            .buttonStyle(PlainButtonStyle())
+            .frame(width: 24, height: 24)
+            .contentShape(Circle())
+            .onTapGesture {
+                onTogglePin()
+            }
             .onHover { hovering in
-                isPinButtonHovered = hovering
+                withAnimation(.spring(response: 0.3)) {
+                    isPinButtonHovered = hovering
+                }
             }
             
             VStack(alignment: .leading, spacing: 0) {
@@ -121,13 +131,14 @@ struct HistoryItemView: View {
             }
             
             if let onDelete = onDelete, isHovered && !isScrolling {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.secondary)
+                    .contentShape(Circle())
+                    .onTapGesture {
+                        onDelete()
+                    }
+                    .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
             }
             .padding(.horizontal, 10)
