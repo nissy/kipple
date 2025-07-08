@@ -63,9 +63,9 @@ struct CopiedNotificationView: View {
                     insertion: .move(edge: .top).combined(with: .opacity),
                     removal: .opacity.combined(with: .scale)
                 ))
-                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showNotification)
             }
         }
         .padding(.top, 8)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showNotification)
     }
 }

@@ -115,6 +115,10 @@ struct HistoryItemView: View {
             .padding(.vertical, 6)
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap()
+            }
             
             if let onDelete = onDelete, isHovered && !isScrolling {
                 Button(action: onDelete) {

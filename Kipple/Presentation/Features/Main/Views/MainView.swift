@@ -329,20 +329,28 @@ struct MainView: View {
         
         // 既に表示中の場合は一旦非表示にしてから再表示（アニメーションのリセット）
         if isShowingCopiedNotification {
-            isShowingCopiedNotification = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.isShowingCopiedNotification = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                isShowingCopiedNotification = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isShowingCopiedNotification = true
+                }
                 self.hideCopiedNotificationAfterDelay()
             }
         } else {
-            isShowingCopiedNotification = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                isShowingCopiedNotification = true
+            }
             hideCopiedNotificationAfterDelay()
         }
     }
     
     private func hideCopiedNotificationAfterDelay() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.isShowingCopiedNotification = false
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                self.isShowingCopiedNotification = false
+            }
         }
     }
     
