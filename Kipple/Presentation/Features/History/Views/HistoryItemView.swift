@@ -96,6 +96,8 @@ struct HistoryItemView: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 Spacer(minLength: 0)
             }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture {
@@ -114,7 +116,13 @@ struct HistoryItemView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(backgroundView)
+        .background(
+            backgroundView
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap()
+                }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in
             // スクロール中はポップオーバーを表示しない
