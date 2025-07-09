@@ -10,6 +10,7 @@ import Foundation
 protocol ClipboardServiceProtocol: AnyObject {
     var history: [ClipItem] { get }
     var pinnedItems: [ClipItem] { get }
+    var currentClipboardContent: String? { get }
     var onHistoryChanged: ((ClipItem) -> Void)? { get set }
     var onPinnedItemsChanged: (([ClipItem]) -> Void)? { get set }
     

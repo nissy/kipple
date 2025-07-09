@@ -17,6 +17,7 @@ struct MainView: View {
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject private var appSettings = AppSettings.shared
+    @ObservedObject private var fontManager = FontManager.shared
     
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
@@ -147,6 +148,7 @@ struct MainView: View {
                                     topContent: {
                                         MainViewHistorySection(
                                             history: viewModel.history,
+                                            currentClipboardContent: viewModel.currentClipboardContent,
                                             selectedHistoryItem: $selectedHistoryItem,
                                             hoveredHistoryItem: $hoveredHistoryItem,
                                             onSelectItem: handleItemSelection,
@@ -169,6 +171,7 @@ struct MainView: View {
                                     bottomContent: {
                                         MainViewPinnedSection(
                                             pinnedItems: viewModel.pinnedItems,
+                                            currentClipboardContent: viewModel.currentClipboardContent,
                                             onSelectItem: handleItemSelection,
                                             onTogglePin: { item in
                                                 if !viewModel.togglePin(for: item) {
@@ -192,6 +195,7 @@ struct MainView: View {
                             } else {
                                 MainViewHistorySection(
                                     history: viewModel.history,
+                                    currentClipboardContent: viewModel.currentClipboardContent,
                                     selectedHistoryItem: $selectedHistoryItem,
                                     hoveredHistoryItem: $hoveredHistoryItem,
                                     onSelectItem: handleItemSelection,
@@ -225,7 +229,28 @@ struct MainView: View {
             // 設定アイコンを下部に配置（ピンアイテムと重ならないように）
             VStack(spacing: 0) {
                 
-                HStack {
+                HStack(spacing: 12) {
+                    // 現在のペースト内容を表示
+                    if let currentContent = viewModel.currentClipboardContent {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.on.clipboard")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                            
+                            Text(currentContent)
+                                .font(.custom(fontManager.historyFont.fontName, size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.accentColor.opacity(0.1))
+                        )
+                    }
+                    
                     Spacer()
                     
                     Button(action: {

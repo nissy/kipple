@@ -10,6 +10,7 @@ import Combine
 
 struct MainViewPinnedSection: View {
     let pinnedItems: [ClipItem]
+    let currentClipboardContent: String?
     let onSelectItem: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
@@ -168,6 +169,7 @@ struct MainViewPinnedSection: View {
                         HistoryItemView(
                             item: item,
                             isSelected: false,  // ピンアイテムは選択状態を表示しない
+                            isCurrentClipboardItem: item.content == currentClipboardContent,
                             onTap: {
                                 withAnimation(.spring(response: 0.3)) {
                                     // selectedItemは設定しない（背景を青くしない）

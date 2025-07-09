@@ -14,6 +14,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     static let shared = ClipboardService()
     
     @Published var history: [ClipItem] = []
+    @Published var currentClipboardContent: String?
     var pinnedItems: [ClipItem] {
         history.filter { $0.isPinned }
     }
@@ -91,6 +92,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         
         // アプリ切り替えの監視を開始
         setupAppActivationMonitoring()
+        
+        // 現在のクリップボードの内容を初期化（同期的に設定）
+        currentClipboardContent = NSPasteboard.general.string(forType: .string)
     }
     
     func startMonitoring() {
@@ -171,6 +175,10 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             
             if let content = NSPasteboard.general.string(forType: .string),
                !content.isEmpty {
+                // 現在のクリップボード内容を更新
+                DispatchQueue.main.async { [weak self] in
+                    self?.currentClipboardContent = content
+                }
                 addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: fromEditor)
             }
         }
@@ -254,6 +262,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             // エディタからのコピーは内部コピーではないことを明示
             isInternalCopy = false
         }
+        
+        // 現在のクリップボード内容を即座に更新（同期的に）
+        currentClipboardContent = content
         
         // クリップボードには常にコピーする
         NSPasteboard.general.clearContents()

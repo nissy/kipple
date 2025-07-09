@@ -10,6 +10,7 @@ import Combine
 
 struct MainViewHistorySection: View {
     let history: [ClipItem]
+    let currentClipboardContent: String?
     @Binding var selectedHistoryItem: ClipItem?
     @Binding var hoveredHistoryItem: ClipItem?
     @State private var isSearching = false
@@ -163,6 +164,7 @@ struct MainViewHistorySection: View {
                             HistoryItemView(
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
+                                isCurrentClipboardItem: item.content == currentClipboardContent,
                                 onTap: {
                                     withAnimation(.spring(response: 0.3)) {
                                         onSelectItem(item)

@@ -26,6 +26,9 @@ class MainViewModel: ObservableObject {
     @Published var pinnedItems: [ClipItem] = []
     @Published var selectedCategory: ClipItemCategory?
     
+    // 現在のクリップボードコンテンツを公開
+    @Published var currentClipboardContent: String?
+    
     init(clipboardService: ClipboardServiceProtocol = ClipboardService.shared) {
         // 保存されたエディタテキストを読み込む（なければ空文字）
         self.editorText = UserDefaults.standard.string(forKey: "lastEditorText") ?? ""
@@ -51,6 +54,13 @@ class MainViewModel: ObservableObject {
                 self.updateFilteredItems(items)
             }
             .store(in: &cancellables)
+            
+            // 現在のクリップボード内容の変更を監視
+            observableService.$currentClipboardContent
+            .sink { [weak self] content in
+                self?.currentClipboardContent = content
+            }
+            .store(in: &cancellables)
         }
         
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
@@ -67,6 +77,7 @@ class MainViewModel: ObservableObject {
         
         // 初回読み込み
         updateFilteredItems(clipboardService.history)
+        currentClipboardContent = clipboardService.currentClipboardContent
     }
     
     func updateFilteredItems(_ items: [ClipItem]) {

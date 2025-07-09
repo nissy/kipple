@@ -223,6 +223,7 @@ class MainViewModelTests: XCTestCase {
 
 class MockClipboardServiceForViewModel: ObservableObject, ClipboardServiceProtocol {
     @Published var history: [ClipItem] = []
+    var currentClipboardContent: String?
     
     var pinnedItems: [ClipItem] {
         history.filter { $0.isPinned }
