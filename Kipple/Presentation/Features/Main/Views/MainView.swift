@@ -46,12 +46,14 @@ struct MainView: View {
         } else {
             viewModel.selectHistoryItem(item)
             
-            // コピー通知を表示
-            showCopiedNotification(.copied)
-            
-            // コピー時はウィンドウを開いたままにする（ユーザーが明示的に閉じるまで）
-            // 以前の動作：ピン留めが無効の場合はウィンドウを自動的に閉じていた
-            // 新しい動作：ピン留めの状態に関わらず、ウィンドウは開いたままにする
+            // コピー時の処理
+            if isAlwaysOnTop {
+                // Always on Topが有効な場合のみ通知を表示
+                showCopiedNotification(.copied)
+            } else {
+                // Always on Topが無効の場合は即座にウィンドウを閉じる
+                onClose?()
+            }
         }
     }
     
@@ -330,10 +332,14 @@ struct MainView: View {
     private func confirmAction() {
         viewModel.copyEditor()
         
-        // コピー通知を表示
-        showCopiedNotification(.copied)
-        
-        // Copyボタンではウィンドウを閉じない（ピンの状態に関わらず）
+        // コピー時の処理
+        if isAlwaysOnTop {
+            // Always on Topが有効な場合のみ通知を表示
+            showCopiedNotification(.copied)
+        } else {
+            // Always on Topが無効の場合は即座にウィンドウを閉じる
+            onClose?()
+        }
     }
     
     private func clearAction() {
