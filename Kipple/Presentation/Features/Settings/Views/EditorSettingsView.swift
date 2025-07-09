@@ -22,6 +22,20 @@ struct EditorSettingsView: View {
                 
                 Divider()
                 
+                // Editor Position
+                SettingsGroup("Editor Position") {
+                    SettingsRow(label: "Position") {
+                        Picker("", selection: $appSettings.editorPosition) {
+                            Text("Top").tag("top")
+                            Text("Bottom").tag("bottom")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .frame(width: 150)
+                    }
+                }
+                
+                Divider()
+                
                 // Editor Copy Hotkey
                 SettingsGroup("Editor Copy Hotkey") {
                     SettingsRow(

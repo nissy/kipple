@@ -65,159 +65,17 @@ struct MainView: View {
                 minTopHeight: 150,
                 minBottomHeight: 150,
                 topContent: {
-                    VStack(spacing: 0) {
-                        MainViewEditorSection(
-                            editorText: $viewModel.editorText,
-                            isAlwaysOnTop: $isAlwaysOnTop,
-                            onToggleAlwaysOnTop: toggleAlwaysOnTop
-                        )
-                        MainViewControlSection(
-                            onCopy: confirmAction,
-                            onClear: clearAction
-                        )
+                    if appSettings.editorPosition == "top" {
+                        editorSection
+                    } else {
+                        historyAndPinnedContent
                     }
-                    .id(editorRefreshID) // エディタセクションの部分更新用
                 },
                 bottomContent: {
-                    HStack(spacing: 0) {
-                        // 有効なフィルターを取得
-                        let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general, .kipple]
-                            .filter { isCategoryFilterEnabled($0) }
-                        
-                        // 有効なフィルターがある場合のみカテゴリフィルターパネルを表示
-                        if !enabledCategories.isEmpty {
-                            VStack(spacing: 8) {
-                                Text("Filter")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.secondary)
-                                    .padding(.top, 12)
-                                
-                                ForEach(enabledCategories, id: \.self) { category in
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.3)) {
-                                            viewModel.toggleCategoryFilter(category)
-                                        }
-                                    }) {
-                                        VStack(spacing: 4) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(viewModel.selectedCategory == category ? 
-                                                        Color.accentColor : 
-                                                        Color.secondary.opacity(0.1))
-                                                    .frame(width: 36, height: 36)
-                                                    .shadow(
-                                                        color: viewModel.selectedCategory == category ? 
-                                                            Color.accentColor.opacity(0.3) : .clear,
-                                                        radius: 4,
-                                                        y: 2
-                                                    )
-                                                
-                                                Image(systemName: category.icon)
-                                                    .font(.system(size: 16, weight: .medium))
-                                                    .foregroundColor(viewModel.selectedCategory == category ? 
-                                                        .white : .secondary)
-                                            }
-                                            
-                                            Text(category.rawValue)
-                                                .font(.system(size: 10))
-                                                .foregroundColor(viewModel.selectedCategory == category ? 
-                                                    .primary : .secondary)
-                                                .lineLimit(1)
-                                        }
-                                        .frame(width: 60)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
-                                    .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
-                                }
-                                
-                                Spacer()
-                            }
-                            .frame(width: 80)
-                            .padding(.vertical, 8)
-                            .background(
-                                Color(NSColor.controlBackgroundColor).opacity(0.5)
-                            )
-                        }
-                        
-                        // メインコンテンツ（履歴とピン留めセクション）
-                        VStack(spacing: 0) {
-                            if !viewModel.pinnedItems.isEmpty {
-                                ResizableSplitView(
-                                    topHeight: $historySectionHeight,
-                                    minTopHeight: 100,
-                                    minBottomHeight: 80,
-                                    topContent: {
-                                        MainViewHistorySection(
-                                            history: viewModel.history,
-                                            currentClipboardContent: viewModel.currentClipboardContent,
-                                            selectedHistoryItem: $selectedHistoryItem,
-                                            hoveredHistoryItem: $hoveredHistoryItem,
-                                            onSelectItem: handleItemSelection,
-                                            onTogglePin: { item in
-                                                if !viewModel.togglePin(for: item) {
-                                                    // ピン留め失敗（最大数に達している）
-                                                    showCopiedNotification(.pinLimitReached)
-                                                }
-                                            },
-                                            onDelete: { item in
-                                                viewModel.deleteItem(item)
-                                            },
-                                            onCategoryFilter: { category in
-                                                viewModel.toggleCategoryFilter(category)
-                                            },
-                                            selectedCategory: $viewModel.selectedCategory
-                                        )
-                                        .id(historyRefreshID)
-                                    },
-                                    bottomContent: {
-                                        MainViewPinnedSection(
-                                            pinnedItems: viewModel.pinnedItems,
-                                            currentClipboardContent: viewModel.currentClipboardContent,
-                                            onSelectItem: handleItemSelection,
-                                            onTogglePin: { item in
-                                                if !viewModel.togglePin(for: item) {
-                                                    // ピン留め失敗（最大数に達している）
-                                                    showCopiedNotification(.pinLimitReached)
-                                                }
-                                            },
-                                            onDelete: { item in
-                                                viewModel.deleteItem(item)
-                                            },
-                                            onReorderPins: { newOrder in
-                                                viewModel.reorderPinnedItems(newOrder)
-                                            },
-                                            onCategoryFilter: { category in
-                                                viewModel.toggleCategoryFilter(category)
-                                            },
-                                            selectedItem: $selectedHistoryItem
-                                        )
-                                    }
-                                )
-                            } else {
-                                MainViewHistorySection(
-                                    history: viewModel.history,
-                                    currentClipboardContent: viewModel.currentClipboardContent,
-                                    selectedHistoryItem: $selectedHistoryItem,
-                                    hoveredHistoryItem: $hoveredHistoryItem,
-                                    onSelectItem: handleItemSelection,
-                                    onTogglePin: { item in
-                                        if !viewModel.togglePin(for: item) {
-                                            // ピン留め失敗（最大数に達している）
-                                            showCopiedNotification(.pinLimitReached)
-                                        }
-                                    },
-                                    onDelete: { item in
-                                        viewModel.deleteItem(item)
-                                    },
-                                    onCategoryFilter: { category in
-                                        viewModel.toggleCategoryFilter(category)
-                                    },
-                                    selectedCategory: $viewModel.selectedCategory
-                                )
-                                .id(historyRefreshID)
-                            }
-                        }
+                    if appSettings.editorPosition == "bottom" {
+                        editorSection
+                    } else {
+                        historyAndPinnedContent
                     }
                 }
             )
@@ -228,69 +86,7 @@ struct MainView: View {
         )
         .overlay(CopiedNotificationView(showNotification: $isShowingCopiedNotification, notificationType: currentNotificationType), alignment: .top)
         .safeAreaInset(edge: .bottom) {
-            // 設定アイコンを下部に配置（ピンアイテムと重ならないように）
-            VStack(spacing: 0) {
-                
-                HStack(spacing: 12) {
-                    // 現在のペースト内容を表示
-                    if let currentContent = viewModel.currentClipboardContent {
-                        HStack(spacing: 8) {
-                            Image(systemName: "doc.on.clipboard")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                            
-                            Text(currentContent)
-                                .font(.custom(fontManager.historyFont.fontName, size: 11))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.accentColor.opacity(0.1))
-                        )
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        onOpenSettings?()
-                    }, label: {
-                        ZStack {
-                            Circle()
-                                .fill(LinearGradient(
-                                    colors: [
-                                        Color(NSColor.controlBackgroundColor),
-                                        Color(NSColor.controlBackgroundColor).opacity(0.8)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ))
-                                .frame(width: 28, height: 28)
-                                .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
-                            
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                        }
-                    })
-                    .buttonStyle(PlainButtonStyle())
-                    .scaleEffect(1.0)
-                    .onHover { _ in
-                        withAnimation(.spring(response: 0.3)) {
-                            // Scale effect handled by button style
-                        }
-                    }
-                    .help("Settings")
-                }
-                .padding(12)
-                .background(
-                    Color(NSColor.windowBackgroundColor).opacity(0.95)
-                    .background(.ultraThinMaterial)
-                )
-            }
+            bottomBar
         }
         .onReceive(NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
@@ -325,6 +121,234 @@ struct MainView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
+        }
+    }
+    
+    // エディタセクション
+    @ViewBuilder
+    private var editorSection: some View {
+        VStack(spacing: 0) {
+            MainViewEditorSection(
+                editorText: $viewModel.editorText,
+                isAlwaysOnTop: $isAlwaysOnTop,
+                onToggleAlwaysOnTop: toggleAlwaysOnTop
+            )
+            MainViewControlSection(
+                onCopy: confirmAction,
+                onClear: clearAction
+            )
+        }
+        .id(editorRefreshID)
+    }
+    
+    // 履歴とピン留めセクションのコンテンツ
+    @ViewBuilder
+    private var historyAndPinnedContent: some View {
+        HStack(spacing: 0) {
+            // 有効なフィルターを取得
+            let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general, .kipple]
+                .filter { isCategoryFilterEnabled($0) }
+            
+            // 有効なフィルターがある場合のみカテゴリフィルターパネルを表示
+            if !enabledCategories.isEmpty {
+                VStack(spacing: 8) {
+                    Text("Filter")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.top, 12)
+                    
+                    ForEach(enabledCategories, id: \.self) { category in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                viewModel.toggleCategoryFilter(category)
+                            }
+                        }) {
+                            VStack(spacing: 4) {
+                                ZStack {
+                                    Circle()
+                                        .fill(viewModel.selectedCategory == category ? 
+                                            Color.accentColor : 
+                                            Color.secondary.opacity(0.1))
+                                        .frame(width: 36, height: 36)
+                                        .shadow(
+                                            color: viewModel.selectedCategory == category ? 
+                                                Color.accentColor.opacity(0.3) : .clear,
+                                            radius: 4,
+                                            y: 2
+                                        )
+                                    
+                                    Image(systemName: category.icon)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(viewModel.selectedCategory == category ? 
+                                            .white : .secondary)
+                                }
+                                
+                                Text(category.rawValue)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(viewModel.selectedCategory == category ? 
+                                        .primary : .secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 60)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
+                    }
+                    
+                    Spacer()
+                }
+                .frame(width: 80)
+                .padding(.vertical, 8)
+                .background(
+                    Color(NSColor.controlBackgroundColor).opacity(0.5)
+                )
+            }
+            
+            // メインコンテンツ（履歴とピン留めセクション）
+            VStack(spacing: 0) {
+                if !viewModel.pinnedItems.isEmpty {
+                    ResizableSplitView(
+                        topHeight: $historySectionHeight,
+                        minTopHeight: 100,
+                        minBottomHeight: 80,
+                        topContent: {
+                            MainViewHistorySection(
+                                history: viewModel.history,
+                                currentClipboardContent: viewModel.currentClipboardContent,
+                                selectedHistoryItem: $selectedHistoryItem,
+                                hoveredHistoryItem: $hoveredHistoryItem,
+                                onSelectItem: handleItemSelection,
+                                onTogglePin: { item in
+                                    if !viewModel.togglePin(for: item) {
+                                        // ピン留め失敗（最大数に達している）
+                                        showCopiedNotification(.pinLimitReached)
+                                    }
+                                },
+                                onDelete: { item in
+                                    viewModel.deleteItem(item)
+                                },
+                                onCategoryFilter: { category in
+                                    viewModel.toggleCategoryFilter(category)
+                                },
+                                selectedCategory: $viewModel.selectedCategory
+                            )
+                            .id(historyRefreshID)
+                        },
+                        bottomContent: {
+                            MainViewPinnedSection(
+                                pinnedItems: viewModel.pinnedItems,
+                                currentClipboardContent: viewModel.currentClipboardContent,
+                                onSelectItem: handleItemSelection,
+                                onTogglePin: { item in
+                                    if !viewModel.togglePin(for: item) {
+                                        // ピン留め失敗（最大数に達している）
+                                        showCopiedNotification(.pinLimitReached)
+                                    }
+                                },
+                                onDelete: { item in
+                                    viewModel.deleteItem(item)
+                                },
+                                onReorderPins: { newOrder in
+                                    viewModel.reorderPinnedItems(newOrder)
+                                },
+                                onCategoryFilter: { category in
+                                    viewModel.toggleCategoryFilter(category)
+                                },
+                                selectedItem: $selectedHistoryItem
+                            )
+                        }
+                    )
+                } else {
+                    MainViewHistorySection(
+                        history: viewModel.history,
+                        currentClipboardContent: viewModel.currentClipboardContent,
+                        selectedHistoryItem: $selectedHistoryItem,
+                        hoveredHistoryItem: $hoveredHistoryItem,
+                        onSelectItem: handleItemSelection,
+                        onTogglePin: { item in
+                            if !viewModel.togglePin(for: item) {
+                                // ピン留め失敗（最大数に達している）
+                                showCopiedNotification(.pinLimitReached)
+                            }
+                        },
+                        onDelete: { item in
+                            viewModel.deleteItem(item)
+                        },
+                        onCategoryFilter: { category in
+                            viewModel.toggleCategoryFilter(category)
+                        },
+                        selectedCategory: $viewModel.selectedCategory
+                    )
+                    .id(historyRefreshID)
+                }
+            }
+        }
+    }
+    
+    // 下部バー
+    @ViewBuilder
+    private var bottomBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // 現在のペースト内容を表示
+                if let currentContent = viewModel.currentClipboardContent {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                        
+                        Text(currentContent)
+                            .font(.custom(fontManager.historyFont.fontName, size: 11))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.1))
+                    )
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    onOpenSettings?()
+                }, label: {
+                    ZStack {
+                        Circle()
+                            .fill(LinearGradient(
+                                colors: [
+                                    Color(NSColor.controlBackgroundColor),
+                                    Color(NSColor.controlBackgroundColor).opacity(0.8)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .frame(width: 28, height: 28)
+                            .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
+                        
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                })
+                .buttonStyle(PlainButtonStyle())
+                .scaleEffect(1.0)
+                .onHover { _ in
+                    withAnimation(.spring(response: 0.3)) {
+                        // Scale effect handled by button style
+                    }
+                }
+                .help("Settings")
+            }
+            .padding(12)
+            .background(
+                Color(NSColor.windowBackgroundColor).opacity(0.95)
+                .background(.ultraThinMaterial)
+            )
         }
     }
     
