@@ -149,13 +149,50 @@ struct MainView: View {
             let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general, .kipple]
                 .filter { isCategoryFilterEnabled($0) }
             
-            // 有効なフィルターがある場合のみカテゴリフィルターパネルを表示
-            if !enabledCategories.isEmpty {
+            // フィルターパネルを常に表示（ピンフィルターがあるため）
                 VStack(spacing: 8) {
                     Text("Filter")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.top, 12)
+                    
+                    // ピン留めフィルター（一番上に配置）
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3)) {
+                            viewModel.togglePinnedFilter()
+                        }
+                    }) {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(viewModel.isPinnedFilterActive ? 
+                                        Color.accentColor : 
+                                        Color.secondary.opacity(0.1))
+                                    .frame(width: 36, height: 36)
+                                    .shadow(
+                                        color: viewModel.isPinnedFilterActive ? 
+                                            Color.accentColor.opacity(0.3) : .clear,
+                                        radius: 4,
+                                        y: 2
+                                    )
+                                
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(viewModel.isPinnedFilterActive ? 
+                                        .white : .secondary)
+                            }
+                            
+                            Text("Pinned")
+                                .font(.system(size: 10))
+                                .foregroundColor(viewModel.isPinnedFilterActive ? 
+                                    .primary : .secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(width: 60)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .scaleEffect(viewModel.isPinnedFilterActive ? 1.05 : 1.0)
+                    .animation(.spring(response: 0.3), value: viewModel.isPinnedFilterActive)
                     
                     ForEach(enabledCategories, id: \.self) { category in
                         Button(action: {
@@ -203,86 +240,29 @@ struct MainView: View {
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.5)
                 )
-            }
             
-            // メインコンテンツ（履歴とピン留めセクション）
-            VStack(spacing: 0) {
-                if !viewModel.pinnedItems.isEmpty {
-                    ResizableSplitView(
-                        topHeight: $historySectionHeight,
-                        minTopHeight: 100,
-                        minBottomHeight: 80,
-                        topContent: {
-                            MainViewHistorySection(
-                                history: viewModel.history,
-                                currentClipboardContent: viewModel.currentClipboardContent,
-                                selectedHistoryItem: $selectedHistoryItem,
-                                hoveredHistoryItem: $hoveredHistoryItem,
-                                onSelectItem: handleItemSelection,
-                                onTogglePin: { item in
-                                    if !viewModel.togglePin(for: item) {
-                                        // ピン留め失敗（最大数に達している）
-                                        showCopiedNotification(.pinLimitReached)
-                                    }
-                                },
-                                onDelete: { item in
-                                    viewModel.deleteItem(item)
-                                },
-                                onCategoryFilter: { category in
-                                    viewModel.toggleCategoryFilter(category)
-                                },
-                                selectedCategory: $viewModel.selectedCategory
-                            )
-                            .id(historyRefreshID)
-                        },
-                        bottomContent: {
-                            MainViewPinnedSection(
-                                pinnedItems: viewModel.pinnedItems,
-                                currentClipboardContent: viewModel.currentClipboardContent,
-                                onSelectItem: handleItemSelection,
-                                onTogglePin: { item in
-                                    if !viewModel.togglePin(for: item) {
-                                        // ピン留め失敗（最大数に達している）
-                                        showCopiedNotification(.pinLimitReached)
-                                    }
-                                },
-                                onDelete: { item in
-                                    viewModel.deleteItem(item)
-                                },
-                                onReorderPins: { newOrder in
-                                    viewModel.reorderPinnedItems(newOrder)
-                                },
-                                onCategoryFilter: { category in
-                                    viewModel.toggleCategoryFilter(category)
-                                },
-                                selectedItem: $selectedHistoryItem
-                            )
-                        }
-                    )
-                } else {
-                    MainViewHistorySection(
-                        history: viewModel.history,
-                        currentClipboardContent: viewModel.currentClipboardContent,
-                        selectedHistoryItem: $selectedHistoryItem,
-                        hoveredHistoryItem: $hoveredHistoryItem,
-                        onSelectItem: handleItemSelection,
-                        onTogglePin: { item in
-                            if !viewModel.togglePin(for: item) {
-                                // ピン留め失敗（最大数に達している）
-                                showCopiedNotification(.pinLimitReached)
-                            }
-                        },
-                        onDelete: { item in
-                            viewModel.deleteItem(item)
-                        },
-                        onCategoryFilter: { category in
-                            viewModel.toggleCategoryFilter(category)
-                        },
-                        selectedCategory: $viewModel.selectedCategory
-                    )
-                    .id(historyRefreshID)
-                }
-            }
+            // メインコンテンツ（履歴セクションのみ）
+            MainViewHistorySection(
+                history: viewModel.history,
+                currentClipboardContent: viewModel.currentClipboardContent,
+                selectedHistoryItem: $selectedHistoryItem,
+                hoveredHistoryItem: $hoveredHistoryItem,
+                onSelectItem: handleItemSelection,
+                onTogglePin: { item in
+                    if !viewModel.togglePin(for: item) {
+                        // ピン留め失敗（最大数に達している）
+                        showCopiedNotification(.pinLimitReached)
+                    }
+                },
+                onDelete: { item in
+                    viewModel.deleteItem(item)
+                },
+                onCategoryFilter: { category in
+                    viewModel.toggleCategoryFilter(category)
+                },
+                selectedCategory: $viewModel.selectedCategory
+            )
+            .id(historyRefreshID)
         }
     }
     

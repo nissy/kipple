@@ -171,9 +171,7 @@ struct MainViewHistorySection: View {
                                     }
                                 },
                                 onTogglePin: {
-                                    withAnimation(.spring(response: 0.4)) {
-                                        onTogglePin(item)
-                                    }
+                                    onTogglePin(item)
                                 },
                                 onDelete: onDelete != nil ? {
                                     withAnimation(.spring(response: 0.3)) {
@@ -184,10 +182,8 @@ struct MainViewHistorySection: View {
                                 historyFont: Font(fontManager.historyFont)
                             )
                             .frame(height: 44) // 固定高さでパフォーマンス向上
-                            .transition(.asymmetric(
-                                insertion: .scale.combined(with: .opacity),
-                                removal: .scale.combined(with: .opacity)
-                            ))
+                            .transition(.opacity)
+                            .animation(.easeInOut(duration: 0.2), value: item.isPinned)
                         }
                     }
                     .padding(.horizontal, 16)

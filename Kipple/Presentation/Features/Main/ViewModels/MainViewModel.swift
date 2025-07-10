@@ -25,6 +25,7 @@ class MainViewModel: ObservableObject {
     @Published var history: [ClipItem] = []
     @Published var pinnedItems: [ClipItem] = []
     @Published var selectedCategory: ClipItemCategory?
+    @Published var isPinnedFilterActive: Bool = false
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String?
@@ -81,72 +82,32 @@ class MainViewModel: ObservableObject {
     }
     
     func updateFilteredItems(_ items: [ClipItem]) {
-        // 変更がない場合は早期リターン（パフォーマンス最適化）
-        if items.isEmpty && history.isEmpty && pinnedItems.isEmpty {
+        // フィルタ無しの場合は全アイテムを使用
+        if !isPinnedFilterActive && selectedCategory == nil {
+            self.history = items
+            self.pinnedItems = []
             return
         }
         
-        // UserDefaultsから設定を直接取得（デフォルトtrue）
-        let defaults = UserDefaults.standard
-        let filterCategoryURL = defaults.object(forKey: "filterCategoryURL") as? Bool ?? true
-        let filterCategoryEmail = defaults.object(forKey: "filterCategoryEmail") as? Bool ?? true
-        let filterCategoryCode = defaults.object(forKey: "filterCategoryCode") as? Bool ?? true
-        let filterCategoryFilePath = defaults.object(forKey: "filterCategoryFilePath") as? Bool ?? true
-        let filterCategoryShortText = defaults.object(forKey: "filterCategoryShortText") as? Bool ?? true
-        let filterCategoryLongText = defaults.object(forKey: "filterCategoryLongText") as? Bool ?? true
-        let filterCategoryGeneral = defaults.object(forKey: "filterCategoryGeneral") as? Bool ?? true
-        let filterCategoryKipple = defaults.object(forKey: "filterCategoryKipple") as? Bool ?? true
-        
-        // 1回のループで分類（パフォーマンス最適化）
-        var unpinnedItems: [ClipItem] = []
-        var pinnedItems: [ClipItem] = []
-        unpinnedItems.reserveCapacity(items.count)
-        pinnedItems.reserveCapacity(min(items.count, 10))
+        // フィルタありの場合
+        var filteredItems: [ClipItem] = []
         
         for item in items {
-            // カテゴリフィルタ（すべてのアイテムに適用）
-            if let selectedCategory = selectedCategory {
-                var shouldFilter = false
-                
-                switch selectedCategory {
-                case .url:
-                    shouldFilter = filterCategoryURL
-                case .email:
-                    shouldFilter = filterCategoryEmail
-                case .code:
-                    shouldFilter = filterCategoryCode
-                case .filePath:
-                    shouldFilter = filterCategoryFilePath
-                case .shortText:
-                    shouldFilter = filterCategoryShortText
-                case .longText:
-                    shouldFilter = filterCategoryLongText
-                case .general:
-                    shouldFilter = filterCategoryGeneral
-                case .kipple:
-                    shouldFilter = filterCategoryKipple
-                }
-                
-                if shouldFilter && item.category != selectedCategory {
-                    continue
-                }
+            // ピンフィルタ
+            if isPinnedFilterActive && !item.isPinned {
+                continue
             }
             
-            // フィルタを通過したアイテムを振り分け
-            if item.isPinned {
-                pinnedItems.append(item)
-            } else {
-                unpinnedItems.append(item)
+            // カテゴリフィルタ
+            if let selectedCategory = selectedCategory, item.category != selectedCategory {
+                continue
             }
+            
+            filteredItems.append(item)
         }
         
-        // 変更がある場合のみ更新
-        if self.history != unpinnedItems {
-            self.history = unpinnedItems
-        }
-        if self.pinnedItems != pinnedItems {
-            self.pinnedItems = pinnedItems
-        }
+        self.history = filteredItems
+        self.pinnedItems = []
     }
     
     func copyEditor() {
@@ -220,6 +181,19 @@ class MainViewModel: ObservableObject {
             selectedCategory = nil
         } else {
             selectedCategory = category
+            // ピンフィルターをクリア
+            isPinnedFilterActive = false
+        }
+        // フィルタを適用
+        updateFilteredItems(clipboardService.history)
+    }
+    
+    /// ピンフィルタの切り替え
+    func togglePinnedFilter() {
+        isPinnedFilterActive.toggle()
+        // カテゴリフィルタをクリア
+        if isPinnedFilterActive {
+            selectedCategory = nil
         }
         // フィルタを適用
         updateFilteredItems(clipboardService.history)

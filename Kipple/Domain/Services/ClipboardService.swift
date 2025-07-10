@@ -306,15 +306,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             
             history[index].isPinned.toggle()
             
-            // ピン留めする場合は一番下に移動
-            if history[index].isPinned {
-                let pinnedItem = history.remove(at: index)
-                // 既存のピン留めアイテムの最後に追加
-                let pinnedItems = history.filter { $0.isPinned }
-                let unpinnedItems = history.filter { !$0.isPinned }
-                history = pinnedItems + [pinnedItem] + unpinnedItems
-            }
-            
             saveSubject.send(history)
             return true
         }
@@ -322,29 +313,32 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     private func cleanupHistory() {
-        // より効率的な実装：1回のパスで分類
-        var pinnedItems: [ClipItem] = []
-        var unpinnedItems: [ClipItem] = []
-        
-        for item in history {
-            if item.isPinned {
-                pinnedItems.append(item)
-            } else {
-                unpinnedItems.append(item)
-            }
-        }
-        
         // UserDefaultsから最大数を取得
         let maxHistoryItems = UserDefaults.standard.integer(forKey: "maxHistoryItems")
         let maxPinnedItems = UserDefaults.standard.integer(forKey: "maxPinnedItems")
         let historyLimit = maxHistoryItems > 0 ? maxHistoryItems : 100 // デフォルトは100
         let pinnedLimit = maxPinnedItems > 0 ? maxPinnedItems : 10 // デフォルトは10
         
-        // ピン留めアイテムと通常アイテムをそれぞれ制限
-        let limitedPinnedItems = Array(pinnedItems.prefix(pinnedLimit))
-        let limitedUnpinnedItems = Array(unpinnedItems.prefix(historyLimit))
+        // ピン留めアイテムの数を制限（元の順序を維持）
+        var pinnedCount = 0
+        var totalCount = 0
+        var newHistory: [ClipItem] = []
         
-        history = limitedPinnedItems + limitedUnpinnedItems
+        for item in history {
+            if item.isPinned {
+                if pinnedCount < pinnedLimit {
+                    newHistory.append(item)
+                    pinnedCount += 1
+                }
+            } else {
+                if totalCount < historyLimit {
+                    newHistory.append(item)
+                    totalCount += 1
+                }
+            }
+        }
+        
+        history = newHistory
     }
     
     func clearAllHistory() {
