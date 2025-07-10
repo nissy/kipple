@@ -58,7 +58,7 @@ struct HistoryItemView: View {
                     )
             }
             
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
             // ピンボタン
             ZStack {
                 Circle()
@@ -139,7 +139,7 @@ struct HistoryItemView: View {
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 4)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture {
