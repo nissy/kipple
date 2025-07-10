@@ -6,7 +6,7 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 
 ## Key Features
 
-<img width="914" src="https://github.com/user-attachments/assets/0d7c42fb-31f2-493e-a0db-89e6e642bd10" />
+<img width="817" height="876" src="https://github.com/user-attachments/assets/cced1786-f1ca-44d3-aec5-2a803f482f05" />
 
 ### 🔖 Use Cases
 - **Reading List**: Pin articles and URLs to read later
