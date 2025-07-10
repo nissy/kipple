@@ -21,6 +21,7 @@ final class HistoryItemViewTests: XCTestCase {
         let view = HistoryItemView(
             item: item,
             isSelected: false,
+            isCurrentClipboardItem: false,
             onTap: { tapCalled = true },
             onTogglePin: { togglePinCalled = true },
             onDelete: nil,
@@ -42,6 +43,7 @@ final class HistoryItemViewTests: XCTestCase {
         _ = HistoryItemView(
             item: item,
             isSelected: false,
+            isCurrentClipboardItem: false,
             onTap: {},
             onTogglePin: {},
             onDelete: nil,

@@ -10,8 +10,8 @@ import Foundation
 protocol ClipboardServiceProtocol: AnyObject {
     var history: [ClipItem] { get }
     var pinnedItems: [ClipItem] { get }
+    var currentClipboardContent: String? { get }
     var onHistoryChanged: ((ClipItem) -> Void)? { get set }
-    var onPinnedItemsChanged: (([ClipItem]) -> Void)? { get set }
     
     func startMonitoring()
     func stopMonitoring()
@@ -19,5 +19,4 @@ protocol ClipboardServiceProtocol: AnyObject {
     func clearAllHistory()
     func togglePin(for item: ClipItem) -> Bool
     func deleteItem(_ item: ClipItem)
-    func reorderPinnedItems(_ items: [ClipItem])
 }

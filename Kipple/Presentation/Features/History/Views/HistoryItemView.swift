@@ -10,6 +10,7 @@ import SwiftUI
 struct HistoryItemView: View {
     let item: ClipItem
     let isSelected: Bool
+    let isCurrentClipboardItem: Bool
     let onTap: () -> Void
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
@@ -21,8 +22,6 @@ struct HistoryItemView: View {
     @State private var popoverTimer: Timer?
     @State private var windowPosition: Bool? // 初期値をnilに設定
     @State private var isScrolling = false
-    @State private var isPinButtonHovered = false
-    @State private var isCategoryButtonHovered = false
     
     var body: some View {
         ZStack {
@@ -33,20 +32,37 @@ struct HistoryItemView: View {
                     onTap()
                 }
             
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
+            // ピンボタン
+            ZStack {
+                Circle()
+                    .fill(pinButtonBackground)
+                    .frame(width: 24, height: 24)
+                
+                Image(systemName: pinButtonIcon)
+                    .foregroundColor(pinButtonForeground)
+                    .font(.system(size: 11, weight: .medium))
+                    .rotationEffect(.degrees(pinButtonRotation))
+            }
+            .frame(width: 24, height: 24)
+            .contentShape(Circle())
+            .onTapGesture {
+                onTogglePin()
+            }
+            
             // カテゴリアイコン（アクション可能な場合はボタンとして機能）
             if item.isActionable {
                 ZStack {
                     Circle()
                         .fill(isSelected ? 
                             Color.white.opacity(0.2) : 
-                            (isCategoryButtonHovered ? Color.accentColor : Color.accentColor.opacity(0.15))
+                            Color.accentColor
                         )
                         .frame(width: 24, height: 24)
                     
                     Image(systemName: item.category.icon)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isSelected ? .white : (isCategoryButtonHovered ? .white : .accentColor))
+                        .foregroundColor(isSelected ? .white : .white)
                 }
                 .frame(width: 24, height: 24)
                 .contentShape(Circle())
@@ -54,11 +70,6 @@ struct HistoryItemView: View {
                     item.performAction()
                 }
                 .help(item.actionTitle ?? "")
-                .onHover { hovering in
-                    withAnimation(.spring(response: 0.3)) {
-                        isCategoryButtonHovered = hovering
-                    }
-                }
             } else if let onCategoryTap = onCategoryTap {
                 ZStack {
                     Circle()
@@ -92,27 +103,6 @@ struct HistoryItemView: View {
                     )
             }
             
-            ZStack {
-                Circle()
-                    .fill(pinButtonBackground)
-                    .frame(width: 24, height: 24)
-                
-                Image(systemName: pinButtonIcon)
-                    .foregroundColor(pinButtonForeground)
-                    .font(.system(size: 11, weight: .medium))
-                    .rotationEffect(.degrees(pinButtonRotation))
-            }
-            .frame(width: 24, height: 24)
-            .contentShape(Circle())
-            .onTapGesture {
-                onTogglePin()
-            }
-            .onHover { hovering in
-                withAnimation(.spring(response: 0.3)) {
-                    isPinButtonHovered = hovering
-                }
-            }
-            
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
                 Text(item.displayContent)
@@ -122,15 +112,15 @@ struct HistoryItemView: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture {
                 onTap()
             }
             
-            if let onDelete = onDelete, isHovered && !isScrolling {
+            if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
@@ -141,8 +131,8 @@ struct HistoryItemView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in
@@ -253,15 +243,12 @@ struct HistoryItemView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )) :
-                AnyShapeStyle(Color(isHovered ? 
-                    NSColor.controlBackgroundColor : 
-                    NSColor.controlBackgroundColor.withAlphaComponent(0.3)
-                ))
+                AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
             )
             .overlay(
                 isHovered && !isSelected ?
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1) : nil
+                    .stroke(Color.accentColor.opacity(0.2), lineWidth: 1) : nil
             )
             .shadow(
                 color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
@@ -407,35 +394,19 @@ extension HistoryItemView {
     }
     
     private var pinButtonBackground: Color {
-        if isPinButtonHovered {
-            return item.isPinned ? Color.secondary.opacity(0.1) : Color.accentColor
-        } else {
-            return item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1)
-        }
+        return item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1)
     }
     
     private var pinButtonIcon: String {
-        if isPinButtonHovered {
-            return item.isPinned ? "pin" : "pin.fill"
-        } else {
-            return item.isPinned ? "pin.fill" : "pin"
-        }
+        return item.isPinned ? "pin.fill" : "pin"
     }
     
     private var pinButtonForeground: Color {
-        if isPinButtonHovered {
-            return item.isPinned ? .secondary : .white
-        } else {
-            return item.isPinned ? .white : .secondary
-        }
+        return item.isPinned ? .white : .secondary
     }
     
     private var pinButtonRotation: Double {
-        if isPinButtonHovered {
-            return item.isPinned ? -45 : 0
-        } else {
-            return item.isPinned ? 0 : -45
-        }
+        return item.isPinned ? 0 : -45
     }
 }
 

@@ -75,16 +75,27 @@ class RegressionTests: XCTestCase {
         // When: 3番目のアイテムをピン留め
         viewModel.togglePin(for: items[2])
         
-        // Then
-        let pinnedItems = viewModel.pinnedItems
-        XCTAssertEqual(pinnedItems.count, 1)
-        XCTAssertEqual(pinnedItems.first?.content, "Item 3")
+        // Then: ピン留めされたアイテムが履歴に含まれることを確認
+        let pinnedInHistory = viewModel.history.filter { $0.isPinned }
+        XCTAssertEqual(pinnedInHistory.count, 1)
+        XCTAssertEqual(pinnedInHistory.first?.content, "Item 3")
+        
+        // When: ピンフィルタを有効化
+        viewModel.isPinnedFilterActive = true
+        viewModel.updateFilteredItems(clipboardService.history)
+        
+        // Then: ピン留めアイテムのみが表示される
+        XCTAssertEqual(viewModel.history.count, 1)
+        XCTAssertEqual(viewModel.history.first?.content, "Item 3")
         
         // When: 同じアイテムのピンを解除
         viewModel.togglePin(for: items[2])
+        viewModel.isPinnedFilterActive = false
+        viewModel.updateFilteredItems(clipboardService.history)
         
         // Then
-        XCTAssertEqual(viewModel.pinnedItems.count, 0)
+        let pinnedCount = viewModel.history.filter { $0.isPinned }.count
+        XCTAssertEqual(pinnedCount, 0)
     }
     
     func testMaxItemsLimit() {

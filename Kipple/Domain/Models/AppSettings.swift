@@ -21,6 +21,7 @@ final class AppSettings: ObservableObject {
     // Editor Settings
     @AppStorage("lastEditorText") var lastEditorText: String = ""
     @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
+    @AppStorage("editorPosition") var editorPosition: String = "top"  // "top" or "bottom"
     
     // History Settings
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
@@ -68,6 +69,7 @@ final class AppSettings: ObservableObject {
         static let historySectionHeight = "historySectionHeight"
         static let lastEditorText = "lastEditorText"
         static let editorInsertMode = "editorInsertMode"
+        static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"
         static let maxPinnedItems = "maxPinnedItems"
         static let enableHotkey = "enableHotkey"
