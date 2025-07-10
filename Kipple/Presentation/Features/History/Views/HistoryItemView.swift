@@ -32,32 +32,6 @@ struct HistoryItemView: View {
                     onTap()
                 }
             
-            // パルスアニメーション効果（現在のクリップボードアイテムの場合）
-            if isCurrentClipboardItem && !isSelected {
-                // 外側のパルスリング
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.2), lineWidth: 1.5)
-                    .scaleEffect(isCurrentClipboardItem ? 1.03 : 1.0)
-                    .opacity(isCurrentClipboardItem ? 0.5 : 0.0)
-                    .animation(
-                        Animation.easeInOut(duration: 2.0)
-                            .repeatForever(autoreverses: true),
-                        value: isCurrentClipboardItem
-                    )
-                
-                // 内側のパルスリング
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.accentColor.opacity(0.15), lineWidth: 1)
-                    .scaleEffect(isCurrentClipboardItem ? 1.01 : 1.0)
-                    .opacity(isCurrentClipboardItem ? 0.4 : 0.0)
-                    .animation(
-                        Animation.easeInOut(duration: 1.5)
-                            .repeatForever(autoreverses: true)
-                            .delay(0.5),
-                        value: isCurrentClipboardItem
-                    )
-            }
-            
             HStack(spacing: 8) {
             // ピンボタン
             ZStack {
@@ -269,12 +243,10 @@ struct HistoryItemView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )) :
-                isCurrentClipboardItem ?
-                AnyShapeStyle(Color.accentColor.opacity(isHovered ? 0.15 : 0.1)) :
                 AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
             )
             .overlay(
-                isHovered && !isSelected && !isCurrentClipboardItem ?
+                isHovered && !isSelected ?
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(Color.accentColor.opacity(0.2), lineWidth: 1) : nil
             )

@@ -359,14 +359,8 @@ struct MainView: View {
     private func confirmAction() {
         viewModel.copyEditor()
         
-        // コピー時の処理
-        if isAlwaysOnTop {
-            // Always on Topが有効な場合のみ通知を表示
-            showCopiedNotification(.copied)
-        } else {
-            // Always on Topが無効の場合は即座にウィンドウを閉じる
-            onClose?()
-        }
+        // コピー時は常に通知を表示（ウィンドウは閉じない）
+        showCopiedNotification(.copied)
     }
     
     private func clearAction() {
