@@ -64,6 +64,15 @@ struct SimpleLineNumberView: NSViewRepresentable {
             context.coordinator.isUpdatingText = true
             textView.string = text
             context.coordinator.isUpdatingText = false
+            
+            // テキストが空になった場合、行番号ビューを強制的に更新
+            if text.isEmpty {
+                if let rulerView = scrollView.verticalRulerView as? SimpleLineNumberRulerView {
+                    rulerView.cachedLineCount = 1
+                    rulerView.cachedTextLength = 0
+                    rulerView.needsDisplay = true
+                }
+            }
         }
         
         // フォントが変更された場合のみ更新
@@ -281,7 +290,13 @@ struct SimpleLineNumberView: NSViewRepresentable {
             // パフォーマンス最適化: 行数が変わった場合のみ再描画
             if let rulerView = scrollView?.verticalRulerView as? SimpleLineNumberRulerView {
                 let newLineCount = SimpleLineNumberRulerView.countLines(in: textView.string as NSString)
-                if newLineCount != rulerView.cachedLineCount || textView.string.isEmpty {
+                
+                // テキストが空になった場合は、必ず再描画を強制する
+                if textView.string.isEmpty {
+                    rulerView.cachedLineCount = 1  // 空の場合は行数を1にリセット
+                    rulerView.cachedTextLength = 0
+                    rulerView.needsDisplay = true
+                } else if newLineCount != rulerView.cachedLineCount {
                     rulerView.cachedLineCount = newLineCount
                     rulerView.cachedTextLength = textView.string.count
                     rulerView.needsDisplay = true
