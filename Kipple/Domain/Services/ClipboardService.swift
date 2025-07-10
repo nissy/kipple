@@ -19,7 +19,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         history.filter { $0.isPinned }
     }
     var onHistoryChanged: ((ClipItem) -> Void)?
-    var onPinnedItemsChanged: (([ClipItem]) -> Void)?
     
     private var lastChangeCount: Int = 0
     private var timer: Timer?
@@ -356,15 +355,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         recentContentHashes.remove(item.content.hashValue)
         
         history.removeAll { $0.id == item.id }
-        saveSubject.send(history)
-    }
-    
-    func reorderPinnedItems(_ newOrder: [ClipItem]) {
-        // 現在の非ピン留めアイテムを保持
-        let unpinnedItems = history.filter { !$0.isPinned }
-        
-        // 新しい順序のピン留めアイテムと非ピン留めアイテムを結合
-        history = newOrder + unpinnedItems
         saveSubject.send(history)
     }
     

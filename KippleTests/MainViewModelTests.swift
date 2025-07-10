@@ -137,22 +137,6 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(mockClipboardService.lastToggledItem?.id, item.id)
     }
     
-    func testReorderPinnedItems() {
-        // Given
-        let items = [
-            ClipItem(content: "Item 1", isPinned: true),
-            ClipItem(content: "Item 2", isPinned: true),
-            ClipItem(content: "Item 3", isPinned: true)
-        ]
-        
-        // When
-        viewModel.reorderPinnedItems(items.reversed())
-        
-        // Then
-        XCTAssertTrue(mockClipboardService.reorderPinnedItemsCalled)
-        XCTAssertEqual(mockClipboardService.lastReorderedItems.count, 3)
-    }
-    
     // MARK: - Delete Tests
     
     func testDeleteItem() {
@@ -230,7 +214,6 @@ class MockClipboardServiceForViewModel: ObservableObject, ClipboardServiceProtoc
     }
     
     var onHistoryChanged: ((ClipItem) -> Void)?
-    var onPinnedItemsChanged: (([ClipItem]) -> Void)?
     
     // Test tracking properties
     var copyToClipboardCalled = false
@@ -242,9 +225,6 @@ class MockClipboardServiceForViewModel: ObservableObject, ClipboardServiceProtoc
     
     var deleteItemCalled = false
     var lastDeletedItem: ClipItem?
-    
-    var reorderPinnedItemsCalled = false
-    var lastReorderedItems: [ClipItem] = []
     
     func startMonitoring() {}
     
@@ -275,10 +255,5 @@ class MockClipboardServiceForViewModel: ObservableObject, ClipboardServiceProtoc
         deleteItemCalled = true
         lastDeletedItem = item
         history.removeAll { $0.id == item.id }
-    }
-    
-    func reorderPinnedItems(_ newOrder: [ClipItem]) {
-        reorderPinnedItemsCalled = true
-        lastReorderedItems = newOrder
     }
 }

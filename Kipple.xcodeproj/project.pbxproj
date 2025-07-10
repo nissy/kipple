@@ -13,7 +13,6 @@
 		100153BEEC3A79B3B25838FD /* DataSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7077BB0F24641D773661D25B /* DataSettingsView.swift */; };
 		12633FD62AD356A257406951 /* SettingsReflectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CD0855135D4D6B1B46EE16 /* SettingsReflectionTests.swift */; };
 		127558A8C21223B2BDBDEA50 /* WindowCloseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AE19C58A61F720F3CFECE3 /* WindowCloseTests.swift */; };
-		1648D3A6450B95CF5B9D7A57 /* MainViewPinnedSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94F1C58A80BE8D0CBB0FF79A /* MainViewPinnedSection.swift */; };
 		18E5382D15725E4D50861B23 /* FontMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387A45AAD067D49821C821E4 /* FontMetrics.swift */; };
 		1AD90183D200D3474E6F4F72 /* KippleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68AE691F1C10B06D450798F8 /* KippleApp.swift */; };
 		1C47AD62906E6AEA7116C89E /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF0A9EA04C6D3DCB72F6EA5 /* HotkeyRecorderView.swift */; };
@@ -139,7 +138,6 @@
 		897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyles.swift; sourceTree = "<group>"; };
 		8D7DCFE250A4461B1535CAD1 /* FontNameMappings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontNameMappings.swift; sourceTree = "<group>"; };
 		91778173C4E051ADCDEA9E05 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
-		94F1C58A80BE8D0CBB0FF79A /* MainViewPinnedSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewPinnedSection.swift; sourceTree = "<group>"; };
 		97FA020C5A7CC371A552A059 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 		9B0A937AF0219AC13A31FBBD /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		9E7BFC490F52E3711D99F9DD /* SimpleLineNumberViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberViewTests.swift; sourceTree = "<group>"; };
@@ -496,7 +494,6 @@
 				C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */,
 				FE96C222A5E167BABAE17011 /* MainViewEditorSection.swift */,
 				B1088BA3F9356CC79A508A02 /* MainViewHistorySection.swift */,
-				94F1C58A80BE8D0CBB0FF79A /* MainViewPinnedSection.swift */,
 				4F0241ABC3DA767CFBA780D6 /* MainViewTitleBar.swift */,
 				B538EF6166B8332429EF10E7 /* ResizableSplitView.swift */,
 				21ABB32E7A1B8EC0C5626699 /* SimpleLineNumberView.swift */,
@@ -695,7 +692,6 @@
 				4C2F5C953ACAD48CD26DD1BE /* MainViewEditorSection.swift in Sources */,
 				AF778ECCA9E520AC5A8CD4B8 /* MainViewHistorySection.swift in Sources */,
 				F09D930768983860F965E45A /* MainViewModel.swift in Sources */,
-				1648D3A6450B95CF5B9D7A57 /* MainViewPinnedSection.swift in Sources */,
 				B7A3D47B0622ED27ADAAD188 /* MainViewTitleBar.swift in Sources */,
 				427F1FD66D8D46E661D2F049 /* MenuBarApp.swift in Sources */,
 				59A504619C472F5D87041F38 /* ResizableSplitView.swift in Sources */,

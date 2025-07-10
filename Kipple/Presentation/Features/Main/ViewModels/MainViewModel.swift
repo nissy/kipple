@@ -82,32 +82,38 @@ class MainViewModel: ObservableObject {
     }
     
     func updateFilteredItems(_ items: [ClipItem]) {
-        // フィルタ無しの場合は全アイテムを使用
+        // まず、ピン留めされたアイテムとそうでないアイテムを分ける
+        let pinnedItemsList = items.filter { $0.isPinned }
+        let unpinnedItemsList = items.filter { !$0.isPinned }
+        
+        // フィルタ無しの場合
         if !isPinnedFilterActive && selectedCategory == nil {
-            self.history = items
-            self.pinnedItems = []
+            self.history = unpinnedItemsList
+            self.pinnedItems = pinnedItemsList
             return
         }
         
         // フィルタありの場合
-        var filteredItems: [ClipItem] = []
+        var filteredUnpinnedItems: [ClipItem] = []
+        var filteredPinnedItems: [ClipItem] = []
         
-        for item in items {
-            // ピンフィルタ
-            if isPinnedFilterActive && !item.isPinned {
-                continue
+        // ピンフィルタが有効な場合は、ピン留めされたアイテムのみを表示
+        if isPinnedFilterActive {
+            // カテゴリフィルタも適用
+            if let selectedCategory = selectedCategory {
+                filteredPinnedItems = pinnedItemsList.filter { $0.category == selectedCategory }
+            } else {
+                filteredPinnedItems = pinnedItemsList
             }
-            
-            // カテゴリフィルタ
-            if let selectedCategory = selectedCategory, item.category != selectedCategory {
-                continue
-            }
-            
-            filteredItems.append(item)
+            self.history = filteredPinnedItems
+            self.pinnedItems = []
+        } else if let selectedCategory = selectedCategory {
+            // カテゴリフィルタのみの場合
+            filteredUnpinnedItems = unpinnedItemsList.filter { $0.category == selectedCategory }
+            filteredPinnedItems = pinnedItemsList.filter { $0.category == selectedCategory }
+            self.history = filteredUnpinnedItems
+            self.pinnedItems = filteredPinnedItems
         }
-        
-        self.history = filteredItems
-        self.pinnedItems = []
     }
     
     func copyEditor() {
@@ -130,10 +136,6 @@ class MainViewModel: ObservableObject {
     
     func deleteItem(_ item: ClipItem) {
         clipboardService.deleteItem(item)
-    }
-    
-    func reorderPinnedItems(_ newOrder: [ClipItem]) {
-        clipboardService.reorderPinnedItems(newOrder)
     }
     
     // MARK: - Editor Insert Functions

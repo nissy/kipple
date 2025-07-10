@@ -144,7 +144,6 @@ private class MockClipboardService: ClipboardServiceProtocol {
     var pinnedItems: [ClipItem] = []
     var currentClipboardContent: String?
     var onHistoryChanged: ((ClipItem) -> Void)?
-    var onPinnedItemsChanged: (([ClipItem]) -> Void)?
     var copiedContent: String?
     var fromEditor: Bool = false
     
@@ -178,7 +177,6 @@ private class MockClipboardService: ClipboardServiceProtocol {
             } else {
                 pinnedItems.removeAll { $0.id == item.id }
             }
-            onPinnedItemsChanged?(pinnedItems)
             return true
         }
         return false
@@ -187,11 +185,5 @@ private class MockClipboardService: ClipboardServiceProtocol {
     func deleteItem(_ item: ClipItem) {
         history.removeAll { $0.id == item.id }
         pinnedItems.removeAll { $0.id == item.id }
-        onPinnedItemsChanged?(pinnedItems)
-    }
-    
-    func reorderPinnedItems(_ items: [ClipItem]) {
-        pinnedItems = items
-        onPinnedItemsChanged?(pinnedItems)
     }
 }
