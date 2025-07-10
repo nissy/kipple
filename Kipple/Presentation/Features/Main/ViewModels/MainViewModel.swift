@@ -82,38 +82,32 @@ class MainViewModel: ObservableObject {
     }
     
     func updateFilteredItems(_ items: [ClipItem]) {
-        // まず、ピン留めされたアイテムとそうでないアイテムを分ける
-        let pinnedItemsList = items.filter { $0.isPinned }
-        let unpinnedItemsList = items.filter { !$0.isPinned }
-        
-        // フィルタ無しの場合
+        // フィルタ無しの場合は全アイテムを使用
         if !isPinnedFilterActive && selectedCategory == nil {
-            self.history = unpinnedItemsList
-            self.pinnedItems = pinnedItemsList
+            self.history = items
+            self.pinnedItems = []
             return
         }
         
         // フィルタありの場合
-        var filteredUnpinnedItems: [ClipItem] = []
-        var filteredPinnedItems: [ClipItem] = []
+        var filteredItems: [ClipItem] = []
         
-        // ピンフィルタが有効な場合は、ピン留めされたアイテムのみを表示
-        if isPinnedFilterActive {
-            // カテゴリフィルタも適用
-            if let selectedCategory = selectedCategory {
-                filteredPinnedItems = pinnedItemsList.filter { $0.category == selectedCategory }
-            } else {
-                filteredPinnedItems = pinnedItemsList
+        for item in items {
+            // ピンフィルタ
+            if isPinnedFilterActive && !item.isPinned {
+                continue
             }
-            self.history = filteredPinnedItems
-            self.pinnedItems = []
-        } else if let selectedCategory = selectedCategory {
-            // カテゴリフィルタのみの場合
-            filteredUnpinnedItems = unpinnedItemsList.filter { $0.category == selectedCategory }
-            filteredPinnedItems = pinnedItemsList.filter { $0.category == selectedCategory }
-            self.history = filteredUnpinnedItems
-            self.pinnedItems = filteredPinnedItems
+            
+            // カテゴリフィルタ
+            if let selectedCategory = selectedCategory, item.category != selectedCategory {
+                continue
+            }
+            
+            filteredItems.append(item)
         }
+        
+        self.history = filteredItems
+        self.pinnedItems = []
     }
     
     func copyEditor() {

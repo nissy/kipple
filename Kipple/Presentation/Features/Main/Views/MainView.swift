@@ -294,6 +294,7 @@ struct MainView: View {
                 
                 Spacer()
                 
+                // Settings button
                 Button(action: {
                     onOpenSettings?()
                 }, label: {
@@ -323,6 +324,35 @@ struct MainView: View {
                     }
                 }
                 .help("Settings")
+                
+                // Always on Top button
+                Button(action: {
+                    toggleAlwaysOnTop()
+                }, label: {
+                    ZStack {
+                        Circle()
+                            .fill(isAlwaysOnTop ? 
+                                Color.accentColor :
+                                Color(NSColor.controlBackgroundColor))
+                            .frame(width: 28, height: 28)
+                            .shadow(
+                                color: isAlwaysOnTop ? 
+                                    Color.accentColor.opacity(0.3) : 
+                                    Color.black.opacity(0.1),
+                                radius: 3,
+                                y: 2
+                            )
+                        
+                        Image(systemName: isAlwaysOnTop ? "pin.fill" : "pin")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(isAlwaysOnTop ? .white : .secondary)
+                            .rotationEffect(.degrees(isAlwaysOnTop ? 0 : -45))
+                    }
+                })
+                .buttonStyle(PlainButtonStyle())
+                .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
+                .animation(.spring(response: 0.3), value: isAlwaysOnTop)
+                .help(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
             }
             .padding(12)
             .background(
