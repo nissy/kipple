@@ -69,7 +69,7 @@ struct MainViewHistorySection: View {
             
                 // 履歴リスト
                 ScrollView {
-                    LazyVStack(spacing: 6, pinnedViews: []) {
+                    LazyVStack(spacing: 3, pinnedViews: []) {
                         ForEach(filteredHistory) { item in
                             HistoryItemView(
                                 item: item,
@@ -91,13 +91,13 @@ struct MainViewHistorySection: View {
                                 onCategoryTap: nil, // カテゴリタップは無効化
                                 historyFont: Font(fontManager.historyFont)
                             )
-                            .frame(height: 44) // 固定高さでパフォーマンス向上
+                            .frame(height: 36) // 固定高さでパフォーマンス向上
                             .transition(.opacity)
                             .animation(.easeInOut(duration: 0.2), value: item.isPinned)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 8)
                 }
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.3)

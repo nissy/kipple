@@ -59,6 +59,23 @@ struct HistoryItemView: View {
             }
             
             HStack(spacing: 12) {
+            // ピンボタン
+            ZStack {
+                Circle()
+                    .fill(pinButtonBackground)
+                    .frame(width: 24, height: 24)
+                
+                Image(systemName: pinButtonIcon)
+                    .foregroundColor(pinButtonForeground)
+                    .font(.system(size: 11, weight: .medium))
+                    .rotationEffect(.degrees(pinButtonRotation))
+            }
+            .frame(width: 24, height: 24)
+            .contentShape(Circle())
+            .onTapGesture {
+                onTogglePin()
+            }
+            
             // カテゴリアイコン（アクション可能な場合はボタンとして機能）
             if item.isActionable {
                 ZStack {
@@ -112,22 +129,6 @@ struct HistoryItemView: View {
                     )
             }
             
-            ZStack {
-                Circle()
-                    .fill(pinButtonBackground)
-                    .frame(width: 24, height: 24)
-                
-                Image(systemName: pinButtonIcon)
-                    .foregroundColor(pinButtonForeground)
-                    .font(.system(size: 11, weight: .medium))
-                    .rotationEffect(.degrees(pinButtonRotation))
-            }
-            .frame(width: 24, height: 24)
-            .contentShape(Circle())
-            .onTapGesture {
-                onTogglePin()
-            }
-            
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
                 Text(item.displayContent)
@@ -137,7 +138,7 @@ struct HistoryItemView: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
@@ -156,8 +157,8 @@ struct HistoryItemView: View {
                     .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering in

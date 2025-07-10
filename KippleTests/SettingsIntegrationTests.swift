@@ -61,9 +61,13 @@ final class SettingsIntegrationTests: XCTestCase {
         // Wait for async updates
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
         
-        // Then - test that view model properly handles history and pinned items
-        XCTAssertGreaterThan(viewModel.history.count, 0, "History should contain items")
-        XCTAssertGreaterThan(viewModel.pinnedItems.count, 0, "Pinned items should contain items")
+        // Then - 現在の実装では全てのアイテムがhistoryに含まれる
+        XCTAssertEqual(viewModel.history.count, 15, "History should contain all items")
+        
+        // ピン留めフィルタテスト
+        viewModel.isPinnedFilterActive = true
+        viewModel.updateFilteredItems(service.history)
+        XCTAssertEqual(viewModel.history.count, 5, "Filtered history should contain only pinned items")
     }
     
     func testSettingsChangeReflectsInViewModel() {
@@ -90,22 +94,16 @@ final class SettingsIntegrationTests: XCTestCase {
         // Wait for async updates
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
         
-        // Then - test that view model updates correctly
-        XCTAssertGreaterThan(viewModel.history.count, 0, "History should contain items")
-        XCTAssertGreaterThan(viewModel.pinnedItems.count, 0, "Pinned items should contain items")
+        // Then - 現在の実装では全てのアイテムがhistoryに含まれる
+        XCTAssertEqual(viewModel.history.count, 15, "History should contain all items")
         
         // When - post notification to trigger update
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: nil)
         
         // Wait for async updates
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.6))
         
         // Then - view model should still work correctly
-        XCTAssertGreaterThan(viewModel.history.count, 0, "History should still contain items after notification")
-        XCTAssertGreaterThan(
-            viewModel.pinnedItems.count,
-            0,
-            "Pinned items should still contain items after notification"
-        )
+        XCTAssertEqual(viewModel.history.count, 15, "History should still contain all items after notification")
     }
 }

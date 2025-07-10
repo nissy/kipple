@@ -142,10 +142,16 @@ class MainViewTests: XCTestCase {
         // When
         viewModel.togglePin(for: item)
         
-        // Then
-        let pinnedItems = viewModel.pinnedItems
-        XCTAssertEqual(pinnedItems.count, 1)
-        XCTAssertEqual(pinnedItems.first?.content, "Test Item")
+        // Then: 現在の実装では、ピン留めアイテムも履歴に含まれる
+        let pinnedInHistory = viewModel.history.filter { $0.isPinned }
+        XCTAssertEqual(pinnedInHistory.count, 1)
+        XCTAssertEqual(pinnedInHistory.first?.content, "Test Item")
+        
+        // ピンフィルタを有効にして確認
+        viewModel.isPinnedFilterActive = true
+        viewModel.updateFilteredItems(ClipboardService.shared.history)
+        XCTAssertEqual(viewModel.history.count, 1)
+        XCTAssertTrue(viewModel.history.first?.isPinned ?? false)
     }
     
     func testWindowCloseWithPinState() {

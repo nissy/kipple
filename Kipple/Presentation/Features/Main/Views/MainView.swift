@@ -151,11 +151,6 @@ struct MainView: View {
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
                 VStack(spacing: 8) {
-                    Text("Filter")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.top, 12)
-                    
                     // ピン留めフィルター（一番上に配置）
                     Button(action: {
                         withAnimation(.spring(response: 0.3)) {
@@ -235,7 +230,6 @@ struct MainView: View {
                     
                     Spacer()
                 }
-                .frame(width: 80)
                 .padding(.vertical, 8)
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.5)
@@ -269,11 +263,10 @@ struct MainView: View {
     // 下部バー
     @ViewBuilder
     private var bottomBar: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
                 // 現在のペースト内容を表示
                 if let currentContent = viewModel.currentClipboardContent {
-                    HStack(spacing: 8) {
+                    HStack(alignment: .center, spacing: 8) {
                         Image(systemName: "doc.on.clipboard")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
@@ -285,7 +278,7 @@ struct MainView: View {
                             .truncationMode(.tail)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 6)
                     .background(
                         Capsule()
                             .fill(Color.accentColor.opacity(0.1))
@@ -353,13 +346,13 @@ struct MainView: View {
                 .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
                 .animation(.spring(response: 0.3), value: isAlwaysOnTop)
                 .help(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
-            }
-            .padding(12)
-            .background(
-                Color(NSColor.windowBackgroundColor).opacity(0.95)
-                .background(.ultraThinMaterial)
-            )
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Color(NSColor.windowBackgroundColor).opacity(0.95)
+            .background(.ultraThinMaterial)
+        )
     }
     
     // MARK: - Actions
