@@ -52,6 +52,7 @@
 		ABA16FADADE89FB7D04377B0 /* HistoryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86EB3075FA086F96EAF118D1 /* HistoryItemView.swift */; };
 		AC14F54787977FD78290F104 /* ClipboardFontSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ED56E8888BBC7EF54BB602 /* ClipboardFontSettingsView.swift */; };
 		AF778ECCA9E520AC5A8CD4B8 /* MainViewHistorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1088BA3F9356CC79A508A02 /* MainViewHistorySection.swift */; };
+		B25EFCB5DE5CAAFC06618991 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAC68556C2D7ACF0FA626A0 /* TestHelpers.swift */; };
 		B378CB5E84CF4DD1C234F629 /* LoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 866EF79DC1C4FABC144A5F04 /* LoggerTests.swift */; };
 		B49CEFA22A41ADF6429EC6EC /* ClipItemCategoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF9FCF3609532B45FC45F36 /* ClipItemCategoryTests.swift */; };
 		B7A3D47B0622ED27ADAAD188 /* MainViewTitleBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0241ABC3DA767CFBA780D6 /* MainViewTitleBar.swift */; };
@@ -159,6 +160,7 @@
 		D36EF972EACF9279EE76CFE9 /* SettingsGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGroup.swift; sourceTree = "<group>"; };
 		D8C1A7D14BB479766C7E44F6 /* KippleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KippleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DD31BAACBCF24EA83E16758F /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		DEAC68556C2D7ACF0FA626A0 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		E42ED86658E61FB6E04428DC /* ClipboardRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardRepository.swift; sourceTree = "<group>"; };
 		E5778807D1EE8AD4AF29AB95 /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
 		E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarApp.swift; sourceTree = "<group>"; };
@@ -493,6 +495,7 @@
 			isa = PBXGroup;
 			children = (
 				6AE27F632B10A5817688AA5E /* MockClipboardService.swift */,
+				DEAC68556C2D7ACF0FA626A0 /* TestHelpers.swift */,
 				03132BE081C4F4DD5B430EB3 /* TestUserDefaults.swift */,
 			);
 			path = Helpers;
@@ -748,6 +751,7 @@
 				76F04D59D6CF00DA20D0E32D /* SearchAndFilterTests.swift in Sources */,
 				834A031FCB3745A842925828 /* SettingsIntegrationTests.swift in Sources */,
 				8631251B94DA1BBAE7A78E9C /* SettingsRestorationExample.swift in Sources */,
+				B25EFCB5DE5CAAFC06618991 /* TestHelpers.swift in Sources */,
 				FD2257A01775EBF6AFBFF297 /* TestUserDefaults.swift in Sources */,
 				E681154B257159EEB2DFB185 /* WindowBehaviorTests.swift in Sources */,
 			);

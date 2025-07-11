@@ -32,6 +32,9 @@ final class MockClipboardService: ObservableObject, ClipboardServiceProtocol {
     var lastDeletedItem: ClipItem?
     var clearAllHistoryCalled = false
     
+    // 内部コピーフラグ（実際のClipboardServiceの動作を模倣）
+    private var isInternalCopy = false
+    
     func startMonitoring() {
         startMonitoringCalled = true
     }
@@ -45,10 +48,26 @@ final class MockClipboardService: ObservableObject, ClipboardServiceProtocol {
         lastCopiedContent = content
         self.fromEditor = fromEditor
         
-        // 新しいアイテムを履歴に追加
-        let newItem = ClipItem(content: content, isFromEditor: fromEditor)
-        history.insert(newItem, at: 0)
+        // 現在のクリップボード内容を更新
         currentClipboardContent = content
+        
+        // 実際のClipboardServiceの動作を模倣
+        if !fromEditor {
+            // 内部コピー（fromEditor: false）は履歴に記録しない
+            return
+        }
+        
+        // エディターからのコピーの場合のみ履歴に追加
+        let newItem = ClipItem(
+            content: content,
+            sourceApp: "Kipple",
+            windowTitle: "Quick Editor",
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            processID: ProcessInfo.processInfo.processIdentifier,
+            isFromEditor: true
+        )
+        
+        history.insert(newItem, at: 0)
         
         // コールバックを呼び出す
         onHistoryChanged?(newItem)

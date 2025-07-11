@@ -36,10 +36,45 @@ final class CoreDataClipboardRepositoryTests: XCTestCase {
     
     func testSaveAndLoad() async throws {
         // Given
+        // タイムスタンプを明示的に設定して順序を保証
+        let baseDate = Date()
         let items = [
-            ClipItem(content: "Test 1"),
-            ClipItem(content: "Test 2"),
-            ClipItem(content: "Test 3")
+            ClipItem(
+                id: UUID(),
+                content: "Test 1",
+                timestamp: baseDate.addingTimeInterval(-2),
+                isPinned: false,
+                kind: .text,
+                sourceApp: nil,
+                windowTitle: nil,
+                bundleIdentifier: nil,
+                processID: nil,
+                isFromEditor: nil
+            ),
+            ClipItem(
+                id: UUID(),
+                content: "Test 2",
+                timestamp: baseDate.addingTimeInterval(-1),
+                isPinned: false,
+                kind: .text,
+                sourceApp: nil,
+                windowTitle: nil,
+                bundleIdentifier: nil,
+                processID: nil,
+                isFromEditor: nil
+            ),
+            ClipItem(
+                id: UUID(),
+                content: "Test 3",
+                timestamp: baseDate,
+                isPinned: false,
+                kind: .text,
+                sourceApp: nil,
+                windowTitle: nil,
+                bundleIdentifier: nil,
+                processID: nil,
+                isFromEditor: nil
+            )
         ]
         
         // When

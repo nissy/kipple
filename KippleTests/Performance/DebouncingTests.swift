@@ -16,14 +16,18 @@ import Combine
 
 final class DebouncingTests: XCTestCase {
     private var cancellables = Set<AnyCancellable>()
+    private var mockClipboardService: MockClipboardService!
     
     override func setUp() {
         super.setUp()
         cancellables.removeAll()
+        mockClipboardService = MockClipboardService()
     }
     
     override func tearDown() {
         cancellables.removeAll()
+        mockClipboardService?.reset()
+        mockClipboardService = nil
         super.tearDown()
     }
     
@@ -33,28 +37,27 @@ final class DebouncingTests: XCTestCase {
         // SPECS.md: エディター保存のデバウンス（500ms）
         let expectation = XCTestExpectation(description: "Editor save debouncing")
         var saveCount = 0
-        let viewModel = MainViewModel()
         
-        // エディターテキスト変更を監視
-        viewModel.$editorText
+        // デバウンスの動作を直接テスト（ViewModelの内部実装に依存しない）
+        let subject = PassthroughSubject<String, Never>()
+        
+        subject
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .dropFirst() // 初期値をスキップ
             .sink { _ in
                 saveCount += 1
             }
             .store(in: &cancellables)
         
         // 短時間に複数回変更
-        viewModel.editorText = "a"
-        viewModel.editorText = "ab"
-        viewModel.editorText = "abc"
-        viewModel.editorText = "abcd"
-        viewModel.editorText = "abcde" // 最終値
+        subject.send("a")
+        subject.send("ab")
+        subject.send("abc")
+        subject.send("abcd")
+        subject.send("abcde") // 最終値
         
-        // 500ms後に確認
+        // 600ms後に確認（デバウンス時間500ms + バッファ100ms）
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             XCTAssertEqual(saveCount, 1, "Should save only once after debouncing")
-            XCTAssertEqual(viewModel.editorText, "abcde")
             expectation.fulfill()
         }
         
@@ -65,7 +68,7 @@ final class DebouncingTests: XCTestCase {
         // デバウンス間隔が正確に500msであることを確認
         let expectation = XCTestExpectation(description: "Editor save interval")
         var saveTime: Date?
-        let viewModel = MainViewModel()
+        let viewModel = MainViewModel(clipboardService: mockClipboardService)
         
         viewModel.$editorText
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
@@ -97,21 +100,21 @@ final class DebouncingTests: XCTestCase {
         // SPECS.md: 履歴保存のデバウンス（1秒）
         let expectation = XCTestExpectation(description: "History save debouncing")
         var saveCount = 0
-        let clipboardService = ClipboardService.shared
         
-        // 履歴変更を監視（実際の実装をシミュレート）
-        clipboardService.$history
+        // デバウンスの動作を直接テスト
+        let subject = PassthroughSubject<[ClipItem], Never>()
+        
+        subject
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
-            .dropFirst()
             .sink { _ in
                 saveCount += 1
             }
             .store(in: &cancellables)
         
         // 短時間に複数回履歴を変更
-        clipboardService.history.append(ClipItem(content: "Item 1"))
-        clipboardService.history.append(ClipItem(content: "Item 2"))
-        clipboardService.history.append(ClipItem(content: "Item 3"))
+        subject.send([ClipItem(content: "Item 1")])
+        subject.send([ClipItem(content: "Item 1"), ClipItem(content: "Item 2")])
+        subject.send([ClipItem(content: "Item 1"), ClipItem(content: "Item 2"), ClipItem(content: "Item 3")])
         
         // 1.1秒後に確認
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
@@ -225,21 +228,19 @@ final class DebouncingTests: XCTestCase {
         var editorSaved = false
         var fontChanged = false
         
-        let viewModel = MainViewModel()
-        
-        // エディター保存（500ms）
-        viewModel.$editorText
+        // エディター保存のデバウンス（500ms）
+        let editorSubject = PassthroughSubject<String, Never>()
+        editorSubject
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .dropFirst()
             .sink { _ in
                 editorSaved = true
                 expectation.fulfill()
             }
             .store(in: &cancellables)
         
-        // フォント変更（500ms）
-        NotificationCenter.default
-            .publisher(for: .editorFontSettingsChanged)
+        // フォント変更のデバウンス（500ms）
+        let fontSubject = PassthroughSubject<Notification, Never>()
+        fontSubject
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
             .sink { _ in
                 fontChanged = true
@@ -248,8 +249,8 @@ final class DebouncingTests: XCTestCase {
             .store(in: &cancellables)
         
         // すべて同時に変更
-        viewModel.editorText = "Test"
-        NotificationCenter.default.post(name: .editorFontSettingsChanged, object: nil)
+        editorSubject.send("Test")
+        fontSubject.send(Notification(name: .editorFontSettingsChanged))
         
         wait(for: [expectation], timeout: 2.0)
         

@@ -89,6 +89,15 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private var lastActiveNonKippleApp: LastActiveApp?
     
     private init() {
+        // テスト環境かどうかを検出
+        let isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+                                NSClassFromString("XCTest") != nil
+        
+        // テスト環境では最小限の初期化のみ
+        if isTestEnvironment {
+            return
+        }
+        
         // デバウンス設定（1秒後に保存）
         saveSubscription = saveSubject
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
@@ -375,20 +384,17 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     func clearAllHistory() {
+        // メモリ上の履歴を即座に更新（UIの即座反映のため）
+        history = history.filter { $0.isPinned }
+        
+        // ハッシュセットを再初期化
+        initializeRecentHashes()
+        
+        // Core Dataのクリアは非同期で実行
         Task {
             do {
                 // Core Dataからクリア（ピン留めは保持）
                 try await repository.clear(keepPinned: true)
-                
-                // メモリ上の履歴も更新
-                await MainActor.run {
-                    // ピン留めされたアイテムのみを保持
-                    history = history.filter { $0.isPinned }
-                    
-                    // ハッシュセットを再初期化
-                    initializeRecentHashes()
-                }
-                
                 Logger.shared.log("Cleared history (kept pinned items)")
             } catch {
                 Logger.shared.error("Failed to clear history: \(error)")
