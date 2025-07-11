@@ -39,7 +39,7 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 - Accessibility permission (for capturing app names)
 
 ## Installation
-1. Download the latest release from the [Releases page](https://github.com/username/kipple/releases)
+1. Download the latest release from the [Releases](https://github.com/nissy/kipple/releases)
 2. Move Kipple.app to Applications folder
 3. Launch Kipple from Applications or Spotlight
 4. Grant accessibility permission when prompted (required for capturing app names)
