@@ -328,26 +328,24 @@ struct ClipboardItemPopover: View {
             
             // 詳細情報セクション
             VStack(alignment: .leading, spacing: 12) {
-                Divider()
-                
                 // 詳細メタデータ
                 HStack(spacing: 16) {
                     // 文字数
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Characters")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.secondary)
                         Text("\(item.characterCount)")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 10, weight: .medium))
                     }
                     
                     // 時刻
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Copied")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.secondary)
                         Text(item.formattedTimestamp)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 10, weight: .medium))
                             .lineLimit(1)
                     }
                     

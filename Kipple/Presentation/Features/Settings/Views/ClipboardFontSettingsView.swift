@@ -47,7 +47,7 @@ struct ClipboardFontSettingsView: View {
                     .foregroundColor(.secondary)
                 
                 ScrollView {
-                    Text("The quick brown fox jumps over the lazy dog\n素早い茶色のキツネが怠け者の犬を飛び越える\n1234567890 !@#$%^&*()")
+                    Text("The quick brown fox jumps over the lazy dog\n素早い茶色のキツネが怠け者の犬を飛び越える\n1234567890 !@#$%^&*()\n😀🎉🚀 ∑∏∫√∞ ™®©")
                         .font(previewFont)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
@@ -89,14 +89,8 @@ struct ClipboardFontSettingsView: View {
     }
     
     private var previewFont: Font {
-        let fontName = fontNameBinding.wrappedValue
-        let fontSize = fontSizeBinding.wrappedValue
-        
-        if fontName == "System" {
-            return .system(size: fontSize)
-        } else {
-            return Font.custom(fontName, size: fontSize)
-        }
+        // FontManagerから実際のフォント（フォールバックチェーン含む）を取得
+        return Font(fontManager.historyFont)
     }
     
     private func makeFontSizeFormatter() -> NumberFormatter {
