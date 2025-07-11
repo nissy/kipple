@@ -19,15 +19,16 @@ final class ClipboardServiceTests: XCTestCase {
         cancellables.removeAll()
         // テスト開始前に履歴をクリア
         clipboardService.clearAllHistory()
+        // Core Dataの非同期処理を待つ
+        Thread.sleep(forTimeInterval: 0.5)
     }
     
     override func tearDown() {
         clipboardService.stopMonitoring()
         // テスト終了後も履歴をクリア
         clipboardService.clearAllHistory()
-        // UserDefaultsから大きなデータをクリア
-        UserDefaults.standard.removeObject(forKey: "com.Kipple.clipboardHistory")
-        UserDefaults.standard.synchronize()
+        // Core Dataの非同期処理を待つ
+        Thread.sleep(forTimeInterval: 0.5)
         cancellables.removeAll()
         clipboardService = nil
         super.tearDown()

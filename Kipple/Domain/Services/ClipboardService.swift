@@ -22,7 +22,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     
     private var lastChangeCount: Int = 0
     private var timer: Timer?
-    private let repository = ClipboardRepository()
+    private let repository: any ClipboardRepositoryProtocol = CoreDataClipboardRepository()
     private let serialQueue = DispatchQueue(label: "com.nissy.Kipple.clipboard", qos: .userInitiated)
     private var timerRunLoop: RunLoop?
     private var timerThread: Thread?
@@ -59,7 +59,20 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     // パフォーマンス最適化: 高速な重複チェック用
-    private var recentContentHashes: Set<Int> = []
+    private let hashLock = NSLock()
+    private var _recentContentHashes: Set<Int> = []
+    private var recentContentHashes: Set<Int> {
+        get {
+            hashLock.lock()
+            defer { hashLock.unlock() }
+            return _recentContentHashes
+        }
+        set {
+            hashLock.lock()
+            defer { hashLock.unlock() }
+            _recentContentHashes = newValue
+        }
+    }
     private let maxRecentHashes = 50
     
     // デバウンス用
@@ -76,12 +89,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private var lastActiveNonKippleApp: LastActiveApp?
     
     private init() {
-        // Load saved history
-        history = repository.load()
-        
-        // ハッシュセットを初期化
-        initializeRecentHashes()
-        
         // デバウンス設定（1秒後に保存）
         saveSubscription = saveSubject
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
@@ -94,6 +101,25 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         
         // 現在のクリップボードの内容を初期化（同期的に設定）
         currentClipboardContent = NSPasteboard.general.string(forType: .string)
+        
+        // 非同期で履歴を読み込み
+        Task {
+            await loadHistory()
+        }
+    }
+    
+    private func loadHistory() async {
+        do {
+            let items = try await repository.load(limit: 100)
+            await MainActor.run {
+                self.history = items
+                // ハッシュセットを初期化
+                self.initializeRecentHashes()
+            }
+            Logger.shared.log("Loaded \(items.count) items from Core Data")
+        } catch {
+            Logger.shared.error("Failed to load history: \(error)")
+        }
     }
     
     func startMonitoring() {
@@ -175,7 +201,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             if let content = NSPasteboard.general.string(forType: .string),
                !content.isEmpty {
                 // 現在のクリップボード内容を更新
-                DispatchQueue.main.async { [weak self] in
+                Task { @MainActor [weak self] in
                     self?.currentClipboardContent = content
                 }
                 addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: fromEditor)
@@ -195,7 +221,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             guard let self = self else { return }
             
             // 履歴の更新と保存
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 let contentHash = content.hashValue
                 
                 // 高速な重複チェック（O(1)）
@@ -213,22 +240,29 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                     let newItem = ClipItem(
                         content: content, 
                         sourceApp: isFromEditor ? "Kipple" : appInfo.appName,  // エディタからの場合は "Kipple" に固定
-                        windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,  // エディタからの場合は "Quick Editor" に固定
+                        windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,
                         bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
                         processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
                         isFromEditor: isFromEditor
                     )
                     self.history.insert(newItem, at: 0)
                     
-                    // ハッシュセットを更新
-                    self.recentContentHashes.insert(contentHash)
-                    if self.recentContentHashes.count > self.maxRecentHashes {
-                        // 古いハッシュを削除（最も古いアイテムのハッシュを削除）
-                        if self.history.count > self.maxRecentHashes,
-                           let oldestContent = self.history[self.maxRecentHashes...].first?.content {
-                            self.recentContentHashes.remove(oldestContent.hashValue)
+                    // ハッシュセットを更新（スレッドセーフ）
+                    // NSLockは async context から直接使えないため、同期的に実行
+                    let updateHashes = { [weak self] in
+                        guard let self = self else { return }
+                        self.hashLock.lock()
+                        defer { self.hashLock.unlock() }
+                        self._recentContentHashes.insert(contentHash)
+                        if self._recentContentHashes.count > self.maxRecentHashes {
+                            // 古いハッシュを削除（最も古いアイテムのハッシュを削除）
+                            if self.history.count > self.maxRecentHashes,
+                               let oldestContent = self.history[self.maxRecentHashes...].first?.content {
+                                self._recentContentHashes.remove(oldestContent.hashValue)
+                            }
                         }
                     }
+                    updateHashes()
                     
                     let appName = isFromEditor ? "Kipple" : (appInfo.appName ?? "unknown")
                     Logger.shared.debug("Added new item to history from app: \(appName)")
@@ -341,28 +375,62 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     func clearAllHistory() {
-        // ピン留めされたアイテムのみを保持
-        history = history.filter { $0.isPinned }
-        
-        // ハッシュセットを再初期化
-        initializeRecentHashes()
-        
-        saveSubject.send(history)
+        Task {
+            do {
+                // Core Dataからクリア（ピン留めは保持）
+                try await repository.clear(keepPinned: true)
+                
+                // メモリ上の履歴も更新
+                await MainActor.run {
+                    // ピン留めされたアイテムのみを保持
+                    history = history.filter { $0.isPinned }
+                    
+                    // ハッシュセットを再初期化
+                    initializeRecentHashes()
+                }
+                
+                Logger.shared.log("Cleared history (kept pinned items)")
+            } catch {
+                Logger.shared.error("Failed to clear history: \(error)")
+            }
+        }
     }
     
     func deleteItem(_ item: ClipItem) {
-        // ハッシュセットから削除
-        recentContentHashes.remove(item.content.hashValue)
+        // ハッシュセットから削除（スレッドセーフ）
+        hashLock.lock()
+        _recentContentHashes.remove(item.content.hashValue)
+        hashLock.unlock()
         
+        // メモリから削除
         history.removeAll { $0.id == item.id }
-        saveSubject.send(history)
+        
+        // Core Dataから削除
+        Task {
+            do {
+                try await repository.delete(item)
+                Logger.shared.debug("Deleted item from Core Data")
+            } catch {
+                Logger.shared.error("Failed to delete item: \(error)")
+            }
+        }
     }
     
     // MARK: - Helper Methods
     
     private func saveHistoryToRepository(_ items: [ClipItem]) {
-        serialQueue.async { [weak self] in
-            self?.repository.save(items)
+        Task {
+            do {
+                try await repository.save(items)
+                Logger.shared.debug("Saved \(items.count) items to repository")
+            } catch CoreDataError.notLoaded {
+                Logger.shared.warning("Core Data not loaded, items stored in memory only")
+                // メモリベースのフォールバック処理
+                // 履歴は既にメモリ上の配列に保存されているため、追加処理は不要
+            } catch {
+                Logger.shared.error("Failed to save history: \(error)")
+                // TODO: リトライロジックの実装を検討
+            }
         }
     }
     
@@ -448,7 +516,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private func initializeRecentHashes() {
         // 最近のアイテムのハッシュをSetに追加
         let recentItems = history.prefix(maxRecentHashes)
-        recentContentHashes = Set(recentItems.map { $0.content.hashValue })
+        hashLock.lock()
+        _recentContentHashes = Set(recentItems.map { $0.content.hashValue })
+        hashLock.unlock()
     }
     
     // MARK: - App Activation Monitoring
@@ -512,7 +582,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     
     private func getWindowTitleViaCGWindowList(processId: Int32) -> String? {
         // CGWindowListでウィンドウ情報を取得（権限不要）
-        let windowList = CGWindowListCopyWindowInfo([.excludeDesktopElements, .optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        let windowOptions: CGWindowListOption = [.excludeDesktopElements, .optionOnScreenOnly]
+        let windowList = CGWindowListCopyWindowInfo(windowOptions, kCGNullWindowID) as? [[String: Any]] ?? []
         
         for window in windowList {
             guard let windowPid = window[kCGWindowOwnerPID as String] as? Int32,
@@ -524,6 +595,21 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         }
         
         return nil
+    }
+    
+    // MARK: - Public Methods for Data Persistence
+    
+    func flushPendingSaves() async {
+        // デバウンスをキャンセルして即座に保存
+        saveSubscription?.cancel()
+        if !history.isEmpty {
+            do {
+                try await repository.save(history)
+                Logger.shared.log("Flushed \(history.count) items to repository")
+            } catch {
+                Logger.shared.error("Failed to flush saves: \(error)")
+            }
+        }
     }
     
     deinit {

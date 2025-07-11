@@ -7,6 +7,7 @@
 
 import Foundation
 
+@available(*, deprecated, message: "Use CoreDataClipboardRepository instead")
 class ClipboardRepository {
     private let userDefaults = UserDefaults.standard
     private let clipboardHistoryKey = "com.Kipple.clipboardHistory"
@@ -35,9 +36,7 @@ class ClipboardRepository {
         
         do {
             let items = try JSONDecoder().decode([ClipItem].self, from: data)
-            // Filter out items older than 7 days
-            let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-            return items.filter { $0.timestamp > sevenDaysAgo }
+            return items
         } catch {
             Logger.shared.error("Error loading clipboard history: \(error.localizedDescription)")
             Logger.shared.warning("Clearing corrupted data")

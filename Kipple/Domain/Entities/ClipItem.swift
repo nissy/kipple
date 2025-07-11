@@ -403,6 +403,21 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.isFromEditor = isFromEditor
     }
     
+    init(id: UUID, content: String, timestamp: Date, isPinned: Bool, kind: ClipItemKind,
+         sourceApp: String?, windowTitle: String?, bundleIdentifier: String?,
+         processID: Int32?, isFromEditor: Bool?) {
+        self.id = id
+        self.content = content
+        self.timestamp = timestamp
+        self.isPinned = isPinned
+        self.kind = kind
+        self.sourceApp = sourceApp
+        self.windowTitle = windowTitle
+        self.bundleIdentifier = bundleIdentifier
+        self.processID = processID
+        self.isFromEditor = isFromEditor
+    }
+    
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
         lhs.id == rhs.id
     }
