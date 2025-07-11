@@ -14,7 +14,7 @@ final class AppSettings: ObservableObject {
     // Window Settings
     @AppStorage("windowHeight") var windowHeight: Double = 600
     @AppStorage("windowWidth") var windowWidth: Double = 420
-    @AppStorage("windowAnimation") var windowAnimation: String = "none"
+    @AppStorage("windowAnimation") var windowAnimation: String = "fade"
     @AppStorage("editorSectionHeight") var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") var historySectionHeight: Double = 300
     
