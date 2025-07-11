@@ -103,7 +103,7 @@ struct HistoryItemView: View {
                     )
             }
             
-            Text(item.content)
+            Text(getDisplayContent())
                 .font(historyFont)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -192,6 +192,13 @@ struct HistoryItemView: View {
                     .interactiveDismissDisabled() // ポップオーバー内のクリックで閉じないようにする
             }
         }
+    }
+    
+    private func getDisplayContent() -> String {
+        if let newlineIndex = item.content.firstIndex(of: "\n") {
+            return String(item.content[..<newlineIndex]) + "..."
+        }
+        return item.content
     }
     
     private func checkWindowPosition() -> Bool {
