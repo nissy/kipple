@@ -65,18 +65,18 @@ final class ClipboardServiceEditorTests: XCTestCase {
             if let latestItem = self.clipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertEqual(latestItem.content, testContent)
                 XCTAssertEqual(latestItem.sourceApp, "Kipple", "Source app should be 'Kipple' for editor copies")
-                XCTAssertEqual(latestItem.windowTitle, "Quick Editor", "Window title should be 'Quick Editor' for editor copies")
+                XCTAssertEqual(
+                    latestItem.windowTitle,
+                    "Quick Editor",
+                    "Window title should be 'Quick Editor' for editor copies"
+                )
                 XCTAssertNotNil(latestItem.bundleIdentifier)
                 XCTAssertEqual(latestItem.bundleIdentifier, Bundle.main.bundleIdentifier)
                 XCTAssertTrue(latestItem.isFromEditor ?? false, "isFromEditor should be true")
                 XCTAssertEqual(latestItem.category, .kipple, "Category should be kipple for editor copies")
             } else {
                 // デバッグ情報を出力
-                print("Initial history count: \(initialHistoryCount)")
-                print("Current history count: \(self.clipboardService.history.count)")
-                print("History items:")
                 for (index, item) in self.clipboardService.history.prefix(5).enumerated() {
-                    print("  [\(index)] \(item.content) (from: \(item.sourceApp ?? "unknown"))")
                 }
                 XCTFail("No item with test content '\(testContent)' was added to history")
             }
@@ -121,10 +121,15 @@ final class ClipboardServiceEditorTests: XCTestCase {
                 // 少し待って確認
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     // 内部コピーは履歴に追加されない
-                    XCTAssertEqual(self.clipboardService.history.count, beforeInternalCount, 
-                                   "Internal copy should not increase history count")
-                    XCTAssertFalse(self.clipboardService.history.contains { $0.content == internalContent }, 
-                                   "Internal copy should not be added to history")
+                    XCTAssertEqual(
+                        self.clipboardService.history.count,
+                        beforeInternalCount,
+                        "Internal copy should not increase history count"
+                    )
+                    XCTAssertFalse(
+                        self.clipboardService.history.contains { $0.content == internalContent },
+                        "Internal copy should not be added to history"
+                    )
                     expectation.fulfill()
                 }
             } else {
@@ -154,7 +159,11 @@ final class ClipboardServiceEditorTests: XCTestCase {
             // Then
             if let latestItem = self.clipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertNotNil(latestItem.processID, "Process ID should be recorded")
-                XCTAssertEqual(latestItem.processID, ProcessInfo.processInfo.processIdentifier, "Process ID should match current process")
+                XCTAssertEqual(
+                    latestItem.processID,
+                    ProcessInfo.processInfo.processIdentifier,
+                    "Process ID should match current process"
+                )
             } else {
                 XCTFail("No item with test content was added to history")
             }
@@ -200,7 +209,11 @@ final class ClipboardServiceEditorTests: XCTestCase {
             // 記録されたアイテムが正しいプロパティを持っているか確認
             for item in foundItems {
                 XCTAssertEqual(item.sourceApp, "Kipple", "All editor items should have 'Kipple' as source app")
-                XCTAssertEqual(item.windowTitle, "Quick Editor", "All editor items should have 'Quick Editor' as window title")
+                XCTAssertEqual(
+                    item.windowTitle,
+                    "Quick Editor",
+                    "All editor items should have 'Quick Editor' as window title"
+                )
                 XCTAssertEqual(item.category, .kipple, "All editor items should have kipple category")
                 XCTAssertTrue(item.isFromEditor ?? false, "Should be marked as from editor")
             }

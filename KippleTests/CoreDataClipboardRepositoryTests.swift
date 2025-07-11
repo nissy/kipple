@@ -162,8 +162,6 @@ final class CoreDataClipboardRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded.count, 100)
         XCTAssertLessThan(saveTime, 5.0, "Save 1000 items should complete within 5 seconds")
         XCTAssertLessThan(loadTime, 0.5, "Load 100 items should complete within 500ms")
-        
-        print("Performance: Save 1000 items = \(saveTime)s, Load 100 items = \(loadTime)s")
     }
     
     func testConcurrentOperations() async throws {

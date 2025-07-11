@@ -84,7 +84,13 @@ struct MainView: View {
         .background(
             Color(NSColor.windowBackgroundColor)
         )
-        .overlay(CopiedNotificationView(showNotification: $isShowingCopiedNotification, notificationType: currentNotificationType), alignment: .top)
+        .overlay(
+            CopiedNotificationView(
+                showNotification: $isShowingCopiedNotification,
+                notificationType: currentNotificationType
+            ),
+            alignment: .top
+        )
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
@@ -146,7 +152,10 @@ struct MainView: View {
     private var historyAndPinnedContent: some View {
         HStack(spacing: 0) {
             // 有効なフィルターを取得
-            let enabledCategories = [ClipItemCategory.url, .email, .code, .filePath, .shortText, .longText, .general, .kipple]
+            let enabledCategories = [
+                ClipItemCategory.url, .email, .code, .filePath,
+                .shortText, .longText, .general, .kipple
+            ]
                 .filter { isCategoryFilterEnabled($0) }
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
@@ -156,7 +165,7 @@ struct MainView: View {
                         withAnimation(.spring(response: 0.3)) {
                             viewModel.togglePinnedFilter()
                         }
-                    }) {
+                    }, label: {
                         VStack(spacing: 4) {
                             ZStack {
                                 Circle()
@@ -184,7 +193,7 @@ struct MainView: View {
                                 .lineLimit(1)
                         }
                         .frame(width: 60)
-                    }
+                    })
                     .buttonStyle(PlainButtonStyle())
                     .scaleEffect(viewModel.isPinnedFilterActive ? 1.05 : 1.0)
                     .animation(.spring(response: 0.3), value: viewModel.isPinnedFilterActive)
@@ -194,7 +203,7 @@ struct MainView: View {
                             withAnimation(.spring(response: 0.3)) {
                                 viewModel.toggleCategoryFilter(category)
                             }
-                        }) {
+                        }, label: {
                             VStack(spacing: 4) {
                                 ZStack {
                                     Circle()
@@ -222,7 +231,7 @@ struct MainView: View {
                                     .lineLimit(1)
                             }
                             .frame(width: 60)
-                        }
+                        })
                         .buttonStyle(PlainButtonStyle())
                         .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
                         .animation(.spring(response: 0.3), value: viewModel.selectedCategory)

@@ -139,7 +139,7 @@ final class ClipItemCategoryTests: XCTestCase {
             // Python
             "def factorial(n):\n    if n == 0:\n        return 1",
             "import numpy as np",
-            "for i in range(10):\n    print(i)",
+            "for i in range(10):\n    output(i)",
             
             // Java/C++/C#
             "public class Main { }",
@@ -152,7 +152,7 @@ final class ClipItemCategoryTests: XCTestCase {
             "array.map(x => x * 2).filter(y => y > 10)",  // より複雑なアロー関数
             "result = a == b && c != d",
             "counter++; value--;",
-            "[1, 2, 3].forEach { print($0) }",
+            "[1, 2, 3].forEach { output($0) }",
             "    return someValue if condition else None",  // インデントされたコード
             "\tfor i in range(10):",       // タブでインデント
             "{ key: value, foo: bar }",  // JSON/オブジェクト
@@ -307,7 +307,7 @@ final class ClipItemCategoryTests: XCTestCase {
         let editorURL = ClipItem(content: "https://example.com", isFromEditor: true)
         XCTAssertEqual(editorURL.category, .kipple, "URL from editor should still be categorized as Kipple")
         
-        let editorCode = ClipItem(content: "func test() { print(\"hello\") }", isFromEditor: true)
+        let editorCode = ClipItem(content: "func test() { output(\"hello\") }", isFromEditor: true)
         XCTAssertEqual(editorCode.category, .kipple, "Code from editor should still be categorized as Kipple")
         
         // エディタ以外からのアイテムは通常のカテゴリ

@@ -34,11 +34,11 @@ struct DeveloperSettingsView: View {
                 
                 Button(action: {
                     presentationMode.wrappedValue.dismiss()
-                }) {
+                }, label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
                         .foregroundColor(.secondary)
-                }
+                })
                 .buttonStyle(PlainButtonStyle())
             }
             .padding(.horizontal, 24)
@@ -141,10 +141,10 @@ struct DeveloperSettingsView: View {
                         // Reset Button
                         Button(action: {
                             fontManager.editorLayoutSettings = .default
-                        }) {
+                        }, label: {
                             Text("デフォルトに戻す")
                                 .font(.subheadline)
-                        }
+                        })
                         .buttonStyle(LinkButtonStyle())
                     }
                     .padding(.horizontal, 24)

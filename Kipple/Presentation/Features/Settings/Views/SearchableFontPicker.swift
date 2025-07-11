@@ -23,7 +23,7 @@ struct SearchableFontPicker: View {
     private let allFonts = FontManager.availableMonospacedFonts()
     
     var body: some View {
-        Button(action: { isShowingPopover.toggle() }) {
+        Button(action: { isShowingPopover.toggle() }, label: {
             HStack {
                 Text(fontDisplayName(for: selectedFont))
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,7 +41,7 @@ struct SearchableFontPicker: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
             )
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .popover(
             isPresented: $isShowingPopover,
@@ -156,10 +156,10 @@ struct FontSelectionView: View {
                 TextField("フォントを検索...", text: $searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                 if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
+                    Button(action: { searchText = "" }, label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
-                    }
+                    })
                     .buttonStyle(PlainButtonStyle())
                 }
             }
@@ -233,7 +233,7 @@ struct FontItemView: View {
     @State private var isHovered = false
     
     var body: some View {
-        Button(action: { onSelect(font) }) {
+        Button(action: { onSelect(font) }, label: {
             HStack {
                 // フォントプレビュー
                 if font.isEmpty {
@@ -266,7 +266,7 @@ struct FontItemView: View {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(isSelected ? Color.accentColor : (isHovered ? Color.gray.opacity(0.1) : Color.clear))
             )
-        }
+        })
         .buttonStyle(PlainButtonStyle())
         .onHover { hovering in
             isHovered = hovering

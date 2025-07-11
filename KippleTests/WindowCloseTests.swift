@@ -131,7 +131,7 @@ final class WindowCloseTests: XCTestCase {
                 
                 // エディタテキストがクリアされることを確認
                 XCTAssertTrue(viewModel.editorText.isEmpty || viewModel.editorText == "Test content",
-                            "Editor text should be handled")
+                              "Editor text should be handled")
             }
         }
     }

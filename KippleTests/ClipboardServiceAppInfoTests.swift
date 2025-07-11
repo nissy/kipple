@@ -59,25 +59,19 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
             let testItems = self.clipboardService.history.filter { $0.content.hasPrefix("KIPPLE_TEST_") }
             
             if let latestItem = testItems.first(where: { $0.content == testContent }) {
-                print("\n=== Captured Clipboard Item ===")
-                print("Content: \(latestItem.content)")
-                print("Source App: \(latestItem.sourceApp ?? "nil")")
-                print("Bundle ID: \(latestItem.bundleIdentifier ?? "nil")")
-                print("Window Title: \(latestItem.windowTitle ?? "nil")")
-                print("Process ID: \(latestItem.processID ?? -1)")
-                print("================================\n")
                 
                 // テスト環境でのコピーの場合、アプリ情報が取得できない可能性がある
                 // そのため、少なくともコンテンツが正しく記録されていることを確認
-                XCTAssertEqual(latestItem.content, testContent, 
-                             "Content should match test content")
+                XCTAssertEqual(
+                    latestItem.content,
+                    testContent,
+                    "Content should match test content"
+                )
                 
                 // アプリ情報が取得できた場合の追加チェック（オプショナル）
                 if latestItem.sourceApp != nil {
-                    print("Source app detected: \(latestItem.sourceApp!)")
                 }
                 if latestItem.bundleIdentifier != nil {
-                    print("Bundle ID detected: \(latestItem.bundleIdentifier!)")
                 }
             } else {
                 XCTFail("No clipboard item was captured")
@@ -103,8 +97,11 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             // 履歴に追加されていないことを確認
-            XCTAssertEqual(self.clipboardService.history.count, initialCount, 
-                          "Internal copy should not be added to history")
+            XCTAssertEqual(
+                self.clipboardService.history.count,
+                initialCount,
+                "Internal copy should not be added to history"
+            )
             expectation.fulfill()
         }
         
@@ -130,10 +127,6 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
             
             // 履歴に追加されているか確認
             if let latestItem = testItems.first(where: { $0.content == testContent }) {
-                print("\n=== Editor Copy Item ===")
-                print("Content: \(latestItem.content)")
-                print("Source App: \(latestItem.sourceApp ?? "nil")")
-                print("========================\n")
                 
                 // エディタからのコピーでもアプリ情報が記録されるはず
                 XCTAssertNotNil(latestItem.sourceApp)
@@ -152,32 +145,24 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
         let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: false]
         let hasPermission = AXIsProcessTrustedWithOptions(options)
         
-        print("\n=== Accessibility Permission Status ===")
-        print("Has Permission: \(hasPermission)")
-        
         if !hasPermission {
-            print("⚠️ To get window titles, grant accessibility permission to the test runner")
-            print("System Preferences > Security & Privacy > Privacy > Accessibility")
         }
-        print("=====================================\n")
     }
     
     func testCGWindowListApproach() {
         // CGWindowListを使用したウィンドウ情報の取得テスト
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
-        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as NSArray? as? [[String: Any]] else {
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as NSArray?
+                as? [[String: Any]] else {
             XCTFail("Failed to get window list")
             return
         }
         
-        print("\n=== CGWindowList Results (Top 5 Windows) ===")
         for (index, window) in windowList.prefix(5).enumerated() {
             if let ownerName = window[kCGWindowOwnerName as String] as? String,
                let windowTitle = window[kCGWindowName as String] as? String {
-                print("\(index + 1). App: \(ownerName), Window: \(windowTitle)")
             }
         }
-        print("==========================================\n")
         
         XCTAssertFalse(windowList.isEmpty, "Window list should not be empty")
     }
@@ -190,8 +175,6 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
         
         // 現在のフロントアプリを記録
         let initialFrontApp = NSWorkspace.shared.frontmostApplication?.localizedName
-        print("\n=== Timing Test ===")
-        print("Initial front app: \(initialFrontApp ?? "unknown")")
         
         // クリップボードにコピー
         let uuid = UUID().uuidString
@@ -202,7 +185,6 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
         // 即座に確認
         DispatchQueue.main.async {
             let currentFrontApp = NSWorkspace.shared.frontmostApplication?.localizedName
-            print("Front app after copy: \(currentFrontApp ?? "unknown")")
         }
         
         // 履歴を確認
@@ -211,9 +193,7 @@ final class ClipboardServiceAppInfoTests: XCTestCase {
             let testItems = self.clipboardService.history.filter { $0.content.hasPrefix("KIPPLE_TEST_") }
             
             if let item = testItems.first(where: { $0.content == testContent }) {
-                print("Recorded app: \(item.sourceApp ?? "unknown")")
             }
-            print("==================\n")
             expectation.fulfill()
         }
         
