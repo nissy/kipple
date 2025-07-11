@@ -251,20 +251,20 @@ struct FontItemView: View {
                 // フォント名
                 Text(fontDisplayName(for: font))
                     .font(.system(size: 12))
-                    .foregroundColor(isSelected ? .white : .primary)
+                    .foregroundColor(isSelected ? Color(NSColor.selectedTextColor) : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.caption)
-                        .foregroundColor(.white)
+                        .foregroundColor(Color(NSColor.selectedTextColor))
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? Color.accentColor : (isHovered ? Color.gray.opacity(0.1) : Color.clear))
+                    .fill(isSelected ? Color(NSColor.selectedControlColor) : (isHovered ? Color.gray.opacity(0.1) : Color.clear))
             )
         })
         .buttonStyle(PlainButtonStyle())
