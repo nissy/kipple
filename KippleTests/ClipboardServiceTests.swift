@@ -343,4 +343,149 @@ final class ClipboardServiceTests: XCTestCase {
     
     // testRapidDuplicateCheckingは内部実装の詳細に依存し、
     // testThreadSafetyで十分にカバーされているため廃止
+    
+    // MARK: - Editor Copy Tests
+    
+    func testCopyFromEditor() {
+        // SPECS.md: エディターからのコピー（Kippleカテゴリ）
+        // Given
+        let uuid = UUID().uuidString
+        let testContent = "KIPPLE_TEST_EDITOR_\(uuid)"
+        let expectation = XCTestExpectation(description: "Editor copy recorded")
+        
+        // モニタリングを開始してエディタコピーを検出できるようにする
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.5)
+        
+        // When
+        clipboardService.copyToClipboard(testContent, fromEditor: true)
+        
+        // クリップボード監視が検出するのを待つ
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // Then
+            if let latestItem = self.clipboardService.history.first(where: { $0.content == testContent }) {
+                XCTAssertEqual(latestItem.content, testContent)
+                XCTAssertEqual(latestItem.sourceApp, "Kipple", "Source app should be 'Kipple' for editor copies")
+                XCTAssertEqual(
+                    latestItem.windowTitle,
+                    "Quick Editor",
+                    "Window title should be 'Quick Editor' for editor copies"
+                )
+                XCTAssertNotNil(latestItem.bundleIdentifier)
+                XCTAssertEqual(latestItem.bundleIdentifier, Bundle.main.bundleIdentifier)
+                XCTAssertTrue(latestItem.isFromEditor ?? false, "isFromEditor should be true")
+                XCTAssertEqual(latestItem.category, .kipple, "Category should be kipple for editor copies")
+            } else {
+                XCTFail("No item with test content '\(testContent)' was added to history")
+            }
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 4.0)
+    }
+    
+    func testCopyFromEditorVsNormalCopy() {
+        // Given
+        let uuid = UUID().uuidString
+        let editorContent = "KIPPLE_TEST_EDITOR_VS_NORMAL_\(uuid)"
+        let expectation = XCTestExpectation(description: "Editor copy recorded")
+        
+        // モニタリングを開始
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.5)
+        
+        let initialCount = clipboardService.history.count
+        
+        // When - エディタからコピー
+        clipboardService.copyToClipboard(editorContent, fromEditor: true)
+        
+        // 待機して結果を確認
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            // Then
+            let currentCount = self.clipboardService.history.count
+            XCTAssertGreaterThan(currentCount, initialCount, "Editor copy should be added to history")
+            
+            // 最新のアイテムを確認
+            if let editorItem = self.clipboardService.history.first(where: { $0.content == editorContent }) {
+                XCTAssertEqual(editorItem.sourceApp, "Kipple", "Editor copy should have 'Kipple' as source app")
+                XCTAssertTrue(editorItem.isFromEditor ?? false, "Should be marked as from editor")
+                XCTAssertEqual(editorItem.category, .kipple, "Should have kipple category")
+                
+                // 通常のコピー（fromEditor: false）は内部コピーとして扱われ、履歴に追加されないことを確認
+                let beforeInternalCount = self.clipboardService.history.count
+                let internalContent = "KIPPLE_TEST_INTERNAL_\(UUID().uuidString)"
+                self.clipboardService.copyToClipboard(internalContent, fromEditor: false)
+                
+                // 少し待って確認
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // 内部コピーは履歴に追加されない
+                    XCTAssertEqual(
+                        self.clipboardService.history.count,
+                        beforeInternalCount,
+                        "Internal copy should not increase history count"
+                    )
+                    XCTAssertFalse(
+                        self.clipboardService.history.contains { $0.content == internalContent },
+                        "Internal copy should not be added to history"
+                    )
+                    expectation.fulfill()
+                }
+            } else {
+                XCTFail("Editor copy not found in history")
+                expectation.fulfill()
+            }
+        }
+        
+        wait(for: [expectation], timeout: 4.0)
+    }
+    
+    // MARK: - SPECS.md準拠: クリップボード監視間隔（0.5秒）
+    
+    func testClipboardMonitoringInterval() {
+        // SPECS.md: 0.5秒間隔でクリップボード変更を検出
+        let expectation = XCTestExpectation(description: "Clipboard monitoring interval")
+        var detectionTimes: [Date] = []
+        
+        // 監視開始
+        clipboardService.startMonitoring()
+        Thread.sleep(forTimeInterval: 0.1) // 監視開始を待つ
+        
+        // 初期クリップボード内容を設定
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("Initial", forType: .string)
+        
+        // クリップボード変更を複数回実行（0.6秒間隔）
+        for i in 1...4 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.6) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("Test \(i)", forType: .string)
+            }
+        }
+        
+        // 履歴変更を監視
+        clipboardService.$history
+            .dropFirst() // 初期値をスキップ
+            .sink { history in
+                if !history.isEmpty {
+                    detectionTimes.append(Date())
+                    if detectionTimes.count >= 4 {
+                        expectation.fulfill()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+        
+        wait(for: [expectation], timeout: 5.0)
+        
+        // 検出間隔を検証（0.5秒間隔の監視なので、約0.5〜0.7秒で検出される）
+        if detectionTimes.count >= 2 {
+            for i in 1..<detectionTimes.count {
+                let interval = detectionTimes[i].timeIntervalSince(detectionTimes[i - 1])
+                XCTAssertGreaterThanOrEqual(interval, 0.4, "Detection interval should be at least 0.4 seconds")
+                XCTAssertLessThanOrEqual(interval, 0.8, "Detection interval should be at most 0.8 seconds")
+            }
+        }
+        
+        clipboardService.stopMonitoring()
+    }
 }

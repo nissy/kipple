@@ -11,11 +11,11 @@ import SwiftUI
 
 class MainViewModelTests: XCTestCase {
     var viewModel: MainViewModel!
-    var mockClipboardService: MockClipboardServiceForViewModel!
+    var mockClipboardService: MockClipboardService!
     
     override func setUp() {
         super.setUp()
-        mockClipboardService = MockClipboardServiceForViewModel()
+        mockClipboardService = MockClipboardService()
         viewModel = MainViewModel(clipboardService: mockClipboardService)
     }
     
@@ -203,57 +203,5 @@ class MainViewModelTests: XCTestCase {
     }
 }
 
-// MARK: - Mock ClipboardService
-
-class MockClipboardServiceForViewModel: ObservableObject, ClipboardServiceProtocol {
-    @Published var history: [ClipItem] = []
-    var currentClipboardContent: String?
-    
-    var pinnedItems: [ClipItem] {
-        history.filter { $0.isPinned }
-    }
-    
-    var onHistoryChanged: ((ClipItem) -> Void)?
-    
-    // Test tracking properties
-    var copyToClipboardCalled = false
-    var lastCopiedContent: String?
-    var fromEditor = false
-    
-    var togglePinCalled = false
-    var lastToggledItem: ClipItem?
-    
-    var deleteItemCalled = false
-    var lastDeletedItem: ClipItem?
-    
-    func startMonitoring() {}
-    
-    func stopMonitoring() {}
-    
-    func copyToClipboard(_ content: String, fromEditor: Bool) {
-        copyToClipboardCalled = true
-        lastCopiedContent = content
-        self.fromEditor = fromEditor
-    }
-    
-    func togglePin(for item: ClipItem) -> Bool {
-        togglePinCalled = true
-        lastToggledItem = item
-        
-        if let index = history.firstIndex(where: { $0.id == item.id }) {
-            history[index].isPinned.toggle()
-            return true
-        }
-        return false
-    }
-    
-    func clearAllHistory() {
-        history.removeAll()
-    }
-    
-    func deleteItem(_ item: ClipItem) {
-        deleteItemCalled = true
-        lastDeletedItem = item
-        history.removeAll { $0.id == item.id }
-    }
-}
+// MockClipboardServiceは削除され、
+// MockClipboardServiceに統合されました（Helpers/MockClipboardService.swift）
