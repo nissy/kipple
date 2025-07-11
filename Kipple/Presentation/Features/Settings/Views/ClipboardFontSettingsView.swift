@@ -47,7 +47,12 @@ struct ClipboardFontSettingsView: View {
                     .foregroundColor(.secondary)
                 
                 ScrollView {
-                    Text("The quick brown fox jumps over the lazy dog\n素早い茶色のキツネが怠け者の犬を飛び越える\n1234567890 !@#$%^&*()\n😀🎉🚀 ∑∏∫√∞ ™®©")
+                    Text("""
+                        The quick brown fox jumps over the lazy dog
+                        素早い茶色のキツネが怠け者の犬を飛び越える
+                        1234567890 !@#$%^&*()
+                        😀🎉🚀 ∑∏∫√∞ ™®©
+                        """)
                         .font(previewFont)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
