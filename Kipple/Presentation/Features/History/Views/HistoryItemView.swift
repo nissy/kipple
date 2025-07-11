@@ -103,22 +103,18 @@ struct HistoryItemView: View {
                     )
             }
             
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
-                Text(item.displayContent)
-                    .font(historyFont)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .foregroundColor(isSelected ? .white : .primary)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onTap()
-            }
+            Text(item.content)
+                .font(historyFont)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundColor(isSelected ? .white : .primary)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap()
+                }
             
             if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
                 Image(systemName: "xmark.circle.fill")
@@ -328,26 +324,24 @@ struct ClipboardItemPopover: View {
             
             // 詳細情報セクション
             VStack(alignment: .leading, spacing: 12) {
-                Divider()
-                
                 // 詳細メタデータ
                 HStack(spacing: 16) {
                     // 文字数
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Characters")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.secondary)
                         Text("\(item.characterCount)")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 10, weight: .medium))
                     }
                     
                     // 時刻
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Copied")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.secondary)
                         Text(item.formattedTimestamp)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 10, weight: .medium))
                             .lineLimit(1)
                     }
                     

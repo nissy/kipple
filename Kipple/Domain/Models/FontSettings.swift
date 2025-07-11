@@ -44,20 +44,43 @@ struct FontSettings: Codable, Equatable {
             return NSFont.systemFont(ofSize: primaryFontSize)
         }
         
-        // プライマリフォントを試す
-        if let font = NSFont(name: primaryFontName, size: primaryFontSize) {
-            return font
+        // フォールバックチェーンを持つフォントを作成
+        var fontNames: [String] = []
+        
+        // プライマリフォントが利用可能な場合は追加
+        if NSFont(name: primaryFontName, size: primaryFontSize) != nil {
+            fontNames.append(primaryFontName)
         }
         
-        // フォールバックフォントを順番に試す
-        for fontName in fallbackFontNames {
-            if let font = NSFont(name: fontName, size: primaryFontSize) {
-                return font
-            }
+        // フォールバックフォントを追加
+        for fontName in fallbackFontNames where NSFont(name: fontName, size: primaryFontSize) != nil {
+            fontNames.append(fontName)
         }
         
-        // すべて失敗した場合はシステムフォントを返す
-        return NSFont.systemFont(ofSize: primaryFontSize)
+        // フォントが見つからない場合はシステムフォントを返す
+        if fontNames.isEmpty {
+            return NSFont.systemFont(ofSize: primaryFontSize)
+        }
+        
+        // 単一のフォントの場合はそのまま返す
+        if fontNames.count == 1 {
+            return NSFont(name: fontNames[0], size: primaryFontSize)!
+        }
+        
+        // 複数のフォントがある場合はフォントディスクリプタでカスケードリストを作成
+        let primaryFont = NSFont(name: fontNames[0], size: primaryFontSize)!
+        let fallbackDescriptors = fontNames.dropFirst().compactMap { fontName in
+            NSFontDescriptor(fontAttributes: [
+                .name: fontName,
+                .size: primaryFontSize
+            ])
+        }
+        
+        let descriptor = primaryFont.fontDescriptor.addingAttributes([
+            .cascadeList: fallbackDescriptors
+        ])
+        
+        return NSFont(descriptor: descriptor, size: primaryFontSize) ?? primaryFont
     }
     
     // フォント名リストから実際のフォントを構築
