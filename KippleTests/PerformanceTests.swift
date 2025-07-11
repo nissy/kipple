@@ -113,7 +113,12 @@ class PerformanceTests: XCTestCase {
             clipboardService.clearAllHistory()
         }
         
-        XCTAssertTrue(clipboardService.history.isEmpty)
+        // clearAllHistoryはピン留めされたアイテムを保持するため、
+        // ピン留めされていないアイテムが全て削除されたことを確認
+        let remainingPinnedItems = clipboardService.history.filter { $0.isPinned }
+        let remainingUnpinnedItems = clipboardService.history.filter { !$0.isPinned }
+        XCTAssertTrue(remainingUnpinnedItems.isEmpty, "All unpinned items should be cleared")
+        XCTAssertEqual(clipboardService.history.count, remainingPinnedItems.count, "Only pinned items should remain")
     }
     
     // MARK: - Pin Operations Performance

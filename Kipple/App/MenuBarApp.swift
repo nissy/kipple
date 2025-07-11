@@ -14,8 +14,18 @@ final class MenuBarApp: NSObject, ObservableObject {
     private let windowManager = WindowManager()
     private let hotkeyManager = HotkeyManager()
     
+    // テスト環境かどうかを検出
+    private static var isTestEnvironment: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+        NSClassFromString("XCTest") != nil
+    }
+    
     override init() {
         super.init()
+        
+        // テスト環境では初期化をスキップ
+        guard !Self.isTestEnvironment else { return }
+        
         // delegateをすぐに設定
         hotkeyManager.delegate = self
         
@@ -134,10 +144,27 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @objc private func quit() {
-        clipboardService.stopMonitoring()
-        windowManager.cleanup()
-        // hotkeyManager は deinit で自動的にクリーンアップされる
-        NSApplication.shared.terminate(nil)
+        // アプリ終了時にデータを確実に保存
+        Task {
+            // デバウンスされた保存を即座に実行
+            await clipboardService.flushPendingSaves()
+            
+            // Core Dataの保存を確実に実行
+            do {
+                try await CoreDataStack.shared.save()
+                Logger.shared.log("Successfully saved data before quit")
+            } catch {
+                Logger.shared.error("Failed to save on quit: \(error)")
+            }
+            
+            // メインスレッドでクリーンアップを実行
+            await MainActor.run {
+                clipboardService.stopMonitoring()
+                windowManager.cleanup()
+                // hotkeyManager は deinit で自動的にクリーンアップされる
+                NSApplication.shared.terminate(nil)
+            }
+        }
     }
 }
 

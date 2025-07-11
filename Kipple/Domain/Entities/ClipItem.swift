@@ -172,18 +172,18 @@ struct ClipItem: Identifiable, Codable, Equatable {
         }
         
         // 一般的なファイル拡張子を除外
-        let fileExtensions = [".txt", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-                             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp",
-                             ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav",
-                             ".zip", ".rar", ".7z", ".tar", ".gz", ".dmg",
-                             ".app", ".exe", ".pkg", ".deb", ".rpm",
-                             ".swift", ".py", ".js", ".java", ".cpp", ".c", ".h",
-                             ".html", ".css", ".xml", ".json", ".yml", ".yaml"]
+        let fileExtensions = [
+            ".txt", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp",
+            ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav",
+            ".zip", ".rar", ".7z", ".tar", ".gz", ".dmg",
+            ".app", ".exe", ".pkg", ".deb", ".rpm",
+            ".swift", ".py", ".js", ".java", ".cpp", ".c", ".h",
+            ".html", ".css", ".xml", ".json", ".yml", ".yaml"
+        ]
         
-        for ext in fileExtensions {
-            if text.lowercased().hasSuffix(ext) {
-                return false
-            }
+        for ext in fileExtensions where text.lowercased().hasSuffix(ext) {
+            return false
         }
         
         // より厳密なドメイン形式のチェック
@@ -195,17 +195,15 @@ struct ClipItem: Identifiable, Codable, Equatable {
                 let tldPattern = "^[a-zA-Z]{2,6}$"
                 if lastComponent.range(of: tldPattern, options: .regularExpression) != nil {
                     // 各要素が妥当なドメイン名であることを確認
-                    for (index, component) in components.enumerated() {
+                    for (index, component) in components.enumerated() where index < components.count - 1 {
                         // 最後のTLD以外をチェック
-                        if index < components.count - 1 {
-                            // ドメイン名は2文字以上、英数字とハイフンのみ
-                            if component.count < 2 {
-                                return false
-                            }
-                            let domainPattern = "^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]+$"
-                            if component.range(of: domainPattern, options: .regularExpression) == nil {
-                                return false
-                            }
+                        // ドメイン名は2文字以上、英数字とハイフンのみ
+                        if component.count < 2 {
+                            return false
+                        }
+                        let domainPattern = "^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]+$"
+                        if component.range(of: domainPattern, options: .regularExpression) == nil {
+                            return false
                         }
                     }
                     return true
@@ -229,7 +227,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         
         // より厳密なメールパターン（RFC準拠に近い）
         // ローカル部は1文字以上、または._%+-を含む複数文字を許可
-        let emailPattern = "^[A-Z0-9a-z]([A-Z0-9a-z._%+-]*[A-Z0-9a-z])?@[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]\\.[A-Za-z]{2,}$"
+        let emailPattern = "^[A-Z0-9a-z]([A-Z0-9a-z._%+-]*[A-Z0-9a-z])?" +
+                          "@[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]\\.[A-Za-z]{2,}$"
         if text.range(of: emailPattern, options: .regularExpression) != nil {
             // @の前後をチェック
             let parts = text.split(separator: "@")
@@ -243,7 +242,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
                 }
                 
                 // ドメイン部の検証
-                if domainPart.hasPrefix(".") || domainPart.hasSuffix(".") || domainPart.hasPrefix("-") || domainPart.hasSuffix("-") {
+                if domainPart.hasPrefix(".") || domainPart.hasSuffix(".") ||
+                   domainPart.hasPrefix("-") || domainPart.hasSuffix("-") {
                     return false
                 }
                 
@@ -323,9 +323,13 @@ struct ClipItem: Identifiable, Codable, Equatable {
         let checkText = text.count > 500 ? String(text.prefix(500)) : text
         
         // 自然言語の文章を除外（文末がピリオドで終わる場合）
-        if checkText.hasSuffix(".") || checkText.hasSuffix("。") || checkText.hasSuffix("!") || checkText.hasSuffix("?") {
+        if checkText.hasSuffix(".") || checkText.hasSuffix("。") ||
+           checkText.hasSuffix("!") || checkText.hasSuffix("?") {
             // ただし、コードの可能性がある場合は続行
-            let codeSymbols = ["{", "}", "[", "]", ";", "=>", "->", "==", "!=", "&&", "||", "++", "--", "()", "<>", "::", ":="]
+            let codeSymbols = [
+                "{", "}", "[", "]", ";", "=>", "->", "==", "!=", 
+                "&&", "||", "++", "--", "()", "<>", "::", ":="
+            ]
             let symbolCount = codeSymbols.filter { checkText.contains($0) }.count
             if symbolCount < 2 {
                 return false
@@ -353,7 +357,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
                     // コメント
                     "^\\s*//", "^\\s*/\\*", "^\\s*#",
                     // SQL
-                    "\\bSELECT\\s+.*\\sFROM\\b", "\\bINSERT\\s+INTO\\b", "\\bUPDATE\\s+.*\\sSET\\b", "\\bDELETE\\s+FROM\\b",
+                    "\\bSELECT\\s+.*\\sFROM\\b", "\\bINSERT\\s+INTO\\b",
+                    "\\bUPDATE\\s+.*\\sSET\\b", "\\bDELETE\\s+FROM\\b",
                     // アロー関数とメソッドチェーン
                     "=>", "\\.\\w+\\(.*\\)"
                 ]
@@ -366,13 +371,18 @@ struct ClipItem: Identifiable, Codable, Equatable {
         // コンパイル済み正規表現を使用
         for (_, regex) in CodePatterns.patterns {
             if let regex = regex,
-               regex.firstMatch(in: checkText, options: [], range: NSRange(checkText.startIndex..., in: checkText)) != nil {
+               regex.firstMatch(in: checkText,
+                                options: [],
+                                range: NSRange(checkText.startIndex..., in: checkText)) != nil {
                 return true
             }
         }
         
         // 複数のコード記号を含む場合
-        let codeSymbols = ["{", "}", "[", "]", ";", "=>", "->", "==", "!=", "&&", "||", "++", "--", "::", ":=", "<=", ">="]
+        let codeSymbols = [
+            "{", "}", "[", "]", ";", "=>", "->", "==", "!=",
+            "&&", "||", "++", "--", "::", ":=", "<=", ">="
+        ]
         let symbolCount = codeSymbols.filter { checkText.contains($0) }.count
         if symbolCount >= 2 {
             return true
@@ -387,13 +397,43 @@ struct ClipItem: Identifiable, Codable, Equatable {
         return false
     }
     
-    init(content: String, isPinned: Bool = false, kind: ClipItemKind = .text, 
-         sourceApp: String? = nil, windowTitle: String? = nil, 
-         bundleIdentifier: String? = nil, processID: Int32? = nil,
-         isFromEditor: Bool = false) {
+    init(
+        content: String,
+        isPinned: Bool = false,
+        kind: ClipItemKind = .text,
+        sourceApp: String? = nil,
+        windowTitle: String? = nil,
+        bundleIdentifier: String? = nil,
+        processID: Int32? = nil,
+        isFromEditor: Bool = false
+    ) {
         self.id = UUID()
         self.content = content
         self.timestamp = Date()
+        self.isPinned = isPinned
+        self.kind = kind
+        self.sourceApp = sourceApp
+        self.windowTitle = windowTitle
+        self.bundleIdentifier = bundleIdentifier
+        self.processID = processID
+        self.isFromEditor = isFromEditor
+    }
+    
+    init(
+        id: UUID,
+        content: String,
+        timestamp: Date,
+        isPinned: Bool,
+        kind: ClipItemKind,
+        sourceApp: String?,
+        windowTitle: String?,
+        bundleIdentifier: String?,
+        processID: Int32?,
+        isFromEditor: Bool?
+    ) {
+        self.id = id
+        self.content = content
+        self.timestamp = timestamp
         self.isPinned = isPinned
         self.kind = kind
         self.sourceApp = sourceApp

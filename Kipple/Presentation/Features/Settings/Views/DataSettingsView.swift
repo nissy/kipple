@@ -125,7 +125,7 @@ struct DataSettingsView: View {
                         HStack {
                             Button(action: {
                                 showClearHistoryAlert = true
-                            }) {
+                            }, label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "trash.fill")
                                         .font(.system(size: 12))
@@ -144,7 +144,7 @@ struct DataSettingsView: View {
                                 )
                                 .cornerRadius(6)
                                 .shadow(color: Color.red.opacity(0.3), radius: 2, y: 1)
-                            }
+                            })
                             .buttonStyle(PlainButtonStyle())
                             .disabled(clipboardService.history.isEmpty)
                             

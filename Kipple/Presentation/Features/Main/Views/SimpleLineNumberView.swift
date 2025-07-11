@@ -338,7 +338,11 @@ struct SimpleLineNumberView: NSViewRepresentable {
             return textBeforeSelection.components(separatedBy: "\n").count
         }
         
-        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        func textView(
+            _ textView: NSTextView,
+            shouldChangeTextIn affectedCharRange: NSRange,
+            replacementString: String?
+        ) -> Bool {
             // デフォルトの動作を維持
             return true
         }
@@ -578,7 +582,8 @@ class SimpleLineNumberRulerView: NSRulerView {
         let lineBuffer = Int(fixedLineHeight * 2) // 2行分のバッファ
         let extendedGlyphRange = NSRange(
             location: max(0, visibleGlyphRange.location),
-            length: min(visibleGlyphRange.length + lineBuffer, layoutManager.numberOfGlyphs - visibleGlyphRange.location)
+            length: min(visibleGlyphRange.length + lineBuffer,
+                        layoutManager.numberOfGlyphs - visibleGlyphRange.location)
         )
         
         // 基準点を正しく計算

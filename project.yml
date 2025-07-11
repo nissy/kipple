@@ -36,6 +36,7 @@ targets:
       - path: Kipple/Resources
         includes:
           - "**/*.xcassets"
+          - "**/*.xcdatamodeld"
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
