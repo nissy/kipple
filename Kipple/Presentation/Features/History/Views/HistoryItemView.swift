@@ -103,22 +103,18 @@ struct HistoryItemView: View {
                     )
             }
             
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
-                Text(item.displayContent)
-                    .font(historyFont)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .foregroundColor(isSelected ? .white : .primary)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onTap()
-            }
+            Text(item.content)
+                .font(historyFont)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundColor(isSelected ? .white : .primary)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onTap()
+                }
             
             if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
                 Image(systemName: "xmark.circle.fill")
