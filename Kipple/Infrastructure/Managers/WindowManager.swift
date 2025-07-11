@@ -60,6 +60,11 @@ final class WindowManager: NSObject {
             
             // カーソル位置に再配置
             positionWindowAtCursor(existingWindow)
+            
+            // エディタにフォーカスを設定
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.focusOnEditor()
+            }
             return
         }
         
@@ -166,6 +171,10 @@ final class WindowManager: NSObject {
             animateSlide(window)
         case "none":
             window.makeKeyAndOrderFront(nil)
+            // アニメーションなしの場合も少し遅延してフォーカス
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.focusOnEditor()
+            }
         default: // "fade"
             animateFade(window)
         }
@@ -178,6 +187,8 @@ final class WindowManager: NSObject {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.25
             window.animator().alphaValue = 1.0
+        } completionHandler: { [weak self] in
+            self?.focusOnEditor()
         }
     }
     
@@ -198,6 +209,8 @@ final class WindowManager: NSObject {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 1.0
             window.animator().setFrame(targetFrame, display: true)
+        } completionHandler: { [weak self] in
+            self?.focusOnEditor()
         }
     }
     
@@ -214,6 +227,8 @@ final class WindowManager: NSObject {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 1.0
             window.animator().setFrame(targetFrame, display: true)
+        } completionHandler: { [weak self] in
+            self?.focusOnEditor()
         }
     }
     
@@ -400,6 +415,35 @@ final class WindowManager: NSObject {
         }
     }
     #endif
+    
+    // MARK: - Focus Management
+    
+    private func focusOnEditor() {
+        guard let window = mainWindow else { return }
+        
+        // ウィンドウ内のNSTextViewを検索してフォーカスを設定
+        findAndFocusTextView(in: window.contentView)
+    }
+    
+    private func findAndFocusTextView(in view: NSView?) {
+        guard let view = view else { return }
+        
+        if let textView = view as? NSTextView {
+            // テキストビューが見つかった場合、フォーカスを設定
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+                // カーソルを末尾に移動
+                let range = NSRange(location: textView.string.count, length: 0)
+                textView.setSelectedRange(range)
+            }
+            return
+        }
+        
+        // 再帰的に子ビューを検索
+        for subview in view.subviews {
+            findAndFocusTextView(in: subview)
+        }
+    }
     
     // MARK: - Cleanup
     
