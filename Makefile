@@ -89,7 +89,7 @@ all: clean generate test build-dev ## Default: clean, generate, test, and build 
 #===============================================================================
 
 generate: ## Generate Xcode project from project.yml
-	@echo "$(BLUE)Creating Xcode project using XcodeGen...$(NC)"
+	@echo "$(BLUE)Creating Xcode project using XcodeGen…$(NC)"
 	@if command -v xcodegen >/dev/null 2>&1; then \
 		xcodegen generate; \
 		echo "$(GREEN)Project created successfully!$(NC)"; \
@@ -105,7 +105,7 @@ generate: ## Generate Xcode project from project.yml
 #===============================================================================
 
 build-dev: generate ## Build and run development version (keeps permissions)
-	@echo "$(BLUE)Building $(PROJECT_NAME) for development...$(NC)"
+	@echo "$(BLUE)Building $(PROJECT_NAME) for development…$(NC)"
 	@echo "$(YELLOW)Team ID: $(DEVELOPMENT_TEAM)$(NC)"
 	@mkdir -p $(DEV_BUILD_DIR)
 	xcodebuild -project $(XCODE_PROJECT) \
@@ -120,33 +120,33 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
 		build
-	@echo "$(GREEN)Copying to dev directory...$(NC)"
+	@echo "$(GREEN)Copying to dev directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_DEBUG) -derivedDataPath $(DEV_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
 	if [ -d "$$BUILD_PATH/$(PROJECT_NAME).app" ]; then \
 		cp -R "$$BUILD_PATH/$(PROJECT_NAME).app" $(DEV_BUILD_DIR)/; \
 		echo "$(GREEN)Development build available at: $(DEV_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
-		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes...$(NC)"; \
+		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes…$(NC)"; \
 		EXISTING_PIDS=$$(pgrep -x $(PROJECT_NAME) || true); \
 		if [ -n "$$EXISTING_PIDS" ]; then \
 			echo "$(YELLOW)Stopping existing processes: $$EXISTING_PIDS$(NC)"; \
 			pkill -x $(PROJECT_NAME) || true; \
 			sleep 2; \
 		fi; \
-		echo "$(BLUE)Starting development version...$(NC)"; \
+		echo "$(BLUE)Starting development version…$(NC)"; \
 		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app"; \
 	fi
 
 run: ## Run development version
-	@echo "$(BLUE)Running $(PROJECT_NAME)...$(NC)"
+	@echo "$(BLUE)Running $(PROJECT_NAME)…$(NC)"
 	@if [ -d "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" ]; then \
-		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes...$(NC)"; \
+		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes…$(NC)"; \
 		EXISTING_PIDS=$$(pgrep -x $(PROJECT_NAME) || true); \
 		if [ -n "$$EXISTING_PIDS" ]; then \
 			echo "$(YELLOW)Stopping existing processes: $$EXISTING_PIDS$(NC)"; \
 			pkill -x $(PROJECT_NAME) || true; \
 			sleep 2; \
 		fi; \
-		echo "$(BLUE)Starting development version...$(NC)"; \
+		echo "$(BLUE)Starting development version…$(NC)"; \
 		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app"; \
 	else \
 		echo "$(RED)Error: Development build not found at $(DEV_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
@@ -159,7 +159,7 @@ run: ## Run development version
 #===============================================================================
 
 build: generate ## Build production version
-	@echo "$(BLUE)Building $(PROJECT_NAME) for production...$(NC)"
+	@echo "$(BLUE)Building $(PROJECT_NAME) for production…$(NC)"
 	@mkdir -p $(PROD_BUILD_DIR)
 	xcodebuild -project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
@@ -177,7 +177,7 @@ build: generate ## Build production version
 		ARCHS="x86_64 arm64" \
 		ONLY_ACTIVE_ARCH=NO \
 		build
-	@echo "$(GREEN)Copying to prod directory...$(NC)"
+	@echo "$(GREEN)Copying to prod directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_RELEASE) -derivedDataPath $(PROD_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
 	if [ -d "$$BUILD_PATH/$(PROJECT_NAME).app" ]; then \
 		cp -R "$$BUILD_PATH/$(PROJECT_NAME).app" $(PROD_BUILD_DIR)/; \
@@ -190,7 +190,7 @@ build: generate ## Build production version
 #===============================================================================
 
 test: generate ## Run all tests
-	@echo "$(BLUE)Running tests...$(NC)"
+	@echo "$(BLUE)Running tests…$(NC)"
 	@rm -rf build/TestResults.xcresult build/TestResults
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
@@ -202,7 +202,7 @@ test: generate ## Run all tests
 		CODE_SIGNING_ALLOWED=NO
 
 test-coverage: generate ## Run tests with coverage report
-	@echo "$(BLUE)Running tests with coverage...$(NC)"
+	@echo "$(BLUE)Running tests with coverage…$(NC)"
 	@rm -rf build/TestResults.xcresult build/TestResults
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
@@ -219,7 +219,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		echo "$(RED)Error: Please specify a test class with TEST=ClassName$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(BLUE)Running test: $(TEST)...$(NC)"
+	@echo "$(BLUE)Running test: $(TEST)…$(NC)"
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
@@ -235,7 +235,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 
 lint: ## Run SwiftLint
 	@if command -v swiftlint >/dev/null 2>&1; then \
-		echo "$(BLUE)Running SwiftLint...$(NC)"; \
+		echo "$(BLUE)Running SwiftLint…$(NC)"; \
 		swiftlint; \
 	else \
 		echo "$(YELLOW)SwiftLint not found. Install with: brew install swiftlint$(NC)"; \
@@ -243,7 +243,7 @@ lint: ## Run SwiftLint
 
 lint-fix: ## Auto-fix SwiftLint issues
 	@if command -v swiftlint >/dev/null 2>&1; then \
-		echo "$(BLUE)Auto-fixing SwiftLint issues...$(NC)"; \
+		echo "$(BLUE)Auto-fixing SwiftLint issues…$(NC)"; \
 		swiftlint --fix; \
 	else \
 		echo "$(YELLOW)SwiftLint not found. Install with: brew install swiftlint$(NC)"; \
@@ -254,7 +254,7 @@ lint-fix: ## Auto-fix SwiftLint issues
 #===============================================================================
 
 archive: generate ## Create xcarchive with Developer ID signing
-	@echo "$(BLUE)Creating xcarchive...$(NC)"
+	@echo "$(BLUE)Creating xcarchive…$(NC)"
 	@mkdir -p $(PROD_BUILD_DIR)
 	xcodebuild -project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
@@ -274,9 +274,9 @@ archive: generate ## Create xcarchive with Developer ID signing
 	@echo "$(GREEN)Archive created at: $(ARCHIVE_PATH)$(NC)"
 
 package: archive ## Export app from archive with Developer ID
-	@echo "$(BLUE)Exporting app from archive...$(NC)"
+	@echo "$(BLUE)Exporting app from archive…$(NC)"
 	@mkdir -p $(EXPORT_PATH)
-	@echo "$(BLUE)Creating exportOptions.plist...$(NC)"
+	@echo "$(BLUE)Creating exportOptions.plist…$(NC)"
 	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(EXPORT_PATH)/exportOptions.plist
 	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(EXPORT_PATH)/exportOptions.plist
 	@echo '<plist version="1.0">' >> $(EXPORT_PATH)/exportOptions.plist
@@ -299,16 +299,16 @@ package: archive ## Export app from archive with Developer ID
 		-exportOptionsPlist $(EXPORT_PATH)/exportOptions.plist \
 		-allowProvisioningUpdates
 	@echo "$(GREEN)App exported to: $(EXPORT_PATH)/$(PROJECT_NAME).app$(NC)"
-	@echo "$(BLUE)Verifying signature...$(NC)"
+	@echo "$(BLUE)Verifying signature…$(NC)"
 	@codesign -dv --verbose=2 "$(EXPORT_PATH)/$(PROJECT_NAME).app"
-	@echo "$(BLUE)Copying to release directory...$(NC)"
+	@echo "$(BLUE)Copying to release directory…$(NC)"
 	@rm -rf "$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"
 	@cp -R "$(EXPORT_PATH)/$(PROJECT_NAME).app" "$(PROD_BUILD_DIR)/"
 	@echo "$(GREEN)Production app ready at: $(PROD_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"
 
 dmg: package ## Create DMG for distribution
-	@echo "$(BLUE)Creating DMG...$(NC)"
-	@echo "$(BLUE)Preparing DMG contents...$(NC)"
+	@echo "$(BLUE)Creating DMG…$(NC)"
+	@echo "$(BLUE)Preparing DMG contents…$(NC)"
 	@rm -rf "$(PROD_BUILD_DIR)/dmg_temp"
 	@mkdir -p "$(PROD_BUILD_DIR)/dmg_temp"
 	@cp -R "$(PROD_BUILD_DIR)/$(PROJECT_NAME).app" "$(PROD_BUILD_DIR)/dmg_temp/"
@@ -327,15 +327,15 @@ dmg: package ## Create DMG for distribution
 			"$(PROD_BUILD_DIR)/dmg_temp/"; \
 	else \
 		echo "$(YELLOW)create-dmg not found. Install with: brew install create-dmg$(NC)"; \
-		echo "$(BLUE)Creating simple DMG...$(NC)"; \
+		echo "$(BLUE)Creating simple DMG…$(NC)"; \
 		hdiutil create -volname "$(PROJECT_NAME)" -srcfolder "$(PROD_BUILD_DIR)/dmg_temp" -ov -format UDZO "$(DMG_PATH)"; \
 	fi
 	@rm -rf "$(PROD_BUILD_DIR)/dmg_temp"
-	@echo "$(BLUE)Signing DMG...$(NC)"
+	@echo "$(BLUE)Signing DMG…$(NC)"
 	codesign --force --sign "Developer ID Application" "$(DMG_PATH)" -v
 
 notarize: ## Submit DMG for notarization (async - returns submission ID)
-	@echo "$(BLUE)Submitting DMG for notarization...$(NC)"
+	@echo "$(BLUE)Submitting DMG for notarization…$(NC)"
 	@if [ -z "$(APPLE_ID)" ] || [ -z "$(APPLE_PASSWORD)" ]; then \
 		echo "$(RED)Error: APPLE_ID and APPLE_PASSWORD environment variables must be set$(NC)"; \
 		exit 1; \
@@ -366,7 +366,7 @@ notarize: ## Submit DMG for notarization (async - returns submission ID)
 	fi
 
 notarize-status: ## Check notarization status (use SUBMISSION_ID=xxx or reads from file)
-	@echo "$(BLUE)Checking notarization status...$(NC)"
+	@echo "$(BLUE)Checking notarization status…$(NC)"
 	@if [ -z "$(APPLE_ID)" ] || [ -z "$(APPLE_PASSWORD)" ]; then \
 		echo "$(RED)Error: APPLE_ID and APPLE_PASSWORD environment variables must be set$(NC)"; \
 		exit 1; \
@@ -386,17 +386,17 @@ notarize-status: ## Check notarization status (use SUBMISSION_ID=xxx or reads fr
 		--team-id "$(DEVELOPMENT_TEAM)"
 
 notarize-staple: ## Staple notarization ticket to DMG after approval
-	@echo "$(BLUE)Stapling notarization ticket to DMG...$(NC)"
+	@echo "$(BLUE)Stapling notarization ticket to DMG…$(NC)"
 	@if [ ! -f "$(DMG_PATH)" ]; then \
 		echo "$(RED)Error: DMG file not found at $(DMG_PATH)$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(BLUE)Checking if DMG is notarized...$(NC)"
+	@echo "$(BLUE)Checking if DMG is notarized…$(NC)"
 	@if xcrun stapler staple "$(DMG_PATH)"; then \
 		echo "$(GREEN)Successfully stapled notarization ticket!$(NC)"; \
 		echo "$(GREEN)DMG is ready for distribution: $(DMG_PATH)$(NC)"; \
 		echo ""; \
-		echo "$(BLUE)Verifying stapled DMG...$(NC)"; \
+		echo "$(BLUE)Verifying stapled DMG…$(NC)"; \
 		spctl -a -t open --context context:primary-signature -v "$(DMG_PATH)" || true; \
 	else \
 		echo "$(RED)Failed to staple notarization ticket$(NC)"; \
@@ -419,22 +419,22 @@ release: clean lint test dmg ## Full release build (clean, lint, test, archive, 
 #===============================================================================
 
 clean: ## Clean build artifacts
-	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
+	@echo "$(BLUE)Cleaning build artifacts…$(NC)"
 	@if [ -f "$(XCODE_PROJECT)/project.pbxproj" ]; then \
 		xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) clean; \
 	fi
 
 clean-all: clean ## Clean all artifacts including caches
-	@echo "$(BLUE)Cleaning all artifacts...$(NC)"
+	@echo "$(BLUE)Cleaning all artifacts…$(NC)"
 	@rm -rf $(BUILD_DIR)
 	@rm -rf ~/Library/Developer/Xcode/DerivedData/$(PROJECT_NAME)-*
 
 clean-dev: ## Clean development build artifacts
-	@echo "$(BLUE)Cleaning development build...$(NC)"
+	@echo "$(BLUE)Cleaning development build…$(NC)"
 	@rm -rf $(DEV_BUILD_DIR)
 
 clean-release: ## Clean release build artifacts
-	@echo "$(BLUE)Cleaning release build...$(NC)"
+	@echo "$(BLUE)Cleaning release build…$(NC)"
 	@rm -rf $(PROD_BUILD_DIR)
 
 version: ## Show current version information

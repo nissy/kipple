@@ -55,7 +55,7 @@ func testPerformance() {
     }
     
     // 1000件のテストデータを生成
-    print("\nGenerating 1000 test items...")
+    print("\nGenerating 1000 test items…")
     let testItems = (1...1000).map { i in
         TestClipItem(content: "Performance test item \(i) - " + String(repeating: "Lorem ipsum ", count: 10))
     }

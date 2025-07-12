@@ -92,7 +92,7 @@ else
 fi
 
 # Update the config file
-echo -e "${BLUE}Updating version configuration...${NC}"
+echo -e "${BLUE}Updating version configuration…${NC}"
 
 # Create backup
 cp "$VERSION_CONFIG" "${VERSION_CONFIG}.bak"
