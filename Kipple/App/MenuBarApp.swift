@@ -66,7 +66,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         
         // Accessibility permission menu item
         let permissionItem = NSMenuItem(
-            title: "Grant Accessibility Permission...",
+            title: "Grant Accessibility Permission…",
             action: #selector(checkAccessibilityPermission),
             keyEquivalent: ""
         )
@@ -74,10 +74,10 @@ final class MenuBarApp: NSObject, ObservableObject {
         menu.addItem(permissionItem)
         menu.addItem(NSMenuItem.separator())
         
-        menu.addItem(NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "Preferences…", action: #selector(openPreferences), keyEquivalent: ","))
         #if DEBUG
         menu.addItem(NSMenuItem(
-            title: "Developer Settings...",
+            title: "Developer Settings…",
             action: #selector(openDeveloperSettings),
             keyEquivalent: ""
         ))
@@ -174,7 +174,7 @@ extension MenuBarApp: NSMenuDelegate {
         // Update permission menu item
         for item in menu.items where item.tag == 100 {
             let hasPermission = AccessibilityManager.shared.hasPermission
-            item.title = hasPermission ? "Accessibility Permission Granted ✓" : "Grant Accessibility Permission..."
+            item.title = hasPermission ? "Accessibility Permission Granted ✓" : "Grant Accessibility Permission…"
             // Always enable the menu item to allow checking status
             item.isEnabled = true
         }

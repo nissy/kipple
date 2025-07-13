@@ -37,7 +37,7 @@ final class HotkeyManager {
     }
     
     private func registerAllHotkeys() {
-        Logger.shared.log("Registering all hotkeys...")
+        Logger.shared.log("Registering all hotkeys…")
         registerCurrentHotkey()
         registerEditorCopyHotkey()
         registerEditorClearHotkey()
@@ -45,7 +45,7 @@ final class HotkeyManager {
     
     // アプリケーション起動完了後に呼び出すメソッド
     func refreshHotkeys() {
-        Logger.shared.log("Refreshing hotkeys...")
+        Logger.shared.log("Refreshing hotkeys…")
         registerAllHotkeys()
     }
     

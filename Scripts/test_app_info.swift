@@ -48,7 +48,7 @@ func getWindowsInfo() {
 // アプリ切り替えの監視
 func monitorAppActivation() {
     print("\n=== Monitoring App Activation ===")
-    print("Switch between apps for 10 seconds...")
+    print("Switch between apps for 10 seconds…")
     
     var recordedApps: [(Date, String)] = []
     

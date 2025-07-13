@@ -79,7 +79,7 @@ struct SearchableFontPicker: View {
         } else if fontName.hasPrefix("YuGothic-") {
             return "游ゴシック"
         }
-        // 他のフォント名処理...
+        // 他のフォント名処理…
         return fontName.replacingOccurrences(of: "-Regular", with: "")
     }
 }
@@ -153,7 +153,7 @@ struct FontSelectionView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("フォントを検索...", text: $searchText)
+                TextField("フォントを検索…", text: $searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }, label: {
@@ -202,7 +202,7 @@ struct FontSelectionView: View {
         if fontName == "System" { return "System" }
         if fontName.hasPrefix("SFMono-") { return "SF Mono" }
         if fontName.hasPrefix("Menlo-") { return "Menlo" }
-        // ... 他のフォント名処理
+        // … 他のフォント名処理
         return fontName.replacingOccurrences(of: "-Regular", with: "")
     }
     

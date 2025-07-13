@@ -84,7 +84,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
             return content
         }
         // prefix は効率的なので問題ないが、早期リターンで無駄な処理を削減
-        return String(content.prefix(maxLength)) + "..."
+        return String(content.prefix(maxLength)) + "…"
     }
     
     var characterCount: Int {

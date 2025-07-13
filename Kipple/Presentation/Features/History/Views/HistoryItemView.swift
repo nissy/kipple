@@ -196,7 +196,7 @@ struct HistoryItemView: View {
     
     private func getDisplayContent() -> String {
         if let newlineIndex = item.content.firstIndex(of: "\n") {
-            return String(item.content[..<newlineIndex]) + "..."
+            return String(item.content[..<newlineIndex]) + "…"
         }
         return item.content
     }
