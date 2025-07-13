@@ -102,6 +102,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         saveSubscription = saveSubject
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
             .sink { [weak self] items in
+                Logger.shared.debug("ClipboardService: Debounce fired with \(items.count) items")
                 self?.saveHistoryToRepository(items)
             }
         
@@ -118,16 +119,30 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     private func loadHistory() async {
+        Logger.shared.log("=== LOADING HISTORY ON STARTUP ===")
+        
+        // Core Data が初期化されるまで待つ
+        CoreDataStack.shared.initializeAndWait()
+        
         do {
             let items = try await repository.load(limit: 100)
+            Logger.shared.log("Repository returned \(items.count) items")
+            
             await MainActor.run {
                 self.history = items
                 // ハッシュセットを初期化
                 self.initializeRecentHashes()
             }
-            Logger.shared.log("Loaded \(items.count) items from Core Data")
+            
+            Logger.shared.log("✅ Successfully loaded \(items.count) items from Core Data")
+            if let firstItem = items.first {
+                Logger.shared.log("Latest item: \(String(firstItem.content.prefix(50)))...")
+            }
+            if items.isEmpty {
+                Logger.shared.log("⚠️ No items found in Core Data on startup")
+            }
         } catch {
-            Logger.shared.error("Failed to load history: \(error)")
+            Logger.shared.error("❌ Failed to load history: \(error)")
         }
     }
     
@@ -281,6 +296,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 self.cleanupHistory()
                 
                 // 履歴をデバウンスして保存
+                Logger.shared.debug("ClipboardService: Sending \(self.history.count) items to saveSubject for debounced save")
                 self.saveSubject.send(self.history)
             }
         }
@@ -425,16 +441,18 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     // MARK: - Helper Methods
     
     private func saveHistoryToRepository(_ items: [ClipItem]) {
+        Logger.shared.debug("ClipboardService.saveHistoryToRepository: Called with \(items.count) items")
         Task {
             do {
+                Logger.shared.debug("ClipboardService.saveHistoryToRepository: Starting save operation")
                 try await repository.save(items)
-                Logger.shared.debug("Saved \(items.count) items to repository")
+                Logger.shared.debug("ClipboardService.saveHistoryToRepository: Successfully saved \(items.count) items to repository")
             } catch CoreDataError.notLoaded {
-                Logger.shared.warning("Core Data not loaded, items stored in memory only")
+                Logger.shared.warning("ClipboardService.saveHistoryToRepository: Core Data not loaded, items stored in memory only")
                 // メモリベースのフォールバック処理
                 // 履歴は既にメモリ上の配列に保存されているため、追加処理は不要
             } catch {
-                Logger.shared.error("Failed to save history: \(error)")
+                Logger.shared.error("ClipboardService.saveHistoryToRepository: Failed to save history: \(error)")
                 // TODO: リトライロジックの実装を検討
             }
         }
