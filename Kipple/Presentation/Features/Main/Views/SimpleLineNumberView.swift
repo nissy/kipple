@@ -287,37 +287,23 @@ struct SimpleLineNumberView: NSViewRepresentable {
             // 同期的に親のテキストを更新（英数字入力時の問題を解決）
             parent.text = textView.string
             
-            // パフォーマンス最適化: 行数が変わった場合のみ再描画
+            // 常に行番号エリアを再描画（行番号が消える問題を防ぐため）
             if let rulerView = scrollView?.verticalRulerView as? SimpleLineNumberRulerView {
-                let newLineCount = SimpleLineNumberRulerView.countLines(in: textView.string as NSString)
-                
-                // テキストが空になった場合は、必ず再描画を強制する
-                if textView.string.isEmpty {
-                    rulerView.cachedLineCount = 1  // 空の場合は行数を1にリセット
-                    rulerView.cachedTextLength = 0
-                    rulerView.needsDisplay = true
-                } else if newLineCount != rulerView.cachedLineCount {
-                    rulerView.cachedLineCount = newLineCount
-                    rulerView.cachedTextLength = textView.string.count
-                    rulerView.needsDisplay = true
-                }
+                rulerView.needsDisplay = true
             }
         }
         
         func textViewDidChangeSelection(_ notification: Notification) {
-            // 選択行が変わった場合のみ行番号エリアを再描画
+            // 選択行が変わった場合は行番号エリア全体を再描画
             guard let textView = notification.object as? NSTextView,
                   let rulerView = scrollView?.verticalRulerView as? SimpleLineNumberRulerView else { return }
             
             let newLine = calculateSelectedLineNumber(textView: textView)
             if newLine != lastSelectedLine {
-                // 前の選択行と新しい選択行の矩形のみを無効化
-                let oldLine = lastSelectedLine
                 lastSelectedLine = newLine
                 
-                // 変更された行のみを再描画
-                rulerView.invalidateLineNumber(oldLine)
-                rulerView.invalidateLineNumber(newLine)
+                // 行番号エリア全体を再描画
+                rulerView.needsDisplay = true
             }
         }
         
@@ -402,7 +388,6 @@ private struct DrawLineNumberParams {
     let lineRect: NSRect
     let glyphRange: NSRange
     var currentLineNumber: Int
-    var drawnLineNumbers: Set<Int>
     let lineNumberFont: NSFont
     let visibleRect: NSRect
     let containerOrigin: NSPoint
@@ -420,18 +405,6 @@ class SimpleLineNumberRulerView: NSRulerView {
     private var lastSelectedLine: Int = 1
     fileprivate var cachedLineCount: Int = 0
     fileprivate var cachedTextLength: Int = 0
-    
-    // 特定の行番号の矩形のみを再描画
-    func invalidateLineNumber(_ lineNumber: Int) {
-        guard let textView = textView else { return }
-        
-        // 行番号の矩形を計算
-        let lineY = CGFloat(lineNumber - 1) * fixedLineHeight + textView.textContainerOrigin.y
-        let lineRect = NSRect(x: 0, y: lineY, width: ruleThickness, height: fixedLineHeight)
-        
-        // この矩形のみを再描画
-        setNeedsDisplay(lineRect)
-    }
     
     init(textView: NSTextView) {
         self.textView = textView
@@ -587,7 +560,6 @@ class SimpleLineNumberRulerView: NSRulerView {
         )
         
         // 基準点を正しく計算
-        let relativePoint = self.convert(NSPoint.zero, from: textView)
         let containerOrigin = textView.textContainerOrigin
         
         // 論理行番号を追跡
@@ -623,15 +595,20 @@ class SimpleLineNumberRulerView: NSRulerView {
             
             // 選択された論理行に属するすべての行フラグメントをハイライト
             if isHighlightingLine {
-                // 正しい Y 位置計算
-                let lineY = lineRect.minY + containerOrigin.y + relativePoint.y
+                // 行番号の描画と完全に同じ計算を使用
+                let lineY = lineRect.origin.y + containerOrigin.y - self.visibleRect.origin.y
+                let textContainerInset = textView.textContainerInset
+                
+                // ハイライトの高さを textContainerInset を除いた実際の行の高さに調整
+                let adjustedHeight = lineRect.height - textContainerInset.height * 2
+                let adjustedY = lineY + textContainerInset.height
                 
                 NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
                 let path = NSBezierPath(rect: NSRect(
                     x: 0,
-                    y: lineY,
+                    y: adjustedY,
                     width: self.ruleThickness,
-                    height: lineRect.height
+                    height: adjustedHeight
                 ))
                 path.fill()
             }
@@ -648,7 +625,6 @@ class SimpleLineNumberRulerView: NSRulerView {
             lastLineProcessed: lastLineProcessed,
             layoutManager: layoutManager,
             containerOrigin: containerOrigin,
-            relativePoint: relativePoint,
             lastLineRect: lastLineRect
         )
     }
@@ -659,7 +635,6 @@ class SimpleLineNumberRulerView: NSRulerView {
         lastLineProcessed: Int,
         layoutManager: NSLayoutManager,
         containerOrigin: NSPoint,
-        relativePoint: NSPoint,
         lastLineRect: NSRect?
     ) {
         // テキストが改行で終わっている場合
@@ -674,7 +649,7 @@ class SimpleLineNumberRulerView: NSRulerView {
                 // lastLineRectがある場合はそれを使用
                 if let lastRect = lastLineRect {
                     // 最後の実際の行の下に空行のハイライトを描画
-                    lineY = lastRect.maxY + containerOrigin.y + relativePoint.y
+                    lineY = lastRect.maxY + containerOrigin.y - self.visibleRect.origin.y
                 } else {
                     // なければ最後のグリフから計算
                     if fullText.length > 0 {
@@ -683,43 +658,50 @@ class SimpleLineNumberRulerView: NSRulerView {
                         let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: lastCharIndex)
                         if lastGlyphIndex < layoutManager.numberOfGlyphs {
                             let rect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
-                            lineY = rect.maxY + containerOrigin.y + relativePoint.y
+                            lineY = rect.maxY + containerOrigin.y - self.visibleRect.origin.y
                         } else {
                             // デフォルト位置
-                            lineY = containerOrigin.y + relativePoint.y
+                            lineY = containerOrigin.y - self.visibleRect.origin.y
                         }
                     } else {
-                        lineY = containerOrigin.y + relativePoint.y
+                        lineY = containerOrigin.y - self.visibleRect.origin.y
                     }
                 }
                 
-                NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
-                let path = NSBezierPath(rect: NSRect(
-                    x: 0,
-                    y: lineY,
-                    width: self.ruleThickness,
-                    height: fixedLineHeight
-                ))
-                path.fill()
+                if let textView = self.textView {
+                    let textContainerInset = textView.textContainerInset
+                    let adjustedHeight = fixedLineHeight - textContainerInset.height * 2
+                    let adjustedY = lineY + textContainerInset.height
+                    
+                    NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
+                    let path = NSBezierPath(rect: NSRect(
+                        x: 0,
+                        y: adjustedY,
+                        width: self.ruleThickness,
+                        height: adjustedHeight
+                    ))
+                    path.fill()
+                }
             }
         }
     }
     
     private func drawEmptyTextHighlight(textView: NSTextView) {
         // 空のテキストの場合、最初の行をハイライト
-        let relativePoint = self.convert(NSPoint.zero, from: textView)
         let containerOrigin = textView.textContainerOrigin
-        _ = textView.textContainerInset
+        let textContainerInset = textView.textContainerInset
         
         // エディタの最初の行の位置に合わせてハイライトを描画
-        let highlightY = containerOrigin.y + relativePoint.y
+        let lineY = containerOrigin.y - self.visibleRect.origin.y
+        let adjustedHeight = fixedLineHeight - textContainerInset.height * 2
+        let adjustedY = lineY + textContainerInset.height
         
         NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
         let path = NSBezierPath(rect: NSRect(
             x: 0,
-            y: highlightY,
+            y: adjustedY,
             width: self.ruleThickness,
-            height: fixedLineHeight
+            height: adjustedHeight
         ))
         path.fill()
     }
@@ -784,19 +766,13 @@ class SimpleLineNumberRulerView: NSRulerView {
             in: context.textContainer
         )
         
-        // 拡張範囲（スクロール時のちらつき防止）
-        let startLoc = max(0, visibleGlyphRange.location - 500)
+        // 拡張範囲（スクロール時のちらつき防止と行番号消失防止）
+        let startLoc = max(0, visibleGlyphRange.location - 1000)
         let maxLength = context.layoutManager.numberOfGlyphs - startLoc
         let extendedGlyphRange = NSRange(
             location: startLoc,
-            length: min(visibleGlyphRange.length + 1000, maxLength)
+            length: min(visibleGlyphRange.length + 2000, maxLength)
         )
-        
-        // 描画済み行番号を記録（重複描画を防ぐ）
-        var drawnLineNumbers = Set<Int>()
-        
-        // 最後の空行処理用にインスタンス変数に保存
-        self.drawnLines = drawnLineNumbers
         
         // 行番号を計算するための初期値
         var currentLineNumber = 1
@@ -816,7 +792,6 @@ class SimpleLineNumberRulerView: NSRulerView {
                 lineRect: lineRect,
                 glyphRange: glyphRange,
                 currentLineNumber: currentLineNumber,
-                drawnLineNumbers: drawnLineNumbers,
                 lineNumberFont: lineNumberFont,
                 visibleRect: visibleRect,
                 containerOrigin: containerOrigin,
@@ -825,7 +800,6 @@ class SimpleLineNumberRulerView: NSRulerView {
             )
             self.drawLineNumber(context: context, params: &params)
             currentLineNumber = params.currentLineNumber
-            drawnLineNumbers = params.drawnLineNumbers
             
             // 次の反復のために文字位置を更新
             let characterRange = context.layoutManager.characterRange(
@@ -834,9 +808,6 @@ class SimpleLineNumberRulerView: NSRulerView {
             )
             previousCharLocation = characterRange.location + characterRange.length
         }
-        
-        // 描画済み行番号をインスタンス変数に保存
-        self.drawnLines = drawnLineNumbers
     }
     
     private func calculateInitialLineNumber(
@@ -878,26 +849,24 @@ class SimpleLineNumberRulerView: NSRulerView {
             isNewLogicalLine = false
         }
         
-        // Y位置の計算
-        let lineY = params.lineRect.origin.y + params.containerOrigin.y - params.visibleRect.origin.y
-        
-        // 描画範囲内かチェック
-        if lineY + self.fixedLineHeight >= -50 && lineY <= context.rect.height + 50 {
-            // 論理行の開始の場合のみ行番号を描画
-            if isNewLogicalLine && !params.drawnLineNumbers.contains(params.currentLineNumber) {
-                params.drawnLineNumbers.insert(params.currentLineNumber)
-                
+        // 論理行の開始の場合のみ行番号を描画
+        if isNewLogicalLine {
+            // Y位置の計算
+            let lineY = params.lineRect.origin.y + params.containerOrigin.y - params.visibleRect.origin.y
+            
+            // 行の中央に配置するための計算
+            let lineNumberHeight = params.lineNumberFont.ascender - params.lineNumberFont.descender
+            let lineCenterY = lineY + params.textContainerInset.height + (params.lineRect.height / 2)
+            
+            // 行番号を中央に配置（設定値でオフセット調整）
+            let offset = self.fontManager.editorLayoutSettings.lineNumberVerticalOffset
+            let drawingY = lineCenterY - (lineNumberHeight / 2) -
+                params.lineNumberFont.descender + offset
+            
+            // 描画範囲を大幅に拡張して、行番号が消えないようにする
+            if drawingY + lineNumberHeight >= -200 && drawingY <= self.bounds.height + 200 {
                 let lineString = "\(params.currentLineNumber)"
                 let size = lineString.size(withAttributes: context.textAttributes)
-                
-                // 行の中央に配置するための計算
-                let lineNumberHeight = params.lineNumberFont.ascender - params.lineNumberFont.descender
-                let lineCenterY = lineY + params.textContainerInset.height + (params.lineRect.height / 2)
-                
-                // 行番号を中央に配置（設定値でオフセット調整）
-                let offset = self.fontManager.editorLayoutSettings.lineNumberVerticalOffset
-                let drawingY = lineCenterY - (lineNumberHeight / 2) -
-                    params.lineNumberFont.descender + offset
                 
                 let drawingPoint = NSPoint(
                     x: self.ruleThickness - size.width - 5,
@@ -948,35 +917,34 @@ class SimpleLineNumberRulerView: NSRulerView {
         // 最後の空行の処理（テキストが改行で終わる場合）
         if fullText.length > 0 && fullText.hasSuffix("\n") {
             let lastLineNumber = totalLineCount
-            if !(drawnLines ?? Set<Int>()).contains(lastLineNumber) {
-                // 最後の行の位置を計算
-                let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: fullText.length - 1)
-                if lastGlyphIndex < layoutManager.numberOfGlyphs {
-                    let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+            // 最後の行の位置を計算
+            let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: fullText.length - 1)
+            if lastGlyphIndex < layoutManager.numberOfGlyphs {
+                let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
                     
                     // 基準点を正しく計算
-                    let relativePoint = self.convert(NSPoint.zero, from: textView)
                     let containerOrigin = textView.textContainerOrigin
                     
-                    // 最後の空行のY位置計算
-                    let lineY = lastLineRect.maxY + containerOrigin.y + relativePoint.y
+                    // 最後の空行のY位置計算（行番号と同じ計算）
+                    let lineY = lastLineRect.maxY + containerOrigin.y - self.visibleRect.origin.y
                     
-                    if lineY >= -50 && lineY <= rect.height + 50 {
-                        let lineString = "\(lastLineNumber)"
-                        let size = lineString.size(withAttributes: textAttributes)
-                        
-                        let lineNumberFont = textAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: fontSize)
-                        
-                        // 他の行と同じ計算方法を使用
-                        let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
-                        
-                        // 行の中央位置を計算（固定行高を使用）
-                        let lineCenterY = lineY + textView.textContainerInset.height + (fixedLineHeight / 2)
-                        
-                        // 行番号を中央に配置（設定値でオフセット調整）
-                        let offset = fontManager.editorLayoutSettings.lineNumberVerticalOffset
-                        let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
-                        
+                    let lineString = "\(lastLineNumber)"
+                    let size = lineString.size(withAttributes: textAttributes)
+                    
+                    let lineNumberFont = textAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: fontSize)
+                    
+                    // 他の行と同じ計算方法を使用
+                    let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
+                    
+                    // 行の中央位置を計算（固定行高を使用）
+                    let lineCenterY = lineY + textView.textContainerInset.height + (fixedLineHeight / 2)
+                    
+                    // 行番号を中央に配置（設定値でオフセット調整）
+                    let offset = fontManager.editorLayoutSettings.lineNumberVerticalOffset
+                    let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
+                    
+                    // 描画範囲を大幅に拡張して、行番号が消えないようにする
+                    if drawingY + lineNumberHeight >= -200 && drawingY <= self.bounds.height + 200 {
                         let drawingPoint = NSPoint(
                             x: self.ruleThickness - size.width - 5,
                             y: drawingY
@@ -987,10 +955,6 @@ class SimpleLineNumberRulerView: NSRulerView {
                 }
             }
         }
-    }
-    
-    // 描画済みの行番号を記録するための一時的なプロパティ
-    private var drawnLines: Set<Int>?
     
     // 効率的な行数カウント
     static func countLines(in string: NSString, upTo location: Int? = nil) -> Int {
