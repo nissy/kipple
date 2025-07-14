@@ -459,7 +459,6 @@ class SimpleLineNumberRulerView: NSRulerView {
             selectedRange: selectedRange
         )
         
-        
         drawSelectedLineBackground(
             textView: textView,
             layoutManager: layoutManager,
@@ -573,7 +572,6 @@ class SimpleLineNumberRulerView: NSRulerView {
             )
             currentLineNumber = SimpleLineNumberRulerView.countLines(in: fullText, upTo: characterRange.location)
         }
-        
         
         var isHighlightingLine = false
         var lastLineProcessed = currentLineNumber
@@ -790,7 +788,6 @@ class SimpleLineNumberRulerView: NSRulerView {
                 extendedGlyphRange: extendedGlyphRange
             )
         }
-        
         
         // 各行フラグメントに対して処理
         var previousCharLocation = -1
