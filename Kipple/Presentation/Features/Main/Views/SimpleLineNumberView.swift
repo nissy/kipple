@@ -392,7 +392,7 @@ private struct DrawLineNumberParams {
     let visibleRect: NSRect
     let containerOrigin: NSPoint
     let textContainerInset: NSSize
-    var previousCharacterLocation: Int = -1  // 前の行フラグメントの終了位置を追跡
+    var previousCharacterLocation: Int = -1  // 前の行フラグメントの終了位置を追跡（現在は未使用）
 }
 
 // シンプルな行番号ルーラービュー
@@ -562,7 +562,7 @@ class SimpleLineNumberRulerView: NSRulerView {
         // 基準点を正しく計算
         let containerOrigin = textView.textContainerOrigin
         
-        // 論理行番号を追跡（drawLineNumbersと同じロジック）
+        // 開始位置の論理行番号を計算
         var currentLineNumber = 1
         if extendedGlyphRange.location > 0 {
             let range = NSRange(location: 0, length: extendedGlyphRange.location)
@@ -599,12 +599,11 @@ class SimpleLineNumberRulerView: NSRulerView {
             
             // 選択された論理行に属するすべての行フラグメントをハイライト
             if isHighlightingLine {
-                
                 // 行番号の描画と完全に同じ計算を使用
                 let lineY = lineRect.origin.y + containerOrigin.y - visibleRect.origin.y
                 let textContainerInset = textView.textContainerInset
                 
-                // ハイライトの高さを固定行高を使用（行番号と一致させるため）
+                // ハイライトの高さに固定行高を使用（行番号と一致させるため）
                 let adjustedHeight = self.fixedLineHeight - textContainerInset.height * 2
                 let adjustedY = lineY + textContainerInset.height
                 
@@ -920,47 +919,43 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         // 最後の改行までの行数を効率的に計算
         let totalLineCount = SimpleLineNumberRulerView.countLines(in: fullText)
-        
-        // 最後の空行の処理（テキストが改行で終わる場合）
-        if fullText.length > 0 && fullText.hasSuffix("\n") {
-            let lastLineNumber = totalLineCount
-            // 最後の行の位置を計算
-            let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: fullText.length - 1)
-            if lastGlyphIndex < layoutManager.numberOfGlyphs {
-                let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
-                    
-                    // 基準点を正しく計算
-                    let containerOrigin = textView.textContainerOrigin
-                    
-                    // 最後の空行のY位置計算（行番号と同じ計算）
-                    let lineY = lastLineRect.maxY + containerOrigin.y - textView.visibleRect.origin.y
-                    
-                    let lineString = "\(lastLineNumber)"
-                    let size = lineString.size(withAttributes: textAttributes)
-                    
-                    let lineNumberFont = textAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: fontSize)
-                    
-                    // 他の行と同じ計算方法を使用
-                    let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
-                    
-                    // 行の中央位置を計算（固定行高を使用）
-                    let lineCenterY = lineY + textView.textContainerInset.height + (fixedLineHeight / 2)
-                    
-                    // 行番号を中央に配置（設定値でオフセット調整）
-                    let offset = fontManager.editorLayoutSettings.lineNumberVerticalOffset
-                    let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
-                    
-                    // 描画範囲を大幅に拡張して、行番号が消えないようにする
-                    if drawingY + lineNumberHeight >= -200 && drawingY <= self.bounds.height + 200 {
-                        let drawingPoint = NSPoint(
-                            x: self.ruleThickness - size.width - 5,
-                            y: drawingY
-                        )
-                        
-                        lineString.draw(at: drawingPoint, withAttributes: textAttributes)
-                    }
-                }
+        let lastLineNumber = totalLineCount
+        // 最後の行の位置を計算
+        let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: fullText.length - 1)
+        if lastGlyphIndex < layoutManager.numberOfGlyphs {
+            let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+            
+            // 基準点を正しく計算
+            let containerOrigin = textView.textContainerOrigin
+            
+            // 最後の空行のY位置計算（行番号と同じ計算）
+            let lineY = lastLineRect.maxY + containerOrigin.y - textView.visibleRect.origin.y
+            
+            let lineString = "\(lastLineNumber)"
+            let size = lineString.size(withAttributes: textAttributes)
+            
+            let lineNumberFont = textAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: fontSize)
+            
+            // 行番号の高さを計算
+            let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
+            
+            // 行の中央位置を計算（固定行高を使用）
+            let lineCenterY = lineY + textView.textContainerInset.height + (fixedLineHeight / 2)
+            
+            // 行番号を中央に配置（設定値でオフセット調整）
+            let offset = fontManager.editorLayoutSettings.lineNumberVerticalOffset
+            let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
+            
+            // 描画範囲内かチェック
+            if drawingY + lineNumberHeight >= -200 && drawingY <= self.bounds.height + 200 {
+                let drawingPoint = NSPoint(
+                    x: self.ruleThickness - size.width - 5,
+                    y: drawingY
+                )
+                
+                lineString.draw(at: drawingPoint, withAttributes: textAttributes)
             }
+        }
         }
     
     // 効率的な行数カウント
