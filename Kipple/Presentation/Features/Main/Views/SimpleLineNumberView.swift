@@ -459,6 +459,7 @@ class SimpleLineNumberRulerView: NSRulerView {
             selectedRange: selectedRange
         )
         
+        
         drawSelectedLineBackground(
             textView: textView,
             layoutManager: layoutManager,
@@ -551,23 +552,28 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         let visibleRect = textView.visibleRect
         let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: visibleRect, in: textView.textContainer!)
-        // パフォーマンス最適化: 必要最小限のバッファのみを追加
-        let lineBuffer = Int(fixedLineHeight * 2) // 2行分のバッファ
+        // 行番号描画と同じ拡張範囲を使用（一貫性のため）
+        let startLoc = max(0, visibleGlyphRange.location - 1000)
+        // 最後まで確実に含めるため、numberOfGlyphs まで拡張
         let extendedGlyphRange = NSRange(
-            location: max(0, visibleGlyphRange.location),
-            length: min(visibleGlyphRange.length + lineBuffer,
-                        layoutManager.numberOfGlyphs - visibleGlyphRange.location)
+            location: startLoc,
+            length: layoutManager.numberOfGlyphs - startLoc
         )
         
         // 基準点を正しく計算
         let containerOrigin = textView.textContainerOrigin
         
-        // 論理行番号を追跡
+        // 論理行番号を追跡（drawLineNumbersと同じロジック）
         var currentLineNumber = 1
         if extendedGlyphRange.location > 0 {
-            // 効率的な行数カウント
-            currentLineNumber = SimpleLineNumberRulerView.countLines(in: fullText, upTo: extendedGlyphRange.location)
+            let range = NSRange(location: 0, length: extendedGlyphRange.location)
+            let characterRange = layoutManager.characterRange(
+                forGlyphRange: range,
+                actualGlyphRange: nil
+            )
+            currentLineNumber = SimpleLineNumberRulerView.countLines(in: fullText, upTo: characterRange.location)
         }
+        
         
         var isHighlightingLine = false
         var lastLineProcessed = currentLineNumber
@@ -595,12 +601,13 @@ class SimpleLineNumberRulerView: NSRulerView {
             
             // 選択された論理行に属するすべての行フラグメントをハイライト
             if isHighlightingLine {
+                
                 // 行番号の描画と完全に同じ計算を使用
-                let lineY = lineRect.origin.y + containerOrigin.y - self.visibleRect.origin.y
+                let lineY = lineRect.origin.y + containerOrigin.y - visibleRect.origin.y
                 let textContainerInset = textView.textContainerInset
                 
-                // ハイライトの高さを textContainerInset を除いた実際の行の高さに調整
-                let adjustedHeight = lineRect.height - textContainerInset.height * 2
+                // ハイライトの高さを固定行高を使用（行番号と一致させるため）
+                let adjustedHeight = self.fixedLineHeight - textContainerInset.height * 2
                 let adjustedY = lineY + textContainerInset.height
                 
                 NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
@@ -649,7 +656,7 @@ class SimpleLineNumberRulerView: NSRulerView {
                 // lastLineRectがある場合はそれを使用
                 if let lastRect = lastLineRect {
                     // 最後の実際の行の下に空行のハイライトを描画
-                    lineY = lastRect.maxY + containerOrigin.y - self.visibleRect.origin.y
+                    lineY = lastRect.maxY + containerOrigin.y - (self.textView?.visibleRect.origin.y ?? 0)
                 } else {
                     // なければ最後のグリフから計算
                     if fullText.length > 0 {
@@ -658,13 +665,13 @@ class SimpleLineNumberRulerView: NSRulerView {
                         let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: lastCharIndex)
                         if lastGlyphIndex < layoutManager.numberOfGlyphs {
                             let rect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
-                            lineY = rect.maxY + containerOrigin.y - self.visibleRect.origin.y
+                            lineY = rect.maxY + containerOrigin.y - (self.textView?.visibleRect.origin.y ?? 0)
                         } else {
                             // デフォルト位置
-                            lineY = containerOrigin.y - self.visibleRect.origin.y
+                            lineY = containerOrigin.y - (self.textView?.visibleRect.origin.y ?? 0)
                         }
                     } else {
-                        lineY = containerOrigin.y - self.visibleRect.origin.y
+                        lineY = containerOrigin.y - (self.textView?.visibleRect.origin.y ?? 0)
                     }
                 }
                 
@@ -690,9 +697,10 @@ class SimpleLineNumberRulerView: NSRulerView {
         // 空のテキストの場合、最初の行をハイライト
         let containerOrigin = textView.textContainerOrigin
         let textContainerInset = textView.textContainerInset
+        let visibleRect = textView.visibleRect
         
         // エディタの最初の行の位置に合わせてハイライトを描画
-        let lineY = containerOrigin.y - self.visibleRect.origin.y
+        let lineY = containerOrigin.y - visibleRect.origin.y
         let adjustedHeight = fixedLineHeight - textContainerInset.height * 2
         let adjustedY = lineY + textContainerInset.height
         
@@ -768,10 +776,10 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         // 拡張範囲（スクロール時のちらつき防止と行番号消失防止）
         let startLoc = max(0, visibleGlyphRange.location - 1000)
-        let maxLength = context.layoutManager.numberOfGlyphs - startLoc
+        // 最後まで確実に含めるため、numberOfGlyphs まで拡張
         let extendedGlyphRange = NSRange(
             location: startLoc,
-            length: min(visibleGlyphRange.length + 2000, maxLength)
+            length: context.layoutManager.numberOfGlyphs - startLoc
         )
         
         // 行番号を計算するための初期値
@@ -782,6 +790,7 @@ class SimpleLineNumberRulerView: NSRulerView {
                 extendedGlyphRange: extendedGlyphRange
             )
         }
+        
         
         // 各行フラグメントに対して処理
         var previousCharLocation = -1
@@ -851,12 +860,13 @@ class SimpleLineNumberRulerView: NSRulerView {
         
         // 論理行の開始の場合のみ行番号を描画
         if isNewLogicalLine {
+            
             // Y位置の計算
             let lineY = params.lineRect.origin.y + params.containerOrigin.y - params.visibleRect.origin.y
             
             // 行の中央に配置するための計算
             let lineNumberHeight = params.lineNumberFont.ascender - params.lineNumberFont.descender
-            let lineCenterY = lineY + params.textContainerInset.height + (params.lineRect.height / 2)
+            let lineCenterY = lineY + params.textContainerInset.height + (self.fixedLineHeight / 2)
             
             // 行番号を中央に配置（設定値でオフセット調整）
             let offset = self.fontManager.editorLayoutSettings.lineNumberVerticalOffset
@@ -908,7 +918,7 @@ class SimpleLineNumberRulerView: NSRulerView {
         rect: NSRect,
         fontSize: CGFloat
     ) {
-        // パフォーマンス最適化：最後の文字のみをチェック
+        // 改行で終わる場合のみ最後の空行を処理
         guard fullText.length > 0 && fullText.hasSuffix("\n") else { return }
         
         // 最後の改行までの行数を効率的に計算
@@ -926,7 +936,7 @@ class SimpleLineNumberRulerView: NSRulerView {
                     let containerOrigin = textView.textContainerOrigin
                     
                     // 最後の空行のY位置計算（行番号と同じ計算）
-                    let lineY = lastLineRect.maxY + containerOrigin.y - self.visibleRect.origin.y
+                    let lineY = lastLineRect.maxY + containerOrigin.y - textView.visibleRect.origin.y
                     
                     let lineString = "\(lastLineNumber)"
                     let size = lineString.size(withAttributes: textAttributes)
