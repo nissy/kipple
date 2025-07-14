@@ -14,6 +14,10 @@ final class MenuBarApp: NSObject, ObservableObject {
     private let windowManager = WindowManager()
     private let hotkeyManager = HotkeyManager()
     
+    // 非同期終了処理用のプロパティ
+    private var isTerminating = false
+    private var terminationWorkItem: DispatchWorkItem?
+    
     // テスト環境かどうかを検出
     private static var isTestEnvironment: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
@@ -28,6 +32,9 @@ final class MenuBarApp: NSObject, ObservableObject {
         
         // delegateをすぐに設定
         hotkeyManager.delegate = self
+        
+        // アプリケーションデリゲートを同期的に設定（重要）
+        NSApplication.shared.delegate = self
         
         DispatchQueue.main.async { [weak self] in
             self?.setupMenuBar()
@@ -144,26 +151,91 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @objc private func quit() {
-        // アプリ終了時にデータを確実に保存
+        Logger.shared.log("=== QUIT MENU CLICKED ===")
+        // NSApplication.terminate を呼ぶことで、applicationShouldTerminate を通る
+        NSApplication.shared.terminate(nil)
+    }
+    
+    private func performAsyncTermination() {
+        Logger.shared.log("=== ASYNC APP QUIT SEQUENCE STARTED ===")
+        Logger.shared.log("Current history count: \(clipboardService.history.count)")
+        
+        // タイムアウト処理（最大2秒）
+        let timeoutWorkItem = DispatchWorkItem { [weak self] in
+            Logger.shared.error("⚠️ Save operation timed out, forcing quit")
+            self?.forceTerminate()
+        }
+        self.terminationWorkItem = timeoutWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: timeoutWorkItem)
+        
+        // 非同期で保存処理を実行
         Task {
-            // デバウンスされた保存を即座に実行
-            await clipboardService.flushPendingSaves()
-            
-            // Core Dataの保存を確実に実行
             do {
-                try await CoreDataStack.shared.save()
-                Logger.shared.log("Successfully saved data before quit")
+                // Core Dataが初期化されていることを確認
+                Logger.shared.log("Ensuring Core Data is initialized...")
+                CoreDataStack.shared.initializeAndWait()
+                
+                // デバウンスされた保存を即座に実行
+                Logger.shared.log("Flushing pending saves...")
+                await clipboardService.flushPendingSaves()
+                
+                // Core Dataの保存を確実に実行（WALチェックポイント含む）
+                Logger.shared.log("Saving Core Data context...")
+                try await MainActor.run {
+                    try CoreDataStack.shared.save()
+                }
+                Logger.shared.log("✅ Successfully saved data before quit")
+                
+                // 保存されたデータを確認（デバッグ用）
+                let repository = CoreDataClipboardRepository()
+                let savedItems = try await repository.load(limit: 10)
+                Logger.shared.log("Verified saved items count: \(savedItems.count)")
             } catch {
-                Logger.shared.error("Failed to save on quit: \(error)")
+                Logger.shared.error("❌ Failed to save on quit: \(error)")
             }
             
-            // メインスレッドでクリーンアップを実行
-            await MainActor.run {
-                clipboardService.stopMonitoring()
-                windowManager.cleanup()
-                // hotkeyManager は deinit で自動的にクリーンアップされる
-                NSApplication.shared.terminate(nil)
+            // タイムアウトをキャンセル
+            self.terminationWorkItem?.cancel()
+            Logger.shared.log("Save operation completed, cancelling timeout")
+            
+            // メインスレッドで終了処理を実行
+            await MainActor.run { [weak self] in
+                Logger.shared.log("Calling completeTermination on main thread")
+                self?.completeTermination()
             }
+        }
+    }
+    
+    private func completeTermination() {
+        Logger.shared.log("completeTermination called on thread: \(Thread.current)")
+        
+        Logger.shared.log("Stopping clipboard monitoring...")
+        clipboardService.stopMonitoring()
+        
+        Logger.shared.log("Cleaning up windows...")
+        windowManager.cleanup()
+        
+        Logger.shared.log("=== APP QUIT SEQUENCE COMPLETED ===")
+        
+        // アプリケーションに終了を許可
+        Logger.shared.log("Calling reply(toApplicationShouldTerminate: true)")
+        NSApplication.shared.reply(toApplicationShouldTerminate: true)
+        Logger.shared.log("reply(toApplicationShouldTerminate: true) called successfully")
+    }
+    
+    private func forceTerminate() {
+        Logger.shared.log("forceTerminate called - timeout occurred")
+        
+        // タイムアウト時の強制終了
+        DispatchQueue.main.async { [weak self] in
+            Logger.shared.log("forceTerminate on main thread")
+            self?.clipboardService.stopMonitoring()
+            self?.windowManager.cleanup()
+            
+            // アプリケーションに終了を許可
+            Logger.shared.log("Calling reply(toApplicationShouldTerminate: true) from forceTerminate")
+            NSApplication.shared.reply(toApplicationShouldTerminate: true)
+            Logger.shared.log("forceTerminate completed")
         }
     }
 }
@@ -207,5 +279,39 @@ extension MenuBarApp: HotkeyManagerDelegate {
                 // クリア後もウィンドウは開いたまま
             }
         }
+    }
+}
+
+// MARK: - NSApplicationDelegate
+extension MenuBarApp: NSApplicationDelegate {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Logger.shared.log("=== applicationShouldTerminate called ===")
+        Logger.shared.log("isTerminating flag: \(isTerminating)")
+        Logger.shared.log("Sender: \(sender)")
+        Logger.shared.log("Current thread: \(Thread.current)")
+        
+        // テスト環境では即座に終了を許可
+        if Self.isTestEnvironment {
+            return .terminateNow
+        }
+        
+        // 既に終了処理中の場合
+        if isTerminating {
+            Logger.shared.log("WARNING: Already terminating, this should not happen!")
+            // 即座に終了を許可（前回の非同期処理が何らかの理由で完了していない）
+            return .terminateNow
+        }
+        
+        // 非同期終了処理を開始
+        isTerminating = true
+        performAsyncTermination()
+        
+        // 一旦終了をキャンセル（後で reply(toApplicationShouldTerminate:) を呼ぶ）
+        return .terminateCancel
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        Logger.shared.log("=== applicationWillTerminate called ===")
+        // この時点ではすでに保存処理は完了しているはず
     }
 }
