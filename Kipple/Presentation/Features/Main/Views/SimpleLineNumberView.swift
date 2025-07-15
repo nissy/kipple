@@ -25,13 +25,19 @@ struct SimpleLineNumberView: NSViewRepresentable {
             return scrollView
         }
         
-        // テキストビューの設定
+        // テキストビューの設定（テキスト以外の基本設定）
         setupTextView(textView, context: context)
         
         // 段落スタイルの設定
         let lineHeight = calculateFixedLineHeight(for: font)
         let paragraphStyle = createParagraphStyle(lineHeight: lineHeight)
         setupParagraphStyle(textView: textView, paragraphStyle: paragraphStyle)
+        
+        // Coordinatorに固定行高を保存
+        context.coordinator.fixedLineHeight = lineHeight
+        
+        // テキストを設定
+        textView.string = text
         
         // スクロールビューの設定
         scrollView.hasVerticalScroller = true
@@ -62,7 +68,9 @@ struct SimpleLineNumberView: NSViewRepresentable {
         if textView.string != text && !textView.hasMarkedText() {
             // 循環更新を防ぐためにフラグを設定
             context.coordinator.isUpdatingText = true
+            
             textView.string = text
+            
             context.coordinator.isUpdatingText = false
             
             // テキストが空になった場合、行番号ビューを強制的に更新
@@ -82,6 +90,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             let lineHeight = calculateFixedLineHeight(for: font)
             let paragraphStyle = createParagraphStyle(lineHeight: lineHeight)
             context.coordinator.paragraphStyle = paragraphStyle
+            context.coordinator.fixedLineHeight = lineHeight
             
             applyParagraphStyle(
                 to: textView,
@@ -113,16 +122,13 @@ struct SimpleLineNumberView: NSViewRepresentable {
         
         // IME入力中はテキストの同期をスキップ
         if !textView.hasMarkedText() && textView.string != text {
-            // 循環更新を防ぐためにフラグを設定（Coordinatorにアクセスできないため、ここではテキストを直接設定）
-            textView.string = text
-        }
-        
-        // 段落スタイルを適用（IME入力中はスキップ）
-        if !textView.hasMarkedText() && !textView.string.isEmpty {
-            let range = NSRange(location: 0, length: textView.string.count)
-            textView.textStorage?.beginEditing()
-            textView.textStorage?.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
-            textView.textStorage?.endEditing()
+            // 属性付き文字列として設定（1文字目に依存しないように）
+            let attributedString = NSMutableAttributedString(string: text)
+            let fullRange = NSRange(location: 0, length: text.count)
+            attributedString.addAttribute(.font, value: font, range: fullRange)
+            attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
+            attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+            textView.textStorage?.setAttributedString(attributedString)
         }
         
         // タイピング属性も更新
@@ -141,7 +147,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
     private func setupTextView(_ textView: NSTextView, context: Context) {
         textView.delegate = context.coordinator
         textView.font = font
-        textView.string = text
+        // テキストの設定は段落スタイル適用後に移動
         textView.isEditable = true
         textView.isSelectable = true
         textView.isRichText = false
@@ -149,6 +155,10 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.smartInsertDeleteEnabled = false
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.textColor = NSColor.labelColor
         
@@ -158,6 +168,9 @@ struct SimpleLineNumberView: NSViewRepresentable {
         // カスタムレイアウトマネージャーを設定
         if let layoutManager = textView.layoutManager {
             layoutManager.delegate = context.coordinator
+            // タイポグラフィの動作を無効化して、固定行高を保証
+            layoutManager.usesDefaultHyphenation = false
+            layoutManager.typesetterBehavior = .latestBehavior
         }
         
         // テキストコンテナの設定
@@ -185,18 +198,14 @@ struct SimpleLineNumberView: NSViewRepresentable {
     private func setupParagraphStyle(textView: NSTextView, paragraphStyle: NSParagraphStyle) {
         textView.defaultParagraphStyle = paragraphStyle
         
-        // 既存のテキストに適用
-        if !text.isEmpty {
-            let range = NSRange(location: 0, length: text.count)
-            textView.textStorage?.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
-        }
-        
-        // タイピング属性にも設定
+        // タイピング属性を先に設定（新規入力時の属性を確実に設定）
         textView.typingAttributes = [
             .font: font,
             .paragraphStyle: paragraphStyle,
             .foregroundColor: NSColor.labelColor
         ]
+        
+        // 既存のテキストへの適用は削除（makeNSViewで属性付き文字列として設定するため）
     }
     
     private func updateLineNumberView(scrollView: NSScrollView, lineHeight: CGFloat) {
@@ -222,6 +231,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
         private var notificationObserver: NSObjectProtocol?
         private var lastSelectedLine: Int = 1
         var isUpdatingText = false
+        // 固定行高を保存（フォールバック後のフォントに影響されないように）
+        var fixedLineHeight: CGFloat = 0
         
         init(_ parent: SimpleLineNumberView) {
             self.parent = parent
@@ -247,10 +258,13 @@ struct SimpleLineNumberView: NSViewRepresentable {
         func updateLayout() {
             guard let textView = textView else { return }
             
-            // 再計算と再描画
-            let font = textView.font ?? NSFont.systemFont(ofSize: 14)
+            // 再計算と再描画（parent.fontを使用してオリジナルのフォントから計算）
+            let font = parent.font
             let lineHeight = calculateFixedLineHeight(for: font)
             let paragraphStyle = parent.createParagraphStyle(lineHeight: lineHeight)
+            
+            // 固定行高を更新
+            self.fixedLineHeight = lineHeight
             
             textView.defaultParagraphStyle = paragraphStyle
             self.paragraphStyle = paragraphStyle
@@ -343,27 +357,21 @@ struct SimpleLineNumberView: NSViewRepresentable {
             in textContainer: NSTextContainer,
             forGlyphRange glyphRange: NSRange
         ) -> Bool {
-            // 固定行高を強制
-            guard let textView = textView,
-                  let font = textView.font else { return false }
+            // 保存された固定行高を使用（初期化時に計算された値）
+            let fixedLineHeight = self.fixedLineHeight > 0 ? self.fixedLineHeight : calculateFixedLineHeight(for: parent.font)
             
-            let fixedLineHeight = calculateFixedLineHeight(for: font)
-            
-            // 行の高さを固定値に強制設定
-            let currentHeight = lineFragmentRect.pointee.height
-            if currentHeight < fixedLineHeight {
-                // 行フラグメントの高さを固定値に設定
-                lineFragmentRect.pointee.size.height = fixedLineHeight
-                lineFragmentUsedRect.pointee.size.height = fixedLineHeight
-            }
+            // 行の高さを固定値に無条件で強制設定
+            lineFragmentRect.pointee.size.height = fixedLineHeight
+            lineFragmentUsedRect.pointee.size.height = fixedLineHeight
             
             // テキストのベースラインオフセットを調整
             let textBaselineOffset = FontManager.shared.editorLayoutSettings.textBaselineOffset
             
-            // ベースラインを行の中央に配置
+            // ベースラインを行の中央に配置（オリジナルフォントのメトリクスを使用）
             let lineCenter = fixedLineHeight / 2.0
-            let fontHeight = font.ascender - font.descender
-            let newBaseline = lineCenter + (fontHeight / 2.0) + font.descender
+            let originalFont = parent.font
+            let fontHeight = originalFont.ascender - originalFont.descender
+            let newBaseline = lineCenter + (fontHeight / 2.0) + originalFont.descender
             
             baselineOffset.pointee = newBaseline + textBaselineOffset
             
@@ -1011,12 +1019,20 @@ private func calculateFixedLineHeight(for font: NSFont) -> CGFloat {
         }
     }
     
+    // テスト用の文字列で実際の高さを測定
+    let testStrings = ["Ag", "あg", "漢字", "ÄÖÜ"]
+    for testString in testStrings {
+        let attributedString = NSAttributedString(string: testString, attributes: [.font: font])
+        let size = attributedString.size()
+        maxHeight = max(maxHeight, size.height)
+    }
+    
     // CJKテキストに適した余白（設定値を使用）
     let recommendedHeight = maxHeight * fontManager.editorLayoutSettings.lineHeightMultiplier
     
     // 最小値を保証（設定値を使用）
     let minimumHeight = font.pointSize * fontManager.editorLayoutSettings.minimumLineHeightMultiplier
     
-    // 最終的な固定行高
-    return ceil(max(recommendedHeight, minimumHeight))
+    // 最終的な固定行高（少し余裕を持たせる）
+    return ceil(max(recommendedHeight, minimumHeight) * 1.1)
 }
