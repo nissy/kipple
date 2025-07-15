@@ -36,21 +36,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
         // Coordinatorに固定行高を保存
         context.coordinator.fixedLineHeight = lineHeight
         
-        // 段落スタイル設定後にテキストを設定
-        // フォールバックフォント使用時の1文字目問題を回避
-        let attributedString = NSMutableAttributedString(string: text)
-        let fullRange = NSRange(location: 0, length: text.count)
-        attributedString.addAttribute(.font, value: font, range: fullRange)
-        attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
-        attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
-        
-        // テキストストレージに設定
-        textView.textStorage?.setAttributedString(attributedString)
-        
-        // フォールバックフォントが設定されている場合、全体のレイアウトを強制的に計算
-        if font.fontDescriptor.fontAttributes[.cascadeList] != nil {
-            textView.layoutManager?.ensureLayout(for: textView.textContainer!)
-        }
+        // テキストを設定
+        textView.string = text
         
         // スクロールビューの設定
         scrollView.hasVerticalScroller = true
@@ -82,21 +69,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             // 循環更新を防ぐためにフラグを設定
             context.coordinator.isUpdatingText = true
             
-            // 属性付き文字列として設定（1文字目に依存しないように）
-            let currentFont = textView.font ?? font
-            let paragraphStyle = context.coordinator.paragraphStyle
-            
-            let attributedString = NSMutableAttributedString(string: text)
-            let fullRange = NSRange(location: 0, length: text.count)
-            attributedString.addAttribute(.font, value: currentFont, range: fullRange)
-            attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
-            attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
-            textView.textStorage?.setAttributedString(attributedString)
-            
-            // フォールバックフォントが設定されている場合、全体のレイアウトを強制的に計算
-            if currentFont.fontDescriptor.fontAttributes[.cascadeList] != nil {
-                textView.layoutManager?.ensureLayout(for: textView.textContainer!)
-            }
+            textView.string = text
             
             context.coordinator.isUpdatingText = false
             
@@ -156,11 +129,6 @@ struct SimpleLineNumberView: NSViewRepresentable {
             attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
             attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
             textView.textStorage?.setAttributedString(attributedString)
-            
-            // フォールバックフォントが設定されている場合、全体のレイアウトを強制的に計算
-            if font.fontDescriptor.fontAttributes[.cascadeList] != nil {
-                textView.layoutManager?.ensureLayout(for: textView.textContainer!)
-            }
         }
         
         // タイピング属性も更新
