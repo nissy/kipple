@@ -139,6 +139,8 @@ class FixedLineHeightEditorContainer: NSView, NSLayoutManagerDelegate {
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.textColor = NSColor.labelColor
         

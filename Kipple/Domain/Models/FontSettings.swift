@@ -360,11 +360,11 @@ class FontManager: ObservableObject {
 
 // MARK: - Editor Layout Settings (Developer Only)
 struct EditorLayoutSettings: Codable {
-    var lineHeightMultiplier: CGFloat = 1.5
-    var verticalPadding: CGFloat = 5.0
-    var lineNumberVerticalOffset: CGFloat = -7.0
-    var minimumLineHeightMultiplier: CGFloat = 1.8
-    var textBaselineOffset: CGFloat = -1.0  // テキストのベースライン調整
+    var lineHeightMultiplier: CGFloat = 1.0 // 行の高さ倍率
+    var minimumLineHeightMultiplier: CGFloat = 1.0 // 最小行高さ倍率
+    var verticalPadding: CGFloat = 0 //  垂直パディング
+    var lineNumberVerticalOffset: CGFloat = -2.0 // 行番号の垂直位置調整
+    var textBaselineOffset: CGFloat = 0 // テキストのベースライン調整
     
     static let `default` = EditorLayoutSettings()
 }
