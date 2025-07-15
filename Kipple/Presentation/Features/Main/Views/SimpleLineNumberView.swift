@@ -151,6 +151,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.isAutomaticSpellingCorrectionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.smartInsertDeleteEnabled = false
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.textColor = NSColor.labelColor
         
@@ -160,6 +162,9 @@ struct SimpleLineNumberView: NSViewRepresentable {
         // カスタムレイアウトマネージャーを設定
         if let layoutManager = textView.layoutManager {
             layoutManager.delegate = context.coordinator
+            // タイポグラフィの動作を無効化して、固定行高を保証
+            layoutManager.usesDefaultHyphenation = false
+            layoutManager.typesetterBehavior = .latestBehavior
         }
         
         // テキストコンテナの設定
@@ -351,13 +356,9 @@ struct SimpleLineNumberView: NSViewRepresentable {
             
             let fixedLineHeight = calculateFixedLineHeight(for: font)
             
-            // 行の高さを固定値に強制設定
-            let currentHeight = lineFragmentRect.pointee.height
-            if currentHeight < fixedLineHeight {
-                // 行フラグメントの高さを固定値に設定
-                lineFragmentRect.pointee.size.height = fixedLineHeight
-                lineFragmentUsedRect.pointee.size.height = fixedLineHeight
-            }
+            // 行の高さを固定値に無条件で強制設定（currentHeightに関わらず）
+            lineFragmentRect.pointee.size.height = fixedLineHeight
+            lineFragmentUsedRect.pointee.size.height = fixedLineHeight
             
             // テキストのベースラインオフセットを調整
             let textBaselineOffset = FontManager.shared.editorLayoutSettings.textBaselineOffset
@@ -1013,12 +1014,20 @@ private func calculateFixedLineHeight(for font: NSFont) -> CGFloat {
         }
     }
     
+    // テスト用の文字列で実際の高さを測定
+    let testStrings = ["Ag", "あg", "漢字", "ÄÖÜ"]
+    for testString in testStrings {
+        let attributedString = NSAttributedString(string: testString, attributes: [.font: font])
+        let size = attributedString.size()
+        maxHeight = max(maxHeight, size.height)
+    }
+    
     // CJKテキストに適した余白（設定値を使用）
     let recommendedHeight = maxHeight * fontManager.editorLayoutSettings.lineHeightMultiplier
     
     // 最小値を保証（設定値を使用）
     let minimumHeight = font.pointSize * fontManager.editorLayoutSettings.minimumLineHeightMultiplier
     
-    // 最終的な固定行高
-    return ceil(max(recommendedHeight, minimumHeight))
+    // 最終的な固定行高（少し余裕を持たせる）
+    return ceil(max(recommendedHeight, minimumHeight) * 1.1)
 }
