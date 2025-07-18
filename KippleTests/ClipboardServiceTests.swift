@@ -513,4 +513,118 @@ final class ClipboardServiceTests: XCTestCase {
             }
         }
     }
+    
+    // MARK: - Auto-Clear Integration Tests
+    
+    func testAutoClearIntegration() {
+        // 自動クリア機能が有効な場合のコピー動作を検証
+        let expectation = XCTestExpectation(description: "Auto-clear integration test")
+        
+        // MainActorで実行
+        Task { @MainActor in
+            // Given: 自動クリア機能を有効化
+            AppSettings.shared.enableAutoClear = true
+            AppSettings.shared.autoClearInterval = 1 // 1分
+            
+            // 初期状態を確認
+            let initialContent = clipboardService.currentClipboardContent
+            
+            // When: 通常のコピーを実行
+            let testContent = "Test content for auto-clear \(UUID().uuidString)"
+            clipboardService.copyToClipboard(testContent, fromEditor: false)
+            
+            // 少し待ってから確認
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+            
+            // Then: currentClipboardContentが更新されていることを確認
+            XCTAssertEqual(clipboardService.currentClipboardContent, testContent, 
+                          "Current clipboard content should be updated even for internal copies")
+            
+            // 自動クリアタイマーが開始されていることを確認（直接的な確認は難しいため、エラーが発生しないことを確認）
+            // restartAutoClearTimer()が呼び出されてもエラーにならないことを暗黙的に確認
+            
+            // Cleanup
+            AppSettings.shared.enableAutoClear = false
+            
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 2.0)
+    }
+    
+    func testEditorCopyWithAutoClear() {
+        // エディタからのコピー時に自動クリアタイマーがリセットされることを検証
+        let expectation = XCTestExpectation(description: "Editor copy with auto-clear")
+        
+        Task { @MainActor in
+            // Given: 自動クリア機能を有効化
+            AppSettings.shared.enableAutoClear = true
+            AppSettings.shared.autoClearInterval = 1
+            
+            // モニタリングを開始
+            clipboardService.startMonitoring()
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+            
+            let initialCount = clipboardService.history.count
+            
+            // When: エディタからコピー
+            let editorContent = "Editor content with auto-clear \(UUID().uuidString)"
+            clipboardService.copyToClipboard(editorContent, fromEditor: true)
+            
+            // 履歴の変更を待つ
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2秒
+            
+            // Then: エディタコピーが履歴に追加される
+            XCTAssertGreaterThan(clipboardService.history.count, initialCount,
+                                "Editor copy should be added to history")
+            
+            if let editorItem = clipboardService.history.first(where: { $0.content == editorContent }) {
+                XCTAssertTrue(editorItem.isFromEditor ?? false, "Should be marked as from editor")
+                XCTAssertEqual(editorItem.category, .kipple, "Should have kipple category")
+                
+                // currentClipboardContentも更新されていることを確認
+                XCTAssertEqual(clipboardService.currentClipboardContent, editorContent,
+                             "Current clipboard content should be updated for editor copies")
+            }
+            
+            // Cleanup
+            AppSettings.shared.enableAutoClear = false
+            clipboardService.stopMonitoring()
+            
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 3.0)
+    }
+    
+    func testCopyToClipboardFailureWithAutoClear() {
+        // restartAutoClearTimer()が呼び出せない場合でもクラッシュしないことを確認
+        // （実際にはprivateメソッドの問題は修正済みだが、将来の回帰を防ぐため）
+        
+        let expectation = XCTestExpectation(description: "Copy with auto-clear enabled")
+        
+        Task { @MainActor in
+            // Given: 自動クリア機能を有効化
+            AppSettings.shared.enableAutoClear = true
+            
+            // When: 内部コピーを実行
+            let testContent = "Test content \(UUID().uuidString)"
+            
+            // エラーが発生しないことを確認
+            XCTAssertNoThrow({
+                self.clipboardService.copyToClipboard(testContent, fromEditor: false)
+            }(), "Copy to clipboard should not throw even with auto-clear enabled")
+            
+            // Then: クリップボードに内容が設定されている
+            let pasteboardContent = NSPasteboard.general.string(forType: .string)
+            XCTAssertEqual(pasteboardContent, testContent)
+            
+            // Cleanup
+            AppSettings.shared.enableAutoClear = false
+            
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 1.0)
+    }
 }

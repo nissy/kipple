@@ -230,6 +230,17 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             }
             
             if shouldSkip {
+                // 内部コピーの場合でも現在のクリップボード内容は更新する
+                if let content = NSPasteboard.general.string(forType: .string),
+                   !content.isEmpty {
+                    Task { @MainActor [weak self] in
+                        self?.currentClipboardContent = content
+                        // 自動クリアタイマーをリセット
+                        if AppSettings.shared.enableAutoClear {
+                            self?.restartAutoClearTimer()
+                        }
+                    }
+                }
                 return // 内部コピーは履歴に追加しない
             }
             
@@ -238,6 +249,10 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 // 現在のクリップボード内容を更新
                 Task { @MainActor [weak self] in
                     self?.currentClipboardContent = content
+                    // 自動クリアタイマーをリセット
+                    if AppSettings.shared.enableAutoClear {
+                        self?.restartAutoClearTimer()
+                    }
                 }
                 addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: fromEditor)
             }
@@ -459,7 +474,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 Logger.shared.debug("ClipboardService.saveHistoryToRepository: Starting save operation")
                 try await repository.save(items)
                 let itemCount = items.count
-                let msg = "ClipboardService.saveHistoryToRepository: Successfully saved \(itemCount) items to repository"
+                let msg = "ClipboardService.saveHistoryToRepository: " +
+                         "Successfully saved \(itemCount) items to repository"
                 Logger.shared.debug(msg)
             } catch CoreDataError.notLoaded {
                 let msg = "ClipboardService.saveHistoryToRepository: Core Data not loaded, items stored in memory only"

@@ -1,14 +1,15 @@
 //
-//  ClipboardService+AutoClear.swift
+//  ClipboardServiceAutoClear.swift
 //  Kipple
 //
-//  Created by Kipple on 2025/07/17.
+//  Created by Kipple on 2025/07/18.
 //
 
 import Foundation
 import Cocoa
 
 // MARK: - Auto-Clear Timer Methods
+// This extension provides auto-clear functionality for ClipboardService
 extension ClipboardService {
     
     @MainActor
@@ -53,7 +54,7 @@ extension ClipboardService {
     }
     
     @MainActor
-    private func restartAutoClearTimer() {
+    func restartAutoClearTimer() {
         if AppSettings.shared.enableAutoClear {
             startAutoClearTimerIfNeeded()
         }
