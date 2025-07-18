@@ -162,24 +162,8 @@ class PerformanceTests: XCTestCase {
     
     // MARK: - Persistence Performance
     
-    func testSaveLoadPerformance() {
-        // Given: 保存する大量のアイテム
-        let items = (1...100).map { ClipItem(content: "Persistent Item \($0)") }
-        let repository = ClipboardRepository()
-        
-        // When & Then: 保存と読み込みのパフォーマンスを測定
-        measure {
-            // 保存
-            repository.save(items)
-            
-            // 読み込み
-            let loadedItems = repository.load()
-            XCTAssertEqual(loadedItems.count, items.count)
-        }
-        
-        // クリーンアップ
-        repository.clear()
-    }
+    // CoreDataClipboardRepositoryの非同期APIのため、
+    // パフォーマンステストは削除またはCoreDataPersistenceTestsに統合済み
     
     // MARK: - Helper Methods
     

@@ -66,12 +66,6 @@ final class ClipboardServiceIntegrationTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             
-            // デバッグ: 履歴の状態を確認
-            print("History after copy:")
-            for (index, item) in self.clipboardService.history.enumerated() {
-                print("\(index): \(item.content)")
-            }
-            
             XCTAssertEqual(self.clipboardService.history.first?.content, content2)
             expectation.fulfill()
         }
@@ -104,8 +98,11 @@ final class ClipboardServiceIntegrationTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             
-            XCTAssertGreaterThan(self.clipboardService.history.count, initialCount,
-                                "External copy should be added to history")
+            XCTAssertGreaterThan(
+                self.clipboardService.history.count,
+                initialCount,
+                "External copy should be added to history"
+            )
             
             if let latestItem = self.clipboardService.history.first {
                 XCTAssertEqual(latestItem.content, testContent)
@@ -133,8 +130,11 @@ final class ClipboardServiceIntegrationTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
             
-            XCTAssertEqual(self.clipboardService.history.count, initialCount, 
-                          "Internal copy should not duplicate history items")
+            XCTAssertEqual(
+                self.clipboardService.history.count,
+                initialCount,
+                "Internal copy should not duplicate history items"
+            )
             
             // But: クリップボードには設定される
             let pasteboardContent = NSPasteboard.general.string(forType: .string)

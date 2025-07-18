@@ -264,7 +264,11 @@ struct FontItemView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? Color(NSColor.selectedControlColor) : (isHovered ? Color.gray.opacity(0.1) : Color.clear))
+                    .fill(
+                        isSelected ?
+                        Color(NSColor.selectedControlColor) :
+                        (isHovered ? Color.gray.opacity(0.1) : Color.clear)
+                    )
             )
         })
         .buttonStyle(PlainButtonStyle())

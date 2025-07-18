@@ -17,7 +17,10 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
             let existingRequest: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
             let existingEntities = try context.fetch(existingRequest)
             
-            Logger.shared.debug("CoreDataClipboardRepository.save: Saving \(items.count) items, existing entities: \(existingEntities.count)")
+            Logger.shared.debug(
+                "CoreDataClipboardRepository.save: Saving \(items.count) items, " +
+                "existing entities: \(existingEntities.count)"
+            )
             
             // パフォーマンス最適化: O(1)ルックアップのための辞書を作成
             let existingEntitiesDict: [UUID: ClipItemEntity] = Dictionary(
@@ -36,7 +39,9 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                 deletedCount += 1
             }
             if deletedCount > 0 {
-                Logger.shared.debug("CoreDataClipboardRepository.save: Deleted \(deletedCount) entities not in the new list")
+                Logger.shared.debug(
+                    "CoreDataClipboardRepository.save: Deleted \(deletedCount) entities not in the new list"
+                )
             }
             
             // 更新・作成処理
@@ -52,10 +57,14 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                 }
             }
             
-            Logger.shared.debug("CoreDataClipboardRepository.save: Updated \(updatedCount), Created \(createdCount) entities")
+            Logger.shared.debug(
+                "CoreDataClipboardRepository.save: Updated \(updatedCount), Created \(createdCount) entities"
+            )
             
             try context.save()
-            Logger.shared.debug("CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data")
+            Logger.shared.debug(
+                "CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data"
+            )
             
             // メインコンテキストも保存して確実に永続化する処理は
             // performBackgroundTaskの外で実行する必要がある

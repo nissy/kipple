@@ -358,7 +358,9 @@ struct SimpleLineNumberView: NSViewRepresentable {
             forGlyphRange glyphRange: NSRange
         ) -> Bool {
             // 保存された固定行高を使用（初期化時に計算された値）
-            let fixedLineHeight = self.fixedLineHeight > 0 ? self.fixedLineHeight : calculateFixedLineHeight(for: parent.font)
+            let fixedLineHeight = self.fixedLineHeight > 0 ?
+                self.fixedLineHeight :
+                calculateFixedLineHeight(for: parent.font)
             
             // 行の高さを固定値に無条件で強制設定
             lineFragmentRect.pointee.size.height = fixedLineHeight

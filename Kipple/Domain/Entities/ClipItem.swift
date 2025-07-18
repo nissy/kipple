@@ -256,6 +256,31 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     // ファイルパス判定を改善
     private func isFilePath(_ text: String) -> Bool {
+        // 基本的な検証
+        if !isValidPathFormat(text) {
+            return false
+        }
+        
+        // Unix/Mac絶対パス
+        if text.hasPrefix("/") {
+            return isValidUnixPath(text)
+        }
+        
+        // ホームディレクトリ
+        if text.hasPrefix("~/") {
+            return text.count > 2
+        }
+        
+        // 相対パス
+        if text.hasPrefix("./") || text.hasPrefix("../") {
+            return text.count > (text.hasPrefix("./") ? 2 : 3)
+        }
+        
+        // Windowsパス
+        return isWindowsPath(text)
+    }
+    
+    private func isValidPathFormat(_ text: String) -> Bool {
         // スペースを含む場合は基本的にファイルパスではない（ただし、エスケープされている場合を除く）
         if text.contains(" ") && !text.contains("\\ ") {
             return false
@@ -266,51 +291,43 @@ struct ClipItem: Identifiable, Codable, Equatable {
             return false
         }
         
-        // Unix/Mac絶対パス
-        if text.hasPrefix("/") {
-            // ただし、単なるスラッシュや短すぎるパスは除外
-            if text.count < 3 || text == "/" {
+        return true
+    }
+    
+    private func isValidUnixPath(_ text: String) -> Bool {
+        // 単なるスラッシュや短すぎるパスは除外
+        if text.count < 3 || text == "/" {
+            return false
+        }
+        
+        // パス区切り文字を含むかチェック
+        let components = text.components(separatedBy: "/")
+        
+        // 少なくとも2つ以上のコンポーネントが必要
+        guard components.count >= 2 else { return false }
+        
+        // 各コンポーネントが妥当かチェック（空文字や特殊文字のみは除外）
+        let validChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
+        for component in components {
+            if component.isEmpty { continue }
+            // ファイル名として妥当な文字を含むかチェック
+            if component.rangeOfCharacter(from: validChars) == nil {
                 return false
             }
-            // パス区切り文字を含むかチェック
-            let components = text.components(separatedBy: "/")
-            // 少なくとも2つ以上のコンポーネントが必要
-            if components.count >= 2 {
-                // 各コンポーネントが妥当かチェック（空文字や特殊文字のみは除外）
-                for component in components {
-                    if component.isEmpty { continue }
-                    // ファイル名として妥当な文字を含むかチェック
-                    let validChars = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
-                    if component.rangeOfCharacter(from: validChars) == nil {
-                        return false
-                    }
-                }
+        }
+        return true
+    }
+    
+    private func isWindowsPath(_ text: String) -> Bool {
+        guard text.count > 3 else { return false }
+        
+        // ドライブレターのチェック（A-Z, a-z）
+        let firstChar = text.first!
+        if (firstChar >= "A" && firstChar <= "Z") || (firstChar >= "a" && firstChar <= "z") {
+            let secondIndex = text.index(text.startIndex, offsetBy: 1)
+            let thirdIndex = text.index(text.startIndex, offsetBy: 2)
+            if text[secondIndex] == ":" && text[thirdIndex] == "\\" {
                 return true
-            }
-        }
-        
-        // ホームディレクトリ
-        if text.hasPrefix("~/") {
-            // ~/の後に何か続く必要がある
-            return text.count > 2
-        }
-        
-        // 相対パス
-        if text.hasPrefix("./") || text.hasPrefix("../") {
-            // ./や../の後に何か続く必要がある
-            return text.count > (text.hasPrefix("./") ? 2 : 3)
-        }
-        
-        // Windowsパス（より厳密なチェック）
-        if text.count > 3 {
-            // ドライブレターのチェック（A-Z, a-z）
-            let firstChar = text.first!
-            if (firstChar >= "A" && firstChar <= "Z") || (firstChar >= "a" && firstChar <= "z") {
-                let secondIndex = text.index(text.startIndex, offsetBy: 1)
-                let thirdIndex = text.index(text.startIndex, offsetBy: 2)
-                if text[secondIndex] == ":" && text[thirdIndex] == "\\" {
-                    return true
-                }
             }
         }
         
