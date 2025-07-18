@@ -18,28 +18,40 @@ enum LogLevel: String {
 class Logger {
     static let shared = Logger()
     private let subsystem = Bundle.main.bundleIdentifier ?? "com.Kipple"
-    private let osLog: OSLog
+    private let osLog: OSLog?
+    private let isTestEnvironment: Bool
     
     private init() {
-        osLog = OSLog(subsystem: subsystem, category: "Kipple")
+        isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        
+        if isTestEnvironment {
+            osLog = nil
+        } else {
+            osLog = OSLog(subsystem: subsystem, category: "Kipple")
+        }
     }
     
     func log(_ message: String, level: LogLevel = .info, file: String = #file, function: String = #function, line: Int = #line) {
         let fileName = URL(fileURLWithPath: file).lastPathComponent
         let logMessage = "[\(level.rawValue)] \(fileName):\(line) \(function) - \(message)"
         
-        switch level {
-        case .debug:
-            os_log(.debug, log: osLog, "%{private}@", logMessage)
-        case .info:
-            os_log(.info, log: osLog, "%{private}@", logMessage)
-        case .warning:
-            os_log(.default, log: osLog, "%{private}@", logMessage)
-        case .error:
-            os_log(.error, log: osLog, "%{private}@", logMessage)
+        if isTestEnvironment {
+            // テスト実行時はコンソール出力のみ
+            print(logMessage)
+        } else {
+            // 通常時はOSLogを使用
+            guard let osLog = osLog else { return }
+            switch level {
+            case .debug:
+                os_log(.debug, log: osLog, "%{private}@", logMessage)
+            case .info:
+                os_log(.info, log: osLog, "%{private}@", logMessage)
+            case .warning:
+                os_log(.default, log: osLog, "%{private}@", logMessage)
+            case .error:
+                os_log(.error, log: osLog, "%{private}@", logMessage)
+            }
         }
-        
-        // Debug output is handled by os_log
     }
     
     func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {

@@ -204,22 +204,14 @@ final class CoreDataPersistenceTests: XCTestCase {
     
     func testAppTerminationSavesData() async throws {
         // Given
-        let clipboardService = ClipboardService.shared
-        
-        // 履歴にアイテムを追加
         let testItems = [
             ClipItem(content: "App Termination Test 1"),
             ClipItem(content: "App Termination Test 2"),
             ClipItem(content: "App Termination Test 3")
         ]
         
-        // ClipboardServiceの履歴に直接追加
-        await MainActor.run {
-            clipboardService.history = testItems
-        }
-        
-        // When - デバウンスされた保存を即座に実行
-        await clipboardService.flushPendingSaves()
+        // When - リポジトリに直接保存
+        try await repository.save(testItems)
         
         // Core Dataの保存を確実に実行
         try await MainActor.run {

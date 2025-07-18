@@ -131,33 +131,22 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
     func clear(keepPinned: Bool = true) async throws {
         try await coreDataStack.performBackgroundTask { [weak self] context in
             guard let self = self else { return }
-            let request: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
+            let request: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
             
             if keepPinned {
                 request.predicate = NSPredicate(format: "isPinned == NO")
             }
             
-            let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
-            deleteRequest.resultType = .resultTypeObjectIDs
+            // インメモリストアでは個別削除を使用
+            let entities = try context.fetch(request)
+            var deletedCount = 0
             
-            let result = try context.execute(deleteRequest) as? NSBatchDeleteResult
-            let deletedObjectIDs = result?.result as? [NSManagedObjectID] ?? []
-            let deletedCount = deletedObjectIDs.count
-            
-            // 削除されたオブジェクトをコンテキストから削除
-            let changes = [NSDeletedObjectsKey: deletedObjectIDs]
-            NSManagedObjectContext.mergeChanges(
-                fromRemoteContextSave: changes,
-                into: [context]
-            )
-            
-            // view contextにも変更を伝播
-            if let viewContext = self.coreDataStack.viewContext {
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: changes,
-                    into: [viewContext]
-                )
+            for entity in entities {
+                context.delete(entity)
+                deletedCount += 1
             }
+            
+            try context.save()
             
             Logger.shared.log("Cleared \(deletedCount) items from Core Data (keepPinned: \(keepPinned))")
         }
