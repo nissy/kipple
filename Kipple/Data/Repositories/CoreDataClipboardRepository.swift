@@ -17,7 +17,10 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
             let existingRequest: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
             let existingEntities = try context.fetch(existingRequest)
             
-            Logger.shared.debug("CoreDataClipboardRepository.save: Saving \(items.count) items, existing entities: \(existingEntities.count)")
+            Logger.shared.debug(
+                "CoreDataClipboardRepository.save: Saving \(items.count) items, " +
+                "existing entities: \(existingEntities.count)"
+            )
             
             // パフォーマンス最適化: O(1)ルックアップのための辞書を作成
             let existingEntitiesDict: [UUID: ClipItemEntity] = Dictionary(
@@ -36,7 +39,9 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                 deletedCount += 1
             }
             if deletedCount > 0 {
-                Logger.shared.debug("CoreDataClipboardRepository.save: Deleted \(deletedCount) entities not in the new list")
+                Logger.shared.debug(
+                    "CoreDataClipboardRepository.save: Deleted \(deletedCount) entities not in the new list"
+                )
             }
             
             // 更新・作成処理
@@ -52,10 +57,14 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                 }
             }
             
-            Logger.shared.debug("CoreDataClipboardRepository.save: Updated \(updatedCount), Created \(createdCount) entities")
+            Logger.shared.debug(
+                "CoreDataClipboardRepository.save: Updated \(updatedCount), Created \(createdCount) entities"
+            )
             
             try context.save()
-            Logger.shared.debug("CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data")
+            Logger.shared.debug(
+                "CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data"
+            )
             
             // メインコンテキストも保存して確実に永続化する処理は
             // performBackgroundTaskの外で実行する必要がある
@@ -122,33 +131,22 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
     func clear(keepPinned: Bool = true) async throws {
         try await coreDataStack.performBackgroundTask { [weak self] context in
             guard let self = self else { return }
-            let request: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
+            let request: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
             
             if keepPinned {
                 request.predicate = NSPredicate(format: "isPinned == NO")
             }
             
-            let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
-            deleteRequest.resultType = .resultTypeObjectIDs
+            // インメモリストアでは個別削除を使用
+            let entities = try context.fetch(request)
+            var deletedCount = 0
             
-            let result = try context.execute(deleteRequest) as? NSBatchDeleteResult
-            let deletedObjectIDs = result?.result as? [NSManagedObjectID] ?? []
-            let deletedCount = deletedObjectIDs.count
-            
-            // 削除されたオブジェクトをコンテキストから削除
-            let changes = [NSDeletedObjectsKey: deletedObjectIDs]
-            NSManagedObjectContext.mergeChanges(
-                fromRemoteContextSave: changes,
-                into: [context]
-            )
-            
-            // view contextにも変更を伝播
-            if let viewContext = self.coreDataStack.viewContext {
-                NSManagedObjectContext.mergeChanges(
-                    fromRemoteContextSave: changes,
-                    into: [viewContext]
-                )
+            for entity in entities {
+                context.delete(entity)
+                deletedCount += 1
             }
+            
+            try context.save()
             
             Logger.shared.log("Cleared \(deletedCount) items from Core Data (keepPinned: \(keepPinned))")
         }

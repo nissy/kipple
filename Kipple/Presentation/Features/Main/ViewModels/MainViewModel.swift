@@ -30,6 +30,9 @@ class MainViewModel: ObservableObject {
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String?
     
+    // 自動消去タイマーの残り時間
+    @Published var autoClearRemainingTime: TimeInterval?
+    
     init(clipboardService: ClipboardServiceProtocol = ClipboardService.shared) {
         // 保存されたエディタテキストを読み込む（なければ空文字）
         self.editorText = UserDefaults.standard.string(forKey: "lastEditorText") ?? ""
@@ -60,6 +63,13 @@ class MainViewModel: ObservableObject {
             observableService.$currentClipboardContent
             .sink { [weak self] content in
                 self?.currentClipboardContent = content
+            }
+            .store(in: &cancellables)
+            
+            // 自動消去タイマーの残り時間を監視
+            observableService.$autoClearRemainingTime
+            .sink { [weak self] remainingTime in
+                self?.autoClearRemainingTime = remainingTime
             }
             .store(in: &cancellables)
         }

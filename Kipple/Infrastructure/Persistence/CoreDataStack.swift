@@ -17,6 +17,7 @@ class CoreDataStack {
     private(set) var isLoaded = false
     private(set) var loadError: Error?
     private let initializationSemaphore = DispatchSemaphore(value: 0)
+    private let isTestEnvironment: Bool
     
     var persistentContainer: NSPersistentContainer? {
         containerLock.lock()
@@ -118,6 +119,8 @@ class CoreDataStack {
     }
     
     private init() {
+        isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        
         // アプリ起動時に非同期で初期化を開始
         Task {
             await loadPersistentContainerAsync()
@@ -161,8 +164,24 @@ class CoreDataStack {
             
             // マイグレーションオプションを設定
             let description = container.persistentStoreDescriptions.first
-            description?.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
-            description?.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
+            if isTestEnvironment {
+                // テスト用の一時ファイルを使用（メモリ内ストアの代わり）
+                let tempDir = FileManager.default.temporaryDirectory
+                let testDBURL = tempDir.appendingPathComponent("KippleTest.sqlite")
+                description?.url = testDBURL
+                description?.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
+                description?.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
+                
+                // 既存のテストDBファイルを削除
+                try? FileManager.default.removeItem(at: testDBURL)
+                let walURL = testDBURL.appendingPathExtension("wal")
+                let shmURL = testDBURL.appendingPathExtension("shm")
+                try? FileManager.default.removeItem(at: walURL)
+                try? FileManager.default.removeItem(at: shmURL)
+            } else {
+                description?.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
+                description?.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
+            }
             
             container.loadPersistentStores { [weak self] storeDescription, error in
                 self?.containerLock.lock()
@@ -180,8 +199,8 @@ class CoreDataStack {
                     let storeURL = storeDescription.url?.absoluteString ?? "unknown"
                     Logger.shared.log("Core Data loaded successfully at: \(storeURL)")
                     
-                    // SQLiteファイルの実際のパスをログに出力
-                    if let url = storeDescription.url {
+                    // SQLiteファイルの実際のパスをログに出力（テスト時は除外）
+                    if let url = storeDescription.url, !(self?.isTestEnvironment ?? false) {
                         Logger.shared.log("SQLite file path: \(url.path)")
                         
                         // ファイルの存在とサイズを確認
@@ -206,6 +225,28 @@ class CoreDataStack {
                 }
             }
         }
+    }
+    
+    // テスト用のデータベースクリーンアップ
+    func resetForTesting() {
+        guard isTestEnvironment else { return }
+        
+        containerLock.lock()
+        defer { containerLock.unlock() }
+        
+        // 現在のコンテナをクリア
+        _persistentContainer = nil
+        isLoaded = false
+        loadError = nil
+        
+        // 一時ファイルを削除
+        let tempDir = FileManager.default.temporaryDirectory
+        let testDBURL = tempDir.appendingPathComponent("KippleTest.sqlite")
+        try? FileManager.default.removeItem(at: testDBURL)
+        let walURL = testDBURL.appendingPathExtension("wal")
+        let shmURL = testDBURL.appendingPathExtension("shm")
+        try? FileManager.default.removeItem(at: walURL)
+        try? FileManager.default.removeItem(at: shmURL)
     }
 }
 

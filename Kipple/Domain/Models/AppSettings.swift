@@ -58,6 +58,10 @@ final class AppSettings: ObservableObject {
     @AppStorage("filterCategoryGeneral") var filterCategoryGeneral: Bool = false
     @AppStorage("filterCategoryKipple") var filterCategoryKipple: Bool = true
     
+    // Auto-Clear Settings
+    @AppStorage("enableAutoClear") var enableAutoClear: Bool = false
+    @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
+    
     private init() {}
     
     // Settings Keys for consistency
