@@ -22,6 +22,7 @@ struct MainView: View {
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
     @State private var historyRefreshID = UUID()
+    @State private var hoveredClearButton = false
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
@@ -276,6 +277,24 @@ struct MainView: View {
                 // 現在のペースト内容を表示
                 if let currentContent = viewModel.currentClipboardContent {
                     HStack(alignment: .center, spacing: 8) {
+                        // 自動消去タイマーの残り時間表示
+                        if AppSettings.shared.enableAutoClear,
+                           let remainingTime = viewModel.autoClearRemainingTime {
+                            HStack(spacing: 6) {
+                                Image(systemName: "timer")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                
+                                Text(formatRemainingTime(remainingTime))
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Divider()
+                                .frame(height: 16)
+                                .padding(.horizontal, 4)
+                        }
+                        
                         Image(systemName: "doc.on.clipboard")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
@@ -285,6 +304,21 @@ struct MainView: View {
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                             .truncationMode(.tail)
+                        
+                        // Clear button
+                        Button(action: {
+                            clearSystemClipboard()
+                        }, label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary.opacity(0.6))
+                                .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
+                        })
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Clear clipboard")
+                        .onHover { hovering in
+                            hoveredClearButton = hovering
+                        }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -433,5 +467,21 @@ struct MainView: View {
         case .kipple:
             return appSettings.filterCategoryKipple
         }
+    }
+    
+    private func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval) / 60
+        let seconds = Int(timeInterval) % 60
+        
+        if minutes > 0 {
+            return String(format: "%02d:%02d", minutes, seconds)
+        } else {
+            return String(format: "00:%02d", seconds)
+        }
+    }
+    
+    private func clearSystemClipboard() {
+        NSPasteboard.general.clearContents()
+        viewModel.currentClipboardContent = nil
     }
 }

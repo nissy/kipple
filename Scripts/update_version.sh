@@ -20,8 +20,8 @@ usage() {
     echo "Usage: $0 <version> [build_number]"
     echo ""
     echo "Examples:"
-    echo "  $0 1.0.8          # Update marketing version to 1.0.8"
-    echo "  $0 1.0.8 42       # Update marketing version to 1.0.8 and build number to 42"
+    echo "  $0 1.0.9          # Update marketing version to 1.0.9"
+    echo "  $0 1.0.9 42       # Update marketing version to 1.0.9 and build number to 42"
     echo "  $0 --build-only   # Increment build number only"
     echo ""
     exit 1
@@ -30,7 +30,7 @@ usage() {
 # Function to validate version format
 validate_version() {
     if [[ ! $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo -e "${RED}Error: Invalid version format. Expected: X.Y.Z (e.g., 1.0.8)${NC}"
+        echo -e "${RED}Error: Invalid version format. Expected: X.Y.Z (e.g., 1.0.9)${NC}"
         exit 1
     fi
 }

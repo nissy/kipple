@@ -26,6 +26,11 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private let serialQueue = DispatchQueue(label: "com.nissy.Kipple.clipboard", qos: .userInitiated)
     private var timerRunLoop: RunLoop?
     private var timerThread: Thread?
+    
+    // Auto-clear timer
+    var autoClearTimer: Timer?
+    var autoClearStartTime: Date?
+    @Published var autoClearRemainingTime: TimeInterval?
     // Thread-safe internal copy flag
     private let internalCopyLock = NSLock()
     private var _isInternalCopy: Bool = false
@@ -175,6 +180,11 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 }
             }
             self.timerThread?.start()
+            
+            // Start auto-clear timer if enabled
+            Task { @MainActor [weak self] in
+                self?.startAutoClearTimerIfNeeded()
+            }
         }
     }
     
@@ -186,6 +196,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         // アプリ切り替えの監視を停止
         DispatchQueue.main.async { [weak self] in
             self?.stopAppActivationMonitoring()
+            self?.stopAutoClearTimer()
         }
     }
     
@@ -296,7 +307,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 self.cleanupHistory()
                 
                 // 履歴をデバウンスして保存
-                Logger.shared.debug("ClipboardService: Sending \(self.history.count) items to saveSubject for debounced save")
+                let count = self.history.count
+                Logger.shared.debug("ClipboardService: Sending \(count) items to saveSubject for debounced save")
                 self.saveSubject.send(self.history)
             }
         }
@@ -446,9 +458,12 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             do {
                 Logger.shared.debug("ClipboardService.saveHistoryToRepository: Starting save operation")
                 try await repository.save(items)
-                Logger.shared.debug("ClipboardService.saveHistoryToRepository: Successfully saved \(items.count) items to repository")
+                let itemCount = items.count
+                let msg = "ClipboardService.saveHistoryToRepository: Successfully saved \(itemCount) items to repository"
+                Logger.shared.debug(msg)
             } catch CoreDataError.notLoaded {
-                Logger.shared.warning("ClipboardService.saveHistoryToRepository: Core Data not loaded, items stored in memory only")
+                let msg = "ClipboardService.saveHistoryToRepository: Core Data not loaded, items stored in memory only"
+                Logger.shared.warning(msg)
                 // メモリベースのフォールバック処理
                 // 履歴は既にメモリ上の配列に保存されているため、追加処理は不要
             } catch {

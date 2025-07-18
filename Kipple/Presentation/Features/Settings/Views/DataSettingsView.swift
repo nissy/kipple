@@ -18,6 +18,8 @@ struct DataSettingsView: View {
     @AppStorage("filterCategoryLongText") private var filterCategoryLongText = true
     @AppStorage("filterCategoryGeneral") private var filterCategoryGeneral = true
     @AppStorage("filterCategoryKipple") private var filterCategoryKipple = true
+    @AppStorage("enableAutoClear") private var enableAutoClear = false
+    @AppStorage("autoClearInterval") private var autoClearInterval = 10
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
@@ -47,6 +49,54 @@ struct DataSettingsView: View {
                             SettingsRow(label: "Long Text", isOn: $filterCategoryLongText)
                             SettingsRow(label: "General", isOn: $filterCategoryGeneral)
                             SettingsRow(label: "Kipple", isOn: $filterCategoryKipple)
+                        }
+                    }
+                }
+                
+                // Auto-Clear Settings Section
+                SettingsGroup("Auto-Clear") {
+                    VStack(spacing: 0) {
+                        SettingsRow(label: "Enable Auto-Clear", isOn: $enableAutoClear)
+                            .onChange(of: enableAutoClear) { _ in
+                                ClipboardService.shared.updateAutoClearTimer()
+                            }
+                        
+                        SettingsRow(
+                            label: "Clear Interval",
+                            description: "Automatically clear system clipboard content after this duration"
+                        ) {
+                            HStack {
+                                TextField(
+                                    "",
+                                    value: Binding(
+                                        get: { Double(autoClearInterval) },
+                                        set: { autoClearInterval = Int(max(1, min(1440, $0))) }
+                                    ),
+                                    formatter: makeNumberFormatter(minimum: 1, maximum: 1440)
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 80)
+                                .disabled(!enableAutoClear)
+                                
+                                Text("minutes")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                
+                                Stepper(
+                                    "",
+                                    value: Binding(
+                                        get: { Double(autoClearInterval) },
+                                        set: { autoClearInterval = Int($0) }
+                                    ),
+                                    in: 1...1440,
+                                    step: 1
+                                )
+                                .labelsHidden()
+                                .disabled(!enableAutoClear)
+                            }
+                        }
+                        .onChange(of: autoClearInterval) { _ in
+                            ClipboardService.shared.updateAutoClearTimer()
                         }
                     }
                 }
