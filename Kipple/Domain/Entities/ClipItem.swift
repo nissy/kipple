@@ -104,10 +104,16 @@ struct ClipItem: Identifiable, Codable, Equatable {
         if isFromEditor == true {
             return .kipple
         }
-        
+        // 共有キャッシュで再計算を回避（エディタ由来は除外）
+        if let cached = CategoryClassifierCache.shared.get(for: content) {
+            return cached
+        }
+
         // パフォーマンス最適化: 大量テキストは早期にlongTextとして分類
         if content.count > 1000 {
-            return .longText
+            let result: ClipItemCategory = .longText
+            CategoryClassifierCache.shared.set(result, for: content)
+            return result
         }
         
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,50 +123,33 @@ struct ClipItem: Identifiable, Codable, Equatable {
         // 短いテキストの早期分類
         if content.count <= 50 {
             // 短いテキストでも特殊なパターンをチェック
-            if isFilePath(trimmed) {
-                return .filePath
-            }
-            if isValidEmail(trimmed) {
-                return .email
-            }
-            if isValidURL(trimmed) {
-                return .url
-            }
+            if isFilePath(trimmed) { CategoryClassifierCache.shared.set(.filePath, for: content); return .filePath }
+            if isValidEmail(trimmed) { CategoryClassifierCache.shared.set(.email, for: content); return .email }
+            if isValidURL(trimmed) { CategoryClassifierCache.shared.set(.url, for: content); return .url }
             // 短いテキストでもコードの可能性をチェック
-            if isCodeSnippet(trimmed) {
-                return .code
-            }
+            if isCodeSnippet(trimmed) { CategoryClassifierCache.shared.set(.code, for: content); return .code }
+            CategoryClassifierCache.shared.set(.shortText, for: content)
             return .shortText
         }
         
         // 中程度のテキスト（50-1000文字）のみ詳細な判定
         
         // ファイルパス判定（最優先）
-        if isFilePath(trimmed) {
-            return .filePath
-        }
+        if isFilePath(trimmed) { CategoryClassifierCache.shared.set(.filePath, for: content); return .filePath }
         
         // メール判定
-        if isValidEmail(trimmed) {
-            return .email
-        }
+        if isValidEmail(trimmed) { CategoryClassifierCache.shared.set(.email, for: content); return .email }
         
         // URL判定
-        if isValidURL(trimmed) {
-            return .url
-        }
+        if isValidURL(trimmed) { CategoryClassifierCache.shared.set(.url, for: content); return .url }
         
         // コード判定（重い処理なので最後に）
-        if isCodeSnippet(trimmed) {
-            return .code
-        }
+        if isCodeSnippet(trimmed) { CategoryClassifierCache.shared.set(.code, for: content); return .code }
         
         // 文字数による分類
-        if content.count <= 500 {
-            return .general
-        } else {
-            return .longText
-        }
+        if content.count <= 500 { CategoryClassifierCache.shared.set(.general, for: content); return .general }
+        CategoryClassifierCache.shared.set(.longText, for: content)
+        return .longText
     }
     
     // URL判定を改善

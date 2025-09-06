@@ -20,6 +20,7 @@ class Logger {
     private let subsystem = Bundle.main.bundleIdentifier ?? "com.Kipple"
     private let osLog: OSLog?
     private let isTestEnvironment: Bool
+    private var _isDebugEnabledCache: Bool?
     
     private init() {
         isTestEnvironment = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -31,9 +32,28 @@ class Logger {
         }
     }
     
-    func log(_ message: String, level: LogLevel = .info, file: String = #file, function: String = #function, line: Int = #line) {
+    // デバッグログの有効/無効をUserDefaultsで制御（既定: false）
+    private var isDebugEnabled: Bool {
+        if let cached = _isDebugEnabledCache { return cached }
+        let enabled = UserDefaults.standard.bool(forKey: "enableDebugLogs")
+        _isDebugEnabledCache = enabled
+        return enabled
+    }
+
+    // 設定変更時にキャッシュをクリア
+    func refreshConfig() {
+        _isDebugEnabledCache = nil
+    }
+
+    // メッセージを遅延評価し、不要な文字列構築を回避
+    func log(_ message: @autoclosure () -> String, level: LogLevel = .info, file: String = #file, function: String = #function, line: Int = #line) {
+        // デバッグログは無効なら即リターン
+        if level == .debug && !isDebugEnabled {
+            return
+        }
         let fileName = URL(fileURLWithPath: file).lastPathComponent
-        let logMessage = "[\(level.rawValue)] \(fileName):\(line) \(function) - \(message)"
+        let built = message()
+        let logMessage = "[\(level.rawValue)] \(fileName):\(line) \(function) - \(built)"
         
         if isTestEnvironment {
             // テスト実行時はコンソール出力のみ
@@ -54,19 +74,19 @@ class Logger {
         }
     }
     
-    func debug(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message, level: .debug, file: file, function: function, line: line)
+    func debug(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(message(), level: .debug, file: file, function: function, line: line)
     }
     
-    func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message, level: .info, file: file, function: function, line: line)
+    func info(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(message(), level: .info, file: file, function: function, line: line)
     }
     
-    func warning(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message, level: .warning, file: file, function: function, line: line)
+    func warning(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(message(), level: .warning, file: file, function: function, line: line)
     }
     
-    func error(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message, level: .error, file: file, function: function, line: line)
+    func error(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
+        log(message(), level: .error, file: file, function: function, line: line)
     }
 }

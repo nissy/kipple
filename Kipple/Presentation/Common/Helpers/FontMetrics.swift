@@ -8,7 +8,13 @@
 import AppKit
 
 struct FontMetrics {
+    private static let lineHeightCache = NSCache<NSString, NSNumber>()
+    
     static func lineHeight(for fontName: String, fontSize: CGFloat) -> CGFloat {
+        let cacheKey = "\(fontName)#\(fontSize)" as NSString
+        if let cached = lineHeightCache.object(forKey: cacheKey) {
+            return CGFloat(truncating: cached)
+        }
         let font = NSFont(name: fontName, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
         
         // NSTextViewを使用して実際の行高を計算
@@ -42,6 +48,7 @@ struct FontMetrics {
             
             // 行間隔が0の場合は、デフォルトの計算を使用
             if lineSpacing > 0 {
+                lineHeightCache.setObject(NSNumber(value: Double(lineSpacing)), forKey: cacheKey)
                 return lineSpacing
             }
         }
@@ -49,7 +56,9 @@ struct FontMetrics {
         // フォールバック: フォントメトリクスから計算
         // NSTextViewのデフォルトの行間隔係数は約1.2
         let baseHeight = font.ascender - font.descender + font.leading
-        return baseHeight * 1.2
+        let calculated = baseHeight * 1.2
+        lineHeightCache.setObject(NSNumber(value: Double(calculated)), forKey: cacheKey)
+        return calculated
     }
     
     static func baselineOffset(for fontName: String, fontSize: CGFloat) -> CGFloat {

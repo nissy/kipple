@@ -13,8 +13,10 @@ import Combine
 extension ClipboardService {
     
     func addToHistoryWithAppInfo(_ content: String, appInfo: AppInfo, isFromEditor: Bool = false) {
-        // サイズ検証（10MBを上限）
-        let maxContentSize = 10 * 1024 * 1024
+        // サイズ検証（既定は1MB、UserDefaultsで上書き可能: key "maxClipboardBytes"）
+        let defaultMaxBytes = 1 * 1024 * 1024
+        let configured = UserDefaults.standard.integer(forKey: "maxClipboardBytes")
+        let maxContentSize = configured > 0 ? configured : defaultMaxBytes
         guard content.utf8.count <= maxContentSize else {
             Logger.shared.warning("Clipboard content too large, skipping: \(content.utf8.count) bytes")
             return

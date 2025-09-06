@@ -14,60 +14,62 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
     func save(_ items: [ClipItem]) async throws {
         try await coreDataStack.performBackgroundTask { [weak self] context in
             guard let self = self else { return }
-            let existingRequest: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
-            let existingEntities = try context.fetch(existingRequest)
-            
-            Logger.shared.debug(
-                "CoreDataClipboardRepository.save: Saving \(items.count) items, " +
-                "existing entities: \(existingEntities.count)"
-            )
-            
-            // パフォーマンス最適化: O(1)ルックアップのための辞書を作成
-            let existingEntitiesDict: [UUID: ClipItemEntity] = Dictionary(
-                uniqueKeysWithValues: existingEntities.compactMap { entity in
+
+            // 1) 先に不要なレコードをバッチ削除（大量フェッチを避ける）
+            let ids = items.map { $0.id }
+            if !ids.isEmpty {
+                let deleteFetch: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
+                deleteFetch.predicate = NSPredicate(format: "NOT (id IN %@)", ids as [UUID])
+                let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteFetch)
+                batchDelete.resultType = .resultTypeObjectIDs
+                if let result = try context.execute(batchDelete) as? NSBatchDeleteResult,
+                   let objectIDs = result.result as? [NSManagedObjectID],
+                   !objectIDs.isEmpty {
+                    let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
+                    NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [context])
+                }
+            } else {
+                // 空の場合は全削除
+                let deleteFetch: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
+                let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteFetch)
+                _ = try context.execute(batchDelete)
+            }
+
+            // 2) 既存の対象のみフェッチして辞書化（全件ロードを避ける）
+            var existingEntitiesDict: [UUID: ClipItemEntity] = [:]
+            if !ids.isEmpty {
+                let fetchExisting: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
+                fetchExisting.predicate = NSPredicate(format: "id IN %@", ids as [UUID])
+                fetchExisting.returnsObjectsAsFaults = true
+                fetchExisting.includesPropertyValues = true
+                let existing = try context.fetch(fetchExisting)
+                existingEntitiesDict = Dictionary(uniqueKeysWithValues: existing.compactMap { entity in
                     guard let id = entity.id else { return nil }
                     return (id, entity)
-                }
-            )
-            
-            let itemIds = Set(items.map { $0.id })
-            
-            // 削除処理
-            var deletedCount = 0
-            for entity in existingEntities where !itemIds.contains(entity.id ?? UUID()) {
-                context.delete(entity)
-                deletedCount += 1
+                })
             }
-            if deletedCount > 0 {
-                Logger.shared.debug(
-                    "CoreDataClipboardRepository.save: Deleted \(deletedCount) entities not in the new list"
-                )
-            }
-            
-            // 更新・作成処理
+
+            // 3) 更新・作成
             var updatedCount = 0
             var createdCount = 0
             for item in items {
-                if let existingEntity = existingEntitiesDict[item.id] {
-                    existingEntity.update(from: item)
+                if let entity = existingEntitiesDict[item.id] {
+                    entity.update(from: item)
                     updatedCount += 1
                 } else {
                     _ = ClipItemEntity.create(from: item, in: context)
                     createdCount += 1
                 }
             }
-            
+
             Logger.shared.debug(
                 "CoreDataClipboardRepository.save: Updated \(updatedCount), Created \(createdCount) entities"
             )
-            
+
             try context.save()
             Logger.shared.debug(
                 "CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data"
             )
-            
-            // メインコンテキストも保存して確実に永続化する処理は
-            // performBackgroundTaskの外で実行する必要がある
         }
         
         // バックグラウンドタスクの外でメインコンテキストを保存

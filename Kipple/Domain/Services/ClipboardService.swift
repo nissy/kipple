@@ -26,6 +26,23 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     let serialQueue = DispatchQueue(label: "com.nissy.Kipple.clipboard", qos: .userInitiated)
     private var timerRunLoop: RunLoop?
     private var timerThread: Thread?
+    // ポーリング間隔（動的調整）
+    private var pollingInterval: TimeInterval = 0.5
+    private let minPollingInterval: TimeInterval = 0.5
+    private let maxPollingInterval: TimeInterval = 1.0
+    private var lastClipboardEventAt: Date = Date()
+    
+    // メインスレッドでアプリのアクティブ状態を取得（バックグラウンドからUI APIへ直接アクセスしない）
+    private func appIsActive() -> Bool {
+        if Thread.isMainThread {
+            return NSApp?.isActive ?? true
+        }
+        var active = true
+        DispatchQueue.main.sync {
+            active = NSApp?.isActive ?? true
+        }
+        return active
+    }
     
     // Auto-clear timer
     var autoClearTimer: Timer?
@@ -103,8 +120,18 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             return
         }
         
-        // デバウンス設定（1秒後に保存）
+        // デバウンス設定（1秒後に保存）＋重複抑制（同一配列は保存しない）
         saveSubscription = saveSubject
+            .removeDuplicates(by: { lhs, rhs in
+                // 配列長が異なる・順序が異なる場合は必ず保存
+                guard lhs.count == rhs.count else { return false }
+                for (a, b) in zip(lhs, rhs) {
+                    // id または isPinned が異なれば保存対象（内容や順序変化も検知）
+                    if a.id != b.id || a.isPinned != b.isPinned { return false }
+                }
+                // 完全に同一（id順序・isPinnedも一致）の場合のみ重複とみなしてスキップ
+                return true
+            })
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
             .sink { [weak self] items in
                 Logger.shared.debug("ClipboardService: Debounce fired with \(items.count) items")
@@ -142,7 +169,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 guard let self = self else { return }
                 
                 self.timerRunLoop = RunLoop.current
-                self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+                self.timer = Timer.scheduledTimer(withTimeInterval: self.pollingInterval, repeats: true) { _ in
                     self.checkClipboard()
                 }
                 
@@ -181,10 +208,16 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     }
     
     private func checkClipboard() {
+        autoreleasepool {
         let currentChangeCount = NSPasteboard.general.changeCount
         
         if currentChangeCount != lastChangeCount {
             lastChangeCount = currentChangeCount
+            lastClipboardEventAt = Date()
+            // 活動を検知したら最短間隔へ戻す
+            if pollingInterval != minPollingInterval {
+                resetPollingInterval(to: minPollingInterval)
+            }
             
             // アプリ情報を即座に取得（遅延させない）
             let appInfo = getActiveAppInfo()
@@ -229,6 +262,34 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: fromEditor)
             }
         }
+        // アクティブでなく、一定時間変化が無ければ間隔を広げる（CPU負荷軽減）
+        if !appIsActive() {
+            let idleFor = Date().timeIntervalSince(lastClipboardEventAt)
+            if idleFor > 60, pollingInterval != maxPollingInterval { // 60秒アイドルで拡張
+                resetPollingInterval(to: maxPollingInterval)
+            }
+        }
+        }
+    }
+
+    private func resetPollingInterval(to newInterval: TimeInterval) {
+        guard let runLoop = timerRunLoop else { return }
+        pollingInterval = newInterval
+        timer?.invalidate()
+        timer = nil
+        // 既存のランループ上で再スケジュール
+        let block: () -> Void = { [weak self] in
+            guard let self = self else { return }
+            self.timer = Timer.scheduledTimer(withTimeInterval: newInterval, repeats: true) { [weak self] _ in
+                self?.checkClipboard()
+            }
+        }
+        // すでにタイマースレッド上なので直接実行
+        if Thread.current == timerThread {
+            block()
+        } else {
+            runLoop.perform(block)
+        }
     }
     
     func copyToClipboard(_ content: String, fromEditor: Bool = false) {
@@ -238,10 +299,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             isInternalCopy = true
             isFromEditor = false
         } else {
-            // エディタからのコピーの場合、次のクリップボード項目がエディタ由来であることを記録
+            // エディタからのコピーは即座に履歴へ反映し、次の監視サイクルでは追加しない
             isFromEditor = true
-            // エディタからのコピーは内部コピーではないことを明示
-            isInternalCopy = false
+            isInternalCopy = true
         }
         
         // 現在のクリップボード内容を即座に更新（同期的に）
@@ -267,6 +327,13 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                     Logger.shared.debug("Moved Kipple-copied item to top")
                 }
             }
+        } else {
+            // エディタからのコピーは即座に履歴へ追加（監視の遅延や環境差による不安定を回避）
+            let appInfo = AppInfo(appName: "Kipple",
+                                  windowTitle: "Quick Editor",
+                                  bundleId: Bundle.main.bundleIdentifier,
+                                  pid: ProcessInfo.processInfo.processIdentifier)
+            addToHistoryWithAppInfo(content, appInfo: appInfo, isFromEditor: true)
         }
     }
     

@@ -182,6 +182,12 @@ class CoreDataStack {
                 description?.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
                 description?.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
             }
+            // SQLite PRAGMA 最適化（WAL + 同期軽減）
+            let pragmas: [String: Any] = [
+                "journal_mode": "WAL",
+                "synchronous": "NORMAL"
+            ]
+            description?.setOption(pragmas as NSDictionary, forKey: NSSQLitePragmasOption)
             
             container.loadPersistentStores { [weak self] storeDescription, error in
                 self?.containerLock.lock()
@@ -219,6 +225,8 @@ class CoreDataStack {
                     
                     self?.isLoaded = true
                     container.viewContext.automaticallyMergesChangesFromParent = true
+                    container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+                    container.viewContext.shouldDeleteInaccessibleFaults = true
                     self?._persistentContainer = container
                     self?.initializationSemaphore.signal()
                     continuation.resume(returning: container)
