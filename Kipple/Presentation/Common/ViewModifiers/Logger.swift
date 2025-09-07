@@ -45,8 +45,13 @@ class Logger {
         _isDebugEnabledCache = nil
     }
 
-    // メッセージを遅延評価し、不要な文字列構築を回避
+    // 外部API（@autoclosure）
     func log(_ message: @autoclosure () -> String, level: LogLevel = .info, file: String = #file, function: String = #function, line: Int = #line) {
+        _log(message, level: level, file: file, function: function, line: line)
+    }
+
+    // 実装本体（クロージャ）: メッセージを必要時のみ評価
+    private func _log(_ message: () -> String, level: LogLevel = .info, file: String = #file, function: String = #function, line: Int = #line) {
         // デバッグログは無効なら即リターン
         if level == .debug && !isDebugEnabled {
             return
@@ -75,18 +80,18 @@ class Logger {
     }
     
     func debug(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message(), level: .debug, file: file, function: function, line: line)
+        _log(message, level: .debug, file: file, function: function, line: line)
     }
     
     func info(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message(), level: .info, file: file, function: function, line: line)
+        _log(message, level: .info, file: file, function: function, line: line)
     }
     
     func warning(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message(), level: .warning, file: file, function: function, line: line)
+        _log(message, level: .warning, file: file, function: function, line: line)
     }
     
     func error(_ message: @autoclosure () -> String, file: String = #file, function: String = #function, line: Int = #line) {
-        log(message(), level: .error, file: file, function: function, line: line)
+        _log(message, level: .error, file: file, function: function, line: line)
     }
 }

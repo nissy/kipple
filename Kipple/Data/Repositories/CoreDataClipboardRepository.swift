@@ -26,13 +26,27 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                    let objectIDs = result.result as? [NSManagedObjectID],
                    !objectIDs.isEmpty {
                     let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
-                    NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [context])
+                    var targetContexts: [NSManagedObjectContext] = [context]
+                    if let viewContext = self.coreDataStack.viewContext {
+                        targetContexts.append(viewContext)
+                    }
+                    NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: targetContexts)
                 }
             } else {
                 // 空の場合は全削除
                 let deleteFetch: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
                 let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteFetch)
-                _ = try context.execute(batchDelete)
+                batchDelete.resultType = .resultTypeObjectIDs
+                if let result = try context.execute(batchDelete) as? NSBatchDeleteResult,
+                   let objectIDs = result.result as? [NSManagedObjectID],
+                   !objectIDs.isEmpty {
+                    let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
+                    var targetContexts: [NSManagedObjectContext] = [context]
+                    if let viewContext = self.coreDataStack.viewContext {
+                        targetContexts.append(viewContext)
+                    }
+                    NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: targetContexts)
+                }
             }
 
             // 2) 既存の対象のみフェッチして辞書化（全件ロードを避ける）

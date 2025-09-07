@@ -199,7 +199,8 @@ test: generate ## Run all tests
 		-resultBundlePath build/TestResults \
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO
+		CODE_SIGNING_ALLOWED=NO \
+		-only-testing:KippleTests
 
 test-coverage: generate ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage…$(NC)"
@@ -212,7 +213,8 @@ test-coverage: generate ## Run tests with coverage report
 		-enableCodeCoverage YES \
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO
+		CODE_SIGNING_ALLOWED=NO \
+		-only-testing:KippleTests
 
 test-specific: generate ## Run specific test (use TEST=ClassName)
 	@if [ -z "$(TEST)" ]; then \
@@ -236,7 +238,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 lint: ## Run SwiftLint
 	@if command -v swiftlint >/dev/null 2>&1; then \
 		echo "$(BLUE)Running SwiftLint…$(NC)"; \
-		swiftlint; \
+		swiftlint --no-cache; \
 	else \
 		echo "$(YELLOW)SwiftLint not found. Install with: brew install swiftlint$(NC)"; \
 	fi
@@ -244,7 +246,7 @@ lint: ## Run SwiftLint
 lint-fix: ## Auto-fix SwiftLint issues
 	@if command -v swiftlint >/dev/null 2>&1; then \
 		echo "$(BLUE)Auto-fixing SwiftLint issues…$(NC)"; \
-		swiftlint --fix; \
+		swiftlint --fix --no-cache; \
 	else \
 		echo "$(YELLOW)SwiftLint not found. Install with: brew install swiftlint$(NC)"; \
 	fi
