@@ -55,4 +55,3 @@ final class ClipboardServiceMemoryGuardTests: XCTestCase {
         waitForExpectations(timeout: 1.0)
     }
 }
-

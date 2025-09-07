@@ -30,7 +30,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private var pollingInterval: TimeInterval = 0.5
     private let minPollingInterval: TimeInterval = 0.5
     private let maxPollingInterval: TimeInterval = 1.0
-    private var lastClipboardEventAt: Date = Date()
+    private var lastClipboardEventAt = Date()
     
     // メインスレッドでアプリのアクティブ状態を取得（バックグラウンドからUI APIへ直接アクセスしない）
     private func appIsActive() -> Bool {
@@ -122,7 +122,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
         
         // デバウンス設定（1秒後に保存）＋重複抑制（同一配列は保存しない）
         saveSubscription = saveSubject
-            .removeDuplicates(by: { lhs, rhs in
+            .removeDuplicates { lhs, rhs in
                 // 配列長が異なる・順序が異なる場合は必ず保存
                 guard lhs.count == rhs.count else { return false }
                 for (a, b) in zip(lhs, rhs) {
@@ -131,7 +131,7 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 }
                 // 完全に同一（id順序・isPinnedも一致）の場合のみ重複とみなしてスキップ
                 return true
-            })
+            }
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
             .sink { [weak self] items in
                 Logger.shared.debug("ClipboardService: Debounce fired with \(items.count) items")

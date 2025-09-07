@@ -103,7 +103,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
         CategoryClassifier.shared.classify(content: content, isFromEditor: isFromEditor ?? false)
     }
     
-    
     init(
         content: String,
         isPinned: Bool = false,

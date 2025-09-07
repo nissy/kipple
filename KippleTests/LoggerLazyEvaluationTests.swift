@@ -45,4 +45,3 @@ final class LoggerLazyEvaluationTests: XCTestCase {
         XCTAssertEqual(Self.sideEffectCounter, 1)
     }
 }
-
