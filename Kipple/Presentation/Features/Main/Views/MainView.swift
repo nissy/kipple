@@ -23,6 +23,8 @@ struct MainView: View {
     @State private var editorRefreshID = UUID()
     @State private var historyRefreshID = UUID()
     @State private var hoveredClearButton = false
+    // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
+    @State private var keyDownMonitor: Any?
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
@@ -106,7 +108,12 @@ struct MainView: View {
             historyRefreshID = UUID()
         }
         .onAppear {
-            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // 既存のモニタがあれば解除
+            if let monitor = keyDownMonitor {
+                NSEvent.removeMonitor(monitor)
+                keyDownMonitor = nil
+            }
+            keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 // Enter キーでアクションを実行
                 if event.keyCode == 36 { // Enter key
                     if let selectedItem = selectedHistoryItem,
@@ -124,6 +131,12 @@ struct MainView: View {
                     }
                 }
                 return event
+            }
+        }
+        .onDisappear {
+            if let monitor = keyDownMonitor {
+                NSEvent.removeMonitor(monitor)
+                keyDownMonitor = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
