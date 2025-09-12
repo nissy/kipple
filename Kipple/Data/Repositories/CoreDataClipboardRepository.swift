@@ -26,7 +26,9 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                     "CoreDataClipboardRepository.save: Updated \(updated), Created \(created) entities"
                 )
 
-                try context.save()
+                if context.hasChanges {
+                    try context.save()
+                }
                 Logger.shared.debug(
                     "CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data"
                 )
@@ -84,8 +86,10 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
         var created = 0
         for item in items {
             if let entity = existing[item.id] {
-                entity.update(from: item)
-                updated += 1
+                if !entity.isSame(as: item) {
+                    entity.update(from: item)
+                    updated += 1
+                }
             } else {
                 _ = ClipItemEntity.create(from: item, in: context)
                 created += 1

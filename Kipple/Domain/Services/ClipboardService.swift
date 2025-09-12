@@ -120,17 +120,14 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             return
         }
         
-        // デバウンス設定（1秒後に保存）＋重複抑制（同一配列は保存しない）
+        // デバウンス設定（1秒後に保存）＋重複抑制（順序のみの差分は保存しない）
         saveSubscription = saveSubject
             .removeDuplicates { lhs, rhs in
-                // 配列長が異なる・順序が異なる場合は必ず保存
                 guard lhs.count == rhs.count else { return false }
-                for (a, b) in zip(lhs, rhs) {
-                    // id または isPinned が異なれば保存対象（内容や順序変化も検知）
-                    if a.id != b.id || a.isPinned != b.isPinned { return false }
-                }
-                // 完全に同一（id順序・isPinnedも一致）の場合のみ重複とみなしてスキップ
-                return true
+                // 順序を無視し、(id -> isPinned) の対応が同一なら重複とみなす
+                let l = Dictionary(uniqueKeysWithValues: lhs.map { ($0.id, $0.isPinned) })
+                let r = Dictionary(uniqueKeysWithValues: rhs.map { ($0.id, $0.isPinned) })
+                return l == r
             }
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
             .sink { [weak self] items in
@@ -323,10 +320,9 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 if let existingIndex = self.history.firstIndex(where: { $0.content == content }) {
                     let existingItem = self.history.remove(at: existingIndex)
                     self.history.insert(existingItem, at: 0)
-                    
-                    // 変更を保存
-                    self.saveSubject.send(self.history)
-                    
+
+                    // 並べ替えのみの場合は永続化を行わない
+                    // （Core Data の順序は timestamp/pin に依存し、表示順の保存意義がないため）
                     Logger.shared.debug("Moved Kipple-copied item to top")
                 }
             }
