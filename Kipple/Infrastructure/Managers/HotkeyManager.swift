@@ -25,7 +25,10 @@ final class HotkeyManager {
     private var settingsObserver: NSObjectProtocol?
     private var editorCopySettingsObserver: NSObjectProtocol?
     private var editorClearSettingsObserver: NSObjectProtocol?
+    private var windowBecameKeyObserver: NSObjectProtocol?
+    private var windowResignedKeyObserver: NSObjectProtocol?
     private static var shared: HotkeyManager?
+    private var editorHotkeysActive = false
     
     init() {
         HotkeyManager.shared = self
@@ -37,10 +40,15 @@ final class HotkeyManager {
     }
     
     private func registerAllHotkeys() {
-        Logger.shared.log("Registering all hotkeys…")
+        Logger.shared.log("Registering required hotkeys…")
         registerCurrentHotkey()
-        registerEditorCopyHotkey()
-        registerEditorClearHotkey()
+        if editorHotkeysActive {
+            registerEditorCopyHotkey()
+            registerEditorClearHotkey()
+        } else {
+            unregisterEditorCopyHotkey()
+            unregisterEditorClearHotkey()
+        }
     }
     
     // アプリケーション起動完了後に呼び出すメソッド
@@ -67,7 +75,15 @@ final class HotkeyManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.registerEditorCopyHotkey()
+            guard let self = self else { return }
+            let enabled = UserDefaults.standard.bool(forKey: "enableEditorCopyHotkey")
+            if !enabled {
+                self.unregisterEditorCopyHotkey()
+                return
+            }
+            if self.editorHotkeysActive {
+                self.registerEditorCopyHotkey()
+            }
         }
         
         editorClearSettingsObserver = NotificationCenter.default.addObserver(
@@ -75,7 +91,32 @@ final class HotkeyManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.registerEditorClearHotkey()
+            guard let self = self else { return }
+            let enabled = UserDefaults.standard.bool(forKey: "enableEditorClearHotkey")
+            if !enabled {
+                self.unregisterEditorClearHotkey()
+                return
+            }
+            if self.editorHotkeysActive {
+                self.registerEditorClearHotkey()
+            }
+        }
+
+        // Window focus based activation for editor hotkeys
+        windowBecameKeyObserver = NotificationCenter.default.addObserver(
+            forName: .mainWindowDidBecomeKey,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.activateEditorHotkeysIfNeeded()
+        }
+
+        windowResignedKeyObserver = NotificationCenter.default.addObserver(
+            forName: .mainWindowDidResignKey,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.deactivateEditorHotkeys()
         }
     }
     
@@ -195,6 +236,14 @@ final class HotkeyManager {
             NotificationCenter.default.removeObserver(observer)
             editorClearSettingsObserver = nil
         }
+        if let observer = windowBecameKeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            windowBecameKeyObserver = nil
+        }
+        if let observer = windowResignedKeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            windowResignedKeyObserver = nil
+        }
         
         unregisterHotkey()
         unregisterEditorCopyHotkey()
@@ -203,6 +252,25 @@ final class HotkeyManager {
             RemoveEventHandler(handler)
             hotKeyEventHandler = nil
         }
+    }
+
+    // MARK: - Editor hotkeys lifecycle
+    private func activateEditorHotkeysIfNeeded() {
+        guard !editorHotkeysActive else { return }
+        editorHotkeysActive = true
+        if UserDefaults.standard.bool(forKey: "enableEditorCopyHotkey") {
+            registerEditorCopyHotkey()
+        }
+        if UserDefaults.standard.bool(forKey: "enableEditorClearHotkey") {
+            registerEditorClearHotkey()
+        }
+    }
+
+    private func deactivateEditorHotkeys() {
+        guard editorHotkeysActive else { return }
+        unregisterEditorCopyHotkey()
+        unregisterEditorClearHotkey()
+        editorHotkeysActive = false
     }
     
     // MARK: - Editor Copy Hotkey

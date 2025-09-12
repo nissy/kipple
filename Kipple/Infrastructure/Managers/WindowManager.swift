@@ -10,6 +10,8 @@ import AppKit
 
 extension Notification.Name {
     static let showCopiedNotification = Notification.Name("showCopiedNotification")
+    static let mainWindowDidBecomeKey = Notification.Name("KippleMainWindowDidBecomeKey")
+    static let mainWindowDidResignKey = Notification.Name("KippleMainWindowDidResignKey")
 }
 
 final class WindowManager: NSObject, NSWindowDelegate {
@@ -535,6 +537,7 @@ extension WindowManager {
             Logger.shared.log("window.isKeyWindow: \(window.isKeyWindow)")
             Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
         }
+        NotificationCenter.default.post(name: .mainWindowDidBecomeKey, object: nil)
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -570,6 +573,7 @@ extension WindowManager {
         } else {
             Logger.shared.log("NOT closing window via NSWindowDelegate because it's always on top")
         }
+        NotificationCenter.default.post(name: .mainWindowDidResignKey, object: nil)
     }
 
     func windowWillClose(_ notification: Notification) {
