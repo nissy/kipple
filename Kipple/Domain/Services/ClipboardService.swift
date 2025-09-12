@@ -169,8 +169,11 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
                 guard let self = self else { return }
                 
                 self.timerRunLoop = RunLoop.current
-                self.timer = Timer.scheduledTimer(withTimeInterval: self.pollingInterval, repeats: true) { _ in
-                    self.checkClipboard()
+                self.timer = Timer.scheduledTimer(
+                    withTimeInterval: self.pollingInterval,
+                    repeats: true
+                ) { [weak self] _ in
+                    self?.checkClipboard()
                 }
                 
                 // RunLoopを実行（停止可能な方法で）

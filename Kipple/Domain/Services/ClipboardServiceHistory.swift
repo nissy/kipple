@@ -28,59 +28,51 @@ extension ClipboardService {
             // 履歴の更新と保存
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                let contentHash = content.hashValue
-                
-                // 高速な重複チェック（O(1)）
-                if self.recentContentHashes.contains(contentHash) {
-                    // ハッシュが存在する場合のみ実際の内容を確認
-                    if let existingIndex = self.history.firstIndex(where: { $0.content == content }) {
-                        // 既存のアイテムを最新に移動
-                        let existingItem = self.history.remove(at: existingIndex)
-                        self.history.insert(existingItem, at: 0)
-                        
-                        Logger.shared.debug("Moved existing item to top")
+                autoreleasepool {
+                    let contentHash = content.hashValue
+                    if self.recentContentHashes.contains(contentHash) {
+                        self.moveExistingItemToTop(matching: content)
+                    } else {
+                        self.insertNewItem(content: content, appInfo: appInfo, isFromEditor: isFromEditor, contentHash: contentHash)
                     }
-                } else {
-                    // 新しいアイテムを追加
-                    let newItem = ClipItem(
-                        content: content, 
-                        sourceApp: isFromEditor ? "Kipple" : appInfo.appName,
-                        windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,
-                        bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
-                        processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
-                        isFromEditor: isFromEditor
-                    )
-                    self.history.insert(newItem, at: 0)
-                    
-                    // ハッシュセットを更新
-                    let updateHashes = { [weak self] in
-                        guard let self = self else { return }
-                        self.hashLock.lock()
-                        defer { self.hashLock.unlock() }
-                        self.internalRecentContentHashes.insert(contentHash)
-                        if self.internalRecentContentHashes.count > self.maxRecentHashes {
-                            // 古いハッシュを削除
-                            if self.history.count > self.maxRecentHashes,
-                               let oldestContent = self.history[self.maxRecentHashes...].first?.content {
-                                self.internalRecentContentHashes.remove(oldestContent.hashValue)
-                            }
-                        }
-                    }
-                    updateHashes()
-                    
-                    let appName = isFromEditor ? "Kipple" : (appInfo.appName ?? "unknown")
-                    Logger.shared.debug("Added new item to history from app: \(appName)")
+                    self.cleanupHistory()
+                    let count = self.history.count
+                    Logger.shared.debug("ClipboardService: Sending \(count) items to saveSubject for debounced save")
+                    self.saveSubject.send(self.history)
                 }
-                
-                // 履歴の上限を設定
-                self.cleanupHistory()
-                
-                // 履歴をデバウンスして保存
-                let count = self.history.count
-                Logger.shared.debug("ClipboardService: Sending \(count) items to saveSubject for debounced save")
-                self.saveSubject.send(self.history)
             }
         }
+    }
+
+    // MARK: - Small helpers (to keep function size small)
+    private func moveExistingItemToTop(matching content: String) {
+        if let existingIndex = history.firstIndex(where: { $0.content == content }) {
+            let existingItem = history.remove(at: existingIndex)
+            history.insert(existingItem, at: 0)
+            Logger.shared.debug("Moved existing item to top")
+        }
+    }
+
+    private func insertNewItem(content: String, appInfo: AppInfo, isFromEditor: Bool, contentHash: Int) {
+        let newItem = ClipItem(
+            content: content,
+            sourceApp: isFromEditor ? "Kipple" : appInfo.appName,
+            windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,
+            bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
+            processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
+            isFromEditor: isFromEditor
+        )
+        history.insert(newItem, at: 0)
+        hashLock.lock()
+        internalRecentContentHashes.insert(contentHash)
+        if internalRecentContentHashes.count > maxRecentHashes {
+            if history.count > maxRecentHashes, let oldestContent = history[maxRecentHashes...].first?.content {
+                internalRecentContentHashes.remove(oldestContent.hashValue)
+            }
+        }
+        hashLock.unlock()
+        let appName = isFromEditor ? "Kipple" : (appInfo.appName ?? "unknown")
+        Logger.shared.debug("Added new item to history from app: \(appName)")
     }
     
     func togglePin(for item: ClipItem) -> Bool {

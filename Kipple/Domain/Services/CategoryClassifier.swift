@@ -155,8 +155,25 @@ final class CategoryClassifier {
 
         if checkText.hasSuffix(".") || checkText.hasSuffix("。") ||
            checkText.hasSuffix("!") || checkText.hasSuffix("?") {
-            let codeSymbols = ["{", "}", "[", "]", ";", "=>", "->", "==", "!=",
-                               "&&", "||", "++", "--", "()", "<>", "::", ":="]
+            let codeSymbols = [
+                "{",
+                "}",
+                "[",
+                "]",
+                ";",
+                "=>",
+                "->",
+                "==",
+                "!=",
+                "&&",
+                "||",
+                "++",
+                "--",
+                "()",
+                "<>",
+                "::",
+                ":="
+            ]
             let symbolCount = codeSymbols.filter { checkText.contains($0) }.count
             if symbolCount < 2 { return false }
         }
@@ -199,8 +216,25 @@ final class CategoryClassifier {
             }
         }
 
-        let codeSymbols = ["{", "}", "[", "]", ";", "=>", "->", "==", "!=",
-                           "&&", "||", "++", "--", "::", ":=", "<=", ">="]
+        let codeSymbols = [
+            "{",
+            "}",
+            "[",
+            "]",
+            ";",
+            "=>",
+            "->",
+            "==",
+            "!=",
+            "&&",
+            "||",
+            "++",
+            "--",
+            "::",
+            ":=",
+            "<=",
+            ">="
+        ]
         let symbolCount = codeSymbols.filter { checkText.contains($0) }.count
         if symbolCount >= 2 { return true }
 

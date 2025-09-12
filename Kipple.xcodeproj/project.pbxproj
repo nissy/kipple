@@ -84,6 +84,7 @@
 		ECF960991E35A8A70CF5093F /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0A937AF0219AC13A31FBBD /* AboutView.swift */; };
 		EEA26857C8053C4CDE9B0639 /* ClipItemEntity+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65833AEAA68F3501553F32E8 /* ClipItemEntity+Extensions.swift */; };
 		F09D930768983860F965E45A /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91778173C4E051ADCDEA9E05 /* MainViewModel.swift */; };
+		F54B58C44D8D8457403D5AD6 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 6752AEBCD45E494DC76F703C /* libsqlite3.tbd */; };
 		FB1BCF2185DA68F62529EAAE /* MainViewControlSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */; };
 		FB9D3338A86658CEC827EFC0 /* ClearButtonRegressionTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */; };
 		FC6F95815A0E3BDD680FDA59 /* SearchableFontPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */; };
@@ -140,6 +141,7 @@
 		5D6095F731C177B070E9D834 /* ClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardService.swift; sourceTree = "<group>"; };
 		5EAACCFD9825C6A71047B2BE /* AutoClearTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoClearTests.swift; sourceTree = "<group>"; };
 		65833AEAA68F3501553F32E8 /* ClipItemEntity+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClipItemEntity+Extensions.swift"; sourceTree = "<group>"; };
+		6752AEBCD45E494DC76F703C /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		68AE691F1C10B06D450798F8 /* KippleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KippleApp.swift; sourceTree = "<group>"; };
 		6A56FEBF6B29FDF3D3A675F7 /* CoreDataStack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreDataStack.swift; sourceTree = "<group>"; };
 		6AE27F632B10A5817688AA5E /* MockClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockClipboardService.swift; sourceTree = "<group>"; };
@@ -188,6 +190,17 @@
 		FAB7B799720062D0F0A7B124 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		FE96C222A5E167BABAE17011 /* MainViewEditorSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewEditorSection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		813F9C4D045BC86EEDFF69D9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F54B58C44D8D8457403D5AD6 /* libsqlite3.tbd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		017AF3E67D2B9A61A029AF05 /* About */ = {
@@ -320,6 +333,14 @@
 				6A56FEBF6B29FDF3D3A675F7 /* CoreDataStack.swift */,
 			);
 			path = Persistence;
+			sourceTree = "<group>";
+		};
+		575520D8D5F7F5DAC7BF39E9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				6752AEBCD45E494DC76F703C /* libsqlite3.tbd */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		5F562EAE35522AD0B198A616 /* Features */ = {
@@ -485,6 +506,7 @@
 			children = (
 				6CDACF12C4FD1FC591FDCB7E /* Kipple */,
 				EAB1D42DFBF928EE85F20A6C /* KippleTests */,
+				575520D8D5F7F5DAC7BF39E9 /* Frameworks */,
 				7309E5310FD2989B53E0D790 /* Products */,
 			);
 			indentWidth = 4;
@@ -631,6 +653,7 @@
 			buildPhases = (
 				060A74D39C8BA3A78C50A17E /* Sources */,
 				88D2ECDCC958BD3824AFAD6F /* Resources */,
+				813F9C4D045BC86EEDFF69D9 /* Frameworks */,
 			);
 			buildRules = (
 			);

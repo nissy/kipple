@@ -243,9 +243,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func setupMainWindowObservers(_ window: NSWindow) {
         removeMainWindowObservers()
-        
-        // ウィンドウがキーウィンドウになったときのログ
-        windowObserver = NotificationCenter.default.addObserver(
+        windowObserver = addWindowDidBecomeKeyObserver(window)
+        windowResignObserver = addWindowDidBecomeMainObserver(window)
+        windowResizeObserver = addWindowResizeObserver(window)
+        appDidResignActiveObserver = addAppDidResignActiveObserver(window)
+        appDidBecomeActiveObserver = addAppDidBecomeActiveObserver()
+    }
+
+    private func addWindowDidBecomeKeyObserver(_ window: NSWindow) -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification,
             object: window,
             queue: .main
@@ -257,9 +263,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
             Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
         }
-        
-        // ウィンドウがメインウィンドウになったときのログ
-        windowResignObserver = NotificationCenter.default.addObserver(
+    }
+
+    private func addWindowDidBecomeMainObserver(_ window: NSWindow) -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeMainNotification,
             object: window,
             queue: .main
@@ -270,9 +277,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 Logger.shared.log("window.isMainWindow: \(win.isMainWindow)")
             }
         }
-        
-        // ウィンドウサイズ変更を監視
-        windowResizeObserver = NotificationCenter.default.addObserver(
+    }
+
+    private func addWindowResizeObserver(_ window: NSWindow) -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
             forName: NSWindow.didResizeNotification,
             object: window,
             queue: .main
@@ -282,9 +290,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 UserDefaults.standard.set(window.frame.width, forKey: "windowWidth")
             }
         }
-        
-        // アプリケーションがアクティブでなくなったときのログ
-        appDidResignActiveObserver = NotificationCenter.default.addObserver(
+    }
+
+    private func addAppDidResignActiveObserver(_ window: NSWindow) -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
             object: nil,
             queue: .main
@@ -296,9 +305,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 Logger.shared.log("mainWindow?.isMainWindow: \(win.isMainWindow)")
             }
         }
-        
-        // アプリケーションがアクティブになったときのログ
-        appDidBecomeActiveObserver = NotificationCenter.default.addObserver(
+    }
+
+    private func addAppDidBecomeActiveObserver() -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
@@ -309,7 +319,13 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func removeMainWindowObservers() {
-        let observers = [windowObserver, windowResignObserver, windowResizeObserver, appDidResignActiveObserver, appDidBecomeActiveObserver]
+        let observers = [
+            windowObserver,
+            windowResignObserver,
+            windowResizeObserver,
+            appDidResignActiveObserver,
+            appDidBecomeActiveObserver
+        ]
         observers.compactMap { $0 }.forEach { NotificationCenter.default.removeObserver($0) }
         windowObserver = nil
         windowResignObserver = nil
@@ -508,8 +524,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         cleanup()
     }
     
-    // MARK: - NSWindowDelegate
-    
+    // MARK: - NSWindowDelegate (moved to extension below)
+}
+
+// MARK: - NSWindowDelegate
+extension WindowManager {
     func windowDidBecomeKey(_ notification: Notification) {
         Logger.shared.log("=== NSWindowDelegate: windowDidBecomeKey ===")
         if let window = notification.object as? NSWindow {
@@ -517,13 +536,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
             Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
         }
     }
-    
+
     func windowDidResignKey(_ notification: Notification) {
         Logger.shared.log("=== NSWindowDelegate: windowDidResignKey ===")
         guard let window = notification.object as? NSWindow,
               window === mainWindow else { return }
-        
-        // システム情報をログ出力
+
         #if arch(arm64)
         let architecture = "Apple Silicon (arm64)"
         #else
@@ -536,11 +554,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
         Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
         Logger.shared.log("window.level: \(window.level.rawValue)")
         Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-        
-        // Always on Top モードでない場合はウィンドウを閉じる
+
         if !isAlwaysOnTop {
             Logger.shared.log("Closing window via NSWindowDelegate because it's not always on top")
-            // 少し遅延を入れることで、誤作動を防ぐ
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
@@ -555,7 +571,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             Logger.shared.log("NOT closing window via NSWindowDelegate because it's always on top")
         }
     }
-    
+
     func windowWillClose(_ notification: Notification) {
         Logger.shared.log("=== NSWindowDelegate: windowWillClose ===")
         if notification.object as? NSWindow === mainWindow {
