@@ -23,8 +23,7 @@ class CoreDataStack {
     private var checkpointTimer: Timer? // deprecated path (kept for compatibility)
     private var checkpointTimerSource: DispatchSourceTimer?
     private let checkpointQueue = DispatchQueue(label: "com.nissy.kipple.coredata.checkpoint", qos: .utility)
-    private let checkpointStateLock = NSLock()
-    private var isCheckpointing = false
+    private let checkpointLock = NSLock()
     
     var persistentContainer: NSPersistentContainer? {
         containerLock.lock()
@@ -83,14 +82,9 @@ class CoreDataStack {
     
     // WALをメインデータベースにマージする
     func checkpointWAL() {
-        // 競合防止（多重実行を避ける）
-        checkpointStateLock.lock()
-        if isCheckpointing { checkpointStateLock.unlock(); return }
-        isCheckpointing = true
-        checkpointStateLock.unlock()
-        defer {
-            checkpointStateLock.lock(); isCheckpointing = false; checkpointStateLock.unlock()
-        }
+        // 競合防止（多重実行を避ける）: 非ブロッキングで取得できない場合は即リターン
+        guard checkpointLock.try() else { return }
+        defer { checkpointLock.unlock() }
         guard let path = databasePath() else { return }
         autoreleasepool {
             saveMainViewContextIfNeeded()
