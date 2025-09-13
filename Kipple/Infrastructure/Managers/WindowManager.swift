@@ -338,6 +338,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func handleMainWindowClose() {
         NSApp.setActivationPolicy(.accessory)
+        // 余計な参照を明示的に解放して解体順序を安定化
+        if let window = mainWindow {
+            window.delegate = nil
+            window.contentView = nil
+            window.contentViewController = nil
+        }
         mainWindow = nil
         isAlwaysOnTop = false
         removeMainWindowObservers()

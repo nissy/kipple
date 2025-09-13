@@ -120,14 +120,14 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             return
         }
         
-        // デバウンス設定（1秒後に保存）＋重複抑制（順序のみの差分は保存しない）
+        // デバウンス設定（1秒後に保存）＋重複抑制（完全一致のみスキップ：順序も含め比較）
         saveSubscription = saveSubject
             .removeDuplicates { lhs, rhs in
                 guard lhs.count == rhs.count else { return false }
-                // 順序を無視し、(id -> isPinned) の対応が同一なら重複とみなす
-                let l = Dictionary(uniqueKeysWithValues: lhs.map { ($0.id, $0.isPinned) })
-                let r = Dictionary(uniqueKeysWithValues: rhs.map { ($0.id, $0.isPinned) })
-                return l == r
+                for (a, b) in zip(lhs, rhs) {
+                    if a.id != b.id || a.isPinned != b.isPinned { return false }
+                }
+                return true
             }
             .debounce(for: .seconds(1), scheduler: RunLoop.main)
             .sink { [weak self] items in
@@ -218,10 +218,6 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             if pollingInterval != minPollingInterval {
                 resetPollingInterval(to: minPollingInterval)
             }
-            
-            // アプリ情報を即座に取得（遅延させない）
-            let appInfo = getActiveAppInfo()
-            
             // スレッドセーフにフラグを処理
             var shouldSkip = false
             var fromEditor = false
@@ -251,6 +247,8 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             
             if let content = NSPasteboard.general.string(forType: .string),
                !content.isEmpty {
+                // 外部コピーの場合のみアプリ情報を取得
+                let appInfo = getActiveAppInfo()
                 // 現在のクリップボード内容を更新
                 Task { @MainActor [weak self] in
                     self?.currentClipboardContent = content
@@ -316,14 +314,24 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 
-                // 既存のアイテムを探して最上位に移動
+                // 既存のアイテムを探して最上位に移動（タイムスタンプを更新して永続化で順序を保つ）
                 if let existingIndex = self.history.firstIndex(where: { $0.content == content }) {
-                    let existingItem = self.history.remove(at: existingIndex)
-                    self.history.insert(existingItem, at: 0)
-
-                    // 並べ替えのみの場合は永続化を行わない
-                    // （Core Data の順序は timestamp/pin に依存し、表示順の保存意義がないため）
-                    Logger.shared.debug("Moved Kipple-copied item to top")
+                    let old = self.history.remove(at: existingIndex)
+                    let updated = ClipItem(
+                        id: old.id,
+                        content: old.content,
+                        timestamp: Date(),
+                        isPinned: old.isPinned,
+                        kind: old.kind,
+                        sourceApp: old.sourceApp,
+                        windowTitle: old.windowTitle,
+                        bundleIdentifier: old.bundleIdentifier,
+                        processID: old.processID,
+                        isFromEditor: old.isFromEditor
+                    )
+                    self.history.insert(updated, at: 0)
+                    self.saveSubject.send(self.history)
+                    Logger.shared.debug("Moved item to top and touched timestamp for persistence")
                 }
             }
         } else {

@@ -192,6 +192,11 @@ struct HistoryItemView: View {
                     .interactiveDismissDisabled() // ポップオーバー内のクリックで閉じないようにする
             }
         }
+        .onDisappear {
+            popoverTimer?.invalidate()
+            popoverTimer = nil
+            isShowingPopover = false
+        }
     }
     
     private func getDisplayContent() -> String {
