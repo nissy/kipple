@@ -25,6 +25,8 @@ struct MainView: View {
     @State private var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
+    // Copied通知の遅延非表示を管理（多重スケジュール防止）
+    @State private var copiedHideWorkItem: DispatchWorkItem?
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
@@ -138,6 +140,10 @@ struct MainView: View {
                 NSEvent.removeMonitor(monitor)
                 keyDownMonitor = nil
             }
+            // Cancel any scheduled hide for copied notification to avoid retaining self after window closes
+            copiedHideWorkItem?.cancel()
+            copiedHideWorkItem = nil
+            isShowingCopiedNotification = false
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
@@ -431,34 +437,21 @@ struct MainView: View {
     }
     
     private func showCopiedNotification(_ type: CopiedNotificationView.NotificationType) {
-        // 通知タイプを設定
         currentNotificationType = type
-        
-        // 既に表示中の場合は一旦非表示にしてから再表示（アニメーションのリセット）
-        if isShowingCopiedNotification {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                isShowingCopiedNotification = false
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    self.isShowingCopiedNotification = true
-                }
-                self.hideCopiedNotificationAfterDelay()
-            }
-        } else {
+        if !isShowingCopiedNotification {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 isShowingCopiedNotification = true
             }
-            hideCopiedNotificationAfterDelay()
         }
-    }
-    
-    private func hideCopiedNotificationAfterDelay() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        // 既存の非表示タスクをキャンセルして延長（多重スケジュール防止）
+        copiedHideWorkItem?.cancel()
+        let work = DispatchWorkItem {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 self.isShowingCopiedNotification = false
             }
         }
+        copiedHideWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
     }
     
     private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {

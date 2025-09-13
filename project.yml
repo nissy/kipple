@@ -57,7 +57,8 @@ targets:
         Release:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
-    dependencies: []
+    dependencies:
+      - sdk: libsqlite3.tbd
     preBuildScripts: []
     postBuildScripts: []
 

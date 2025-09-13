@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreData
+import SQLite3
 
 class CoreDataStack {
     static let shared = CoreDataStack()
@@ -18,6 +19,11 @@ class CoreDataStack {
     private(set) var loadError: Error?
     private let initializationSemaphore = DispatchSemaphore(value: 0)
     private let isTestEnvironment: Bool
+    // WAL checkpoint scheduling/guard
+    private var checkpointTimer: Timer? // deprecated path (kept for compatibility)
+    private var checkpointTimerSource: DispatchSourceTimer?
+    private let checkpointQueue = DispatchQueue(label: "com.nissy.kipple.coredata.checkpoint", qos: .utility)
+    private let checkpointLock = NSLock()
     
     var persistentContainer: NSPersistentContainer? {
         containerLock.lock()
@@ -68,47 +74,63 @@ class CoreDataStack {
             try context.save()
         }
         
-        // WALチェックポイントを強制的に実行
-        checkpointWAL()
+        // WALチェックポイントはUIをブロックしないよう非同期で実行
+        checkpointQueue.async { [weak self] in
+            self?.checkpointWAL()
+        }
     }
     
     // WALをメインデータベースにマージする
     func checkpointWAL() {
-        guard let container = _persistentContainer else {
-            return
+        // 競合防止（多重実行を避ける）: 非ブロッキングで取得できない場合は即リターン
+        guard checkpointLock.try() else { return }
+        defer { checkpointLock.unlock() }
+        guard let path = databasePath() else { return }
+        autoreleasepool {
+            saveMainViewContextIfNeeded()
+            guard let db = openDatabase(atPath: path) else { return }
+            defer { sqlite3_close(db) }
+            executeCheckpoint(on: db)
         }
-        
-        // すべてのコンテキストの変更を保存
+    }
+
+    private func databasePath() -> String? {
+        guard let coordinator = _persistentContainer?.persistentStoreCoordinator,
+              let store = coordinator.persistentStores.first,
+              let url = store.url else { return nil }
+        return url.path
+    }
+
+    private func saveMainViewContextIfNeeded() {
         do {
-            // viewContextの変更を保存
-            if let viewContext = viewContext, viewContext.hasChanges {
-                try viewContext.save()
-            }
-            
-            // NSSQLiteManualVacuumOption を使用してWALをチェックポイント
-            if let store = container.persistentStoreCoordinator.persistentStores.first,
-               let storeURL = store.url {
-                
-                // 現在のストアのオプションを取得
-                var options = store.options ?? [:]
-                
-                // 手動バキュームオプションを設定（これによりWALがチェックポイントされる）
-                options[NSSQLiteManualVacuumOption] = true
-                
-                // ストアを削除して再追加
-                try container.persistentStoreCoordinator.remove(store)
-                
-                _ = try container.persistentStoreCoordinator.addPersistentStore(
-                    ofType: store.type,
-                    configurationName: store.configurationName,
-                    at: storeURL,
-                    options: options
-                )
-                
-                Logger.shared.log("WAL checkpoint completed with manual vacuum")
+            if let ctx = viewContext, ctx.hasChanges {
+                try ctx.save()
             }
         } catch {
-            Logger.shared.error("Failed to checkpoint WAL: \(error)")
+            Logger.shared.error("Failed to save viewContext before WAL checkpoint: \(error)")
+        }
+    }
+
+    private func openDatabase(atPath path: String) -> OpaquePointer? {
+        var db: OpaquePointer?
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        let openResult = sqlite3_open_v2(path, &db, flags, nil)
+        guard openResult == SQLITE_OK, let opened = db else {
+            Logger.shared.error("sqlite3_open_v2 failed for WAL checkpoint: code=\(openResult)")
+            return nil
+        }
+        sqlite3_busy_timeout(opened, 1000)
+        return opened
+    }
+
+    private func executeCheckpoint(on db: OpaquePointer) {
+        if sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE);", nil, nil, nil) == SQLITE_OK {
+            _ = sqlite3_exec(db, "PRAGMA optimize;", nil, nil, nil)
+            Logger.shared.log("WAL checkpoint (TRUNCATE) executed successfully")
+        } else if let err = sqlite3_errmsg(db) {
+            Logger.shared.error("WAL checkpoint failed: \(String(cString: err))")
+        } else {
+            Logger.shared.error("WAL checkpoint failed with unknown error")
         }
     }
     
@@ -228,6 +250,7 @@ class CoreDataStack {
                     container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
                     container.viewContext.shouldDeleteInaccessibleFaults = true
                     self?._persistentContainer = container
+                    self?.startCheckpointTimerIfNeeded()
                     self?.initializationSemaphore.signal()
                     continuation.resume(returning: container)
                 }
@@ -239,6 +262,10 @@ class CoreDataStack {
     func resetForTesting() {
         guard isTestEnvironment else { return }
         
+        // タイマー解除
+        checkpointTimer?.invalidate(); checkpointTimer = nil
+        checkpointTimerSource?.cancel(); checkpointTimerSource = nil
+
         containerLock.lock()
         defer { containerLock.unlock() }
         
@@ -255,6 +282,19 @@ class CoreDataStack {
         let shmURL = testDBURL.appendingPathExtension("shm")
         try? FileManager.default.removeItem(at: walURL)
         try? FileManager.default.removeItem(at: shmURL)
+    }
+
+    // MARK: - Periodic WAL checkpoint
+    private func startCheckpointTimerIfNeeded() {
+        guard !isTestEnvironment, checkpointTimerSource == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: checkpointQueue)
+        timer.schedule(deadline: .now() + .seconds(1800), repeating: .seconds(1800), leeway: .seconds(60))
+        timer.setEventHandler { [weak self] in
+            guard let self = self, self.isLoaded else { return }
+            self.checkpointWAL()
+        }
+        checkpointTimerSource = timer
+        timer.resume()
     }
 }
 

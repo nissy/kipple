@@ -13,77 +13,26 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
     
     func save(_ items: [ClipItem]) async throws {
         try await coreDataStack.performBackgroundTask { [weak self] context in
-            guard let self = self else { return }
+            try autoreleasepool {
+                guard let self = self else { return }
 
-            // 1) 先に不要なレコードをバッチ削除（大量フェッチを避ける）
-            let ids = items.map { $0.id }
-            if !ids.isEmpty {
-                let deleteFetch: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
-                deleteFetch.predicate = NSPredicate(format: "NOT (id IN %@)", ids as [UUID])
-                let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteFetch)
-                batchDelete.resultType = .resultTypeObjectIDs
-                if let result = try context.execute(batchDelete) as? NSBatchDeleteResult,
-                   let objectIDs = result.result as? [NSManagedObjectID],
-                   !objectIDs.isEmpty {
-                    let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
-                    var targetContexts: [NSManagedObjectContext] = [context]
-                    if let viewContext = self.coreDataStack.viewContext {
-                        targetContexts.append(viewContext)
-                    }
-                    NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: targetContexts)
+                let ids = items.map { $0.id }
+                try self.batchDeleteNotIn(ids: ids, context: context)
+
+                let existing = try self.fetchExistingDict(for: ids, context: context)
+                let (updated, created) = self.upsert(items, using: existing, in: context)
+
+                Logger.shared.debug(
+                    "CoreDataClipboardRepository.save: Updated \(updated), Created \(created) entities"
+                )
+
+                if context.hasChanges {
+                    try context.save()
                 }
-            } else {
-                // 空の場合は全削除
-                let deleteFetch: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
-                let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteFetch)
-                batchDelete.resultType = .resultTypeObjectIDs
-                if let result = try context.execute(batchDelete) as? NSBatchDeleteResult,
-                   let objectIDs = result.result as? [NSManagedObjectID],
-                   !objectIDs.isEmpty {
-                    let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
-                    var targetContexts: [NSManagedObjectContext] = [context]
-                    if let viewContext = self.coreDataStack.viewContext {
-                        targetContexts.append(viewContext)
-                    }
-                    NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: targetContexts)
-                }
+                Logger.shared.debug(
+                    "CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data"
+                )
             }
-
-            // 2) 既存の対象のみフェッチして辞書化（全件ロードを避ける）
-            var existingEntitiesDict: [UUID: ClipItemEntity] = [:]
-            if !ids.isEmpty {
-                let fetchExisting: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
-                fetchExisting.predicate = NSPredicate(format: "id IN %@", ids as [UUID])
-                fetchExisting.returnsObjectsAsFaults = true
-                fetchExisting.includesPropertyValues = true
-                let existing = try context.fetch(fetchExisting)
-                existingEntitiesDict = Dictionary(uniqueKeysWithValues: existing.compactMap { entity in
-                    guard let id = entity.id else { return nil }
-                    return (id, entity)
-                })
-            }
-
-            // 3) 更新・作成
-            var updatedCount = 0
-            var createdCount = 0
-            for item in items {
-                if let entity = existingEntitiesDict[item.id] {
-                    entity.update(from: item)
-                    updatedCount += 1
-                } else {
-                    _ = ClipItemEntity.create(from: item, in: context)
-                    createdCount += 1
-                }
-            }
-
-            Logger.shared.debug(
-                "CoreDataClipboardRepository.save: Updated \(updatedCount), Created \(createdCount) entities"
-            )
-
-            try context.save()
-            Logger.shared.debug(
-                "CoreDataClipboardRepository.save: Successfully saved \(items.count) items to Core Data"
-            )
         }
         
         // バックグラウンドタスクの外でメインコンテキストを保存
@@ -98,6 +47,55 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
                 }
             }
         }
+    }
+
+    // MARK: - Private helpers
+    private func batchDeleteNotIn(ids: [UUID], context: NSManagedObjectContext) throws {
+        let deleteFetch: NSFetchRequest<NSFetchRequestResult> = ClipItemEntity.fetchRequest()
+        if ids.isEmpty {
+            // 全削除
+        } else {
+            deleteFetch.predicate = NSPredicate(format: "NOT (id IN %@)", ids as [UUID])
+        }
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: deleteFetch)
+        batchDelete.resultType = .resultTypeObjectIDs
+        if let result = try context.execute(batchDelete) as? NSBatchDeleteResult,
+           let objectIDs = result.result as? [NSManagedObjectID], !objectIDs.isEmpty {
+            let changes: [AnyHashable: Any] = [NSDeletedObjectsKey: objectIDs]
+            var targetContexts: [NSManagedObjectContext] = [context]
+            if let viewContext = coreDataStack.viewContext { targetContexts.append(viewContext) }
+            NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: targetContexts)
+        }
+    }
+
+    private func fetchExistingDict(for ids: [UUID], context: NSManagedObjectContext) throws -> [UUID: ClipItemEntity] {
+        guard !ids.isEmpty else { return [:] }
+        let fetch: NSFetchRequest<ClipItemEntity> = ClipItemEntity.fetchRequest()
+        fetch.predicate = NSPredicate(format: "id IN %@", ids as [UUID])
+        fetch.returnsObjectsAsFaults = true
+        fetch.includesPropertyValues = true
+        let existing = try context.fetch(fetch)
+        return Dictionary(uniqueKeysWithValues: existing.compactMap { entity in
+            guard let id = entity.id else { return nil }
+            return (id, entity)
+        })
+    }
+
+    private func upsert(_ items: [ClipItem], using existing: [UUID: ClipItemEntity], in context: NSManagedObjectContext) -> (Int, Int) {
+        var updated = 0
+        var created = 0
+        for item in items {
+            if let entity = existing[item.id] {
+                if !entity.isSame(as: item) {
+                    entity.update(from: item)
+                    updated += 1
+                }
+            } else {
+                _ = ClipItemEntity.create(from: item, in: context)
+                created += 1
+            }
+        }
+        return (updated, created)
     }
     
     func load(limit: Int = 100) async throws -> [ClipItem] {

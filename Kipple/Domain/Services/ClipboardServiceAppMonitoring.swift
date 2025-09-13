@@ -24,6 +24,8 @@ extension ClipboardService {
     // MARK: - App Activation Monitoring
     
     func setupAppActivationMonitoring() {
+        // 既存のオブザーバがあれば解除（多重登録によるリーク防止）
+        stopAppActivationMonitoring()
         appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,

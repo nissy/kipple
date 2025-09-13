@@ -59,13 +59,10 @@ struct CopiedNotificationView: View {
                     Capsule()
                         .fill(notificationType.backgroundColor)
                 )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .opacity.combined(with: .scale)
-                ))
             }
         }
         .padding(.top, 8)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showNotification)
+        // 過剰なレイアウト変化を避け、軽量なアニメーションに限定
+        .animation(.easeInOut(duration: 0.2), value: showNotification)
     }
 }

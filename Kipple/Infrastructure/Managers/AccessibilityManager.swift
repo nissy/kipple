@@ -12,6 +12,7 @@ import AppKit
 final class AccessibilityManager {
     static let shared = AccessibilityManager()
     
+    private var permissionTimer: Timer?
     private var lastCheckTime = Date(timeIntervalSince1970: 0)
     private var cachedPermissionStatus: Bool?
     private let cacheValidityDuration: TimeInterval = 1.0
@@ -25,8 +26,12 @@ final class AccessibilityManager {
     }
     
     private func startPermissionMonitoring() {
+        // 既存タイマーを解除（多重登録防止）
+        permissionTimer?.invalidate()
+        permissionTimer = nil
+
         // Check permission status periodically
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
             let currentStatus = AXIsProcessTrusted()
@@ -55,6 +60,11 @@ final class AccessibilityManager {
                 }
             }
         }
+    }
+
+    deinit {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
     }
     
     // Check accessibility permission with caching (thread-safe)

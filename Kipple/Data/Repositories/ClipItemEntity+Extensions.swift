@@ -9,6 +9,19 @@ import Foundation
 import CoreData
 
 extension ClipItemEntity {
+    func isSame(as clipItem: ClipItem) -> Bool {
+        let same = (self.id == clipItem.id) &&
+                   (self.content == clipItem.content) &&
+                   (self.timestamp ?? Date.distantPast) == clipItem.timestamp &&
+                   (self.isPinned == clipItem.isPinned) &&
+                   (self.kind == clipItem.kind.rawValue) &&
+                   (self.sourceApp == clipItem.sourceApp) &&
+                   (self.windowTitle == clipItem.windowTitle) &&
+                   (self.bundleIdentifier == clipItem.bundleIdentifier) &&
+                   ((self.processID == 0 ? nil : self.processID) == clipItem.processID) &&
+                   (self.isFromEditor == (clipItem.isFromEditor ?? false))
+        return same
+    }
     func toClipItem() -> ClipItem {
         ClipItem(
             id: id ?? UUID(),
