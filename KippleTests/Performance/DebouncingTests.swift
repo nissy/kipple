@@ -64,12 +64,13 @@ final class DebouncingTests: XCTestCase {
         wait(for: [expectation], timeout: 2.0)
     }
     
+    @MainActor
     func testEditorSaveDebounceInterval() {
         // デバウンス間隔が正確に500msであることを確認
         let expectation = XCTestExpectation(description: "Editor save interval")
         var saveTime: Date?
         let viewModel = MainViewModel(clipboardService: mockClipboardService)
-        
+
         viewModel.$editorText
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
             .dropFirst()
@@ -77,10 +78,10 @@ final class DebouncingTests: XCTestCase {
                 saveTime = Date()
             }
             .store(in: &cancellables)
-        
+
         let startTime = Date()
         viewModel.editorText = "Test content"
-        
+
         // 800ms後に確認（500msデバウンス + バッファ）
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             if let saveTime = saveTime {
@@ -90,7 +91,7 @@ final class DebouncingTests: XCTestCase {
             }
             expectation.fulfill()
         }
-        
+
         wait(for: [expectation], timeout: 2.0)
     }
     

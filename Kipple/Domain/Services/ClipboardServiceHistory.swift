@@ -119,10 +119,10 @@ extension ClipboardService {
         hashLock.lock()
         internalRecentContentHashes.remove(item.content.hashValue)
         hashLock.unlock()
-        
+
         // メモリから削除
         history.removeAll { $0.id == item.id }
-        
+
         // Core Dataから削除
         Task {
             do {
@@ -133,7 +133,54 @@ extension ClipboardService {
             }
         }
     }
-    
+
+    func clearHistory(keepPinned: Bool) async {
+        // メモリ上の履歴を即座に更新
+        if keepPinned {
+            history = history.filter { $0.isPinned }
+        } else {
+            history.removeAll()
+        }
+
+        // ハッシュセットを再初期化
+        initializeRecentHashes()
+
+        // Core Dataのクリアは非同期で実行
+        do {
+            try await repository.clear(keepPinned: keepPinned)
+            Logger.shared.log("Cleared history (keepPinned: \(keepPinned))")
+        } catch {
+            Logger.shared.error("Failed to clear history: \(error)")
+        }
+    }
+
+    func deleteItem(_ item: ClipItem) async {
+        // Duplicate the sync logic for async version
+        // ハッシュセットから削除
+        hashLock.lock()
+        internalRecentContentHashes.remove(item.content.hashValue)
+        hashLock.unlock()
+
+        // メモリから削除
+        history.removeAll { $0.id == item.id }
+
+        // Core Dataから削除
+        do {
+            try await repository.delete(item)
+            Logger.shared.debug("Deleted item from Core Data")
+        } catch {
+            Logger.shared.error("Failed to delete item: \(error)")
+        }
+    }
+
+    func updateItem(_ item: ClipItem) async {
+        // Update item in history
+        if let index = history.firstIndex(where: { $0.id == item.id }) {
+            history[index] = item
+            saveSubject.send(history)
+        }
+    }
+
     // MARK: - Private History Methods
     
     private func cleanupHistory() {

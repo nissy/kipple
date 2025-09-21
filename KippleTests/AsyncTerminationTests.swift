@@ -200,8 +200,8 @@ extension AsyncTerminationTests {
     
     /// タイムアウトシミュレーションのテスト
     func testTimeoutSimulation() async {
-        // Given - 2秒のタイムアウトを設定
-        let timeout: TimeInterval = 2.0
+        // Given - 0.5秒のタイムアウトを設定
+        let timeout: TimeInterval = 0.5
         let startTime = Date()
         
         // When - タイムアウトをシミュレート
@@ -213,8 +213,8 @@ extension AsyncTerminationTests {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: workItem)
         
-        // Then - 約2秒後にタイムアウトが発生
-        await fulfillment(of: [timeoutExpectation], timeout: 3.0)
+        // Then - 約0.5秒後にタイムアウトが発生
+        await fulfillment(of: [timeoutExpectation], timeout: 1.0)
         
         let elapsed = Date().timeIntervalSince(startTime)
         XCTAssertGreaterThanOrEqual(elapsed, timeout - 0.1) // 許容誤差0.1秒

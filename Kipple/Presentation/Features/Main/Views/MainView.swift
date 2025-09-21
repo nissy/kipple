@@ -272,13 +272,13 @@ struct MainView: View {
                 hoveredHistoryItem: $hoveredHistoryItem,
                 onSelectItem: handleItemSelection,
                 onTogglePin: { item in
-                    if !viewModel.togglePin(for: item) {
+                    if !viewModel.togglePinSync(for: item) {
                         // ピン留め失敗（最大数に達している）
                         showCopiedNotification(.pinLimitReached)
                     }
                 },
                 onDelete: { item in
-                    viewModel.deleteItem(item)
+                    viewModel.deleteItemSync(item)
                 },
                 onCategoryFilter: { category in
                     viewModel.toggleCategoryFilter(category)
@@ -456,18 +456,24 @@ struct MainView: View {
     
     private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
         switch category {
-        case .url:
+        case .all:
+            return true // All is always enabled
+        case .url, .urls:
             return appSettings.filterCategoryURL
-        case .email:
+        case .email, .emails:
             return appSettings.filterCategoryEmail
         case .code:
             return appSettings.filterCategoryCode
-        case .filePath:
+        case .filePath, .files:
             return appSettings.filterCategoryFilePath
         case .shortText:
             return appSettings.filterCategoryShortText
         case .longText:
             return appSettings.filterCategoryLongText
+        case .numbers:
+            return true // Numbers doesn't have a specific setting
+        case .json:
+            return true // JSON doesn't have a specific setting
         case .general:
             return appSettings.filterCategoryGeneral
         case .kipple:

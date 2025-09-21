@@ -13,11 +13,12 @@ import Combine
 final class MockClipboardService: ObservableObject, ClipboardServiceProtocol {
     @Published var history: [ClipItem] = []
     @Published var currentClipboardContent: String?
-    
+    @Published var autoClearRemainingTime: TimeInterval?
+
     var pinnedItems: [ClipItem] {
         history.filter { $0.isPinned }
     }
-    
+
     var onHistoryChanged: ((ClipItem) -> Void)?
     
     // Test tracking properties
@@ -76,10 +77,15 @@ final class MockClipboardService: ObservableObject, ClipboardServiceProtocol {
     func togglePin(for item: ClipItem) -> Bool {
         togglePinCalled = true
         lastToggledItem = item
-        
+
+        // If the item is not in history, add it first
+        if !history.contains(where: { $0.id == item.id }) {
+            history.insert(item, at: 0)
+        }
+
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             history[index].isPinned.toggle()
-            return true
+            return history[index].isPinned
         }
         return false
     }
@@ -88,12 +94,30 @@ final class MockClipboardService: ObservableObject, ClipboardServiceProtocol {
         clearAllHistoryCalled = true
         history.removeAll()
     }
-    
+
     func deleteItem(_ item: ClipItem) {
         deleteItemCalled = true
         lastDeletedItem = item
         history.removeAll { $0.id == item.id }
     }
+
+    func deleteItem(_ item: ClipItem) async {
+        deleteItemCalled = true
+        lastDeletedItem = item
+        history.removeAll { $0.id == item.id }
+    }
+
+    func clearHistory(keepPinned: Bool) async {
+        clearAllHistoryCalled = true
+        if keepPinned {
+            history = history.filter { $0.isPinned }
+        } else {
+            history.removeAll()
+        }
+        currentClipboardContent = nil
+    }
+
+    func flushPendingSaves() async { }
     
     // テスト用のヘルパーメソッド
     func addTestItem(_ item: ClipItem) {

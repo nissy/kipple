@@ -9,143 +9,144 @@ import XCTest
 import SwiftUI
 @testable import Kipple
 
+@MainActor
 class MainViewModelTests: XCTestCase {
     var viewModel: MainViewModel!
     var mockClipboardService: MockClipboardService!
-    
+
     override func setUp() {
         super.setUp()
         mockClipboardService = MockClipboardService()
         viewModel = MainViewModel(clipboardService: mockClipboardService)
     }
-    
+
     override func tearDown() {
         viewModel = nil
         mockClipboardService = nil
         super.tearDown()
     }
-    
+
     // MARK: - Editor Tests
-    
+
     func testEditorTextBinding() {
         // Given
         let testText = "Test Editor Content"
-        
+
         // When
         viewModel.editorText = testText
-        
+
         // Then
         XCTAssertEqual(viewModel.editorText, testText)
     }
-    
+
     func testCopyEditor() {
         // Given
         let testText = "Test Copy Content"
         viewModel.editorText = testText
-        
+
         // When
         viewModel.copyEditor()
-        
+
         // Then
         XCTAssertEqual(mockClipboardService.lastCopiedContent, testText)
         XCTAssertTrue(mockClipboardService.copyToClipboardCalled)
         XCTAssertTrue(mockClipboardService.fromEditor)
     }
-    
+
     func testClearEditor() {
         // Given
         viewModel.editorText = "Some content"
-        
+
         // When
         viewModel.clearEditor()
-        
+
         // Then
         XCTAssertEqual(viewModel.editorText, "")
     }
-    
+
     // MARK: - History Selection Tests
-    
+
     func testSelectHistoryItem() {
         // Given
         let item = ClipItem(content: "History Item")
-        
+
         // When
         viewModel.selectHistoryItem(item)
-        
+
         // Then
         XCTAssertEqual(mockClipboardService.lastCopiedContent, item.content)
         XCTAssertFalse(mockClipboardService.fromEditor)
     }
-    
+
     // MARK: - Editor Insert Tests
-    
+
     func testIsEditorInsertEnabled() {
         // Given
         let userDefaults = UserDefaults.standard
-        
+
         // When: デフォルト状態
         userDefaults.set(false, forKey: "enableEditorInsert")
-        
+
         // Then
         XCTAssertFalse(viewModel.isEditorInsertEnabled())
-        
+
         // When: 有効化
         userDefaults.set(true, forKey: "enableEditorInsert")
-        
+
         // Then
         XCTAssertTrue(viewModel.isEditorInsertEnabled())
     }
-    
+
     func testShouldInsertToEditor() {
         // Given
         let userDefaults = UserDefaults.standard
         userDefaults.set(true, forKey: "enableEditorInsert")
         userDefaults.set(Int(NSEvent.ModifierFlags.shift.rawValue), forKey: "editorInsertModifiers")
-        
+
         // When: エディタ挿入モードが有効な場合
         // 注: 実際のNSEventはテストで作成できないため、この部分は統合テストで確認
-        
+
         // Then
         // メソッドが存在することを確認
         _ = viewModel.shouldInsertToEditor()
     }
-    
+
     func testInsertToEditor() {
         // Given
         viewModel.editorText = "Existing text"
         let insertText = "New content"
-        
+
         // When
         viewModel.insertToEditor(content: insertText)
-        
+
         // Then
         // insertToEditorは既存の内容を置き換える（クリアしてから挿入）
         XCTAssertEqual(viewModel.editorText, "New content")
     }
     
     // MARK: - Pin Tests
-    
-    func testTogglePin() {
+
+    func testTogglePin() async {
         // Given
         let item = ClipItem(content: "Pin Test", isPinned: false)
-        
+
         // When
-        viewModel.togglePin(for: item)
-        
+        await viewModel.togglePin(for: item)
+
         // Then
         XCTAssertTrue(mockClipboardService.togglePinCalled)
         XCTAssertEqual(mockClipboardService.lastToggledItem?.id, item.id)
     }
-    
+
     // MARK: - Delete Tests
-    
-    func testDeleteItem() {
+
+    func testDeleteItem() async {
         // Given
         let item = ClipItem(content: "Delete Test")
-        
+
         // When
-        viewModel.deleteItem(item)
-        
+        await viewModel.deleteItem(item)
+
         // Then
         XCTAssertTrue(mockClipboardService.deleteItemCalled)
         XCTAssertEqual(mockClipboardService.lastDeletedItem?.id, item.id)

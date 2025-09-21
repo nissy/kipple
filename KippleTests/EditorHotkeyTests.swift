@@ -182,19 +182,20 @@ final class EditorHotkeyTests: XCTestCase {
     
     // MARK: - Main Hotkey Tests
     
+    @MainActor
     func testMainHotkeyToggleWindow() async {
         // SPECS.md: メインホットキー（Control+V）でウィンドウ表示/非表示
         // WindowManagerのウィンドウ操作メソッドをテスト
-        
+
         // When: ウィンドウを開く
         windowManager.openMainWindow()
-        
+
         // Then: MainViewModelが作成される
         XCTAssertNotNil(windowManager.getMainViewModel())
-        
+
         // When: ウィンドウを閉じる
         windowManager.closeMainWindow()
-        
+
         // Then: ウィンドウは閉じられる（実際の動作は統合テストで確認）
         // ユニットテストではメソッドが呼ばれることを確認
     }

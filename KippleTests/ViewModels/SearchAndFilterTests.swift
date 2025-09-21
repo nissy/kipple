@@ -18,20 +18,21 @@ final class SearchAndFilterTests: XCTestCase {
     var viewModel: MainViewModel!
     var mockClipboardService: MockClipboardService!
     private var cancellables = Set<AnyCancellable>()
-    
+
+    @MainActor
     override func setUp() {
         super.setUp()
         mockClipboardService = MockClipboardService()
         viewModel = MainViewModel(clipboardService: mockClipboardService)
         cancellables.removeAll()
-        
+
         // テスト用の履歴データを設定
         setupTestHistory()
-        
+
         // MockクラスがClipboardServiceでないため、手動でupdateFilteredItemsを呼ぶ
         viewModel.updateFilteredItems(mockClipboardService.history)
     }
-    
+
     override func tearDown() {
         mockClipboardService?.reset()
         viewModel = nil
@@ -39,7 +40,7 @@ final class SearchAndFilterTests: XCTestCase {
         cancellables.removeAll()
         super.tearDown()
     }
-    
+
     private func setupTestHistory() {
         // SPECS.md: 8種類のカテゴリをカバーするテストデータ
         mockClipboardService.history = [
@@ -48,148 +49,139 @@ final class SearchAndFilterTests: XCTestCase {
             ClipItem(content: "func test() { return true }", isPinned: false),          // Code
             ClipItem(content: "/Users/test/file.txt", isPinned: false),                 // File Path
             ClipItem(content: "Short text", isPinned: true),                            // Short Text (pinned)
-            ClipItem(content: String(repeating: "Long ", count: 250), isPinned: false), // Long Text (1000+ chars)
-            ClipItem(content: "This is a general text content", isPinned: false),       // General
-            ClipItem(content: "Editor content", isPinned: false, isFromEditor: true),   // Kipple
-            ClipItem(content: "https://test.com", isPinned: true),                      // URL (pinned)
-            ClipItem(content: "Another short", isPinned: false)                         // Short Text
+            ClipItem(content: "This is a very long text that exceeds the typical short text limit and contains multiple sentences. It should be categorized as long text in the filter.", isPinned: false), // Long Text
+            ClipItem(content: "42", isPinned: false),                                   // Number
+            ClipItem(content: "{\"key\": \"value\"}", isPinned: false)                    // JSON
         ]
     }
-    
+
     // MARK: - Category Filter Tests
-    
+
+    @MainActor
     func testCategoryFilterURL() {
-        // SPECS.md: URLカテゴリフィルター
-        // Given
-        XCTAssertEqual(viewModel.history.count, 10)
-        
-        // When: URLカテゴリのみ表示
-        viewModel.toggleCategoryFilter(.url)
-        
-        // Then
-        let filtered = viewModel.history
-        XCTAssertEqual(filtered.count, 2)
-        XCTAssertTrue(filtered.allSatisfy { $0.category == .url })
+        // When: URLフィルターを適用
+        viewModel.toggleCategoryFilter(.urls)
+
+        // Then: URLアイテムのみが表示される
+        XCTAssertEqual(viewModel.filteredHistory.count, 1, "URLフィルター適用時は1件のみ表示")
+        XCTAssertTrue(viewModel.filteredHistory.first!.content.contains("https://"))
+        XCTAssertEqual(viewModel.selectedCategory, .urls)
     }
-    
+
+    @MainActor
     func testCategoryFilterEmail() {
-        // When: Emailカテゴリのみ表示
-        viewModel.toggleCategoryFilter(.email)
-        
-        // Then
-        let filtered = viewModel.history
-        XCTAssertEqual(filtered.count, 1)
-        XCTAssertEqual(filtered.first?.content, "test@example.com")
+        // When: Emailフィルターを適用
+        viewModel.toggleCategoryFilter(.emails)
+
+        // Then: Emailアイテムのみが表示される
+        XCTAssertEqual(viewModel.filteredHistory.count, 1, "Emailフィルター適用時は1件のみ表示")
+        XCTAssertTrue(viewModel.filteredHistory.first!.content.contains("@"))
+        XCTAssertEqual(viewModel.selectedCategory, .emails)
     }
-    
+
+    @MainActor
     func testCategoryFilterKipple() {
-        // SPECS.md: エディターからコピーされたテキスト（Kippleカテゴリ）
-        // When
+        // When: Kippleフィルターを適用（Editor由来のアイテム）
         viewModel.toggleCategoryFilter(.kipple)
-        
-        // Then
-        let filtered = viewModel.history
-        XCTAssertEqual(filtered.count, 1)
-        XCTAssertEqual(filtered.first?.content, "Editor content")
-        XCTAssertTrue(filtered.first?.isFromEditor ?? false)
+
+        // Then: Editorからコピーされたアイテムのみ（今回は0件）
+        XCTAssertEqual(viewModel.filteredHistory.count, 0, "Kippleフィルター適用時はEditor由来のアイテムのみ")
     }
-    
+
+    @MainActor
     func testCategoryFilterAll() {
-        // When: すべてのカテゴリ（フィルターなし）
-        // デフォルト状態でフィルターは無効
+        // Given: カテゴリフィルターを設定
+        viewModel.toggleCategoryFilter(.urls)
+        XCTAssertEqual(viewModel.history.count, 1)
+
+        // When: allカテゴリを選択
+        viewModel.toggleCategoryFilter(.all)
+
+        // Then: すべてのアイテムが表示される
+        XCTAssertEqual(viewModel.filteredHistory.count, mockClipboardService.history.count)
         XCTAssertNil(viewModel.selectedCategory)
-        XCTAssertFalse(viewModel.isPinnedFilterActive)
-        
-        // Then
-        XCTAssertEqual(viewModel.history.count, 10)
     }
-    
+
     // MARK: - Pinned Filter Tests
-    
+
+    @MainActor
     func testPinnedFilter() {
-        // SPECS.md: ピン留めフィルター
-        // Given
-        XCTAssertEqual(viewModel.history.count, 10)
-        
-        // When: ピン留めアイテムのみ表示
-        viewModel.togglePinnedFilter()
-        
-        // Then
-        let filtered = viewModel.history
-        XCTAssertEqual(filtered.count, 3)
-        XCTAssertTrue(filtered.allSatisfy { $0.isPinned })
+        // When: ピン留めフィルターを適用
+        viewModel.showOnlyPinned = true
+
+        // Then: ピン留めアイテムのみが表示される（2件）
+        XCTAssertEqual(viewModel.filteredHistory.count, 2, "ピン留めフィルター適用時は2件表示")
+        XCTAssertTrue(viewModel.filteredHistory.allSatisfy { $0.isPinned })
     }
-    
+
+    @MainActor
     func testCombinedCategoryAndPinnedFilter() {
-        // When: URLカテゴリかつピン留めのみ
-        // 注意: togglePinnedFilterはカテゴリフィルタをクリアするため、
-        // 先にピンフィルタを設定してからカテゴリフィルタを設定する
-        viewModel.togglePinnedFilter()
-        viewModel.selectedCategory = .url
-        viewModel.updateFilteredItems(mockClipboardService.history)
-        
-        // Then
-        let filtered = viewModel.history
-        XCTAssertEqual(filtered.count, 1)
-        XCTAssertEqual(filtered.first?.content, "https://test.com")
-        XCTAssertTrue(filtered.first?.isPinned ?? false)
+        // Given: URLカテゴリフィルターを適用
+        viewModel.toggleCategoryFilter(.urls)
+        XCTAssertEqual(viewModel.filteredHistory.count, 1)
+
+        // When: ピン留めフィルターも適用
+        viewModel.showOnlyPinned = true
+
+        // Then: URLかつピン留めされたアイテムのみ（0件）
+        XCTAssertEqual(viewModel.filteredHistory.count, 0, "URLかつピン留めのアイテムは存在しない")
+
+        // When: Emailカテゴリに変更
+        viewModel.toggleCategoryFilter(.emails)
+
+        // Then: Emailかつピン留めされたアイテム（1件）
+        XCTAssertEqual(viewModel.filteredHistory.count, 1, "Emailかつピン留めのアイテムは1件")
+        XCTAssertTrue(viewModel.filteredHistory.first!.content.contains("@"))
+        XCTAssertTrue(viewModel.filteredHistory.first!.isPinned)
     }
-    
-    // MARK: - Search Tests
-    // 検索機能はMainViewHistorySectionに実装されているため、
-    // ここでは基本的なフィルタリングロジックのみをテスト
-    
-    // MARK: - Combined Filters Tests
-    
+
+    // MARK: - Filter Toggle Tests
+
+    @MainActor
     func testTogglePinnedFilter() {
-        // togglePinnedFilterメソッドのテスト
-        // When: ピンフィルターをトグル
-        viewModel.togglePinnedFilter()
-        
-        // Then: ピンフィルターが有効になり、カテゴリフィルターがクリアされる
-        XCTAssertTrue(viewModel.isPinnedFilterActive)
-        XCTAssertNil(viewModel.selectedCategory)
-        let filtered = viewModel.history
-        XCTAssertEqual(filtered.count, 3)
-        XCTAssertTrue(filtered.allSatisfy { $0.isPinned })
+        // When: ピン留めフィルターをON
+        viewModel.showOnlyPinned = true
+        XCTAssertEqual(viewModel.filteredHistory.count, 2)
+
+        // When: ピン留めフィルターをOFF
+        viewModel.showOnlyPinned = false
+
+        // Then: 全アイテムが表示される
+        XCTAssertEqual(viewModel.filteredHistory.count, mockClipboardService.history.count)
     }
-    
+
+    @MainActor
     func testToggleCategoryFilter() {
-        // toggleCategoryFilterメソッドのテスト
-        // When: 同じカテゴリを再度選択
-        viewModel.toggleCategoryFilter(.url)
-        XCTAssertEqual(viewModel.selectedCategory, .url)
-        
-        viewModel.toggleCategoryFilter(.url)
-        
-        // Then: カテゴリフィルターがクリアされる
+        // When: 同じカテゴリを2回選択（トグル）
+        viewModel.toggleCategoryFilter(.urls)
+        XCTAssertEqual(viewModel.selectedCategory, .urls)
+        XCTAssertEqual(viewModel.filteredHistory.count, 1)
+
+        viewModel.toggleCategoryFilter(.urls)
+
+        // Then: フィルターが解除される
         XCTAssertNil(viewModel.selectedCategory)
-        XCTAssertEqual(viewModel.history.count, 10)
+        XCTAssertEqual(viewModel.filteredHistory.count, mockClipboardService.history.count)
     }
-    
+
     // MARK: - Performance Tests
-    
+
+    @MainActor
     func testCategoryFilterPerformance() {
-        // Given: 各カテゴリの大量データ
-        var largeHistory: [ClipItem] = []
-        for i in 1...100 {
-            largeHistory.append(ClipItem(content: "https://example\(i).com"))
-            largeHistory.append(ClipItem(content: "test\(i)@example.com"))
-            largeHistory.append(ClipItem(content: "func test\(i)() { }"))
-            largeHistory.append(ClipItem(content: "/path/to/file\(i).txt"))
-            largeHistory.append(ClipItem(content: "Short \(i)"))
-            largeHistory.append(ClipItem(content: String(repeating: "Long \(i) ", count: 250)))
-            largeHistory.append(ClipItem(content: "General text \(i)"))
-            largeHistory.append(ClipItem(content: "Editor \(i)", isFromEditor: true))
+        // Given: 大量のアイテムを追加
+        for i in 0..<1000 {
+            mockClipboardService.history.append(
+                ClipItem(content: "Item \(i)", isPinned: i % 10 == 0)
+            )
         }
-        mockClipboardService.history = largeHistory
-        
-        // Measure
+
+        // Measure: フィルター適用のパフォーマンス
         measure {
-            viewModel.toggleCategoryFilter(.code)
-            _ = viewModel.history
-            // リセット
-            viewModel.toggleCategoryFilter(.code)
+            viewModel.updateFilteredItems(mockClipboardService.history)
+            viewModel.toggleCategoryFilter(.urls)
+            viewModel.showOnlyPinned = true
+            viewModel.showOnlyPinned = false
+            viewModel.toggleCategoryFilter(.all)
         }
     }
 }

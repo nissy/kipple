@@ -8,13 +8,14 @@
 import XCTest
 @testable import Kipple
 
+@MainActor
 final class AppTerminationTests: XCTestCase {
     var menuBarApp: MenuBarApp!
     var clipboardService: ClipboardService!
-    
+
     override func setUp() async throws {
         try await super.setUp()
-        
+
         // MenuBarApp のインスタンスを作成
         menuBarApp = MenuBarApp()
         clipboardService = ClipboardService.shared

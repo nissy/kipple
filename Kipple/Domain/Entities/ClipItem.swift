@@ -15,30 +15,42 @@ enum ClipItemKind: String, Codable {
     case url
 }
 
-enum ClipItemCategory: String {
+enum ClipItemCategory: String, CaseIterable {
+    case all = "All"
     case url = "URL"
+    case urls = "URLs"  // Alias for compatibility
     case email = "Email"
+    case emails = "Emails"  // Alias for compatibility
     case code = "Code"
     case filePath = "File"
+    case files = "Files"  // Alias for compatibility
     case shortText = "Short"
     case longText = "Long"
+    case numbers = "Numbers"
+    case json = "JSON"
     case general = "General"
     case kipple = "Kipple"
     
     var icon: String {
         switch self {
-        case .url:
+        case .all:
+            return "square.grid.2x2"
+        case .url, .urls:
             return "link"
-        case .email:
+        case .email, .emails:
             return "envelope"
         case .code:
             return "chevron.left.forwardslash.chevron.right"
-        case .filePath:
+        case .filePath, .files:
             return "folder"
         case .shortText:
             return "text.quote"
         case .longText:
             return "doc.text"
+        case .numbers:
+            return "number"
+        case .json:
+            return "curlybraces.square"
         case .general:
             return "doc"
         case .kipple:
@@ -50,7 +62,7 @@ enum ClipItemCategory: String {
 struct ClipItem: Identifiable, Codable, Equatable {
     let id: UUID
     let content: String
-    let timestamp: Date
+    var timestamp: Date
     var isPinned: Bool
     let kind: ClipItemKind
     let sourceApp: String?

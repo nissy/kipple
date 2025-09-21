@@ -142,6 +142,10 @@ class CoreDataClipboardRepository: ClipboardRepositoryProtocol {
         }
     }
     
+    func clear() async throws {
+        try await clear(keepPinned: false)
+    }
+
     func clear(keepPinned: Bool = true) async throws {
         try await coreDataStack.performBackgroundTask { [weak self] context in
             guard let self = self else { return }

@@ -37,11 +37,12 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertTrue(service.history.count <= 10, "History should respect maxHistoryItems setting")
     }
     
+    @MainActor
     func testMainViewModelUsesSettingsValues() {
         // Given
-        let viewModel = MainViewModel()
         let service = ClipboardService.shared
         service.history = []
+        let viewModel = MainViewModel(clipboardService: service)
         
         // Add some test items
         for i in 1...10 {
@@ -70,11 +71,12 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertEqual(viewModel.history.count, 5, "Filtered history should contain only pinned items")
     }
     
+    @MainActor
     func testSettingsChangeReflectsInViewModel() {
         // Given
-        let viewModel = MainViewModel()
         let service = ClipboardService.shared
         service.history = []
+        let viewModel = MainViewModel(clipboardService: service)
         
         // Add test items
         for i in 1...10 {

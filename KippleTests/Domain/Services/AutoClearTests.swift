@@ -130,12 +130,12 @@ class AutoClearTests: XCTestCase {
             return
         }
         
-        // When - wait for 2 seconds
+        // When - wait for 1 second
         let expectation = XCTestExpectation(description: "Wait for timer update")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             expectation.fulfill()
         }
-        wait(for: [expectation], timeout: 3)
+        wait(for: [expectation], timeout: 1.5)
         
         // Then
         guard let currentTime = clipboardService.autoClearRemainingTime else {
@@ -144,7 +144,7 @@ class AutoClearTests: XCTestCase {
         }
         
         XCTAssertLessThan(currentTime, initialTime)
-        XCTAssertGreaterThan(currentTime, initialTime - 3) // Should be about 2 seconds less
+        XCTAssertGreaterThan(currentTime, initialTime - 2) // Should be about 1 second less
     }
     
     func testAutoClearClearsSystemClipboard() async {

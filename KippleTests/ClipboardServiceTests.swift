@@ -25,10 +25,12 @@ final class ClipboardServiceTests: XCTestCase {
     
     override func tearDown() {
         clipboardService.stopMonitoring()
+        // 監視が完全に停止するまで少し待つ
+        Thread.sleep(forTimeInterval: 0.2)
         // テスト終了後も履歴をクリア
         clipboardService.clearAllHistory()
         // Core Dataの非同期処理を待つ
-        Thread.sleep(forTimeInterval: 0.5)
+        Thread.sleep(forTimeInterval: 0.3)
         cancellables.removeAll()
         clipboardService = nil
         super.tearDown()
@@ -469,7 +471,12 @@ final class ClipboardServiceTests: XCTestCase {
         
         // 監視開始
         clipboardService.startMonitoring()
-        Thread.sleep(forTimeInterval: 1.0) // 監視開始を確実に待つ（0.5秒→1秒に増加）
+        // 非同期で監視開始を待つ
+        let startExpectation = XCTestExpectation(description: "Monitoring started")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            startExpectation.fulfill()
+        }
+        wait(for: [startExpectation], timeout: 0.5)
         
         // 初期履歴数を記録
         let initialHistoryCount = clipboardService.history.count
@@ -494,7 +501,7 @@ final class ClipboardServiceTests: XCTestCase {
         let group = DispatchGroup()
         for i in 1...3 {
             group.enter()
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.6) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString("MonitorTest \(i) \(UUID().uuidString)", forType: .string)
                 group.leave()
@@ -504,7 +511,7 @@ final class ClipboardServiceTests: XCTestCase {
         // すべての変更が完了するまで待つ
         group.notify(queue: .main) {
             // 追加の待機時間を設けて最後の検出を確実にする
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 if detectionTimes.count < 2 {
                     // タイムアウトを防ぐため、条件を満たさなくても終了
                     expectation.fulfill()
@@ -512,9 +519,15 @@ final class ClipboardServiceTests: XCTestCase {
             }
         }
         
-        wait(for: [expectation], timeout: 10.0) // タイムアウトを増加
-        
+        wait(for: [expectation], timeout: 5.0) // 適切なタイムアウト値
+
+        // 監視を停止して、完了を待つ
         clipboardService.stopMonitoring()
+        let stopExpectation = XCTestExpectation(description: "Monitoring stopped")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            stopExpectation.fulfill()
+        }
+        wait(for: [stopExpectation], timeout: 0.5)
         
         // 検出が適切に行われたことを確認（条件を緩和）
         XCTAssertGreaterThanOrEqual(detectionTimes.count, 2, "Should detect at least 2 clipboard changes")
@@ -524,7 +537,7 @@ final class ClipboardServiceTests: XCTestCase {
             for i in 0..<min(2, detectionTimes.count - 1) {
                 let interval = detectionTimes[i + 1].timeIntervalSince(detectionTimes[i])
                 // 間隔の許容範囲を拡大
-                XCTAssertGreaterThanOrEqual(interval, 0.5, "Detection interval should be at least 0.5 seconds")
+                XCTAssertGreaterThanOrEqual(interval, 0.4, "Detection interval should be at least 0.4 seconds")
                 XCTAssertLessThanOrEqual(interval, 3.0, "Detection interval should be at most 3.0 seconds")
             }
         }

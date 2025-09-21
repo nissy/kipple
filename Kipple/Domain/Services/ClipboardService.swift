@@ -202,7 +202,13 @@ class ClipboardService: ObservableObject, ClipboardServiceProtocol {
     private func stopMonitoringInternal() {
         timer?.invalidate()
         timer = nil
+
+        // RunLoopを明示的に停止
+        if let runLoop = timerRunLoop {
+            CFRunLoopStop(runLoop.getCFRunLoop())
+        }
         timerRunLoop = nil
+
         timerThread?.cancel()
         timerThread = nil
     }

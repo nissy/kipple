@@ -24,7 +24,16 @@ struct DataSettingsView: View {
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
     
-    private let clipboardService = ClipboardService.shared
+    private let clipboardService: any ClipboardServiceProtocol
+    
+    @MainActor
+    init(clipboardService: (any ClipboardServiceProtocol)? = nil) {
+        if let service = clipboardService {
+            self.clipboardService = service
+        } else {
+            self.clipboardService = ClipboardServiceProvider.resolve()
+        }
+    }
     
     var body: some View {
         ScrollView {
@@ -58,7 +67,7 @@ struct DataSettingsView: View {
                     VStack(spacing: 0) {
                         SettingsRow(label: "Enable Auto-Clear", isOn: $enableAutoClear)
                             .onChange(of: enableAutoClear) { _ in
-                                ClipboardService.shared.updateAutoClearTimer()
+                                updateAutoClearConfiguration()
                             }
                         
                         SettingsRow(
@@ -96,7 +105,7 @@ struct DataSettingsView: View {
                             }
                         }
                         .onChange(of: autoClearInterval) { _ in
-                            ClipboardService.shared.updateAutoClearTimer()
+                            updateAutoClearConfiguration()
                         }
                     }
                 }
@@ -222,6 +231,9 @@ struct DataSettingsView: View {
             }
             .padding(20)
         }
+        .task {
+            updateAutoClearConfiguration()
+        }
         .alert("Clear Clipboard History?", isPresented: $showClearHistoryAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Clear History", role: .destructive) {
@@ -276,5 +288,18 @@ struct DataSettingsView: View {
         formatter.generatesDecimalNumbers = false
         formatter.allowsFloats = false
         return formatter
+    }
+
+    private func updateAutoClearConfiguration() {
+        if let legacyService = clipboardService as? ClipboardService {
+            legacyService.updateAutoClearTimer()
+        } else if #available(macOS 13.0, *), let modernService = clipboardService as? ModernClipboardServiceAdapter {
+            Task { @MainActor in
+                modernService.stopAutoClearTimer()
+                if enableAutoClear {
+                    modernService.startAutoClearTimer(minutes: autoClearInterval)
+                }
+            }
+        }
     }
 }

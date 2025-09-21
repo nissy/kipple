@@ -66,7 +66,8 @@ class PerformanceTests: XCTestCase {
     }
     
     // MARK: - History List Performance
-    
+
+    @MainActor
     func testHistoryListRenderingPerformance() {
         // Given: 大量の履歴アイテム
         let items = (1...200).map { index in
@@ -75,18 +76,18 @@ class PerformanceTests: XCTestCase {
                 isPinned: index % 10 == 0 // 10個ごとにピン留め
             )
         }
-        
-        let viewModel = MainViewModel()
-        
+
+        let viewModel = MainViewModel(clipboardService: clipboardService)
+
         // When & Then: ビューモデルの処理パフォーマンスを測定
         measure {
             // 履歴の更新
             clipboardService.history = items
-            
+
             // フィルタリング処理
             _ = viewModel.history
             _ = viewModel.pinnedItems
-            
+
             // 検索シミュレーション
             let searchResults = items.filter { $0.content.contains("50") }
             XCTAssertFalse(searchResults.isEmpty)
