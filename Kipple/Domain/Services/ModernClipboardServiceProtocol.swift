@@ -2,7 +2,6 @@ import Foundation
 
 // MARK: - Modern Clipboard Service Protocol
 
-@available(macOS 13.0, *)
 protocol ModernClipboardServiceProtocol {
     // Core functionality
     func getHistory() async -> [ClipItem]
@@ -10,6 +9,7 @@ protocol ModernClipboardServiceProtocol {
     func stopMonitoring() async
     func isMonitoring() async -> Bool
     func copyToClipboard(_ content: String, fromEditor: Bool) async
+    func recopyFromHistory(_ item: ClipItem) async
 
     // History management
     func clearAllHistory() async
@@ -25,4 +25,7 @@ protocol ModernClipboardServiceProtocol {
     func getCurrentClipboardContent() async -> String?
     func getCurrentInterval() async -> TimeInterval
     func setMaxHistoryItems(_ max: Int) async
+
+    // Persistence
+    func flushPendingSaves() async
 }

@@ -50,7 +50,7 @@ class MainViewModelTests: XCTestCase {
         // Then
         XCTAssertEqual(mockClipboardService.lastCopiedContent, testText)
         XCTAssertTrue(mockClipboardService.copyToClipboardCalled)
-        XCTAssertTrue(mockClipboardService.fromEditor)
+        XCTAssertTrue(mockClipboardService.fromEditor ?? false)
     }
 
     func testClearEditor() {
@@ -74,8 +74,7 @@ class MainViewModelTests: XCTestCase {
         viewModel.selectHistoryItem(item)
 
         // Then
-        XCTAssertEqual(mockClipboardService.lastCopiedContent, item.content)
-        XCTAssertFalse(mockClipboardService.fromEditor)
+        XCTAssertEqual(mockClipboardService.lastRecopiedItem?.content, item.content)
     }
 
     // MARK: - Editor Insert Tests

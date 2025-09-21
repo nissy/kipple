@@ -128,7 +128,10 @@ struct DataSettingsView: View {
                                 )
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 80)
-                                
+                                .onChange(of: maxHistoryItems) { newValue in
+                                    updateHistoryLimit(newValue)
+                                }
+
                                 Stepper(
                                     "",
                                     value: Binding(
@@ -176,7 +179,7 @@ struct DataSettingsView: View {
                 // Data Management Section
                 SettingsGroup("Data Management") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Permanently remove all clipboard history items")
+                        Text("Remove all clipboard history items (pinned items will be kept)")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .padding(.bottom, 8)
@@ -270,16 +273,27 @@ struct DataSettingsView: View {
         // 削除前の履歴アイテム数を記録（ピン留め以外）
         let unpinnedItems = clipboardService.history.filter { !$0.isPinned }
         clearedItemCount = unpinnedItems.count
-        
+
         // 履歴をクリア（ピン留めアイテムは保持）
-        clipboardService.clearAllHistory()
-        
-        // 成功アラートを表示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showClearSuccessAlert = true
+        Task {
+            await clipboardService.clearHistory(keepPinned: true)
+
+            // 成功アラートを表示
+            await MainActor.run {
+                showClearSuccessAlert = true
+            }
         }
     }
-    
+
+    private func updateHistoryLimit(_ newLimit: Int) {
+        // Update ModernClipboardService with new limit
+        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
+            Task {
+                await modernService.setMaxHistoryItems(newLimit)
+            }
+        }
+    }
+
     private func makeNumberFormatter(minimum: Double, maximum: Double) -> NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -291,9 +305,7 @@ struct DataSettingsView: View {
     }
 
     private func updateAutoClearConfiguration() {
-        if let legacyService = clipboardService as? ClipboardService {
-            legacyService.updateAutoClearTimer()
-        } else if #available(macOS 13.0, *), let modernService = clipboardService as? ModernClipboardServiceAdapter {
+        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
             Task { @MainActor in
                 modernService.stopAutoClearTimer()
                 if enableAutoClear {

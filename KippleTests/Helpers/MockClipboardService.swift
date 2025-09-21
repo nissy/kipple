@@ -2,140 +2,157 @@
 //  MockClipboardService.swift
 //  KippleTests
 //
-//  Core Dataに依存しないテスト用のMock実装
+//  Mock implementation of ClipboardServiceProtocol for testing
 //
 
 import Foundation
-import Combine
 @testable import Kipple
 
-/// Core Dataを使用しないテスト用のClipboardService実装
-final class MockClipboardService: ObservableObject, ClipboardServiceProtocol {
-    @Published var history: [ClipItem] = []
-    @Published var currentClipboardContent: String?
-    @Published var autoClearRemainingTime: TimeInterval?
-
-    var pinnedItems: [ClipItem] {
-        history.filter { $0.isPinned }
-    }
-
+class MockClipboardService: ClipboardServiceProtocol {
+    var history: [ClipItem] = []
+    var pinnedItems: [ClipItem] = []
+    var currentClipboardContent: String?
     var onHistoryChanged: ((ClipItem) -> Void)?
-    
-    // Test tracking properties
-    var startMonitoringCalled = false
-    var stopMonitoringCalled = false
-    var copyToClipboardCalled = false
+
+    var isMonitoringActive = false
     var lastCopiedContent: String?
-    var fromEditor = false
+    var lastCopiedFromEditor: Bool?
+    var lastRecopiedItem: ClipItem?
+
+    // Additional test properties
+    var copyToClipboardCalled = false
+    var fromEditor: Bool?
     var togglePinCalled = false
     var lastToggledItem: ClipItem?
     var deleteItemCalled = false
     var lastDeletedItem: ClipItem?
     var clearAllHistoryCalled = false
-    
-    // 内部コピーフラグ（実際のClipboardServiceの動作を模倣）
-    private var isInternalCopy = false
-    
+    var autoClearRemainingTime: TimeInterval?
+
     func startMonitoring() {
-        startMonitoringCalled = true
+        isMonitoringActive = true
     }
-    
+
     func stopMonitoring() {
-        stopMonitoringCalled = true
+        isMonitoringActive = false
     }
-    
-    func copyToClipboard(_ content: String, fromEditor: Bool = false) {
+
+    func copyToClipboard(_ content: String, fromEditor: Bool) {
         copyToClipboardCalled = true
-        lastCopiedContent = content
         self.fromEditor = fromEditor
-        
-        // 現在のクリップボード内容を更新
+        lastCopiedContent = content
+        lastCopiedFromEditor = fromEditor
+
+        let item = ClipItem(content: content, isFromEditor: fromEditor)
+        history.insert(item, at: 0)
         currentClipboardContent = content
-        
-        // 実際のClipboardServiceの動作を模倣
-        if !fromEditor {
-            // 内部コピー（fromEditor: false）は履歴に記録しない
-            return
-        }
-        
-        // エディターからのコピーの場合のみ履歴に追加
-        let newItem = ClipItem(
-            content: content,
-            sourceApp: "Kipple",
-            windowTitle: "Quick Editor",
-            bundleIdentifier: Bundle.main.bundleIdentifier,
-            processID: ProcessInfo.processInfo.processIdentifier,
-            isFromEditor: true
-        )
-        
-        history.insert(newItem, at: 0)
-        
-        // コールバックを呼び出す
-        onHistoryChanged?(newItem)
+        onHistoryChanged?(item)
     }
-    
+
+    func recopyFromHistory(_ item: ClipItem) {
+        lastRecopiedItem = item
+
+        // Remove existing item with same content
+        if let index = history.firstIndex(where: { $0.content == item.content }) {
+            history.remove(at: index)
+        }
+
+        // Add to top with preserved metadata
+        history.insert(item, at: 0)
+        currentClipboardContent = item.content
+        onHistoryChanged?(item)
+    }
+
+    func clearSystemClipboard() {
+        currentClipboardContent = nil
+    }
+
+    func clearAllHistory() {
+        clearAllHistoryCalled = true
+        history.removeAll()
+        pinnedItems.removeAll()
+        currentClipboardContent = nil
+    }
+
+    func clearHistory(keepPinned: Bool) async {
+        if keepPinned {
+            history = history.filter { $0.isPinned }
+            pinnedItems = history.filter { $0.isPinned }
+        } else {
+            clearAllHistory()
+        }
+    }
+
     func togglePin(for item: ClipItem) -> Bool {
         togglePinCalled = true
         lastToggledItem = item
 
-        // If the item is not in history, add it first
-        if !history.contains(where: { $0.id == item.id }) {
-            history.insert(item, at: 0)
-        }
-
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             history[index].isPinned.toggle()
+
+            if history[index].isPinned {
+                pinnedItems.append(history[index])
+            } else {
+                pinnedItems.removeAll { $0.id == item.id }
+            }
+
             return history[index].isPinned
         }
         return false
-    }
-    
-    func clearAllHistory() {
-        clearAllHistoryCalled = true
-        history.removeAll()
     }
 
     func deleteItem(_ item: ClipItem) {
         deleteItemCalled = true
         lastDeletedItem = item
         history.removeAll { $0.id == item.id }
+        pinnedItems.removeAll { $0.id == item.id }
     }
 
     func deleteItem(_ item: ClipItem) async {
         deleteItemCalled = true
         lastDeletedItem = item
         history.removeAll { $0.id == item.id }
+        pinnedItems.removeAll { $0.id == item.id }
     }
 
-    func clearHistory(keepPinned: Bool) async {
-        clearAllHistoryCalled = true
-        if keepPinned {
-            history = history.filter { $0.isPinned }
-        } else {
-            history.removeAll()
+    func flushPendingSaves() async {
+        // No-op for mock
+    }
+
+    // Helper methods for testing
+    func addTestItem(_ content: String, isPinned: Bool = false, sourceApp: String? = nil) {
+        var item = ClipItem(content: content, sourceApp: sourceApp)
+        item.isPinned = isPinned
+        history.append(item)
+
+        if isPinned {
+            pinnedItems.append(item)
         }
-        currentClipboardContent = nil
     }
 
-    func flushPendingSaves() async { }
-    
-    // テスト用のヘルパーメソッド
     func addTestItem(_ item: ClipItem) {
         history.append(item)
+
+        if item.isPinned {
+            pinnedItems.append(item)
+        }
     }
-    
+
     func reset() {
         history.removeAll()
+        pinnedItems.removeAll()
         currentClipboardContent = nil
-        startMonitoringCalled = false
-        stopMonitoringCalled = false
-        copyToClipboardCalled = false
+        isMonitoringActive = false
         lastCopiedContent = nil
-        fromEditor = false
+        lastCopiedFromEditor = nil
+        lastRecopiedItem = nil
+        copyToClipboardCalled = false
+        fromEditor = nil
         togglePinCalled = false
         lastToggledItem = nil
         deleteItemCalled = false
         lastDeletedItem = nil
         clearAllHistoryCalled = false
+        autoClearRemainingTime = nil
     }
 }

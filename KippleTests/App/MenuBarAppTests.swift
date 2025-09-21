@@ -22,29 +22,21 @@ final class MenuBarAppIntegrationTests: XCTestCase {
         // When: App initializes its clipboard service
         let serviceType = type(of: app.clipboardService)
 
-        // Then: ClipboardService is used
-        if #available(macOS 13.0, *) {
-            XCTAssertTrue(
-                serviceType == ModernClipboardServiceAdapter.self,
-                "Should use ModernClipboardServiceAdapter on supported macOS"
-            )
-        } else {
-            XCTAssertTrue(
-                serviceType == ClipboardService.self,
-                "Should fallback to ClipboardService on older macOS"
-            )
-        }
+        // Then: ModernClipboardServiceAdapter is used
+        XCTAssertTrue(
+            serviceType == ModernClipboardServiceAdapter.self,
+            "Should use ModernClipboardServiceAdapter"
+        )
     }
 
-    @available(macOS 13.0, *)
     func testUsesHotkeyManager() {
         // When: App initializes its hotkey manager
         let managerType = type(of: app.hotkeyManager)
 
-        // Then: The appropriate manager is used based on OS version
+        // Then: SimplifiedHotkeyManager is used
         XCTAssertTrue(
-            managerType is SimplifiedHotkeyManager.Type || managerType == HotkeyManager.self,
-            "Should use appropriate hotkey manager"
+            managerType is SimplifiedHotkeyManager.Type,
+            "Should use SimplifiedHotkeyManager"
         )
     }
 

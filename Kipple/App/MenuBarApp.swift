@@ -29,7 +29,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Initialize services using providers
         self.clipboardService = ClipboardServiceProvider.resolve()
 
-        // Initialize with legacy manager first (will be replaced if needed)
+        // Initialize with SimplifiedHotkeyManager
         self.hotkeyManager = HotkeyManagerProvider.resolveSync()
 
         super.init()
@@ -37,28 +37,17 @@ final class MenuBarApp: NSObject, ObservableObject {
         // テスト環境では初期化をスキップ
         guard !Self.isTestEnvironment else { return }
 
-        // Set up delegates for hotkey manager
+        // Set up notification for SimplifiedHotkeyManager
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
 
-            // Configure delegate based on manager type
-            if #available(macOS 13.0, *) {
-                // Resolve the appropriate manager based on OS version
-                self.hotkeyManager = HotkeyManagerProvider.resolve()
-                if let simplifiedManager = self.hotkeyManager as? SimplifiedHotkeyManager {
-                    // SimplifiedHotkeyManager uses notifications, no delegate needed
-                    NotificationCenter.default.addObserver(
-                        self,
-                        selector: #selector(handleHotkeyNotification),
-                        name: NSNotification.Name("toggleMainWindow"),
-                        object: nil
-                    )
-                } else if let legacyManager = self.hotkeyManager as? HotkeyManager {
-                    legacyManager.delegate = self
-                }
-            } else if let legacyManager = self.hotkeyManager as? HotkeyManager {
-                legacyManager.delegate = self
-            }
+            // SimplifiedHotkeyManager uses notifications
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleHotkeyNotification),
+                name: NSNotification.Name("toggleMainWindow"),
+                object: nil
+            )
         }
 
         // アプリケーションデリゲートを同期的に設定（重要）
@@ -198,25 +187,11 @@ final class MenuBarApp: NSObject, ObservableObject {
         // 非同期で保存処理を実行
         Task {
             do {
-                // Core Dataが初期化されていることを確認
-                Logger.shared.log("Ensuring Core Data is initialized...")
-                CoreDataStack.shared.initializeAndWait()
-                
                 // デバウンスされた保存を即座に実行
                 Logger.shared.log("Flushing pending saves...")
                 await clipboardService.flushPendingSaves()
-                
-                // Core Dataの保存を確実に実行（WALチェックポイント含む）
-                Logger.shared.log("Saving Core Data context...")
-                try await MainActor.run {
-                    try CoreDataStack.shared.save()
-                }
+
                 Logger.shared.log("✅ Successfully saved data before quit")
-                
-                // 保存されたデータを確認（デバッグ用）
-                let repository = CoreDataClipboardRepository()
-                let savedItems = try await repository.load(limit: 10)
-                Logger.shared.log("Verified saved items count: \(savedItems.count)")
             } catch {
                 Logger.shared.error("❌ Failed to save on quit: \(error)")
             }
@@ -281,39 +256,10 @@ extension MenuBarApp: NSMenuDelegate {
 }
 
 // MARK: - HotkeyManagerDelegate
-extension MenuBarApp: HotkeyManagerDelegate {
-    func hotkeyPressed() {
-        Task { @MainActor in
-            windowManager.openMainWindow()
-        }
-    }
-    
-    func editorCopyHotkeyPressed() {
-        // MainViewModelのインスタンスを取得してコピー処理を実行
-        Task { @MainActor in
-            if let mainViewModel = windowManager.getMainViewModel() {
-                mainViewModel.copyEditor()
-                // コピー通知を表示
-                windowManager.showCopiedNotification()
-                // Copyボタンのショートカットキーでもウィンドウを閉じない（ピンの状態に関わらず）
-            }
-        }
-    }
-
-    func editorClearHotkeyPressed() {
-        // MainViewModelのインスタンスを取得してクリア処理を実行
-        Task { @MainActor in
-            if let mainViewModel = windowManager.getMainViewModel() {
-                mainViewModel.clearEditor()
-                // クリア後もウィンドウは開いたまま
-            }
-        }
-    }
-}
+// HotkeyManagerDelegate removed - using SimplifiedHotkeyManager notifications instead
 
 // MARK: - Hotkey Handling
 
-@available(macOS 13.0, *)
 extension MenuBarApp {
     @objc func handleHotkeyNotification() {
         Task { @MainActor in
@@ -374,19 +320,10 @@ extension MenuBarApp {
     func performTermination() async {
         // Extract the async work from performAsyncTermination
         do {
-            // Core Dataが初期化されていることを確認
-            Logger.shared.log("Ensuring Core Data is initialized...")
-            CoreDataStack.shared.initializeAndWait()
-
             // デバウンスされた保存を即座に実行
             Logger.shared.log("Flushing pending saves...")
             await clipboardService.flushPendingSaves()
 
-            // Core Dataの保存を確実に実行（WALチェックポイント含む）
-            Logger.shared.log("Saving Core Data context...")
-            try await MainActor.run {
-                try CoreDataStack.shared.save()
-            }
             Logger.shared.log("✅ Successfully saved data before quit")
         } catch {
             Logger.shared.error("❌ Failed to save on quit: \(error)")
@@ -394,17 +331,15 @@ extension MenuBarApp {
     }
 
     func registerHotkeys() async {
-        // SimplifiedHotkeyManager automatically manages registration
-        // No manual registration needed
+        if let simplifiedManager = hotkeyManager as? SimplifiedHotkeyManager {
+            simplifiedManager.setEnabled(true)
+        }
     }
 
     @MainActor
     func isHotkeyRegistered() -> Bool {
         if let simplifiedManager = hotkeyManager as? SimplifiedHotkeyManager {
             return simplifiedManager.getEnabled()
-        } else if let legacyManager = hotkeyManager as? HotkeyManager {
-            // Legacy implementation
-            return true // Simplified for testing
         }
         return false
     }

@@ -181,38 +181,9 @@ final class ObservableMainViewModel: MainViewModelProtocol {
     private func setupBindings() {
         serviceCancellables.removeAll()
 
-        if let observableService = clipboardService as? ClipboardService {
-            bindLegacyService(observableService)
-        } else if #available(macOS 13.0, *), let modernService = clipboardService as? ModernClipboardServiceAdapter {
+        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
             bindModernService(modernService)
         }
-    }
-
-    private func bindLegacyService(_ service: ClipboardService) {
-        service.$history
-            .sink { [weak self] items in
-                Task { @MainActor in
-                    self?.allItems = items
-                    self?.applyFilters()
-                }
-            }
-            .store(in: &serviceCancellables)
-
-        service.$currentClipboardContent
-            .sink { [weak self] content in
-                Task { @MainActor in
-                    self?.currentClipboardContent = content
-                }
-            }
-            .store(in: &serviceCancellables)
-
-        service.$autoClearRemainingTime
-            .sink { [weak self] time in
-                Task { @MainActor in
-                    self?.autoClearRemainingTime = time
-                }
-            }
-            .store(in: &serviceCancellables)
     }
 
     private func bindModernService(_ service: ModernClipboardServiceAdapter) {

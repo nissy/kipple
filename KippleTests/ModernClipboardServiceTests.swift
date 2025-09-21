@@ -4,13 +4,12 @@ import AppKit
 
 // MARK: - ModernClipboardService Tests
 
-@available(macOS 13.0, *)
 final class ModernClipboardServiceTests: XCTestCase {
     private var service: ModernClipboardService!
 
     override func setUp() async throws {
         try await super.setUp()
-        service = ModernClipboardService()
+        service = ModernClipboardService.shared
     }
 
     override func tearDown() async throws {
@@ -293,7 +292,6 @@ final class ModernClipboardServiceTests: XCTestCase {
 
 // MARK: - ModernClipboardService Mock for Testing
 
-@available(macOS 13.0, *)
 actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
     private var history: [ClipItem] = []
     private var monitoring = false
@@ -316,6 +314,13 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
 
     func copyToClipboard(_ content: String, fromEditor: Bool) async {
         let item = ClipItem(content: content, isFromEditor: fromEditor)
+        history.insert(item, at: 0)
+    }
+
+    func recopyFromHistory(_ item: ClipItem) async {
+        if let index = history.firstIndex(where: { $0.content == item.content }) {
+            history.remove(at: index)
+        }
         history.insert(item, at: 0)
     }
 
@@ -365,5 +370,9 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
         if history.count > max {
             history = Array(history.prefix(max))
         }
+    }
+
+    func flushPendingSaves() async {
+        // No-op for mock
     }
 }

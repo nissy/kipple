@@ -2,7 +2,6 @@ import XCTest
 import Combine
 @testable import Kipple
 
-@available(macOS 13.0, *)
 @MainActor
 final class ModernClipboardServiceAdapterTests: XCTestCase {
     private var adapter: ModernClipboardServiceAdapter!

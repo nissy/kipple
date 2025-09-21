@@ -1,10 +1,10 @@
 import Foundation
 import Combine
+import AppKit
 
 // MARK: - Modern Clipboard Service Adapter
 
 /// Adapter to bridge ModernClipboardService (Actor) with existing ClipboardServiceProtocol
-@available(macOS 13.0, *)
 @MainActor
 final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServiceProtocol {
     // MARK: - Published Properties
@@ -58,34 +58,60 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
-    func togglePin(for item: ClipItem) -> Bool {
-        // Find the item in current history and toggle its pin state
-        if let index = history.firstIndex(where: { $0.id == item.id }) {
-            // Toggle pin state locally first for immediate feedback
-            history[index].isPinned.toggle()
-            let isPinned = history[index].isPinned
-
-            // Then update the backend asynchronously
-            Task {
-                _ = await modernService.togglePin(for: item)
-                await refreshHistory()
-            }
-
-            return isPinned
-        } else {
-            // If item not in history, add it as pinned
-            var newItem = item
-            newItem.isPinned = true
-            history.insert(newItem, at: 0)
-
-            // Update backend
-            Task {
-                await modernService.updateItem(newItem)
-                await refreshHistory()
-            }
-
-            return true
+    func recopyFromHistory(_ item: ClipItem) {
+        Task {
+            await modernService.recopyFromHistory(item)
+            await refreshHistory()
         }
+    }
+
+    func clearSystemClipboard() {
+        // Clear the system clipboard
+        NSPasteboard.general.clearContents()
+        let newChangeCount = NSPasteboard.general.changeCount
+
+        // Update our state immediately
+        currentClipboardContent = nil
+
+        // Mark the new changeCount as an internal operation to skip
+        Task {
+            await modernService.setInternalOperation(true)
+            await modernService.setExpectedChangeCount(newChangeCount)
+        }
+    }
+
+    func togglePin(for item: ClipItem) -> Bool {
+        // Find the item in current history
+        guard let index = history.firstIndex(where: { $0.id == item.id }) else {
+            // Item not in current history - should not happen in normal flow
+            Logger.shared.log("togglePin: Item not found in history", level: .warning)
+            return false
+        }
+
+        let currentlyPinned = history[index].isPinned
+
+        // If we're trying to pin (currently unpinned)
+        if !currentlyPinned {
+            // Check if we've reached the max pinned items limit
+            let currentPinnedCount = history.filter { $0.isPinned }.count
+            let maxPinnedItems = AppSettings.shared.maxPinnedItems
+
+            if currentPinnedCount >= maxPinnedItems {
+                // Exceeded limit, don't allow pinning
+                Logger.shared.log("Cannot pin item: Maximum pinned items limit (\(maxPinnedItems)) reached", level: .warning)
+                return false
+            }
+        }
+
+        // Update backend synchronously via Task and wait for result
+        Task {
+            let success = await modernService.togglePin(for: item)
+            // Always refresh history to ensure consistency
+            await refreshHistory()
+        }
+
+        // Return expected new state (backend will be updated async)
+        return !currentlyPinned
     }
 
     func deleteItem(_ item: ClipItem) {
@@ -93,11 +119,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             await modernService.deleteItem(item)
             await refreshHistory()
         }
-    }
-
-    func deleteItem(_ item: ClipItem) async {
-        await modernService.deleteItem(item)
-        await refreshHistory()
     }
 
     func clearHistory(keepPinned: Bool) async {
@@ -125,8 +146,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func flushPendingSaves() async {
-        // No-op for actor-based implementation
-        // Actor handles all saves internally
+        // Delegate to the modern service
+        await modernService.flushPendingSaves()
     }
 
     func searchHistory(_ query: String) -> [ClipItem] {
@@ -152,7 +173,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
                 if let remaining = self.autoClearRemainingTime {
                     self.autoClearRemainingTime = max(0, remaining - 1)
                     if remaining <= 0 {
-                        await self.clearHistory(keepPinned: true)
+                        // Clear only system clipboard, not history (matches legacy behavior)
+                        self.performAutoClear()
                         self.stopAutoClearTimer()
                     }
                 }
@@ -168,12 +190,30 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     // MARK: - Private Methods
 
+    /// Clear only the system clipboard, preserving history (matches legacy behavior)
+    internal func performAutoClear() {
+        // Check if current clipboard content is text
+        guard NSPasteboard.general.string(forType: .string) != nil else {
+            Logger.shared.log("Skipping auto-clear: current clipboard content is not text")
+            return
+        }
+
+        Logger.shared.log("Performing auto-clear of system clipboard (Modern pathway)")
+
+        // Clear the system clipboard only
+        NSPasteboard.general.clearContents()
+
+        // Update the current clipboard content
+        currentClipboardContent = nil
+    }
+
     private func startPeriodicRefresh() {
         refreshTask = Task {
             while !Task.isCancelled {
                 await refreshHistory()
-                // Refresh every 0.5 seconds to keep UI responsive
-                try? await Task.sleep(for: .seconds(0.5))
+                // Refresh every 1 second for balanced performance
+                // This reduces CPU usage while maintaining reasonable responsiveness
+                try? await Task.sleep(for: .seconds(1.0))
             }
         }
     }
@@ -182,14 +222,22 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         let newHistory = await modernService.getHistory()
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
-        // Only update if changed to avoid unnecessary UI updates
-        if history != newHistory {
+        // Only update if history actually changed (comparing IDs and pinned states)
+        let historyChanged = history.count != newHistory.count ||
+            !zip(history, newHistory).allSatisfy { old, new in
+                old.id == new.id && old.isPinned == new.isPinned
+            }
+
+        if historyChanged {
             history = newHistory
+
             // Call the history changed callback if set
             if let firstItem = newHistory.first {
                 onHistoryChanged?(firstItem)
             }
         }
+
+        // Update current clipboard content if changed
         if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent
         }
@@ -198,7 +246,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
 // MARK: - Extensions for Compatibility
 
-@available(macOS 13.0, *)
 extension ModernClipboardServiceAdapter {
     /// Get pinned items from history
     var pinnedItems: [ClipItem] {
@@ -218,5 +265,6 @@ extension ModernClipboardServiceAdapter {
     /// Set maximum history items
     func setMaxHistoryItems(_ max: Int) async {
         await modernService.setMaxHistoryItems(max)
+        await refreshHistory()
     }
 }

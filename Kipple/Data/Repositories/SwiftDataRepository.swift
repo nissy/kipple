@@ -24,17 +24,43 @@ final class SwiftDataRepository: ClipboardRepositoryProtocol {
     }
 
     func save(_ items: [ClipItem]) async throws {
-        // For migration, just add items without clearing existing ones
-        // Check for duplicates by ID
+        // Fetch all existing models
         let descriptor = FetchDescriptor<ClipItemModel>()
         let existingModels = try context.fetch(descriptor)
-        let existingIds = Set(existingModels.map { $0.id })
 
-        // Add only new items (not already present)
+        // Create a dictionary for fast lookup
+        var existingDict: [UUID: ClipItemModel] = [:]
+        for model in existingModels {
+            existingDict[model.id] = model
+        }
+
+        // Track which IDs are in the new items list
+        let newItemIds = Set(items.map { $0.id })
+
+        // Update existing or insert new items
         for item in items {
-            if !existingIds.contains(item.id) {
+            if let existingModel = existingDict[item.id] {
+                // Update existing model
+                existingModel.content = item.content
+                existingModel.isPinned = item.isPinned
+                existingModel.timestamp = item.timestamp
+                existingModel.appName = item.sourceApp
+                existingModel.windowTitle = item.windowTitle
+                existingModel.bundleId = item.bundleIdentifier
+                existingModel.processId = item.processID
+                existingModel.isFromEditor = item.isFromEditor ?? false
+                existingModel.kindRawValue = item.kind.rawValue
+            } else {
+                // Insert new model
                 let model = ClipItemModel(from: item)
                 context.insert(model)
+            }
+        }
+
+        // Delete models that are not in the new items list
+        for model in existingModels {
+            if !newItemIds.contains(model.id) {
+                context.delete(model)
             }
         }
 

@@ -162,7 +162,16 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.content == rhs.content &&
+        lhs.isPinned == rhs.isPinned &&
+        lhs.timestamp == rhs.timestamp &&
+        lhs.kind == rhs.kind &&
+        lhs.sourceApp == rhs.sourceApp &&
+        lhs.windowTitle == rhs.windowTitle &&
+        lhs.bundleIdentifier == rhs.bundleIdentifier &&
+        lhs.processID == rhs.processID &&
+        lhs.isFromEditor == rhs.isFromEditor
     }
     
     // 行数を計算

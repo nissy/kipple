@@ -87,38 +87,12 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func subscribeToClipboardService() {
-        if let observableService = clipboardService as? ClipboardService {
-            bindLegacyService(observableService)
-        } else if #available(macOS 13.0, *), let modernService = clipboardService as? ModernClipboardServiceAdapter {
+        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
             bindModernService(modernService)
         }
     }
 
-    private func bindLegacyService(_ service: ClipboardService) {
-        serviceCancellables.removeAll()
-
-        service.$history
-            .sink { [weak self] items in
-                guard let self = self else { return }
-                self.updateFilteredItems(items)
-            }
-            .store(in: &serviceCancellables)
-
-        service.$currentClipboardContent
-            .sink { [weak self] content in
-                self?.currentClipboardContent = content
-            }
-            .store(in: &serviceCancellables)
-
-        service.$autoClearRemainingTime
-            .sink { [weak self] remainingTime in
-                self?.autoClearRemainingTime = remainingTime
-            }
-            .store(in: &serviceCancellables)
-    }
-
-    @available(macOS 13.0, *)
-    private func bindModernService(_ service: ModernClipboardServiceAdapter) {
+        private func bindModernService(_ service: ModernClipboardServiceAdapter) {
         serviceCancellables.removeAll()
 
         service.$history
@@ -282,7 +256,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         if forceInsert || shouldInsertToEditor() {
             insertToEditor(content: item.content)
         } else {
-            clipboardService.copyToClipboard(item.content, fromEditor: false)
+            clipboardService.recopyFromHistory(item)
         }
     }
     

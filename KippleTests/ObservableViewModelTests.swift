@@ -151,7 +151,7 @@ final class ObservableMainViewModelTests: XCTestCase {
 
         // Then
         XCTAssertEqual(mockService.lastCopiedContent, "Test Editor Content")
-        XCTAssertTrue(mockService.fromEditor)
+        XCTAssertTrue(mockService.fromEditor ?? false)
     }
 
     func testClearEditor() async {

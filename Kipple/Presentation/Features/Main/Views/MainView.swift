@@ -493,7 +493,7 @@ struct MainView: View {
     }
     
     private func clearSystemClipboard() {
-        NSPasteboard.general.clearContents()
-        viewModel.currentClipboardContent = nil
+        // Clear through service to maintain synchronization
+        viewModel.clipboardService.clearSystemClipboard()
     }
 }

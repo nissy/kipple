@@ -4,13 +4,13 @@ import AppKit
 enum HotkeyManagerProvider {
     @MainActor
     static func resolve() -> Any {
-        // Use SimplifiedHotkeyManager for all versions
+        // Use SimplifiedHotkeyManager singleton for all cases
         return SimplifiedHotkeyManager.shared
     }
 
     // Create without MainActor requirement
     static func resolveSync() -> Any {
-        // For synchronous contexts, use the legacy manager
-        return HotkeyManager()
+        // Use SimplifiedHotkeyManager singleton for all cases
+        return SimplifiedHotkeyManager.shared
     }
 }

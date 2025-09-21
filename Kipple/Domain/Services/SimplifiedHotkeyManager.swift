@@ -19,6 +19,7 @@ final class SimplifiedHotkeyManager {
 
     private init() {
         loadSettings()
+        setupNotificationObservers()
         startMonitoring()
     }
 
@@ -26,6 +27,7 @@ final class SimplifiedHotkeyManager {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Public Methods
@@ -41,6 +43,15 @@ final class SimplifiedHotkeyManager {
         startMonitoring()
     }
 
+    /// Refresh hotkey from settings
+    func refreshHotkeys() {
+        loadSettings()
+        stopMonitoring()
+        if isEnabled {
+            startMonitoring()
+        }
+    }
+
     /// Get current hotkey configuration
     func getHotkey() -> (keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
         return (keyCode, modifiers)
@@ -49,7 +60,7 @@ final class SimplifiedHotkeyManager {
     /// Enable or disable the hotkey
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "KippleHotkeyEnabled")
+        UserDefaults.standard.set(enabled, forKey: "enableHotkey")
 
         if enabled {
             startMonitoring()
@@ -89,10 +100,15 @@ final class SimplifiedHotkeyManager {
     private func startMonitoring() {
         guard isEnabled else { return }
 
+        // Ensure previous monitor is removed before creating new one
         stopMonitoring()
 
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
+        // Add small delay to ensure cleanup is complete
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.handleKeyEvent(event)
+            }
         }
     }
 
@@ -119,23 +135,50 @@ final class SimplifiedHotkeyManager {
     }
 
     private func loadSettings() {
-        if let savedKeyCode = UserDefaults.standard.object(forKey: "KippleHotkeyCode") as? Int {
+        // Use the same keys as HotkeyManager for compatibility
+        if let savedKeyCode = UserDefaults.standard.object(forKey: "hotkeyKeyCode") as? Int {
             keyCode = UInt16(savedKeyCode)
         }
 
-        if let savedModifiers = UserDefaults.standard.object(forKey: "KippleHotkeyModifiers") as? UInt {
+        if let savedModifiers = UserDefaults.standard.object(forKey: "hotkeyModifierFlags") as? UInt {
             modifiers = NSEvent.ModifierFlags(rawValue: savedModifiers)
         }
 
-        if let savedEnabled = UserDefaults.standard.object(forKey: "KippleHotkeyEnabled") as? Bool {
+        if let savedEnabled = UserDefaults.standard.object(forKey: "enableHotkey") as? Bool {
             isEnabled = savedEnabled
         }
     }
 
     private func saveSettings() {
-        UserDefaults.standard.set(Int(keyCode), forKey: "KippleHotkeyCode")
-        UserDefaults.standard.set(modifiers.rawValue, forKey: "KippleHotkeyModifiers")
-        UserDefaults.standard.set(isEnabled, forKey: "KippleHotkeyEnabled")
+        // Use the same keys as HotkeyManager for compatibility
+        UserDefaults.standard.set(Int(keyCode), forKey: "hotkeyKeyCode")
+        UserDefaults.standard.set(modifiers.rawValue, forKey: "hotkeyModifierFlags")
+        UserDefaults.standard.set(isEnabled, forKey: "enableHotkey")
+    }
+
+    // MARK: - Notification Observers
+
+    private func setupNotificationObservers() {
+        // Listen for hotkey settings changes from UI
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHotkeySettingsChanged),
+            name: NSNotification.Name("HotkeySettingsChanged"),
+            object: nil
+        )
+
+        // Listen for editor hotkey settings changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHotkeySettingsChanged),
+            name: NSNotification.Name("EditorHotkeySettingsChanged"),
+            object: nil
+        )
+    }
+
+    @objc private func handleHotkeySettingsChanged() {
+        // Reload settings from UserDefaults and re-register
+        refreshHotkeys()
     }
 
     private func keyCodeToString(_ keyCode: UInt16) -> String {

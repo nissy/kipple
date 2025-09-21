@@ -3,26 +3,16 @@ import XCTest
 
 @MainActor
 final class ClipboardServiceProviderTests: XCTestCase {
-    func testResolveReturnsExpectedService() {
+    func testResolveReturnsModernServiceAdapter() {
         let service = ClipboardServiceProvider.resolve()
-        if #available(macOS 13.0, *) {
-            XCTAssertTrue(service is ModernClipboardServiceAdapter)
-        } else {
-            XCTAssertTrue(service === ClipboardService.shared)
-        }
+        XCTAssertTrue(service is ModernClipboardServiceAdapter,
+                     "Provider should return ModernClipboardServiceAdapter")
     }
 
-    func testResolveIsDeterministic() {
+    func testResolveReturnsSameInstance() {
         let first = ClipboardServiceProvider.resolve()
         let second = ClipboardServiceProvider.resolve()
-
-        if #available(macOS 13.0, *) {
-            XCTAssertTrue(first is ModernClipboardServiceAdapter)
-            XCTAssertTrue(second is ModernClipboardServiceAdapter)
-            XCTAssertTrue(first === second)
-        } else {
-            XCTAssertTrue(first === ClipboardService.shared)
-            XCTAssertTrue(second === ClipboardService.shared)
-        }
+        XCTAssertTrue(first === second,
+                     "Provider should return the same singleton instance")
     }
 }
