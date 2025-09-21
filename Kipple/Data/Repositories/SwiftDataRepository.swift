@@ -57,12 +57,8 @@ final class SwiftDataRepository: ClipboardRepositoryProtocol {
             }
         }
 
-        // Delete models that are not in the new items list
-        for model in existingModels {
-            if !newItemIds.contains(model.id) {
-                context.delete(model)
-            }
-        }
+        // Don't delete items that are not in the new items list
+        // save() should only add/update, not remove existing items
 
         try context.save()
     }

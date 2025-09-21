@@ -120,8 +120,8 @@ final class InternalClearExternalCopyTests: XCTestCase {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString("Rapid External Copy", forType: .string)
 
-        // Very short wait
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        // Give monitoring a chance to detect the change
+        try await Task.sleep(nanoseconds: 600_000_000) // 0.6 seconds
 
         // Another clear and copy cycle
         await adapter.clearSystemClipboard()

@@ -61,8 +61,8 @@ class Logger {
         let logMessage = "[\(level.rawValue)] \(fileName):\(line) \(function) - \(built)"
         
         if isTestEnvironment {
-            // テスト実行時はコンソール出力のみ
-            print(logMessage)
+            // テスト実行時はNSLogを使用
+            NSLog("%@", logMessage)
         } else {
             // 通常時はOSLogを使用
             guard let osLog = osLog else { return }

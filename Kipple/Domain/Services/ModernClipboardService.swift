@@ -435,8 +435,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     // MARK: - App Info
 
+    private struct ActiveAppInfo {
+        let appName: String?
+        let windowTitle: String?
+        let bundleId: String?
+        let pid: Int32
+    }
+
     @MainActor
-    private func getActiveAppInfo() -> (appName: String?, windowTitle: String?, bundleId: String?, pid: Int32) {
+    private func getActiveAppInfo() -> ActiveAppInfo {
         // Use LastActiveAppTracker to get the correct app
         let tracker = LastActiveAppTracker.shared
         let appInfo = tracker.getSourceAppInfo()
@@ -444,7 +451,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Try to get window title using CGWindowList
         let windowTitle = getWindowTitle(for: appInfo.pid)
 
-        return (appInfo.name, windowTitle, appInfo.bundleId, appInfo.pid)
+        return ActiveAppInfo(
+            appName: appInfo.name,
+            windowTitle: windowTitle,
+            bundleId: appInfo.bundleId,
+            pid: appInfo.pid
+        )
     }
 
     @MainActor
@@ -518,7 +530,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 actor ClipboardState {
     private var isInternalCopy = false
     private var isFromEditor = false
-    private var expectedInternalChangeCount: Int? = nil
+    private var expectedInternalChangeCount: Int?
 
     func getInternalCopy() -> Bool { isInternalCopy }
     func setInternalCopy(_ value: Bool) { isInternalCopy = value }

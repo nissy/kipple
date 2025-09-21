@@ -16,7 +16,12 @@ final class LastActiveAppTracker {
 
     // MARK: - Properties
 
-    private var lastActiveNonKippleApp: (name: String?, bundleId: String?, pid: Int32)?
+    struct AppInfo {
+        let name: String?
+        let bundleId: String?
+        let pid: Int32
+    }
+    private var lastActiveNonKippleApp: AppInfo?
     private var observer: Any?
 
     // MARK: - Initialization
@@ -57,7 +62,7 @@ final class LastActiveAppTracker {
 
                 // If it's not Kipple, store it as last active app
                 if app.bundleIdentifier != Bundle.main.bundleIdentifier {
-                    self.lastActiveNonKippleApp = (
+                    self.lastActiveNonKippleApp = AppInfo(
                         name: app.localizedName,
                         bundleId: app.bundleIdentifier,
                         pid: app.processIdentifier
@@ -78,13 +83,13 @@ final class LastActiveAppTracker {
         }
     }
 
-    func getSourceAppInfo() -> (name: String?, bundleId: String?, pid: Int32) {
+    func getSourceAppInfo() -> AppInfo {
         guard let frontApp = NSWorkspace.shared.frontmostApplication else {
             // No frontmost app, use last known
             if let lastApp = lastActiveNonKippleApp {
                 return lastApp
             }
-            return (nil, nil, 0)
+            return AppInfo(name: nil, bundleId: nil, pid: 0)
         }
 
         let bundleId = frontApp.bundleIdentifier
@@ -99,15 +104,15 @@ final class LastActiveAppTracker {
                 return lastApp
             }
             // Fallback to Kipple if no other app was tracked
-            return (
-                frontApp.localizedName,
-                bundleId,
-                frontApp.processIdentifier
+            return AppInfo(
+                name: frontApp.localizedName,
+                bundleId: bundleId,
+                pid: frontApp.processIdentifier
             )
         }
 
         // Not Kipple, return current app and update tracker
-        let appInfo = (
+        let appInfo = AppInfo(
             name: frontApp.localizedName,
             bundleId: bundleId,
             pid: frontApp.processIdentifier
@@ -126,7 +131,7 @@ final class LastActiveAppTracker {
 
         // If current app is not Kipple, store it
         if frontApp.bundleIdentifier != Bundle.main.bundleIdentifier {
-            lastActiveNonKippleApp = (
+            lastActiveNonKippleApp = AppInfo(
                 name: frontApp.localizedName,
                 bundleId: frontApp.bundleIdentifier,
                 pid: frontApp.processIdentifier

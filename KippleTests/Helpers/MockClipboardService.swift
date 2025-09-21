@@ -43,7 +43,21 @@ class MockClipboardService: ClipboardServiceProtocol {
         lastCopiedContent = content
         lastCopiedFromEditor = fromEditor
 
-        let item = ClipItem(content: content, isFromEditor: fromEditor)
+        let item: ClipItem
+        if fromEditor {
+            // エディターからのコピーの場合、Kippleのメタデータを設定
+            item = ClipItem(
+                content: content,
+                sourceApp: "Kipple",
+                windowTitle: "Quick Editor",
+                bundleIdentifier: Bundle.main.bundleIdentifier,
+                processID: ProcessInfo.processInfo.processIdentifier,
+                isFromEditor: true
+            )
+        } else {
+            item = ClipItem(content: content, isFromEditor: false)
+        }
+
         history.insert(item, at: 0)
         currentClipboardContent = content
         onHistoryChanged?(item)

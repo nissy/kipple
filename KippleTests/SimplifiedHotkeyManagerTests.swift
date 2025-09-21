@@ -136,44 +136,56 @@ final class SimplifiedHotkeyManagerTests: XCTestCase {
     }
 
     func testKeyCodeToStringMapping() {
+        struct KeyTestCase {
+            let keyCode: UInt16
+            let modifiers: NSEvent.ModifierFlags
+            let expected: String
+        }
+
         // Test various key codes
-        let testCases: [(UInt16, NSEvent.ModifierFlags, String)] = [
-            (0, [], "A"),
-            (1, [], "S"),
-            (46, [], "M"),
-            (40, [], "K"),
-            (35, [], "P"),
-            (12, [], "Q"),
-            (13, [], "W"),
-            (14, [], "E"),
-            (15, [], "R"),
-            (17, [], "T")
+        let testCases: [KeyTestCase] = [
+            KeyTestCase(keyCode: 0, modifiers: [], expected: "A"),
+            KeyTestCase(keyCode: 1, modifiers: [], expected: "S"),
+            KeyTestCase(keyCode: 46, modifiers: [], expected: "M"),
+            KeyTestCase(keyCode: 40, modifiers: [], expected: "K"),
+            KeyTestCase(keyCode: 35, modifiers: [], expected: "P"),
+            KeyTestCase(keyCode: 12, modifiers: [], expected: "Q"),
+            KeyTestCase(keyCode: 13, modifiers: [], expected: "W"),
+            KeyTestCase(keyCode: 14, modifiers: [], expected: "E"),
+            KeyTestCase(keyCode: 15, modifiers: [], expected: "R"),
+            KeyTestCase(keyCode: 17, modifiers: [], expected: "T")
         ]
 
-        for (keyCode, modifiers, expectedChar) in testCases {
-            manager.setHotkey(keyCode: keyCode, modifiers: modifiers)
+        for testCase in testCases {
+            manager.setHotkey(keyCode: testCase.keyCode, modifiers: testCase.modifiers)
             let description = manager.getHotkeyDescription()
-            XCTAssertEqual(description, expectedChar, "Key code \(keyCode) should map to \(expectedChar)")
+            XCTAssertEqual(description, testCase.expected, "Key code \(testCase.keyCode) should map to \(testCase.expected)")
         }
     }
 
     func testMultipleHotkeyChanges() {
+        struct HotkeyChange {
+            let keyCode: UInt16
+            let modifiers: NSEvent.ModifierFlags
+            let expectedDescription: String
+        }
+
         // Test that changing hotkey multiple times works correctly
-        let changes: [(UInt16, NSEvent.ModifierFlags, String)] = [
-            (46, [.control, .option], "⌃⌥M"),
-            (40, [.command], "⌘K"),
-            (35, [.shift, .option], "⌥⇧P"),
-            (0, [.control, .command], "⌃⌘A")
+        let changes: [HotkeyChange] = [
+            HotkeyChange(keyCode: 46, modifiers: [.control, .option], expectedDescription: "⌃⌥M"),
+            HotkeyChange(keyCode: 40, modifiers: [.command], expectedDescription: "⌘K"),
+            HotkeyChange(keyCode: 35, modifiers: [.shift, .option], expectedDescription: "⌥⇧P"),
+            HotkeyChange(keyCode: 0, modifiers: [.control, .command], expectedDescription: "⌃⌘A")
         ]
 
-        for (keyCode, modifiers, expectedDescription) in changes {
-            manager.setHotkey(keyCode: keyCode, modifiers: modifiers)
+        for change in changes {
+            manager.setHotkey(keyCode: change.keyCode, modifiers: change.modifiers)
             let description = manager.getHotkeyDescription()
-            XCTAssertEqual(description, expectedDescription)
+            XCTAssertEqual(description, change.expectedDescription)
 
             let (retrievedKeyCode, retrievedModifiers) = manager.getHotkey()
-            XCTAssertEqual(retrievedKeyCode, keyCode)
-            XCTAssertEqual(retrievedModifiers, modifiers)
+            XCTAssertEqual(retrievedKeyCode, change.keyCode)
+            XCTAssertEqual(retrievedModifiers, change.modifiers)
         }
     }
 }

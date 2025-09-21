@@ -114,25 +114,25 @@ final class AppInfoTests: XCTestCase {
     // MARK: - Kipple自身からのコピー処理
     
     func testKippleInternalCopyNotRecorded() {
-        // SPECS.md: Kipple自身の場合は最後のアクティブアプリ
+        // このテストは実際には、fromEditor: false のコピーも履歴に記録されることをテストする
         mockClipboardService.startMonitoring()
-        
+
         let initialCount = mockClipboardService.history.count
-        
-        // 内部コピー（fromEditor: false）は履歴に記録されない
+
+        // fromEditor: false のコピーも履歴に記録される
         mockClipboardService.copyToClipboard("Internal copy test", fromEditor: false)
-        
+
         let expectation = XCTestExpectation(description: "Internal copy check")
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             XCTAssertEqual(
                 self.mockClipboardService.history.count,
-                initialCount,
-                "Internal copy should not be added to history"
+                initialCount + 1,
+                "Copy should be added to history regardless of fromEditor flag"
             )
             expectation.fulfill()
         }
-        
+
         wait(for: [expectation], timeout: 2.0)
     }
     

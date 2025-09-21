@@ -71,13 +71,11 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         XCTAssertEqual(history[2].content, "Third content")
         
         // When: Re-copy the first content that was trimmed
-        print("Before re-copy: \(history.map { $0.content })")
         await service.copyToClipboard("First content", fromEditor: false)
         await service.flushPendingSaves()
 
         // Then: First content should be added back to history
         history = await service.getHistory()
-        print("After re-copy: \(history.map { $0.content })")
         XCTAssertEqual(history.count, 3, "History should still be limited to 3 items")
         XCTAssertEqual(history[0].content, "First content", "Re-copied content should be at top")
         XCTAssertEqual(history[1].content, "Fifth content")
