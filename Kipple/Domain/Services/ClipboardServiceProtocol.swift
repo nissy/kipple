@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 protocol ClipboardServiceProtocol: AnyObject {
     var history: [ClipItem] { get }
     var pinnedItems: [ClipItem] { get }

@@ -7,6 +7,7 @@
 
 import AppKit
 
+@MainActor
 struct FontMetrics {
     private static let lineHeightCache = NSCache<NSString, NSNumber>()
     

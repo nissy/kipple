@@ -14,6 +14,7 @@ extension Notification.Name {
     static let mainWindowDidResignKey = Notification.Name("KippleMainWindowDidResignKey")
 }
 
+@MainActor
 final class WindowManager: NSObject, NSWindowDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
@@ -440,7 +441,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             object: aboutWindow,
             queue: .main
         ) { _ in
-            NSApp.setActivationPolicy(.accessory)
+            Task { @MainActor in
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
     
@@ -471,25 +474,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
         for subview in view.subviews {
             findAndFocusTextView(in: subview)
         }
-    }
-    
-    // MARK: - Cleanup
-    
-    func cleanup() {
-        var observers: [NSObjectProtocol?] = [
-            windowObserver,
-            windowResignObserver,
-            windowResizeObserver,
-            appDidResignActiveObserver,
-            appDidBecomeActiveObserver,
-            settingsObserver,
-            aboutObserver
-        ]
-        observers.compactMap { $0 }.forEach { NotificationCenter.default.removeObserver($0) }
-    }
-    
-    deinit {
-        cleanup()
     }
     
     // MARK: - NSWindowDelegate (moved to extension below)

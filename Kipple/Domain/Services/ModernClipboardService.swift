@@ -48,21 +48,27 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private func initializeRepository() async {
         // Initialize repository
-        self.repository = await MainActor.run {
+        await MainActor.run { [weak self] in
             do {
-                return try RepositoryProvider.resolve()
+                let repo = try RepositoryProvider.resolve()
+                Task { [weak self] in
+                    await self?.setRepository(repo)
+                }
             } catch {
                 Logger.shared.error("Failed to initialize repository: \(error)")
-                return nil
             }
         }
+    }
+
+    private func setRepository(_ repo: ClipboardRepositoryProtocol) {
+        self.repository = repo
     }
 
     private func setupSavePipeline() {
         saveCancellable = saveSubject
             .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
-            .sink { [weak self] items in
-                Task {
+            .sink { items in
+                Task { [weak self] in
                     await self?.saveToRepository(items)
                 }
             }
@@ -205,7 +211,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func clearAllHistory() async {
         let pinnedItems = history.filter { $0.isPinned }
-        let removedItems = history.filter { !$0.isPinned }
+        _ = history.filter { !$0.isPinned }  // removedItems for potential future use
 
         // Keep pinned items to match legacy implementation behavior
         history = pinnedItems
@@ -217,13 +223,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     func clearHistory(keepPinned: Bool) async {
-        let removedItems: [ClipItem]
-
         if keepPinned {
-            removedItems = history.filter { !$0.isPinned }
+            _ = history.filter { !$0.isPinned }  // removedItems for potential future use
             history = history.filter { $0.isPinned }
         } else {
-            removedItems = history
+            _ = history  // removedItems for potential future use
             history.removeAll()
         }
 
@@ -273,7 +277,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func updateItem(_ item: ClipItem) async {
         if let index = history.firstIndex(where: { $0.id == item.id }) {
-            let oldItem = history[index]
+            _ = history[index]  // oldItem for potential future use
 
             // Content change is allowed - no special handling needed
 

@@ -19,7 +19,7 @@ extension XCTestCase {
     }
     
     /// テスト用の非同期待機
-    func waitAsync(seconds: TimeInterval, completion: @escaping () -> Void) {
+    func waitAsync(seconds: TimeInterval, completion: @escaping @Sendable () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
             completion()
         }

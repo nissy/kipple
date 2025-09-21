@@ -11,7 +11,7 @@ import AppKit
 
 @available(macOS 14.0, *)
 @MainActor
-final class TogglePinRaceConditionTests: XCTestCase {
+final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
     private var service: ModernClipboardService!
     private var adapter: ModernClipboardServiceAdapter!
     
@@ -172,12 +172,12 @@ final class TogglePinRaceConditionTests: XCTestCase {
         XCTAssertEqual(history.count, 10)
         
         // When: Toggle multiple items concurrently
+        let adapter = self.adapter!
         await withTaskGroup(of: Bool.self) { group in
             for i in 0..<5 {
-                group.addTask { [weak self] in
-                    guard let self = self else { return false }
+                group.addTask {
                     return await MainActor.run {
-                        self.adapter.togglePin(for: history[i])
+                        adapter.togglePin(for: history[i])
                     }
                 }
             }

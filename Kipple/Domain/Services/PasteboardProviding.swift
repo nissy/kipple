@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 
+@MainActor
 protocol PasteboardProviding {
     func currentChangeCount() -> Int
     func string() -> String?
@@ -8,6 +9,7 @@ protocol PasteboardProviding {
     func clearContents()
 }
 
+@MainActor
 final class SystemPasteboard: PasteboardProviding {
     static let shared = SystemPasteboard()
 
@@ -36,24 +38,24 @@ final class SystemPasteboard: PasteboardProviding {
     }
 
     func setString(_ string: String) {
-        let writeBlock = {
+        let writeBlock = { () -> Bool in
             NSPasteboard.general.setString(string, forType: .string)
         }
         if Thread.isMainThread {
-            writeBlock()
+            _ = writeBlock()
         } else {
-            DispatchQueue.main.sync(execute: writeBlock)
+            _ = DispatchQueue.main.sync(execute: writeBlock)
         }
     }
 
     func clearContents() {
-        let clearBlock = {
+        let clearBlock = { () -> Int in
             NSPasteboard.general.clearContents()
         }
         if Thread.isMainThread {
-            clearBlock()
+            _ = clearBlock()
         } else {
-            DispatchQueue.main.sync(execute: clearBlock)
+            _ = DispatchQueue.main.sync(execute: clearBlock)
         }
     }
 }

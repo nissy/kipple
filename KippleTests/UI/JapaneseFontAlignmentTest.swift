@@ -9,7 +9,8 @@ import XCTest
 import AppKit
 @testable import Kipple
 
-class JapaneseFontAlignmentTest: XCTestCase {
+@MainActor
+class JapaneseFontAlignmentTest: XCTestCase, @unchecked Sendable {
     
     func testFontMetricsComparison() {
         // 英語フォントと日本語フォントのメトリクスを比較

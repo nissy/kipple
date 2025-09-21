@@ -244,3 +244,5 @@ final class CategoryClassifier {
         return false
     }
 }
+
+extension CategoryClassifier: @unchecked Sendable {}

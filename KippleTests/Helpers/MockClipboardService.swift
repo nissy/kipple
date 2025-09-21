@@ -8,6 +8,7 @@
 import Foundation
 @testable import Kipple
 
+@MainActor
 class MockClipboardService: ClipboardServiceProtocol {
     var history: [ClipItem] = []
     var pinnedItems: [ClipItem] = []

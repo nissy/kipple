@@ -103,7 +103,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         }
     }
     
-    private func createParagraphStyle(lineHeight: CGFloat) -> NSMutableParagraphStyle {
+    private nonisolated func createParagraphStyle(lineHeight: CGFloat) -> NSMutableParagraphStyle {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.minimumLineHeight = lineHeight
         paragraphStyle.maximumLineHeight = lineHeight
@@ -174,7 +174,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         }
         
         // テキストコンテナの設定
-        let verticalPadding = FontManager.shared.editorLayoutSettings.verticalPadding
+        let verticalPadding = FontManager.currentEditorLayoutSettings().verticalPadding
         textView.textContainerInset = NSSize(width: 8, height: verticalPadding)
         if let textContainer = textView.textContainer {
             textContainer.lineFragmentPadding = 0
@@ -270,7 +270,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             self.paragraphStyle = paragraphStyle
             
             // テキストコンテナのパディングを更新
-            let verticalPadding = FontManager.shared.editorLayoutSettings.verticalPadding
+            let verticalPadding = FontManager.currentEditorLayoutSettings().verticalPadding
             textView.textContainerInset = NSSize(width: 8, height: verticalPadding)
             
             if !textView.string.isEmpty {
@@ -367,7 +367,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             lineFragmentUsedRect.pointee.size.height = fixedLineHeight
             
             // テキストのベースラインオフセットを調整
-            let textBaselineOffset = FontManager.shared.editorLayoutSettings.textBaselineOffset
+            let textBaselineOffset = FontManager.currentEditorLayoutSettings().textBaselineOffset
             
             // ベースラインを行の中央に配置（オリジナルフォントのメトリクスを使用）
             let lineCenter = fixedLineHeight / 2.0
@@ -409,7 +409,6 @@ private struct DrawLineNumberParams {
 class SimpleLineNumberRulerView: NSRulerView {
     weak var textView: NSTextView?
     var fixedLineHeight: CGFloat = 20 // 固定行高
-    let fontManager = FontManager.shared
     
     // パフォーマンス最適化用のキャッシュ
     private var lastSelectedLine: Int = 1
@@ -755,7 +754,7 @@ class SimpleLineNumberRulerView: NSRulerView {
         let lineCenterY = lineY + textContainerInset.height + (lineHeight / 2)
         
         // 行番号を中央に配置（設定値でオフセット調整）
-        let offset = fontManager.editorLayoutSettings.lineNumberVerticalOffset
+        let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
         let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
         
         let drawingPoint = NSPoint(
@@ -875,7 +874,7 @@ class SimpleLineNumberRulerView: NSRulerView {
             let lineCenterY = lineY + params.textContainerInset.height + (self.fixedLineHeight / 2)
             
             // 行番号を中央に配置（設定値でオフセット調整）
-            let offset = self.fontManager.editorLayoutSettings.lineNumberVerticalOffset
+            let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
             let drawingY = lineCenterY - (lineNumberHeight / 2) -
                 params.lineNumberFont.descender + offset
             
@@ -953,7 +952,7 @@ class SimpleLineNumberRulerView: NSRulerView {
             let lineCenterY = lineY + textView.textContainerInset.height + (fixedLineHeight / 2)
             
             // 行番号を中央に配置（設定値でオフセット調整）
-            let offset = fontManager.editorLayoutSettings.lineNumberVerticalOffset
+            let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
             let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
             
             // 描画範囲内かチェック
@@ -1007,7 +1006,7 @@ class SimpleLineNumberRulerView: NSRulerView {
 
 // 固定行高を計算するヘルパー関数
 private func calculateFixedLineHeight(for font: NSFont) -> CGFloat {
-    let fontManager = FontManager.shared
+    let layoutSettings = FontManager.currentEditorLayoutSettings()
     
     // 基本フォントの高さ
     var maxHeight = font.ascender - font.descender
@@ -1030,10 +1029,10 @@ private func calculateFixedLineHeight(for font: NSFont) -> CGFloat {
     }
     
     // CJKテキストに適した余白（設定値を使用）
-    let recommendedHeight = maxHeight * fontManager.editorLayoutSettings.lineHeightMultiplier
+    let recommendedHeight = maxHeight * layoutSettings.lineHeightMultiplier
     
     // 最小値を保証（設定値を使用）
-    let minimumHeight = font.pointSize * fontManager.editorLayoutSettings.minimumLineHeightMultiplier
+    let minimumHeight = font.pointSize * layoutSettings.minimumLineHeightMultiplier
     
     // 最終的な固定行高（少し余裕を持たせる）
     return ceil(max(recommendedHeight, minimumHeight) * 1.1)

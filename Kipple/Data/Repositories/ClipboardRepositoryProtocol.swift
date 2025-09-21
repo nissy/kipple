@@ -7,7 +7,7 @@
 
 import Foundation
 
-protocol ClipboardRepositoryProtocol {
+protocol ClipboardRepositoryProtocol: Sendable {
     func save(_ items: [ClipItem]) async throws
     func load(limit: Int) async throws -> [ClipItem]
     func loadAll() async throws -> [ClipItem]

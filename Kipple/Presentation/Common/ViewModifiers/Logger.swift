@@ -95,3 +95,5 @@ class Logger {
         _log(message, level: .error, file: file, function: function, line: line)
     }
 }
+
+extension Logger: @unchecked Sendable {}

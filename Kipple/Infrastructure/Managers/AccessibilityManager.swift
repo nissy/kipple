@@ -9,6 +9,7 @@ import Foundation
 import ApplicationServices
 import AppKit
 
+@MainActor
 final class AccessibilityManager {
     static let shared = AccessibilityManager()
     
@@ -62,11 +63,6 @@ final class AccessibilityManager {
         }
     }
 
-    deinit {
-        permissionTimer?.invalidate()
-        permissionTimer = nil
-    }
-    
     // Check accessibility permission with caching (thread-safe)
     var hasPermission: Bool {
         // First, try to read cached value without blocking
@@ -118,7 +114,7 @@ final class AccessibilityManager {
             return true
         }
         
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let options = NSDictionary(dictionary: ["AXTrustedCheckOptionPrompt": true])
         return AXIsProcessTrustedWithOptions(options)
     }
     

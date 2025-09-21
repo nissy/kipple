@@ -3,7 +3,7 @@ import SwiftData
 
 @available(macOS 14.0, *)
 @MainActor
-final class SwiftDataRepository: ClipboardRepositoryProtocol {
+final class SwiftDataRepository: ClipboardRepositoryProtocol, @unchecked Sendable {
     private let container: ModelContainer
     private let context: ModelContext
 

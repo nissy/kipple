@@ -215,7 +215,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         clipboardService.stopMonitoring()
         
         Logger.shared.log("Cleaning up windows...")
-        windowManager.cleanup()
+        // cleanup method was removed in Swift 6.2 migration
         
         Logger.shared.log("=== APP QUIT SEQUENCE COMPLETED ===")
         
@@ -232,7 +232,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         DispatchQueue.main.async { [weak self] in
             Logger.shared.log("forceTerminate on main thread")
             self?.clipboardService.stopMonitoring()
-            self?.windowManager.cleanup()
+            // cleanup method was removed in Swift 6.2 migration
             
             // アプリケーションに終了を許可
             Logger.shared.log("Calling reply(toApplicationShouldTerminate: true) from forceTerminate")
@@ -319,15 +319,11 @@ extension MenuBarApp {
 
     func performTermination() async {
         // Extract the async work from performAsyncTermination
-        do {
-            // デバウンスされた保存を即座に実行
-            Logger.shared.log("Flushing pending saves...")
-            await clipboardService.flushPendingSaves()
+        // デバウンスされた保存を即座に実行
+        Logger.shared.log("Flushing pending saves...")
+        await clipboardService.flushPendingSaves()
 
-            Logger.shared.log("✅ Successfully saved data before quit")
-        } catch {
-            Logger.shared.error("❌ Failed to save on quit: \(error)")
-        }
+        Logger.shared.log("✅ Successfully saved data before quit")
     }
 
     func registerHotkeys() async {

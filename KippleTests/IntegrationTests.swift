@@ -5,7 +5,7 @@ import Combine
 
 @available(macOS 14.0, *)
 @MainActor
-final class IntegrationTests: XCTestCase {
+final class IntegrationTests: XCTestCase, @unchecked Sendable {
     private var clipboardService: ModernClipboardService!
     private var repository: SwiftDataRepository!
     private var hotkeyManager: SimplifiedHotkeyManager!
@@ -237,25 +237,26 @@ final class IntegrationTests: XCTestCase {
         await clipboardService.startMonitoring()
 
         // Perform concurrent operations
+        let clipboardService = self.clipboardService!
         await withTaskGroup(of: Void.self) { group in
             // Copy operations
             for i in 1...10 {
                 group.addTask {
-                    await self.clipboardService.copyToClipboard("Concurrent \(i)", fromEditor: false)
+                    await clipboardService.copyToClipboard("Concurrent \(i)", fromEditor: false)
                 }
             }
 
             // Search operations
             for _ in 1...5 {
                 group.addTask {
-                    _ = await self.clipboardService.searchHistory(query: "Concurrent")
+                    _ = await clipboardService.searchHistory(query: "Concurrent")
                 }
             }
 
             // History fetch operations
             for _ in 1...5 {
                 group.addTask {
-                    _ = await self.clipboardService.getHistory()
+                    _ = await clipboardService.getHistory()
                 }
             }
         }

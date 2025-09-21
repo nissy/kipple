@@ -23,13 +23,6 @@ final class SimplifiedHotkeyManager {
         startMonitoring()
     }
 
-    deinit {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        NotificationCenter.default.removeObserver(self)
-    }
-
     // MARK: - Public Methods
 
     /// Set the hotkey configuration

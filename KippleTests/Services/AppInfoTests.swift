@@ -16,6 +16,7 @@ import Cocoa
 import Carbon
 @testable import Kipple
 
+@MainActor
 final class AppInfoTests: XCTestCase {
     var mockClipboardService: MockClipboardService!
     
@@ -104,9 +105,9 @@ final class AppInfoTests: XCTestCase {
     
     func testAccessibilityPermissionCheck() {
         // SPECS.md: アクセシビリティ権限チェック（キャッシュ付き、1秒間有効）
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: false]
-        let hasPermission = AXIsProcessTrustedWithOptions(options)
-        
+        // Note: Testing accessibility permission check without prompting
+        let hasPermission = AXIsProcessTrusted()
+
         // 権限の有無に関わらず、チェック機能が動作することを確認
         XCTAssertNotNil(hasPermission)
     }

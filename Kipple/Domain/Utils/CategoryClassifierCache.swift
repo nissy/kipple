@@ -28,3 +28,5 @@ final class CategoryClassifierCache {
         cache.setObject(category.rawValue as NSString, forKey: content as NSString)
     }
 }
+
+extension CategoryClassifierCache: @unchecked Sendable {}

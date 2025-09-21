@@ -8,6 +8,7 @@
 import Foundation
 import ServiceManagement
 
+@MainActor
 class LaunchAtLogin {
     static let shared = LaunchAtLogin()
     

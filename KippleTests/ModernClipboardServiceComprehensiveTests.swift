@@ -3,7 +3,7 @@ import Combine
 @testable import Kipple
 
 @MainActor
-final class ModernClipboardServiceComprehensiveTests: XCTestCase {
+final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sendable {
     private var service: ModernClipboardService!
     private var cancellables: Set<AnyCancellable> = []
 
@@ -369,10 +369,11 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase {
         let operations = 10
 
         // When - Perform concurrent copies
+        let service = self.service!
         await withTaskGroup(of: Void.self) { group in
             for i in 1...operations {
                 group.addTask {
-                    await self.service.copyToClipboard("Concurrent \(i)", fromEditor: false)
+                    await service.copyToClipboard("Concurrent \(i)", fromEditor: false)
                 }
             }
         }
@@ -392,10 +393,11 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase {
         let history = await service.getHistory()
 
         // When - Toggle pins concurrently
+        let service = self.service!
         await withTaskGroup(of: Void.self) { group in
             for item in history {
                 group.addTask {
-                    _ = await self.service.togglePin(for: item)
+                    _ = await service.togglePin(for: item)
                 }
             }
         }

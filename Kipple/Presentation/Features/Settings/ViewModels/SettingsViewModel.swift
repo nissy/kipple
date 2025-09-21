@@ -8,6 +8,7 @@
 import SwiftUI
 import Combine
 
+@MainActor
 class SettingsViewModel: ObservableObject {
     @Published var selectedTab = 0
     @Published var showLaunchAtLoginError = false

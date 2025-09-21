@@ -14,6 +14,7 @@ import XCTest
 import Combine
 @testable import Kipple
 
+@MainActor
 final class DebouncingTests: XCTestCase {
     private var cancellables = Set<AnyCancellable>()
     private var mockClipboardService: MockClipboardService!

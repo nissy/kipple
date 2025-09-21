@@ -3,7 +3,8 @@ import SwiftUI
 @testable import Kipple
 
 @available(macOS 14.0, iOS 17.0, *)
-final class ObservableMainViewModelTests: XCTestCase {
+@MainActor
+final class ObservableMainViewModelTests: XCTestCase, @unchecked Sendable {
     private var viewModel: ObservableMainViewModel!
     private var mockService: MockClipboardService!
 
@@ -337,25 +338,26 @@ final class ObservableMainViewModelTests: XCTestCase {
 
     func testConcurrentOperations() async {
         // Test thread safety with concurrent operations
+        let viewModel = self.viewModel!
         await withTaskGroup(of: Void.self) { group in
             // Concurrent searches
             for i in 1...10 {
                 group.addTask {
-                    await self.viewModel.setSearchText("Search \(i)")
+                    await viewModel.setSearchText("Search \(i)")
                 }
             }
 
             // Concurrent refreshes
             for _ in 1...5 {
                 group.addTask {
-                    await self.viewModel.refreshItems()
+                    await viewModel.refreshItems()
                 }
             }
 
             // Concurrent category changes
             for category in [ClipItemCategory.url, .email, .code] {
                 group.addTask {
-                    await self.viewModel.setSelectedCategory(category)
+                    await viewModel.setSelectedCategory(category)
                 }
             }
         }

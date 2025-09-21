@@ -4,7 +4,7 @@ import SwiftData
 
 @available(macOS 14.0, *)
 @MainActor
-final class SwiftDataRepositoryComprehensiveTests: XCTestCase {
+final class SwiftDataRepositoryComprehensiveTests: XCTestCase, @unchecked Sendable {
     private var repository: SwiftDataRepository!
     private var container: ModelContainer!
 
@@ -275,11 +275,12 @@ final class SwiftDataRepositoryComprehensiveTests: XCTestCase {
         let concurrentOps = 10
 
         // When - Save items concurrently
+        let repository = self.repository!
         await withTaskGroup(of: Void.self) { group in
             for i in 1...concurrentOps {
                 group.addTask {
                     let item = ClipItem(content: "Concurrent \(i)", isPinned: false)
-                    try? await self.repository.save([item])
+                    try? await repository.save([item])
                 }
             }
         }
@@ -297,10 +298,11 @@ final class SwiftDataRepositoryComprehensiveTests: XCTestCase {
 
         // When - Read concurrently
         var results: [[ClipItem]] = []
+        let repository = self.repository!
         await withTaskGroup(of: [ClipItem]?.self) { group in
             for _ in 1...5 {
                 group.addTask {
-                    try? await self.repository.loadAll()
+                    try? await repository.loadAll()
                 }
             }
 

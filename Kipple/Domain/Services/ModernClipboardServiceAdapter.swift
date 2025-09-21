@@ -17,7 +17,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     private let modernService = ModernClipboardService.shared
     private var refreshTask: Task<Void, Never>?
-    private var autoClearTimer: Timer?
+    private nonisolated(unsafe) var autoClearTimer: Timer?
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -105,7 +105,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
         // Update backend synchronously via Task and wait for result
         Task {
-            let success = await modernService.togglePin(for: item)
+            _ = await modernService.togglePin(for: item)
             // Always refresh history to ensure consistency
             await refreshHistory()
         }

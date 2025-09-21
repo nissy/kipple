@@ -3,7 +3,7 @@ import Combine
 @testable import Kipple
 
 @MainActor
-final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase {
+final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase, @unchecked Sendable {
     private var manager: SimplifiedHotkeyManager!
     private var cancellables: Set<AnyCancellable> = []
     private let testUserDefaultsKeys = [
@@ -362,22 +362,23 @@ final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase {
 
     func testConcurrentAccess() async {
         // Test concurrent reads and writes
+        let manager = self.manager!
         await withTaskGroup(of: Void.self) { group in
             // Writers
             for i in 0..<10 {
                 group.addTask { @MainActor in
                     let keyCode = UInt16(i)
                     let modifiers: NSEvent.ModifierFlags = i % 2 == 0 ? [.control] : [.command]
-                    self.manager.setHotkey(keyCode: keyCode, modifiers: modifiers)
+                    manager.setHotkey(keyCode: keyCode, modifiers: modifiers)
                 }
             }
 
             // Readers
             for _ in 0..<10 {
                 group.addTask { @MainActor in
-                    _ = self.manager.getHotkey()
-                    _ = self.manager.getEnabled()
-                    _ = self.manager.getHotkeyDescription()
+                    _ = manager.getHotkey()
+                    _ = manager.getEnabled()
+                    _ = manager.getHotkeyDescription()
                 }
             }
         }

@@ -8,6 +8,7 @@
 import XCTest
 @testable import Kipple
 
+@MainActor
 final class ClipItemCategoryTests: XCTestCase {
     
     // MARK: - URL判定のテストケース

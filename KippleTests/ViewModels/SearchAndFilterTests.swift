@@ -14,12 +14,12 @@ import XCTest
 import Combine
 @testable import Kipple
 
-final class SearchAndFilterTests: XCTestCase {
+@MainActor
+final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
     var viewModel: MainViewModel!
     var mockClipboardService: MockClipboardService!
     private var cancellables = Set<AnyCancellable>()
 
-    @MainActor
     override func setUp() {
         super.setUp()
         mockClipboardService = MockClipboardService()

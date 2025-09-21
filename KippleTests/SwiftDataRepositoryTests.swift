@@ -3,7 +3,7 @@ import SwiftData
 @testable import Kipple
 
 @available(macOS 14.0, *)
-final class SwiftDataRepositoryTests: XCTestCase {
+final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
     private var repository: SwiftDataRepository!
     private var modelContainer: ModelContainer!
 
@@ -139,17 +139,18 @@ final class SwiftDataRepositoryTests: XCTestCase {
 
     func testConcurrentAccess() async throws {
         // Test thread safety with concurrent operations
+        let repository = self.repository!
         await withTaskGroup(of: Void.self) { group in
             for i in 1...10 {
                 group.addTask {
                     let item = ClipItem(content: "Concurrent \(i)", isPinned: false)
-                    try? await self.repository.save([item])
+                    try? await repository.save([item])
                 }
             }
 
             for _ in 1...5 {
                 group.addTask {
-                    _ = try? await self.repository.loadAll()
+                    _ = try? await repository.loadAll()
                 }
             }
         }

@@ -4,7 +4,7 @@ import AppKit
 
 // MARK: - ModernClipboardService Tests
 
-final class ModernClipboardServiceTests: XCTestCase {
+final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
     private var service: ModernClipboardService!
 
     override func setUp() async throws {
@@ -175,18 +175,19 @@ final class ModernClipboardServiceTests: XCTestCase {
 
     func testConcurrentAccess() async {
         // Test thread safety with concurrent operations
+        let service = self.service!
         await withTaskGroup(of: Void.self) { group in
             // Multiple concurrent writes
             for i in 1...100 {
                 group.addTask {
-                    await self.service.copyToClipboard("Concurrent \(i)", fromEditor: false)
+                    await service.copyToClipboard("Concurrent \(i)", fromEditor: false)
                 }
             }
 
             // Multiple concurrent reads
             for _ in 1...50 {
                 group.addTask {
-                    _ = await self.service.getHistory()
+                    _ = await service.getHistory()
                 }
             }
         }

@@ -22,7 +22,7 @@ final class LastActiveAppTracker {
         let pid: Int32
     }
     private var lastActiveNonKippleApp: AppInfo?
-    private var observer: Any?
+    private nonisolated(unsafe) var observer: Any?
 
     // MARK: - Initialization
 
@@ -56,9 +56,10 @@ final class LastActiveAppTracker {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            Task { @MainActor in
-                guard let self = self else { return }
-                guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+
+            Task { @MainActor [weak self, weak app] in
+                guard let self = self, let app else { return }
 
                 // If it's not Kipple, store it as last active app
                 if app.bundleIdentifier != Bundle.main.bundleIdentifier {

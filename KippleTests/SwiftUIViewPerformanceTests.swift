@@ -2,7 +2,20 @@ import XCTest
 import SwiftUI
 @testable import Kipple
 
-final class SwiftUIViewPerformanceTests: XCTestCase {
+actor ProcessCounter {
+    private var count = 0
+
+    func increment() {
+        count += 1
+    }
+
+    func getValue() -> Int {
+        return count
+    }
+}
+
+@MainActor
+final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
 
     // MARK: - Animation Performance Tests
 
@@ -241,14 +254,14 @@ final class PerformanceMetricsTests: XCTestCase {
     func testDebouncePerformance() async {
         // Given: Rapid input changes
         let inputValues = (0..<100).map { "Query \($0)" }
-        var processedCount = 0
+        let processedCount = ProcessCounter()
 
         // When: Processing with debounce
         for value in inputValues {
             // Simulate debounced processing
-            Task {
+            Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 10_000_000) // 10ms debounce
-                processedCount += 1
+                await processedCount.increment()
             }
             _ = value
         }
@@ -257,6 +270,7 @@ final class PerformanceMetricsTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
 
         // Then: Not all inputs should be processed (debouncing works)
-        XCTAssertLessThan(processedCount, inputValues.count)
+        let finalCount = await processedCount.getValue()
+        XCTAssertLessThan(finalCount, inputValues.count)
     }
 }
