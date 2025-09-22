@@ -67,8 +67,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private func setupSavePipeline() {
         saveCancellable = saveSubject
             .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
-            .sink { items in
-                Task { [weak self] in
+            .sink { @Sendable items in
+                Task { @MainActor [weak self] in
                     await self?.saveToRepository(items)
                 }
             }

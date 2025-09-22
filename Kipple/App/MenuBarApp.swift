@@ -186,15 +186,11 @@ final class MenuBarApp: NSObject, ObservableObject {
         
         // 非同期で保存処理を実行
         Task {
-            do {
-                // デバウンスされた保存を即座に実行
-                Logger.shared.log("Flushing pending saves...")
-                await clipboardService.flushPendingSaves()
+            // デバウンスされた保存を即座に実行
+            Logger.shared.log("Flushing pending saves...")
+            await clipboardService.flushPendingSaves()
 
-                Logger.shared.log("✅ Successfully saved data before quit")
-            } catch {
-                Logger.shared.error("❌ Failed to save on quit: \(error)")
-            }
+            Logger.shared.log("✅ Successfully saved data before quit")
             
             // タイムアウトをキャンセル
             self.terminationWorkItem?.cancel()

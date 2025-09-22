@@ -12,8 +12,10 @@ final class SimplifiedHotkeyManager {
 
     private var keyCode: UInt16 = 46 // M key default
     private var modifiers: NSEvent.ModifierFlags = [.control, .option]
-    private var eventMonitor: Any?
+    private var globalEventMonitor: Any?
+    private var localEventMonitor: Any?
     private var isEnabled: Bool = true
+    private var hasInputMonitoringPermission = false
 
     // MARK: - Initialization
 
@@ -88,27 +90,99 @@ final class SimplifiedHotkeyManager {
         return description
     }
 
+    /// Check if we have Input Monitoring permission
+    private func checkInputMonitoringPermission() {
+        // Test if global monitoring is working by checking if we can create a test monitor
+        let testMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { _ in }
+        if let monitor = testMonitor {
+            NSEvent.removeMonitor(monitor)
+            hasInputMonitoringPermission = true
+            Logger.shared.info("Input Monitoring permission: GRANTED")
+        } else {
+            hasInputMonitoringPermission = false
+            Logger.shared.warning("Input Monitoring permission: NOT GRANTED - Global hotkey will only work when Kipple is active")
+            showInputMonitoringAlert()
+        }
+    }
+
+    /// Show alert for Input Monitoring permission
+    private func showInputMonitoringAlert() {
+        // Only show alert once per session
+        guard !UserDefaults.standard.bool(forKey: "InputMonitoringAlertShown") else { return }
+        UserDefaults.standard.set(true, forKey: "InputMonitoringAlertShown")
+
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Input Monitoring Permission Required"
+            alert.informativeText = """
+                Kipple needs Input Monitoring permission for the global hotkey (⌃⌥M) to work when other apps are in focus.
+
+                Without this permission:
+                • The hotkey will only work when Kipple's window is active
+                • You can still use the menu bar icon to open Kipple
+
+                To enable:
+                1. Open System Settings → Privacy & Security → Input Monitoring
+                2. Enable the toggle for Kipple
+                3. Restart Kipple
+                """
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Later")
+
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // Open Input Monitoring settings
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+    }
+
     // MARK: - Private Methods
 
     private func startMonitoring() {
         guard isEnabled else { return }
 
-        // Ensure previous monitor is removed before creating new one
+        // Ensure previous monitors are removed before creating new ones
         stopMonitoring()
 
         // Add small delay to ensure cleanup is complete
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+
+            // Try to add global monitor (requires Input Monitoring permission)
+            self.globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 self?.handleKeyEvent(event)
             }
+
+            // Also add local monitor as fallback (works when app is active)
+            self.localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self = self else { return event }
+                self.handleKeyEvent(event)
+                // Return nil to consume the event if it matches our hotkey
+                let eventKeyCode = event.keyCode
+                let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                if eventKeyCode == self.keyCode && eventModifiers == self.modifiers {
+                    return nil
+                }
+                return event
+            }
+
+            // Check if we have Input Monitoring permission
+            self.checkInputMonitoringPermission()
         }
     }
 
     private func stopMonitoring() {
-        if let monitor = eventMonitor {
+        if let monitor = globalEventMonitor {
             NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
+            globalEventMonitor = nil
+        }
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            localEventMonitor = nil
         }
     }
 
