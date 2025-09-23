@@ -18,6 +18,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private let modernService = ModernClipboardService.shared
     private var refreshTask: Task<Void, Never>?
     private nonisolated(unsafe) var autoClearTimer: Timer?
+    private var historyObserver: NSObjectProtocol?
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -30,6 +31,16 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     private init() {
         startPeriodicRefresh()
+        historyObserver = NotificationCenter.default.addObserver(
+            forName: .modernClipboardHistoryDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task {
+                await self.refreshHistory()
+            }
+        }
     }
 
     deinit {
@@ -104,21 +115,32 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
 
         // Update backend synchronously via Task and wait for result
+        history[index].isPinned.toggle()
+        let newState = history[index].isPinned
+
         Task {
-            _ = await modernService.togglePin(for: item)
+            let result = await modernService.togglePin(for: item)
+            if result != newState {
+                // Backend rejected change (e.g. limit), revert local state
+                history[index].isPinned = result
+            }
             // Always refresh history to ensure consistency
             await refreshHistory()
         }
 
         // Return expected new state (backend will be updated async)
-        return !currentlyPinned
+        return newState
     }
 
     func deleteItem(_ item: ClipItem) {
         Task {
-            await modernService.deleteItem(item)
-            await refreshHistory()
+            await self.deleteItem(item)
         }
+    }
+
+    func deleteItem(_ item: ClipItem) async {
+        await modernService.deleteItem(item)
+        await refreshHistory()
     }
 
     func clearHistory(keepPinned: Bool) async {
@@ -175,17 +197,19 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
                     if remaining <= 0 {
                         // Clear only system clipboard, not history (matches legacy behavior)
                         self.performAutoClear()
-                        self.stopAutoClearTimer()
+                        self.stopAutoClearTimer(resetRemaining: false)
                     }
                 }
             }
         }
     }
 
-    func stopAutoClearTimer() {
+    func stopAutoClearTimer(resetRemaining: Bool = true) {
         autoClearTimer?.invalidate()
         autoClearTimer = nil
-        autoClearRemainingTime = nil
+        if resetRemaining {
+            autoClearRemainingTime = nil
+        }
     }
 
     // MARK: - Private Methods

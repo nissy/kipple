@@ -18,17 +18,16 @@ final class ClearAllHistoryBehaviorTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
-        // Clear any existing data
-        await service.clearHistory(keepPinned: false)
-        await service.stopMonitoring()
+        await service.resetForTesting()
+        await adapter.clearHistory(keepPinned: false)
     }
 
     override func tearDown() async throws {
-        // Clean up
-        await service.clearHistory(keepPinned: false)
-        await service.stopMonitoring()
+        await service.resetForTesting()
+        await adapter.clearHistory(keepPinned: false)
 
         service = nil
         adapter = nil

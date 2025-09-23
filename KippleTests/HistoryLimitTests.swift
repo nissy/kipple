@@ -18,10 +18,12 @@ final class HistoryLimitTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
-        // Clear any existing data
+        // Clear any existing data (including pinned)
         await service.clearAllHistory()
+        await service.clearHistory(keepPinned: false)
 
         // Reset to default settings
         AppSettings.shared.maxHistoryItems = 100
@@ -31,6 +33,7 @@ final class HistoryLimitTests: XCTestCase {
     override func tearDown() async throws {
         // Clean up
         await service.clearAllHistory()
+        await service.clearHistory(keepPinned: false)
 
         service = nil
         adapter = nil

@@ -12,6 +12,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         // Given: ModernClipboardServiceAdapter with some history
         let adapter = ModernClipboardServiceAdapter.shared
         let service = ModernClipboardService.shared
+        await service.resetForTesting()
 
         // Add some items to history
         await service.copyToClipboard("Modern Item 1", fromEditor: false)
@@ -55,6 +56,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         // Given: ModernClipboardService with pinned and regular items
         let adapter = ModernClipboardServiceAdapter.shared
         let service = ModernClipboardService.shared
+        await service.resetForTesting()
 
         // Clear existing history
         await service.clearHistory(keepPinned: false)
@@ -93,6 +95,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         // Given: ModernClipboardServiceAdapter
         let adapter = ModernClipboardServiceAdapter.shared
         let service = ModernClipboardService.shared
+        await service.resetForTesting()
 
         // Add test data
         await service.copyToClipboard("Timer test content", fromEditor: false)

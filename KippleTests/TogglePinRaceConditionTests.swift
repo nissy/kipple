@@ -19,24 +19,19 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
-        // Clear any existing data
-        await service.clearAllHistory()
-        await service.stopMonitoring()
-
-        // Ensure adapter is synced with service
+        await adapter.clearHistory(keepPinned: false)
         await adapter.flushPendingSaves()
-
-        // Wait for adapter to sync
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        try await Task.sleep(nanoseconds: 500_000_000)
     }
     
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
-        await service.stopMonitoring()
-        
+        await service.resetForTesting()
+        await adapter.clearHistory(keepPinned: false)
+
         service = nil
         adapter = nil
         
@@ -57,7 +52,8 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
             await service.copyToClipboard(item.content, fromEditor: false)
         }
         await service.flushPendingSaves()
-        
+        try? await Task.sleep(for: .seconds(0.3))
+
         // When: Toggle pin state of an item
         let historyBefore = adapter.history
         XCTAssertEqual(historyBefore.count, 3)

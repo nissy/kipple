@@ -19,6 +19,7 @@ final class MetadataPreservationTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
         viewModel = MainViewModel(clipboardService: adapter)
 

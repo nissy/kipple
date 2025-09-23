@@ -18,14 +18,19 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // Use in-memory repository for testing
         repository = try await SwiftDataRepository(inMemory: true)
+        await ModernClipboardService.shared.useTestingRepository(repository)
+        await ModernClipboardService.shared.resetForTesting()
 
         // Reset settings to defaults
         AppSettings.shared.maxHistoryItems = 100
         AppSettings.shared.maxPinnedItems = 20
+        await ModernClipboardService.shared.setMaxHistoryItems(100)
     }
 
     override func tearDown() async throws {
+        RepositoryProvider.useTestingRepository(nil)
         repository = nil
+        await ModernClipboardService.shared.resetForTesting()
 
         // Reset settings
         AppSettings.shared.maxHistoryItems = 300
@@ -47,9 +52,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // When: Create a new service instance (simulating app startup)
         let service = ModernClipboardService.shared
-
-        // Wait for initialization to complete
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        await service.loadHistoryFromRepository()
 
         // Then: History should be trimmed to maxHistoryItems
         let history = await service.getHistory()
@@ -58,7 +61,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // Verify the newest items are kept
         if !history.isEmpty {
-            XCTAssertEqual(history.first?.content, "Item 1",
+            XCTAssertEqual(history.first?.content, "Item 150",
                           "Newest items should be preserved")
         }
     }
@@ -91,7 +94,8 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // When: Create service (startup)
         let service = ModernClipboardService.shared
-        try await Task.sleep(nanoseconds: 500_000_000)
+        await service.setMaxHistoryItems(50)
+        await service.loadHistoryFromRepository()
 
         // Then: All pinned items should be preserved
         let history = await service.getHistory()
@@ -108,6 +112,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
     func testSettingsUpdateTrimsHistory() async throws {
         // Given: Service with 100 items
         let service = ModernClipboardService.shared
+        await service.loadHistoryFromRepository()
         let testItems = (1...100).map { index in
             ClipItem(content: "Item \(index)")
         }
@@ -161,6 +166,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // When: Service starts
         let service = ModernClipboardService.shared
+        await service.loadHistoryFromRepository()
         try await Task.sleep(nanoseconds: 200_000_000)
 
         // Then: Should handle gracefully
@@ -180,6 +186,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // When: Service starts
         let service = ModernClipboardService.shared
+        await service.resetForTesting()
         try await Task.sleep(nanoseconds: 500_000_000)
 
         // Then: Should trim to limit
@@ -203,6 +210,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // When: Service starts
         let service = ModernClipboardService.shared
+        await service.resetForTesting()
         try await Task.sleep(nanoseconds: 500_000_000)
 
         // Then: Should keep only up to limit even if all are pinned

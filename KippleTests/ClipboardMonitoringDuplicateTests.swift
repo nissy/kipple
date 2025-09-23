@@ -17,6 +17,7 @@ final class ClipboardMonitoringDuplicateTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
 
         // Clear any existing data
         await service.clearAllHistory()

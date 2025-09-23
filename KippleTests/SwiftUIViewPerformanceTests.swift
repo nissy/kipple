@@ -257,17 +257,22 @@ final class PerformanceMetricsTests: XCTestCase {
         let processedCount = ProcessCounter()
 
         // When: Processing with debounce
+        var currentTask: Task<Void, Never>?
         for value in inputValues {
-            // Simulate debounced processing
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 10_000_000) // 10ms debounce
-                await processedCount.increment()
+            currentTask?.cancel()
+            currentTask = Task { @MainActor in
+                do {
+                    try await Task.sleep(nanoseconds: 10_000_000) // 10ms debounce
+                    await processedCount.increment()
+                } catch {
+                    // Task cancelled - ignore
+                }
             }
             _ = value
         }
 
-        // Wait for debounce to complete
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        // Wait for final debounced task to complete
+        await currentTask?.value
 
         // Then: Not all inputs should be processed (debouncing works)
         let finalCount = await processedCount.getValue()

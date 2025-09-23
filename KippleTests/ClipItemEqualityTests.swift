@@ -112,11 +112,13 @@ final class ModernClipboardServicePinUpdateTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
         // Clear history before each test
         await service.clearAllHistory()
         await service.flushPendingSaves()
+        await adapter.clearHistory(keepPinned: false)
     }
 
     @MainActor
@@ -130,6 +132,7 @@ final class ModernClipboardServicePinUpdateTests: XCTestCase {
     func testPinToggleUpdatesUI() async throws {
         // Given: Add an item
         await service.copyToClipboard("Test Item", fromEditor: false)
+        try? await Task.sleep(for: .seconds(0.2))
 
         // Get initial history
         let initialHistory = adapter.history

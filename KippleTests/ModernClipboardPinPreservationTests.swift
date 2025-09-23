@@ -11,6 +11,7 @@ final class ModernClipboardPinPreservationTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
         // Stop monitoring to avoid interference
@@ -241,24 +242,14 @@ final class ModernClipboardPinPreservationTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    /// Test empty content handling
+    /// Test empty content is ignored
     func testEmptyContentPinPreservation() async throws {
         // Given: Empty content (edge case)
         let testContent = ""
         await service.copyToClipboard(testContent, fromEditor: false)
 
         var history = await service.getHistory()
-        if let item = history.first {
-            _ = await service.togglePin(for: item)
-        }
-
-        // When: Re-copy empty content
-        await service.copyToClipboard(testContent, fromEditor: false)
-
-        // Then: Pin should be preserved even for empty content
-        history = await service.getHistory()
-        XCTAssertTrue(history.first?.isPinned == true,
-                     "Pin should be preserved for empty content")
+        XCTAssertTrue(history.isEmpty, "Empty content should be ignored")
     }
 
     /// Test very long content

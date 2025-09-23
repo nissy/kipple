@@ -10,6 +10,7 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
 
         // Stop monitoring to avoid interference
         await service.stopMonitoring()

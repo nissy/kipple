@@ -125,7 +125,11 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func clearHistory(keepPinned: Bool) async {
-        await clipboardService.clearHistory(keepPinned: keepPinned)
+        if keepPinned {
+            await clipboardService.clearAllHistory()
+        } else {
+            await clipboardService.clearHistory(keepPinned: false)
+        }
         loadHistory()
     }
 

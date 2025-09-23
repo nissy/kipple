@@ -12,6 +12,7 @@ final class ModernClipboardMetadataAccuracyTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
         // Clear history completely before each test

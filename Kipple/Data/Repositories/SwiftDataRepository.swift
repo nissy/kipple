@@ -57,10 +57,13 @@ final class SwiftDataRepository: ClipboardRepositoryProtocol, @unchecked Sendabl
             }
         }
 
-        // Don't delete items that are not in the new items list
-        // save() should only add/update, not remove existing items
-
         try context.save()
+    }
+
+    func replaceAll(with items: [ClipItem]) async throws {
+        try await clear()
+        guard !items.isEmpty else { return }
+        try await save(items)
     }
 
     func load(limit: Int) async throws -> [ClipItem] {

@@ -11,6 +11,7 @@ final class ModernClipboardHashResetTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
         // Stop monitoring to avoid interference

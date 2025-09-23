@@ -18,6 +18,8 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         // Setup services
         clipboardService = ModernClipboardService.shared
         await clipboardService.clearAllHistory()
+        await clipboardService.clearHistory(keepPinned: false)
+        AppSettings.shared.maxPinnedItems = 20
 
         // Setup repository
         let schema = Schema([ClipItemModel.self])
@@ -36,6 +38,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
     override func tearDown() async throws {
         await clipboardService.stopMonitoring()
         await clipboardService.clearAllHistory()
+        await clipboardService.clearHistory(keepPinned: false)
         repository = nil
         container = nil
         cancellables.removeAll()
@@ -93,7 +96,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         // 1. Create test data
         let testItems = [
             ClipItem(content: "Persistent 1", isPinned: false),
-            ClipItem(content: "Persistent 2", isPinned: true),
+            ClipItem(content: "Persistent 2", isPinned: false),
             ClipItem(content: "Persistent 3", isPinned: false)
         ]
 
@@ -214,12 +217,17 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
 
         // 2. Pin items in service
         let history = await clipboardService.getHistory()
-        for item in history[0...1] {
-            _ = await clipboardService.togglePin(for: item)
+        for (index, item) in history[0...1].enumerated() {
+            let didPin = await clipboardService.togglePin(for: item)
+            XCTAssertTrue(didPin, "Toggle should succeed for item index \(index)")
+            let snapshot = await clipboardService.getHistory()
+            let pinnedCount = snapshot.filter { $0.isPinned }.count
+            XCTAssertEqual(pinnedCount, index + 1)
         }
 
         // 3. Save to repository
         let pinnedHistory = await clipboardService.getHistory()
+        XCTAssertEqual(pinnedHistory.filter { $0.isPinned }.count, 2)
         try await repository.save(pinnedHistory)
 
         // 4. Load pinned items from repository

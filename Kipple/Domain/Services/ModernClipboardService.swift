@@ -2,6 +2,10 @@ import Foundation
 import AppKit
 import Combine
 
+extension Notification.Name {
+    static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
+}
+
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
@@ -60,7 +64,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
     }
 
-    private func setRepository(_ repo: ClipboardRepositoryProtocol) {
+    func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
     }
 
@@ -74,7 +78,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             }
     }
 
-    private func loadHistoryFromRepository() async {
+    func loadHistoryFromRepository() async {
         guard let repository = repository else { return }
 
         do {
@@ -133,6 +137,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     func copyToClipboard(_ content: String, fromEditor: Bool) async {
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else { return }
+
         // Mark as internal copy to avoid re-adding to history
         await state.setInternalCopy(true)
         await state.setFromEditor(fromEditor)
@@ -211,23 +218,19 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func clearAllHistory() async {
         let pinnedItems = history.filter { $0.isPinned }
-        _ = history.filter { !$0.isPinned }  // removedItems for potential future use
-
-        // Keep pinned items to match legacy implementation behavior
         history = pinnedItems
 
         // No hash cleanup needed - we don't use hash-based duplicate detection
 
         // Save updated history to repository
         saveSubject.send(history)
+        notifyHistoryObservers()
     }
 
     func clearHistory(keepPinned: Bool) async {
         if keepPinned {
-            _ = history.filter { !$0.isPinned }  // removedItems for potential future use
             history = history.filter { $0.isPinned }
         } else {
-            _ = history  // removedItems for potential future use
             history.removeAll()
         }
 
@@ -235,6 +238,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Save updated history
         saveSubject.send(history)
+        notifyHistoryObservers()
     }
 
     func togglePin(for item: ClipItem) async -> Bool {
@@ -260,6 +264,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             // Trigger save
             saveSubject.send(history)
+            notifyHistoryObservers()
 
             return isPinned
         }
@@ -273,6 +278,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Trigger save
         saveSubject.send(history)
+        notifyHistoryObservers()
     }
 
     func updateItem(_ item: ClipItem) async {
@@ -285,6 +291,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             // Trigger save
             saveSubject.send(history)
+            notifyHistoryObservers()
         }
     }
 
@@ -311,7 +318,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func setMaxHistoryItems(_ max: Int) async {
         maxHistoryItems = max
-        trimHistory()
+        if trimHistory() {
+            saveSubject.send(history)
+            notifyHistoryObservers()
+        }
     }
 
     func setInternalOperation(_ value: Bool) async {
@@ -367,6 +377,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             return
         }
 
+        let isInternalCopy = await state.getInternalCopy()
+        if isInternalCopy && expectedChangeCount == nil {
+            lastChangeCount = changeCount
+            await state.setInternalCopy(false)
+            await state.setFromEditor(false)
+            return
+        }
+
         // Clear any stale expected count if we've moved past it
         if let expected = expectedChangeCount, changeCount > expected {
             await state.setExpectedChangeCount(nil)
@@ -379,7 +397,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Get clipboard content
         if let content = await MainActor.run(body: { [pasteboard] in
             pasteboard.string(forType: .string)
-        }) {
+        }), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Get app info for metadata
             let appInfo = await MainActor.run {
                 getActiveAppInfo()
@@ -398,6 +416,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             // Always add to history - addToHistory handles duplicates by moving them to top
             addToHistory(item)
             lastEventTime = Date()
+        } else {
+            await state.setInternalCopy(false)
+            await state.setFromEditor(false)
         }
 
         // Reset flags
@@ -421,10 +442,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         history.insert(newItem, at: 0)
 
         // Trim history to max size
-        trimHistory()
+        _ = trimHistory()
 
         // Trigger save
         saveSubject.send(history)
+        notifyHistoryObservers()
     }
 
     // MARK: - Flush Pending Saves
@@ -500,19 +522,48 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return nil
     }
 
-    private func trimHistory() {
-        if history.count > maxHistoryItems {
-            // Keep pinned items and most recent items
-            let pinnedItems = history.filter { $0.isPinned }
-            let unpinnedItems = history.filter { !$0.isPinned }
-            let maxUnpinned = maxHistoryItems - pinnedItems.count
+    @discardableResult
+    private func trimHistory() -> Bool {
+        guard history.count > maxHistoryItems else { return false }
 
-            if maxUnpinned > 0 {
-                history = pinnedItems + Array(unpinnedItems.prefix(maxUnpinned))
-            } else {
-                history = Array(pinnedItems.prefix(maxHistoryItems))
+        let totalPinned = history.reduce(into: 0) { count, item in
+            if item.isPinned { count += 1 }
+        }
+        let allowedPinned = min(totalPinned, maxHistoryItems)
+        let allowedUnpinned = max(0, maxHistoryItems - allowedPinned)
+
+        var trimmed: [ClipItem] = []
+        trimmed.reserveCapacity(maxHistoryItems)
+
+        var pinnedAdded = 0
+        var unpinnedAdded = 0
+
+        for item in history {
+            if item.isPinned {
+                if pinnedAdded < allowedPinned {
+                    trimmed.append(item)
+                    pinnedAdded += 1
+                }
+            } else if unpinnedAdded < allowedUnpinned {
+                trimmed.append(item)
+                unpinnedAdded += 1
+            }
+
+            if trimmed.count == maxHistoryItems {
+                break
             }
         }
+
+        if trimmed != history {
+            history = trimmed
+            return true
+        }
+
+        return false
+    }
+
+    private func notifyHistoryObservers() {
+        NotificationCenter.default.post(name: .modernClipboardHistoryDidChange, object: nil)
     }
 
     // MARK: - App Tracking

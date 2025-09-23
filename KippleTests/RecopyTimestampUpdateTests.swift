@@ -19,18 +19,18 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
         viewModel = MainViewModel(clipboardService: adapter)
 
-        // Clear any existing data
-        await service.clearAllHistory()
-        await service.stopMonitoring()
+        await service.resetForTesting()
+        await adapter.clearHistory(keepPinned: false)
     }
 
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
-        await service.stopMonitoring()
+        await service.resetForTesting()
+        await adapter.clearHistory(keepPinned: false)
 
         service = nil
         adapter = nil

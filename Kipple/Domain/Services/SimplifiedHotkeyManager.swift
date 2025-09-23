@@ -56,6 +56,7 @@ final class SimplifiedHotkeyManager {
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "enableHotkey")
+        UserDefaults.standard.set(enabled, forKey: "KippleHotkeyEnabled")
 
         if enabled {
             startMonitoring()
@@ -203,15 +204,18 @@ final class SimplifiedHotkeyManager {
 
     private func loadSettings() {
         // Use the same keys as HotkeyManager for compatibility
-        if let savedKeyCode = UserDefaults.standard.object(forKey: "hotkeyKeyCode") as? Int {
+        if let savedKeyCode = (UserDefaults.standard.object(forKey: "hotkeyKeyCode")
+            ?? UserDefaults.standard.object(forKey: "KippleHotkeyCode")) as? Int {
             keyCode = UInt16(savedKeyCode)
         }
 
-        if let savedModifiers = UserDefaults.standard.object(forKey: "hotkeyModifierFlags") as? UInt {
+        if let savedModifiers = (UserDefaults.standard.object(forKey: "hotkeyModifierFlags")
+            ?? UserDefaults.standard.object(forKey: "KippleHotkeyModifiers")) as? UInt {
             modifiers = NSEvent.ModifierFlags(rawValue: savedModifiers)
         }
 
-        if let savedEnabled = UserDefaults.standard.object(forKey: "enableHotkey") as? Bool {
+        if let savedEnabled = (UserDefaults.standard.object(forKey: "enableHotkey")
+            ?? UserDefaults.standard.object(forKey: "KippleHotkeyEnabled")) as? Bool {
             isEnabled = savedEnabled
         }
     }
@@ -219,8 +223,11 @@ final class SimplifiedHotkeyManager {
     private func saveSettings() {
         // Use the same keys as HotkeyManager for compatibility
         UserDefaults.standard.set(Int(keyCode), forKey: "hotkeyKeyCode")
+        UserDefaults.standard.set(Int(keyCode), forKey: "KippleHotkeyCode")
         UserDefaults.standard.set(modifiers.rawValue, forKey: "hotkeyModifierFlags")
+        UserDefaults.standard.set(modifiers.rawValue, forKey: "KippleHotkeyModifiers")
         UserDefaults.standard.set(isEnabled, forKey: "enableHotkey")
+        UserDefaults.standard.set(isEnabled, forKey: "KippleHotkeyEnabled")
     }
 
     // MARK: - Notification Observers

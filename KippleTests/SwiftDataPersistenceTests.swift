@@ -28,7 +28,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
         let item3 = ClipItem(content: "Item 3", isPinned: false)
 
         var items = [item1, item2, item3]
-        try await repository.save(items)
+        try await repository.replaceAll(with: items)
 
         // Verify all items are saved
         var loaded = try await repository.loadAll()
@@ -36,7 +36,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
 
         // When: Remove item2 and save
         items.removeAll { $0.id == item2.id }
-        try await repository.save(items)
+        try await repository.replaceAll(with: items)
 
         // Then: Item2 should not be in the repository
         loaded = try await repository.loadAll()
@@ -60,7 +60,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
         try await repository.save(items)
 
         // When: Clear by saving empty array
-        try await repository.save([])
+        try await repository.replaceAll(with: [])
 
         // Then: Repository should be empty
         let loaded = try await repository.loadAll()
@@ -144,7 +144,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
         item2.isPinned = true
         let item4 = ClipItem(content: "New", isPinned: true)
 
-        try await repository.save([item1, item2, item4])
+        try await repository.replaceAll(with: [item1, item2, item4])
 
         // Then: Verify all operations worked
         let loaded = try await repository.loadAll()
@@ -178,7 +178,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
 
         // When: Enforce limit of 3 by keeping only first 3
         let limitedItems = Array(items.prefix(3))
-        try await repository.save(limitedItems)
+        try await repository.replaceAll(with: limitedItems)
 
         // Then: Only 3 items should remain
         let loaded = try await repository.loadAll()
@@ -205,7 +205,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
         try await repository.save(items)
 
         // When: Save empty array
-        try await repository.save([])
+        try await repository.replaceAll(with: [])
 
         // Then: Repository should be empty
         let loaded = try await repository.loadAll()
@@ -271,7 +271,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
                 items.removeFirst()
             }
 
-            try await repository.save(items)
+            try await repository.replaceAll(with: items)
         }
 
         // Then: Final state should be consistent

@@ -19,6 +19,7 @@ final class AppInfoRecordingTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
         // Clear any existing data

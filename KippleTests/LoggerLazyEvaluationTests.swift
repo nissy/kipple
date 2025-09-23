@@ -43,9 +43,7 @@ final class LoggerLazyEvaluationTests: XCTestCase {
     override func setUp() {
         super.setUp()
         UserDefaults.standard.removeObject(forKey: "enableDebugLogs")
-        Task { @MainActor in
-            Logger.shared.refreshConfig() // clear cache
-        }
+        Logger.shared.refreshConfig() // clear cache
         LoggerLazyEvaluationTests.counter.reset()
     }
 

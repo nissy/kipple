@@ -18,6 +18,7 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
         // Clear any existing data (including pinned items)
@@ -146,6 +147,30 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         // Then: Should be able to add it back
         history = await service.getHistory()
         XCTAssertEqual(history[0].content, "Item 2", "Should be able to re-add trimmed item")
+    }
+
+    func testPinnedItemKeepsRelativeOrderAfterTrimming() async throws {
+        // Given: history limit set to 3 with an older pinned item
+        await service.setMaxHistoryItems(3)
+
+        await service.copyToClipboard("Item 1", fromEditor: false)
+        await service.copyToClipboard("Item 2", fromEditor: false)
+        await service.flushPendingSaves()
+
+        var history = await service.getHistory()
+        let pinnedCandidate = history[1]
+        _ = await service.togglePin(for: pinnedCandidate)
+
+        // When: new items push history past the limit
+        await service.copyToClipboard("Item 3", fromEditor: false)
+        await service.copyToClipboard("Item 4", fromEditor: false)
+        await service.flushPendingSaves()
+
+        history = await service.getHistory()
+
+        // Then: the most recent unpinned items remain at the top and the pinned item stays last
+        XCTAssertEqual(history.map(\.content), ["Item 4", "Item 3", "Item 1"], "Pinned item should retain its relative order")
+        XCTAssertTrue(history[2].isPinned)
     }
     
     func testRecopyIdenticalContentAfterTrimming() async throws {

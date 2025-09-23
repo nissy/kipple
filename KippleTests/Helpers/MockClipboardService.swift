@@ -10,7 +10,11 @@ import Foundation
 
 @MainActor
 class MockClipboardService: ClipboardServiceProtocol {
-    var history: [ClipItem] = []
+    var history: [ClipItem] = [] {
+        didSet {
+            pinnedItems = history.filter { $0.isPinned }
+        }
+    }
     var pinnedItems: [ClipItem] = []
     var currentClipboardContent: String?
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -85,14 +89,12 @@ class MockClipboardService: ClipboardServiceProtocol {
     func clearAllHistory() {
         clearAllHistoryCalled = true
         history.removeAll()
-        pinnedItems.removeAll()
         currentClipboardContent = nil
     }
 
     func clearHistory(keepPinned: Bool) async {
         if keepPinned {
             history = history.filter { $0.isPinned }
-            pinnedItems = history.filter { $0.isPinned }
         } else {
             clearAllHistory()
         }
@@ -104,13 +106,6 @@ class MockClipboardService: ClipboardServiceProtocol {
 
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             history[index].isPinned.toggle()
-
-            if history[index].isPinned {
-                pinnedItems.append(history[index])
-            } else {
-                pinnedItems.removeAll { $0.id == item.id }
-            }
-
             return history[index].isPinned
         }
         return false
@@ -120,14 +115,12 @@ class MockClipboardService: ClipboardServiceProtocol {
         deleteItemCalled = true
         lastDeletedItem = item
         history.removeAll { $0.id == item.id }
-        pinnedItems.removeAll { $0.id == item.id }
     }
 
     func deleteItem(_ item: ClipItem) async {
         deleteItemCalled = true
         lastDeletedItem = item
         history.removeAll { $0.id == item.id }
-        pinnedItems.removeAll { $0.id == item.id }
     }
 
     func flushPendingSaves() async {
@@ -139,23 +132,14 @@ class MockClipboardService: ClipboardServiceProtocol {
         var item = ClipItem(content: content, sourceApp: sourceApp)
         item.isPinned = isPinned
         history.append(item)
-
-        if isPinned {
-            pinnedItems.append(item)
-        }
     }
 
     func addTestItem(_ item: ClipItem) {
         history.append(item)
-
-        if item.isPinned {
-            pinnedItems.append(item)
-        }
     }
 
     func reset() {
         history.removeAll()
-        pinnedItems.removeAll()
         currentClipboardContent = nil
         isMonitoringActive = false
         lastCopiedContent = nil

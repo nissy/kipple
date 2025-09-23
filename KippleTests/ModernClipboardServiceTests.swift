@@ -10,6 +10,7 @@ final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
     }
 
     override func tearDown() async throws {
@@ -58,8 +59,8 @@ final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
         await service.copyToClipboard(content, fromEditor: false)
 
         // Then - Should mark as internal copy
-        let pasteboard = NSPasteboard.general
-        XCTAssertEqual(pasteboard.string(forType: .string), content)
+        let clipboardValue = await MainActor.run { NSPasteboard.general.string(forType: .string) }
+        XCTAssertEqual(clipboardValue, content)
     }
 
     func testAddToHistory() async {

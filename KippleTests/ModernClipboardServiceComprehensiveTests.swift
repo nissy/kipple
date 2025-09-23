@@ -10,13 +10,17 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
     override func setUp() async throws {
         try await super.setUp()
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         await service.clearAllHistory()
+        await service.clearHistory(keepPinned: false)
+        AppSettings.shared.maxPinnedItems = 20
         cancellables.removeAll()
     }
 
     override func tearDown() async throws {
         await service.stopMonitoring()
         await service.clearAllHistory()
+        await service.clearHistory(keepPinned: false)
         cancellables.removeAll()
         service = nil
         try await super.tearDown()

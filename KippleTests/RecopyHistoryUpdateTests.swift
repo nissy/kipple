@@ -18,17 +18,15 @@ final class RecopyHistoryUpdateTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
-
-        // Clear any existing data
-        await service.clearAllHistory()
-        await service.stopMonitoring()
+        await adapter.clearHistory(keepPinned: false)
     }
 
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
-        await service.stopMonitoring()
+        await service.resetForTesting()
+        await adapter.clearHistory(keepPinned: false)
 
         service = nil
         adapter = nil
@@ -137,12 +135,16 @@ final class RecopyHistoryUpdateTests: XCTestCase {
         await service.copyToClipboard("Non-empty", fromEditor: false)
         await service.flushPendingSaves()
 
+        var history = await service.getHistory()
+        XCTAssertEqual(history.count, 1)
+        XCTAssertEqual(history.first?.content, "Non-empty")
+
         // When: Recopy empty string
         await service.copyToClipboard("", fromEditor: false)
         await service.flushPendingSaves()
 
         // Then: Should handle gracefully (empty strings might be filtered)
-        let history = await service.getHistory()
+        history = await service.getHistory()
         // Empty strings are typically filtered out
         XCTAssertTrue(history.allSatisfy { !$0.content.isEmpty }, "Empty strings should be filtered")
     }

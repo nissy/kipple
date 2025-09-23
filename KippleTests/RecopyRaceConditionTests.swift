@@ -18,19 +18,15 @@ final class RecopyRaceConditionTests: XCTestCase {
         try await super.setUp()
         
         service = ModernClipboardService.shared
-        
-        // Clear any existing data
-        await service.clearHistory(keepPinned: false)
-        await service.stopMonitoring()
-        await service.flushPendingSaves()
+
+        await service.resetForTesting()
     }
-    
+
     override func tearDown() async throws {
-        await service.clearHistory(keepPinned: false)
-        await service.stopMonitoring()
-        
+        await service.resetForTesting()
+
         service = nil
-        
+
         try await super.tearDown()
     }
     
