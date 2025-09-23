@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 import AppKit
 
 // MARK: - Modern Clipboard Service Adapter
@@ -18,7 +17,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private let modernService = ModernClipboardService.shared
     private var refreshTask: Task<Void, Never>?
     private nonisolated(unsafe) var autoClearTimer: Timer?
-    private var historyObserver: NSObjectProtocol?
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -30,22 +28,19 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     // MARK: - Initialization
 
     private init() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(historyDidChange(_:)),
+            name: .modernClipboardHistoryDidChange,
+            object: nil
+        )
         startPeriodicRefresh()
-        historyObserver = NotificationCenter.default.addObserver(
-            forName: .modernClipboardHistoryDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            Task {
-                await self.refreshHistory()
-            }
-        }
     }
 
     deinit {
         refreshTask?.cancel()
         autoClearTimer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - ClipboardServiceProtocol Implementation
@@ -232,12 +227,11 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     private func startPeriodicRefresh() {
+        let interval: TimeInterval = 5.0
         refreshTask = Task {
             while !Task.isCancelled {
                 await refreshHistory()
-                // Refresh every 1 second for balanced performance
-                // This reduces CPU usage while maintaining reasonable responsiveness
-                try? await Task.sleep(for: .seconds(1.0))
+                try? await Task.sleep(for: .seconds(interval))
             }
         }
     }
@@ -247,10 +241,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
         // Only update if history actually changed (comparing IDs and pinned states)
-        let historyChanged = history.count != newHistory.count ||
-            !zip(history, newHistory).allSatisfy { old, new in
-                old.id == new.id && old.isPinned == new.isPinned
-            }
+        let historyChanged = history != newHistory
 
         if historyChanged {
             history = newHistory
@@ -264,6 +255,13 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         // Update current clipboard content if changed
         if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent
+        }
+    }
+
+    @objc private func historyDidChange(_ notification: Notification) {
+        Task { [weak self] in
+            guard let self else { return }
+            await self.refreshHistory()
         }
     }
 }

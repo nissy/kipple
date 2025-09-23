@@ -15,7 +15,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var pollingTask: Task<Void, Never>?
     private let state = ClipboardState()
     private var lastEventTime = Date()
-    private var lastChangeCount = NSPasteboard.general.changeCount
+    private var lastChangeCount = 0
     private var currentInterval: TimeInterval = 0.5
     private let minInterval: TimeInterval = 0.5
     private let maxInterval: TimeInterval = 1.0
@@ -42,6 +42,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 AppSettings.shared.maxHistoryItems
             }
             await self.setMaxHistoryItems(maxItems)
+
+            let initialChangeCount = await MainActor.run {
+                NSPasteboard.general.changeCount
+            }
+            await self.updateLastChangeCount(initialChangeCount)
 
             await self.initializeRepository()
             await self.setupSavePipeline()
@@ -332,6 +337,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await state.setExpectedChangeCount(value)
     }
 
+    private func updateLastChangeCount(_ value: Int) {
+        lastChangeCount = value
+    }
+
     // MARK: - Private Methods
 
     private func startPollingLoop() async {
@@ -361,8 +370,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func checkClipboard() async {
-        let pasteboard = NSPasteboard.general
-        let changeCount = pasteboard.changeCount
+        let changeCount = await MainActor.run {
+            NSPasteboard.general.changeCount
+        }
 
         guard changeCount != lastChangeCount else { return }
 
@@ -395,8 +405,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         lastChangeCount = changeCount
 
         // Get clipboard content
-        if let content = await MainActor.run(body: { [pasteboard] in
-            pasteboard.string(forType: .string)
+        if let content = await MainActor.run(body: {
+            NSPasteboard.general.string(forType: .string)
         }), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Get app info for metadata
             let appInfo = await MainActor.run {
@@ -563,7 +573,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func notifyHistoryObservers() {
-        NotificationCenter.default.post(name: .modernClipboardHistoryDidChange, object: nil)
+        Task { @MainActor in
+            NotificationCenter.default.post(name: .modernClipboardHistoryDidChange, object: nil)
+        }
     }
 
     // MARK: - App Tracking

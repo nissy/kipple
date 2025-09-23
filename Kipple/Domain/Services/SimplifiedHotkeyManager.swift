@@ -1,12 +1,13 @@
 import Foundation
 import AppKit
+import Carbon
 
 /// Simplified modern hotkey manager - manages a single global hotkey
 @MainActor
 final class SimplifiedHotkeyManager {
     // MARK: - Singleton
 
-    static let shared = SimplifiedHotkeyManager()
+    @MainActor static let shared = SimplifiedHotkeyManager()
 
     // MARK: - Properties
 
@@ -16,6 +17,10 @@ final class SimplifiedHotkeyManager {
     private var localEventMonitor: Any?
     private var isEnabled: Bool = true
     private var hasInputMonitoringPermission = false
+    private var hotKeyRef: EventHotKeyRef?
+    @MainActor private static var hotKeyEventHandler: EventHandlerRef?
+    private static let hotKeySignature: OSType = 0x4B50484B // 'KPHK'
+    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     // MARK: - Initialization
 
@@ -93,6 +98,10 @@ final class SimplifiedHotkeyManager {
 
     /// Check if we have Input Monitoring permission
     private func checkInputMonitoringPermission() {
+        if isRunningTests {
+            hasInputMonitoringPermission = true
+            return
+        }
         // Test if global monitoring is working by checking if we can create a test monitor
         let testMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { _ in }
         if let monitor = testMonitor {
@@ -102,42 +111,6 @@ final class SimplifiedHotkeyManager {
         } else {
             hasInputMonitoringPermission = false
             Logger.shared.warning("Input Monitoring permission: NOT GRANTED - Global hotkey will only work when Kipple is active")
-            showInputMonitoringAlert()
-        }
-    }
-
-    /// Show alert for Input Monitoring permission
-    private func showInputMonitoringAlert() {
-        // Only show alert once per session
-        guard !UserDefaults.standard.bool(forKey: "InputMonitoringAlertShown") else { return }
-        UserDefaults.standard.set(true, forKey: "InputMonitoringAlertShown")
-
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Input Monitoring Permission Required"
-            alert.informativeText = """
-                Kipple needs Input Monitoring permission for the global hotkey (⌃⌥M) to work when other apps are in focus.
-
-                Without this permission:
-                • The hotkey will only work when Kipple's window is active
-                • You can still use the menu bar icon to open Kipple
-
-                To enable:
-                1. Open System Settings → Privacy & Security → Input Monitoring
-                2. Enable the toggle for Kipple
-                3. Restart Kipple
-                """
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Later")
-
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                // Open Input Monitoring settings
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
         }
     }
 
@@ -152,6 +125,10 @@ final class SimplifiedHotkeyManager {
         // Add small delay to ensure cleanup is complete
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+
+            if !self.isRunningTests && self.registerHotKey() {
+                return
+            }
 
             // Try to add global monitor (requires Input Monitoring permission)
             self.globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -177,6 +154,10 @@ final class SimplifiedHotkeyManager {
     }
 
     private func stopMonitoring() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
         if let monitor = globalEventMonitor {
             NSEvent.removeMonitor(monitor)
             globalEventMonitor = nil
@@ -188,18 +169,57 @@ final class SimplifiedHotkeyManager {
     }
 
     private func handleKeyEvent(_ event: NSEvent) {
-        guard isEnabled else { return }
-
         let eventKeyCode = event.keyCode
         let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         if eventKeyCode == keyCode && eventModifiers == modifiers {
-            // Post notification for window toggle
+            SimplifiedHotkeyManager.scheduleToggleNotification()
+        }
+    }
+
+    nonisolated private static func scheduleToggleNotification() {
+        Task { @MainActor in
+            let manager = SimplifiedHotkeyManager.shared
+            guard manager.isEnabled else { return }
             NotificationCenter.default.post(
                 name: NSNotification.Name("toggleMainWindow"),
                 object: nil
             )
         }
+    }
+
+    @MainActor
+    private func registerHotKey() -> Bool {
+        installHotKeyHandlerIfNeeded()
+
+        var id = EventHotKeyID(signature: SimplifiedHotkeyManager.hotKeySignature, id: 1)
+        let status = RegisterEventHotKey(UInt32(keyCode), carbonFlags(from: modifiers), id, GetEventDispatcherTarget(), 0, &hotKeyRef)
+        if status != noErr {
+            hotKeyRef = nil
+            return false
+        }
+        return true
+    }
+
+    @MainActor
+    private func installHotKeyHandlerIfNeeded() {
+        guard SimplifiedHotkeyManager.hotKeyEventHandler == nil else { return }
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        InstallEventHandler(GetEventDispatcherTarget(), SimplifiedHotkeyManager.hotKeyEventCallback, 1, &eventType, nil, &SimplifiedHotkeyManager.hotKeyEventHandler)
+    }
+
+    private func carbonFlags(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var carbon: UInt32 = 0
+        if flags.contains(.command) { carbon |= UInt32(cmdKey) }
+        if flags.contains(.option) { carbon |= UInt32(optionKey) }
+        if flags.contains(.control) { carbon |= UInt32(controlKey) }
+        if flags.contains(.shift) { carbon |= UInt32(shiftKey) }
+        return carbon
+    }
+
+    private static let hotKeyEventCallback: EventHandlerUPP = { _, _, _ in
+        SimplifiedHotkeyManager.scheduleToggleNotification()
+        return noErr
     }
 
     private func loadSettings() {
