@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct HistoryItemView: View {
     let item: ClipItem
@@ -29,9 +30,10 @@ struct HistoryItemView: View {
             backgroundView
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    closePopover()
                     onTap()
                 }
-            
+
             HStack(spacing: 8) {
             // ピンボタン
             ZStack {
@@ -47,6 +49,7 @@ struct HistoryItemView: View {
             .frame(width: 24, height: 24)
             .contentShape(Circle())
             .onTapGesture {
+                closePopover()
                 onTogglePin()
             }
             
@@ -67,6 +70,7 @@ struct HistoryItemView: View {
                 .frame(width: 24, height: 24)
                 .contentShape(Circle())
                 .onTapGesture {
+                    closePopover()
                     item.performAction()
                 }
                 .help(item.actionTitle ?? "")
@@ -86,6 +90,7 @@ struct HistoryItemView: View {
                 .frame(width: 24, height: 24)
                 .contentShape(Circle())
                 .onTapGesture {
+                    closePopover()
                     onCategoryTap()
                 }
                 .help("「\(item.category.rawValue)」でフィルタ")
@@ -113,15 +118,17 @@ struct HistoryItemView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    closePopover()
                     onTap()
                 }
-            
+
             if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
                     .contentShape(Circle())
                     .onTapGesture {
+                        closePopover()
                         onDelete()
                     }
                     .transition(.opacity.animation(.easeInOut(duration: 0.15)))
@@ -140,62 +147,35 @@ struct HistoryItemView: View {
             
             isHovered = hovering
             
-            // タイマーをキャンセル
-            popoverTimer?.invalidate()
-            popoverTimer = nil
+            cancelPopoverTimer()
             
             if hovering {
-                // ポップオーバーの遅延表示
-                popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
-                    if isHovered && !isScrolling {
-                        // 初回のみウィンドウ位置を確認
-                        if windowPosition == nil {
-                            windowPosition = checkWindowPosition()
-                        }
-                        isShowingPopover = true
-                    }
-                }
+                schedulePopoverPresentation()
             } else {
-                isShowingPopover = false
+                closePopover()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
             isScrolling = true
-            if isShowingPopover {
-                isShowingPopover = false
-            }
-            popoverTimer?.invalidate()
-            popoverTimer = nil
+            closePopover()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification)) { _ in
             isScrolling = false
             // スクロール終了後、ホバー中ならポップオーバーを再開
             if isHovered {
-                popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
-                    if isHovered && !isScrolling {
-                        // 初回のみウィンドウ位置を確認
-                        if windowPosition == nil {
-                            windowPosition = checkWindowPosition()
-                        }
-                        isShowingPopover = true
-                    }
-                }
+                schedulePopoverPresentation()
             }
         }
-        .popover(
-            isPresented: $isShowingPopover,
-            attachmentAnchor: popoverAttachmentAnchor,
-            arrowEdge: popoverArrowEdge
-        ) {
-            if isShowingPopover {
+        .background(
+            HoverPopoverPresenter(
+                isPresented: $isShowingPopover,
+                arrowEdge: popoverArrowEdge
+            ) {
                 ClipboardItemPopover(item: item)
-                    .interactiveDismissDisabled() // ポップオーバー内のクリックで閉じないようにする
             }
-        }
+        )
         .onDisappear {
-            popoverTimer?.invalidate()
-            popoverTimer = nil
-            isShowingPopover = false
+            closePopover()
         }
     }
     
@@ -230,15 +210,35 @@ struct HistoryItemView: View {
         return windowFrame.midX < screenCenter
     }
     
-    private var popoverAttachmentAnchor: PopoverAttachmentAnchor {
-        // プレビューをできるだけウィンドウの外側に表示するための設定
-        return .rect(.bounds)  // アイテムの境界に基づいて配置
-    }
-    
     private var popoverArrowEdge: Edge {
         // プレビューの矢印の向きを調整（ウィンドウの位置に基づいて左右に表示）
         // 初期値がnilの場合はデフォルトで右側に表示
         return (windowPosition ?? true) ? .trailing : .leading
+    }
+
+    private func schedulePopoverPresentation() {
+        cancelPopoverTimer()
+        
+        popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+            if isHovered && !isScrolling {
+                if windowPosition == nil {
+                    windowPosition = checkWindowPosition()
+                }
+                isShowingPopover = true
+            }
+        }
+    }
+
+    private func cancelPopoverTimer() {
+        popoverTimer?.invalidate()
+        popoverTimer = nil
+    }
+
+    private func closePopover() {
+        cancelPopoverTimer()
+        if isShowingPopover {
+            isShowingPopover = false
+        }
     }
     
     @ViewBuilder
@@ -429,6 +429,177 @@ extension ClipboardItemPopover {
             return "envelope"
         default:
             return "arrow.right.circle"
+        }
+    }
+}
+
+// MARK: - NSPopover Bridge
+
+private struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
+    @Binding var isPresented: Bool
+    let arrowEdge: Edge
+    let content: () -> Content
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> AnchorView {
+        let view = AnchorView()
+        view.translatesAutoresizingMaskIntoConstraints = true
+        view.autoresizingMask = [.width, .height]
+        view.coordinator = context.coordinator
+        context.coordinator.anchorView = view
+        return view
+    }
+
+    func updateNSView(_ nsView: AnchorView, context: Context) {
+        context.coordinator.anchorView = nsView
+        context.coordinator.update(
+            isPresented: $isPresented,
+            arrowEdge: arrowEdge
+        )            { AnyView(content()) }
+    }
+
+    final class AnchorView: NSView {
+        weak var coordinator: Coordinator?
+
+        override func layout() {
+            super.layout()
+            coordinator?.anchorViewDidLayout(self)
+        }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            if let superview {
+                frame = superview.bounds
+            }
+            coordinator?.anchorViewDidLayout(self)
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            coordinator?.anchorViewDidMoveToWindow(self)
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSPopoverDelegate {
+        var isPresented: Binding<Bool> = .constant(false)
+        var arrowEdge: Edge = .trailing
+        var contentProvider: (() -> AnyView)?
+        weak var anchorView: AnchorView?
+
+        private var popover: NSPopover?
+        private var needsPresentation = false
+
+        func update(
+            isPresented: Binding<Bool>,
+            arrowEdge: Edge,
+            content: @escaping () -> AnyView
+        ) {
+            self.isPresented = isPresented
+            self.arrowEdge = arrowEdge
+            contentProvider = content
+            presentIfPossible()
+        }
+
+        func anchorViewDidMoveToWindow(_ anchorView: AnchorView) {
+            self.anchorView = anchorView
+            if anchorView.window != nil {
+                presentIfPossible()
+            } else {
+                dismissPopover()
+            }
+        }
+
+        func anchorViewDidLayout(_ anchorView: AnchorView) {
+            if let popover, popover.isShown {
+                popover.positioningRect = anchorView.bounds
+                popover.contentViewController?.view.layoutSubtreeIfNeeded()
+            } else if needsPresentation {
+                presentIfPossible()
+            }
+        }
+
+        private func presentIfPossible() {
+            guard let anchorView, let contentProvider else { return }
+
+            guard isPresented.wrappedValue else {
+                dismissPopover()
+                return
+            }
+
+            guard anchorView.window != nil else {
+                needsPresentation = true
+                return
+            }
+
+            needsPresentation = false
+
+            if let popover {
+                if let hosting = popover.contentViewController as? NSHostingController<AnyView> {
+                    hosting.rootView = contentProvider()
+                } else {
+                    let hosting = NSHostingController(rootView: contentProvider())
+                    popover.contentViewController = hosting
+                }
+                popover.contentViewController?.view.layoutSubtreeIfNeeded()
+                popover.contentSize = popover.contentViewController?.view.fittingSize ?? popover.contentSize
+                popover.positioningRect = anchorView.bounds
+            } else {
+                let popover = makePopover()
+                let hosting = NSHostingController(rootView: contentProvider())
+                popover.contentViewController = hosting
+                hosting.view.layoutSubtreeIfNeeded()
+                popover.contentSize = hosting.view.fittingSize
+                popover.show(
+                    relativeTo: anchorView.bounds,
+                    of: anchorView,
+                    preferredEdge: arrowEdge.nsRectEdge(using: anchorView.userInterfaceLayoutDirection)
+                )
+                self.popover = popover
+            }
+        }
+
+        private func makePopover() -> NSPopover {
+            let popover = NSPopover()
+            popover.behavior = .transient
+            popover.animates = false
+            popover.delegate = self
+            return popover
+        }
+
+        private func dismissPopover() {
+            popover?.performClose(nil)
+            popover = nil
+            needsPresentation = false
+            if isPresented.wrappedValue {
+                isPresented.wrappedValue = false
+            }
+        }
+
+        func popoverDidClose(_ notification: Notification) {
+            popover = nil
+            needsPresentation = false
+            if isPresented.wrappedValue {
+                isPresented.wrappedValue = false
+            }
+        }
+    }
+}
+
+private extension Edge {
+    func nsRectEdge(using direction: NSUserInterfaceLayoutDirection) -> NSRectEdge {
+        switch self {
+        case .top:
+            return .maxY
+        case .bottom:
+            return .minY
+        case .leading:
+            return direction == .rightToLeft ? .maxX : .minX
+        case .trailing:
+            return direction == .rightToLeft ? .minX : .maxX
         }
     }
 }

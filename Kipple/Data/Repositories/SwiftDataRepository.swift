@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @available(macOS 14.0, *)
-actor SwiftDataRepository: ClipboardRepositoryProtocol, Sendable {
+actor SwiftDataRepository: ClipboardRepositoryProtocol {
     private let container: ModelContainer
 
     // MARK: - Factory
