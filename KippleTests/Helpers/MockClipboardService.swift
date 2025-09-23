@@ -82,7 +82,7 @@ class MockClipboardService: ClipboardServiceProtocol {
         onHistoryChanged?(item)
     }
 
-    func clearSystemClipboard() {
+    func clearSystemClipboard() async {
         currentClipboardContent = nil
     }
 

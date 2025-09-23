@@ -182,10 +182,18 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         // When: Recopy pinned item
         let beforeRecopy = Date()
         viewModel.selectHistoryItem(pinnedItem)
-        await service.flushPendingSaves()
 
-        // Then: Pinned item should have updated timestamp and remain pinned
-        let history = await service.getHistory()
+        var history: [ClipItem] = []
+        for _ in 0..<10 {
+            await service.flushPendingSaves()
+            history = await service.getHistory()
+            if history.first?.content == "Pinned Old" {
+                break
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        XCTAssertFalse(history.isEmpty)
         XCTAssertEqual(history[0].content, "Pinned Old")
         XCTAssertTrue(history[0].isPinned, "Should remain pinned")
         XCTAssertTrue(history[0].timestamp >= beforeRecopy, "Timestamp should be updated")

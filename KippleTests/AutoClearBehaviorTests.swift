@@ -26,7 +26,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         let historyCountBefore = adapter.history.count
 
         // When: Trigger auto-clear directly
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
 
         // Then: History should be preserved
         XCTAssertEqual(adapter.history.count, historyCountBefore,
@@ -44,7 +44,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         let adapter = ModernClipboardServiceAdapter.shared
 
         // When: Perform auto-clear
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
 
         // Then: System clipboard should be empty
         let clipboardContent = NSPasteboard.general.string(forType: .string)
@@ -80,7 +80,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         let pinnedCountBefore = adapter.pinnedItems.count
 
         // When: Perform auto-clear
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
 
         // Then: All history (including pinned) should be preserved
         XCTAssertEqual(adapter.history.count, totalCountBefore,
@@ -111,7 +111,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         adapter.autoClearRemainingTime = 0.1 // Almost immediate
 
         // Manually trigger what timer would do
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
         adapter.stopAutoClearTimer()
 
         // Then: History preserved, clipboard cleared
@@ -123,7 +123,7 @@ final class AutoClearBehaviorTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    func testAutoClearWithNonTextContent() {
+    func testAutoClearWithNonTextContent() async {
         // Given: Clipboard with non-text content
         NSPasteboard.general.clearContents()
         // Don't set any text content
@@ -131,7 +131,7 @@ final class AutoClearBehaviorTests: XCTestCase {
         let adapter = ModernClipboardServiceAdapter.shared
 
         // When: Try to auto-clear
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
 
         // Then: Should handle gracefully (no crash, logged skip)
         XCTAssertTrue(true, "Auto-clear with non-text content should not crash")

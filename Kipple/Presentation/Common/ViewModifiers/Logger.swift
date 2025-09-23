@@ -61,8 +61,10 @@ class Logger {
         let logMessage = "[\(level.rawValue)] \(fileName):\(line) \(function) - \(built)"
         
         if isTestEnvironment {
-            // テスト実行時はNSLogを使用
+            // swiftlint:disable no_nslog
+            // テスト実行時はNSLogを使用（Xcode のテストログに確実に出すため）
             NSLog("%@", logMessage)
+            // swiftlint:enable no_nslog
         } else {
             // 通常時はOSLogを使用
             guard let osLog = osLog else { return }

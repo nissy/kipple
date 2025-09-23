@@ -326,6 +326,10 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
         history.insert(item, at: 0)
     }
 
+    func clearSystemClipboard() async {
+        // In mock, clearing system clipboard just means we don't track pasteboard contents.
+    }
+
     func clearAllHistory() async {
         history.removeAll()
     }

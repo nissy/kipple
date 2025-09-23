@@ -52,7 +52,7 @@ final class InternalOperationFlagTests: XCTestCase {
         XCTAssertEqual(history.count, 1)
         
         // When: Clear system clipboard
-        adapter.clearSystemClipboard()
+        await adapter.clearSystemClipboard()
         
         // Immediately copy something externally (simulate quick user action)
         // Small delay to ensure clear completes
@@ -116,7 +116,7 @@ final class InternalOperationFlagTests: XCTestCase {
         try await Task.sleep(nanoseconds: 1_000_000_000)
         
         // When: Clear clipboard then rapid external copies
-        adapter.clearSystemClipboard()
+        await adapter.clearSystemClipboard()
         
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
         

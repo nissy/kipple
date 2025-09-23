@@ -10,6 +10,7 @@ protocol ModernClipboardServiceProtocol {
     func isMonitoring() async -> Bool
     func copyToClipboard(_ content: String, fromEditor: Bool) async
     func recopyFromHistory(_ item: ClipItem) async
+    func clearSystemClipboard() async
 
     // History management
     func clearAllHistory() async

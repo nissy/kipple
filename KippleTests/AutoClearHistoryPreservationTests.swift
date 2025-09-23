@@ -72,7 +72,7 @@ final class AutoClearHistoryPreservationTests: XCTestCase {
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Test content")
         
         // When: Trigger auto-clear directly
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
         
         // Wait a moment for async operations
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -105,7 +105,7 @@ final class AutoClearHistoryPreservationTests: XCTestCase {
         NSPasteboard.general.setString("Clipboard content", forType: .string)
         
         // When: Perform auto-clear
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
         
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
@@ -138,7 +138,7 @@ final class AutoClearHistoryPreservationTests: XCTestCase {
         adapter.autoClearRemainingTime = 1 // Set to 1 second directly for testing
         
         // Manually trigger what happens when timer reaches 0
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
         adapter.stopAutoClearTimer()
         
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -166,7 +166,7 @@ final class AutoClearHistoryPreservationTests: XCTestCase {
         NSPasteboard.general.setData(Data(), forType: .fileURL)
         
         // When: Perform auto-clear
-        adapter.performAutoClear()
+        await adapter.performAutoClear()
         
         try await Task.sleep(nanoseconds: 100_000_000)
         

@@ -117,8 +117,12 @@ struct MainView: View {
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let copyModifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)).intersection(.deviceIndependentFlagsMask)
-                let clearModifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorClearHotkeyModifierFlags)).intersection(.deviceIndependentFlagsMask)
+                let copyModifiers = NSEvent.ModifierFlags(
+                    rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)
+                ).intersection(.deviceIndependentFlagsMask)
+                let clearModifiers = NSEvent.ModifierFlags(
+                    rawValue: UInt(appSettings.editorClearHotkeyModifierFlags)
+                ).intersection(.deviceIndependentFlagsMask)
 
                 // Editor Copy Hotkey
                 if appSettings.enableEditorCopyHotkey,
@@ -515,7 +519,8 @@ struct MainView: View {
     }
     
     private func clearSystemClipboard() {
-        // Clear through service to maintain synchronization
-        viewModel.clipboardService.clearSystemClipboard()
+        Task {
+            await viewModel.clipboardService.clearSystemClipboard()
+        }
     }
 }

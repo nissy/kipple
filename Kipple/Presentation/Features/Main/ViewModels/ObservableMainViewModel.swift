@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 
+// swiftlint:disable function_body_length
+
 @available(macOS 14.0, iOS 17.0, *)
 @Observable
 @MainActor
@@ -320,3 +322,5 @@ final class ObservableMainViewModel: MainViewModelProtocol {
         // invalidated when the object is deallocated
     }
 }
+
+// swiftlint:enable function_body_length

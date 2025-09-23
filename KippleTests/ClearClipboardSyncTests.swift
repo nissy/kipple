@@ -58,7 +58,7 @@ final class ClearClipboardSyncTests: XCTestCase {
         XCTAssertEqual(pasteboardContent, "Test Content")
 
         // When: Clear system clipboard through service
-        adapter.clearSystemClipboard()
+        await adapter.clearSystemClipboard()
 
         // Wait for update
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -85,7 +85,7 @@ final class ClearClipboardSyncTests: XCTestCase {
         XCTAssertEqual(adapter.currentClipboardContent, "Current Content")
 
         // When: Clear system clipboard
-        adapter.clearSystemClipboard()
+        await adapter.clearSystemClipboard()
 
         // Wait for update
         try await Task.sleep(nanoseconds: 200_000_000)
@@ -103,7 +103,7 @@ final class ClearClipboardSyncTests: XCTestCase {
 
         // When: Rapid clear and copy operations
         for i in 1...5 {
-            adapter.clearSystemClipboard()
+            await adapter.clearSystemClipboard()
             try await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
 
             XCTAssertNil(adapter.currentClipboardContent, "Should be nil after clear \(i)")
@@ -129,7 +129,7 @@ final class ClearClipboardSyncTests: XCTestCase {
         XCTAssertEqual(adapter.currentClipboardContent, "Monitored Content")
 
         // When: Clear clipboard while monitoring
-        adapter.clearSystemClipboard()
+        await adapter.clearSystemClipboard()
         try await Task.sleep(nanoseconds: 500_000_000)
 
         // Then: Should remain cleared even with monitoring
@@ -151,7 +151,7 @@ final class ClearClipboardSyncTests: XCTestCase {
         XCTAssertEqual(viewModel.currentClipboardContent, "Synced Content")
 
         // When: Clear through adapter
-        adapter.clearSystemClipboard()
+        await adapter.clearSystemClipboard()
 
         // Then: ViewModel should update immediately or very quickly
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -182,7 +182,7 @@ final class ClearClipboardSyncTests: XCTestCase {
         XCTAssertNil(testViewModel.currentClipboardContent)
 
         // When: Clear system clipboard
-        mockService.clearSystemClipboard()
+        await mockService.clearSystemClipboard()
 
         // Then: Mock service should be cleared
         XCTAssertNil(mockService.currentClipboardContent)

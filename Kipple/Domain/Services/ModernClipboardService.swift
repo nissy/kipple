@@ -2,6 +2,8 @@ import Foundation
 import AppKit
 import Combine
 
+// swiftlint:disable type_body_length
+
 extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
 }
@@ -240,6 +242,19 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
+    }
+
+    func clearSystemClipboard() async {
+        let newChangeCount = await MainActor.run { () -> Int in
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            return pasteboard.changeCount
+        }
+
+        await state.setInternalCopy(true)
+        await state.setFromEditor(false)
+        await state.setExpectedChangeCount(newChangeCount)
+        updateLastChangeCount(newChangeCount)
     }
 
     // MARK: - History Management
@@ -610,6 +625,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Cleanup if needed
     }
 }
+
+// swiftlint:enable type_body_length
 
 // MARK: - Clipboard State Actor
 

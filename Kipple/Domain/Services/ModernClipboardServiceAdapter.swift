@@ -58,6 +58,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func copyToClipboard(_ content: String, fromEditor: Bool) {
+        currentClipboardContent = content
         Task {
             await modernService.copyToClipboard(content, fromEditor: fromEditor)
             await refreshHistory()
@@ -71,19 +72,10 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
-    func clearSystemClipboard() {
-        // Clear the system clipboard
-        NSPasteboard.general.clearContents()
-        let newChangeCount = NSPasteboard.general.changeCount
-
-        // Update our state immediately
+    func clearSystemClipboard() async {
+        await modernService.clearSystemClipboard()
         currentClipboardContent = nil
-
-        // Mark the new changeCount as an internal operation to skip
-        Task {
-            await modernService.setInternalOperation(true)
-            await modernService.setExpectedChangeCount(newChangeCount)
-        }
+        await refreshHistory()
     }
 
     func togglePin(for item: ClipItem) -> Bool {
@@ -187,17 +179,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         autoClearTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self else { return }
-                if let remaining = self.autoClearRemainingTime {
-                    self.autoClearRemainingTime = max(0, remaining - 1)
-                    if remaining <= 0 {
-                        // Clear only system clipboard, not history (matches legacy behavior)
-                        self.performAutoClear()
-                        self.stopAutoClearTimer(resetRemaining: false)
+                    if let remaining = self.autoClearRemainingTime {
+                        self.autoClearRemainingTime = max(0, remaining - 1)
+                        if remaining <= 0 {
+                            // Clear only system clipboard, not history (matches legacy behavior)
+                            Task { @MainActor [weak self] in
+                                guard let self else { return }
+                                await self.performAutoClear()
+                                self.stopAutoClearTimer(resetRemaining: false)
+                            }
+                        }
                     }
-                }
             }
         }
-    }
+        }
 
     func stopAutoClearTimer(resetRemaining: Bool = true) {
         autoClearTimer?.invalidate()
@@ -210,7 +205,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     // MARK: - Private Methods
 
     /// Clear only the system clipboard, preserving history (matches legacy behavior)
-    internal func performAutoClear() {
+    internal func performAutoClear() async {
         // Check if current clipboard content is text
         guard NSPasteboard.general.string(forType: .string) != nil else {
             Logger.shared.log("Skipping auto-clear: current clipboard content is not text")
@@ -219,11 +214,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
         Logger.shared.log("Performing auto-clear of system clipboard (Modern pathway)")
 
-        // Clear the system clipboard only
-        NSPasteboard.general.clearContents()
-
-        // Update the current clipboard content
-        currentClipboardContent = nil
+        await clearSystemClipboard()
     }
 
     private func startPeriodicRefresh() {
@@ -257,6 +248,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             currentClipboardContent = newCurrentContent
         }
     }
+
+    #if DEBUG
+    func resetAdapterStateForTesting() async {
+        refreshTask?.cancel()
+        refreshTask = nil
+        history = []
+        currentClipboardContent = nil
+        autoClearRemainingTime = nil
+
+        // Ensure we are in sync with the service after it resets.
+        await refreshHistory()
+        startPeriodicRefresh()
+    }
+    #endif
 
     @objc private func historyDidChange(_ notification: Notification) {
         Task { [weak self] in

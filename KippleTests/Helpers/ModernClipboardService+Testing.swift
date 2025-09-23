@@ -10,7 +10,10 @@ extension ModernClipboardService {
         await MainActor.run {
             AppSettings.shared.maxHistoryItems = 300
             AppSettings.shared.maxPinnedItems = 20
+            UserDefaults.standard.set(false, forKey: "enableEditorInsert")
         }
+
+        await ModernClipboardServiceAdapter.shared.resetAdapterStateForTesting()
     }
 
     func useTestingRepository(_ repository: any ClipboardRepositoryProtocol) async {
