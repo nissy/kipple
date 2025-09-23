@@ -155,7 +155,7 @@ final class HistoryLimitTests: XCTestCase {
 
     func testLimitAppliedAfterRepositoryLoad() async throws {
         // Given: Repository with many items
-        let repository = try await SwiftDataRepository(inMemory: true)
+        let repository = try SwiftDataRepository.make(inMemory: true)
 
         // Save 150 items directly to repository
         let testItems = (1...150).map { index in

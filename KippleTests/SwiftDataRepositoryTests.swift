@@ -14,9 +14,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         let schema = Schema([ClipItemModel.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         modelContainer = try ModelContainer(for: schema, configurations: [config])
-        repository = try await MainActor.run {
-            try SwiftDataRepository(container: modelContainer)
-        }
+        repository = try SwiftDataRepository.make(container: modelContainer)
     }
 
     override func tearDown() async throws {

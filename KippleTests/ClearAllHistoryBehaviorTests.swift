@@ -132,7 +132,7 @@ final class ClearAllHistoryBehaviorTests: XCTestCase {
         await service.flushPendingSaves()
 
         // Then: Repository should also be empty
-        let repository = try await SwiftDataRepository(inMemory: true)
+        let repository = try SwiftDataRepository.make(inMemory: true)
         let savedHistory = await service.getHistory()
         try await repository.save(savedHistory)
 

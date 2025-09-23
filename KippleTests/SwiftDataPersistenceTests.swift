@@ -10,7 +10,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         // Create in-memory repository for testing
-        repository = try SwiftDataRepository(inMemory: true)
+        repository = try SwiftDataRepository.make(inMemory: true)
     }
 
     override func tearDown() async throws {

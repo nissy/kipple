@@ -17,7 +17,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
         try await super.setUp()
 
         // Use in-memory repository for testing
-        repository = try await SwiftDataRepository(inMemory: true)
+        repository = try SwiftDataRepository.make(inMemory: true)
         await ModernClipboardService.shared.useTestingRepository(repository)
         await ModernClipboardService.shared.resetForTesting()
 

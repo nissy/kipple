@@ -2,194 +2,234 @@ import Foundation
 import SwiftData
 
 @available(macOS 14.0, *)
-@MainActor
-final class SwiftDataRepository: ClipboardRepositoryProtocol, @unchecked Sendable {
+actor SwiftDataRepository: ClipboardRepositoryProtocol, Sendable {
     private let container: ModelContainer
-    private let context: ModelContext
 
-    init(container: ModelContainer? = nil, inMemory: Bool = false) throws {
+    // MARK: - Factory
+
+    nonisolated static func make(container: ModelContainer? = nil, inMemory: Bool = false) throws -> SwiftDataRepository {
         if let container {
-            self.container = container
-        } else {
-            let schema = Schema([ClipItemModel.self])
-            let config: ModelConfiguration
-            if inMemory {
-                config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-            } else {
-                config = ModelConfiguration(schema: schema)
-            }
-            self.container = try ModelContainer(for: schema, configurations: [config])
+            return SwiftDataRepository(container: container)
         }
-        self.context = self.container.mainContext
+
+        let schema = Schema([ClipItemModel.self])
+        let config = inMemory
+            ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            : ModelConfiguration(schema: schema)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        return SwiftDataRepository(container: container)
     }
 
-    func save(_ items: [ClipItem]) async throws {
-        // Fetch all existing models
+    private init(container: ModelContainer) {
+        self.container = container
+    }
+
+    // MARK: - Helpers
+
+    private func makeContext() -> ModelContext {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        return context
+    }
+
+    private func saveIfNeeded(_ context: ModelContext) throws {
+        if context.hasChanges {
+            try context.save()
+        }
+    }
+
+    private func fetchIDs(_ context: ModelContext) -> [UUID] {
         let descriptor = FetchDescriptor<ClipItemModel>()
-        let existingModels = try context.fetch(descriptor)
+        let models = (try? context.fetch(descriptor)) ?? []
+        return models.map { $0.id }
+    }
 
-        // Create a dictionary for fast lookup
-        var existingDict: [UUID: ClipItemModel] = [:]
-        for model in existingModels {
-            existingDict[model.id] = model
-        }
+    // MARK: - ClipboardRepositoryProtocol
 
-        // Track which IDs are in the new items list
-        let newItemIds = Set(items.map { $0.id })
-
-        // Update existing or insert new items
-        for item in items {
-            if let existingModel = existingDict[item.id] {
-                // Update existing model
-                existingModel.content = item.content
-                existingModel.isPinned = item.isPinned
-                existingModel.timestamp = item.timestamp
-                existingModel.appName = item.sourceApp
-                existingModel.windowTitle = item.windowTitle
-                existingModel.bundleId = item.bundleIdentifier
-                existingModel.processId = item.processID
-                existingModel.isFromEditor = item.isFromEditor ?? false
-                existingModel.kindRawValue = item.kind.rawValue
-            } else {
-                // Insert new model
-                let model = ClipItemModel(from: item)
-                context.insert(model)
-            }
-        }
-
-        try context.save()
+    func save(_ items: [ClipItem]) async throws {
+        guard !items.isEmpty else { return }
+        try await applyChanges(inserted: items, updated: [], removed: [])
     }
 
     func replaceAll(with items: [ClipItem]) async throws {
-        try await clear()
-        guard !items.isEmpty else { return }
-        try await save(items)
+        let context = makeContext()
+        let existingIDs = Set(fetchIDs(context))
+        let newMap = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+
+        let inserted = newMap.values.filter { !existingIDs.contains($0.id) }
+        let common = newMap.values.filter { existingIDs.contains($0.id) }
+        let removed = existingIDs.subtracting(newMap.keys)
+
+        try insertItems(Array(inserted), context: context)
+        try updateItems(Array(common), context: context)
+        try removeItems(Array(removed), context: context)
+        try saveIfNeeded(context)
     }
 
     func load(limit: Int) async throws -> [ClipItem] {
+        let context = makeContext()
         var descriptor = FetchDescriptor<ClipItemModel>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         descriptor.fetchLimit = limit
-
         let models = try context.fetch(descriptor)
         return models.map { $0.toClipItem() }
     }
 
     func loadAll() async throws -> [ClipItem] {
+        let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
-
         let models = try context.fetch(descriptor)
         return models.map { $0.toClipItem() }
     }
 
     func delete(_ item: ClipItem) async throws {
-        let descriptor = FetchDescriptor<ClipItemModel>(
-            predicate: #Predicate { model in
-                model.id == item.id
-            }
-        )
-
-        let models = try context.fetch(descriptor)
-        for model in models {
-            context.delete(model)
-        }
-
-        try context.save()
+        try await applyChanges(inserted: [], updated: [], removed: [item.id])
     }
 
     func clear() async throws {
+        let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>()
         let models = try context.fetch(descriptor)
         for model in models {
             context.delete(model)
         }
-        try context.save()
+        try saveIfNeeded(context)
     }
 
     func clear(keepPinned: Bool) async throws {
+        let context = makeContext()
         let descriptor: FetchDescriptor<ClipItemModel>
-
         if keepPinned {
             descriptor = FetchDescriptor<ClipItemModel>(
-                predicate: #Predicate { model in
-                    !model.isPinned
-                }
+                predicate: #Predicate { entity in !entity.isPinned }
             )
         } else {
             descriptor = FetchDescriptor<ClipItemModel>()
         }
-
         let models = try context.fetch(descriptor)
         for model in models {
             context.delete(model)
         }
-
-        try context.save()
+        try saveIfNeeded(context)
     }
 
-    // MARK: - Additional Operations
-
     func countItems() async throws -> Int {
-        let descriptor = FetchDescriptor<ClipItemModel>()
-        return try context.fetchCount(descriptor)
+        let context = makeContext()
+        return try context.fetchCount(FetchDescriptor<ClipItemModel>())
     }
 
     func update(_ item: ClipItem) async throws {
-        // Find existing model by ID
-        let descriptor = FetchDescriptor<ClipItemModel>(
-            predicate: #Predicate { model in
-                model.id == item.id
-            }
-        )
-
-        let models = try context.fetch(descriptor)
-        if let existingModel = models.first {
-            // Update properties
-            existingModel.content = item.content
-            existingModel.isPinned = item.isPinned
-            existingModel.timestamp = item.timestamp
-            existingModel.appName = item.sourceApp
-            existingModel.windowTitle = item.windowTitle
-            existingModel.bundleId = item.bundleIdentifier
-            existingModel.processId = item.processID
-            existingModel.isFromEditor = item.isFromEditor ?? false
-            existingModel.kindRawValue = item.kind.rawValue
-        } else {
-            // If not found, create new
-            let model = ClipItemModel(from: item)
-            context.insert(model)
-        }
-
-        try context.save()
+        try await applyChanges(inserted: [], updated: [item], removed: [])
     }
 
     func loadPinned() async throws -> [ClipItem] {
+        let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>(
-            predicate: #Predicate { model in
-                model.isPinned
-            },
+            predicate: #Predicate { entity in entity.isPinned },
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
-
         let models = try context.fetch(descriptor)
         return models.map { $0.toClipItem() }
     }
 
     func deleteItemsOlderThan(_ date: Date) async throws {
+        let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>(
-            predicate: #Predicate { model in
-                model.timestamp < date && !model.isPinned
-            }
+            predicate: #Predicate { entity in entity.timestamp < date && !entity.isPinned }
         )
-
         let models = try context.fetch(descriptor)
         for model in models {
             context.delete(model)
         }
+        try saveIfNeeded(context)
+    }
 
-        try context.save()
+    func applyChanges(inserted: [ClipItem], updated: [ClipItem], removed: [UUID]) async throws {
+        let context = makeContext()
+        try removeItems(removed, context: context)
+        try updateItems(updated, context: context)
+        try insertItems(inserted, context: context)
+        try saveIfNeeded(context)
+    }
+
+    // MARK: - Internal helpers
+
+    private func insertItems(_ items: [ClipItem], context: ModelContext) throws {
+        guard !items.isEmpty else { return }
+        for (offset, item) in items.enumerated() {
+            let adjustedTimestamp = item.timestamp.addingTimeInterval(TimeInterval(offset) * 1e-6)
+            let model = ClipItemModel(
+                id: item.id,
+                content: item.content,
+                timestamp: adjustedTimestamp,
+                isPinned: item.isPinned,
+                kind: item.kind,
+                appName: item.sourceApp,
+                windowTitle: item.windowTitle,
+                bundleId: item.bundleIdentifier,
+                processId: item.processID,
+                isFromEditor: item.isFromEditor ?? false
+            )
+            context.insert(model)
+        }
+    }
+
+    private func updateItems(_ items: [ClipItem], context: ModelContext) throws {
+        guard !items.isEmpty else { return }
+        let ids = items.map { $0.id }
+        let descriptor = FetchDescriptor<ClipItemModel>(
+            predicate: #Predicate { entity in ids.contains(entity.id) }
+        )
+        let models = try context.fetch(descriptor)
+        var map = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        for model in models {
+            if let item = map.removeValue(forKey: model.id) {
+                model.update(with: item)
+            }
+        }
+        for (offset, item) in map.values.enumerated() {
+            let adjustedTimestamp = item.timestamp.addingTimeInterval(TimeInterval(offset) * 1e-6)
+            context.insert(ClipItemModel(
+                id: item.id,
+                content: item.content,
+                timestamp: adjustedTimestamp,
+                isPinned: item.isPinned,
+                kind: item.kind,
+                appName: item.sourceApp,
+                windowTitle: item.windowTitle,
+                bundleId: item.bundleIdentifier,
+                processId: item.processID,
+                isFromEditor: item.isFromEditor ?? false
+            ))
+        }
+    }
+
+    private func removeItems(_ ids: [UUID], context: ModelContext) throws {
+        guard !ids.isEmpty else { return }
+        let descriptor = FetchDescriptor<ClipItemModel>(
+            predicate: #Predicate { entity in ids.contains(entity.id) }
+        )
+        let models = try context.fetch(descriptor)
+        for model in models {
+            context.delete(model)
+        }
+    }
+}
+
+@available(macOS 14.0, *)
+private extension ClipItemModel {
+    func update(with item: ClipItem) {
+        content = item.content
+        timestamp = item.timestamp
+        isPinned = item.isPinned
+        kindRawValue = item.kind.rawValue
+        appName = item.sourceApp
+        windowTitle = item.windowTitle
+        bundleId = item.bundleIdentifier
+        processId = item.processID
+        isFromEditor = item.isFromEditor ?? false
     }
 }

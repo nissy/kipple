@@ -106,7 +106,7 @@ final class RecopyTimestampUpdateTests: XCTestCase {
 
     func testTimestampPersistenceAfterRecopy() async throws {
         // Given: Item with old timestamp
-        let repository = try await SwiftDataRepository(inMemory: true)
+        let repository = try SwiftDataRepository.make(inMemory: true)
         let oldItem = ClipItem(
             content: "Persistent Content",
             sourceApp: "Xcode"

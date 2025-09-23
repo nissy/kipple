@@ -25,7 +25,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         let schema = Schema([ClipItemModel.self])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         container = try ModelContainer(for: schema, configurations: [config])
-        repository = try SwiftDataRepository(container: container)
+        repository = try SwiftDataRepository.make(container: container)
 
         // Setup hotkey manager
         hotkeyManager = SimplifiedHotkeyManager.shared

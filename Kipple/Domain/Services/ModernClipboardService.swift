@@ -26,7 +26,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var repository: ClipboardRepositoryProtocol?
     private let saveSubject = PassthroughSubject<[ClipItem], Never>()
     private var saveCancellable: AnyCancellable?
-    private var pendingSaveTask: Task<Void, Never>?
+    private var persistedSnapshot: [UUID: ClipItem] = [:]
 
     // MARK: - Singleton
 
@@ -71,14 +71,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
+        persistedSnapshot = [:]
     }
 
     private func setupSavePipeline() {
         saveCancellable = saveSubject
-            .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
-            .sink { @Sendable items in
-                Task { @MainActor [weak self] in
-                    await self?.saveToRepository(items)
+            .debounce(for: .seconds(0.3), scheduler: RunLoop.main)
+            .sink { [weak self] items in
+                guard let self else { return }
+                Task(priority: .utility) {
+                    await self.persistHistoryDiff(items)
                 }
             }
     }
@@ -95,19 +97,40 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             // Apply current user's limit setting
             trimHistory()
             Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
+
+            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
         } catch {
             Logger.shared.error("Failed to load history: \(error)")
         }
     }
 
-    private func saveToRepository(_ items: [ClipItem]) async {
+    private func persistHistoryDiff(_ items: [ClipItem]) async {
         guard let repository = repository else { return }
 
+        let previousSnapshot = persistedSnapshot
+        let currentSnapshot = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+
+        guard previousSnapshot != currentSnapshot else { return }
+
+        let inserted = items.filter { previousSnapshot[$0.id] == nil }
+        let updated = items.compactMap { item -> ClipItem? in
+            if let previous = previousSnapshot[item.id], previous != item {
+                return item
+            }
+            return nil
+        }
+        let removedIDs = previousSnapshot.keys.filter { currentSnapshot[$0] == nil }
+
         do {
-            try await repository.save(items)
-            Logger.shared.debug("Saved \(items.count) items to repository")
+            try await repository.applyChanges(
+                inserted: inserted,
+                updated: updated,
+                removed: removedIDs
+            )
+            persistedSnapshot = currentSnapshot
+            Logger.shared.debug("Persisted history diff (inserted: \(inserted.count), updated: \(updated.count), removed: \(removedIDs.count))")
         } catch {
-            Logger.shared.error("Failed to save to repository: \(error)")
+            Logger.shared.error("Failed to persist history diff: \(error)")
         }
     }
 
@@ -462,11 +485,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Flush Pending Saves
 
     func flushPendingSaves() async {
-        // Cancel any pending save task
-        pendingSaveTask?.cancel()
-
-        // Save immediately
-        await saveToRepository(history)
+        await persistHistoryDiff(history)
     }
 
     // MARK: - App Info

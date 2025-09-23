@@ -11,7 +11,7 @@ enum RepositoryProvider {
         }
         // Use SwiftData exclusively (macOS 14.0+ only)
         do {
-            return try SwiftDataRepository()
+            return try SwiftDataRepository.make()
         } catch {
             Logger.shared.error("Failed to create SwiftDataRepository: \(error)")
             fatalError("SwiftData initialization failed: \(error)")
