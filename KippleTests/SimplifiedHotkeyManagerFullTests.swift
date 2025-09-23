@@ -3,7 +3,7 @@ import Combine
 @testable import Kipple
 
 @MainActor
-final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase, @unchecked Sendable {
+final class SimplifiedHotkeyManagerFullTests: XCTestCase, @unchecked Sendable {
     private var manager: SimplifiedHotkeyManager!
     private var cancellables: Set<AnyCancellable> = []
     private let testUserDefaultsKeys = [
@@ -11,6 +11,17 @@ final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase, @unchecked Se
         "KippleHotkeyModifiers",
         "KippleHotkeyEnabled"
     ]
+    private struct HotkeyDescriptionCase {
+        let keyCode: UInt16
+        let modifiers: NSEvent.ModifierFlags
+        let expectedDescription: String
+    }
+
+    private struct HotkeyOperation {
+        let keyCode: UInt16
+        let modifiers: NSEvent.ModifierFlags
+        let enabled: Bool
+    }
 
     override func setUp() async throws {
         try await super.setUp()
@@ -145,23 +156,26 @@ final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase, @unchecked Se
     // MARK: - Description Formatting Tests
 
     func testHotkeyDescription() {
-        let testCases: [(UInt16, NSEvent.ModifierFlags, String)] = [
-            (46, [.control, .option], "⌃⌥M"),
-            (0, [.command], "⌘A"),
-            (35, [.shift, .option], "⌥⇧P"),
-            (40, [.control, .command], "⌃⌘K"),
-            (14, [.control, .option, .command], "⌃⌥⌘E"),
-            (15, [.control, .option, .command, .shift], "⌃⌥⌘⇧R")
+        let testCases: [HotkeyDescriptionCase] = [
+            .init(keyCode: 46, modifiers: [.control, .option], expectedDescription: "⌃⌥M"),
+            .init(keyCode: 0, modifiers: [.command], expectedDescription: "⌘A"),
+            .init(keyCode: 35, modifiers: [.shift, .option], expectedDescription: "⌥⇧P"),
+            .init(keyCode: 40, modifiers: [.control, .command], expectedDescription: "⌃⌘K"),
+            .init(keyCode: 14, modifiers: [.control, .option, .command], expectedDescription: "⌃⌥⌘E"),
+            .init(keyCode: 15, modifiers: [.control, .option, .command, .shift], expectedDescription: "⌃⌥⌘⇧R")
         ]
 
-        for (keyCode, modifiers, expectedDescription) in testCases {
+        for testCase in testCases {
             // When
-            manager.setHotkey(keyCode: keyCode, modifiers: modifiers)
+            manager.setHotkey(keyCode: testCase.keyCode, modifiers: testCase.modifiers)
             let description = manager.getHotkeyDescription()
 
             // Then
-            XCTAssertEqual(description, expectedDescription,
-                          "Key code \(keyCode) with modifiers \(modifiers.rawValue) should format as \(expectedDescription)")
+            XCTAssertEqual(
+                description,
+                testCase.expectedDescription,
+                "Key code \(testCase.keyCode) with modifiers \(testCase.modifiers.rawValue) should format as \(testCase.expectedDescription)"
+            )
         }
     }
 
@@ -236,30 +250,30 @@ final class SimplifiedHotkeyManagerComprehensiveTests: XCTestCase, @unchecked Se
 
     func testStateConsistency() {
         // Given - Perform multiple operations
-        let operations: [(UInt16, NSEvent.ModifierFlags, Bool)] = [
-            (46, [.control, .option], true),
-            (35, [.command], false),
-            (0, [.shift, .option], true),
-            (40, [.control, .command, .shift], false)
+        let operations: [HotkeyOperation] = [
+            .init(keyCode: 46, modifiers: [.control, .option], enabled: true),
+            .init(keyCode: 35, modifiers: [.command], enabled: false),
+            .init(keyCode: 0, modifiers: [.shift, .option], enabled: true),
+            .init(keyCode: 40, modifiers: [.control, .command, .shift], enabled: false)
         ]
 
-        for (keyCode, modifiers, enabled) in operations {
+        for operation in operations {
             // When
-            manager.setHotkey(keyCode: keyCode, modifiers: modifiers)
-            manager.setEnabled(enabled)
+            manager.setHotkey(keyCode: operation.keyCode, modifiers: operation.modifiers)
+            manager.setEnabled(operation.enabled)
 
             // Then - Verify state is consistent
             let (retrievedKeyCode, retrievedModifiers) = manager.getHotkey()
             let retrievedEnabled = manager.getEnabled()
 
-            XCTAssertEqual(retrievedKeyCode, keyCode)
-            XCTAssertEqual(retrievedModifiers, modifiers)
-            XCTAssertEqual(retrievedEnabled, enabled)
+            XCTAssertEqual(retrievedKeyCode, operation.keyCode)
+            XCTAssertEqual(retrievedModifiers, operation.modifiers)
+            XCTAssertEqual(retrievedEnabled, operation.enabled)
 
             // Verify persistence
-            XCTAssertEqual(UserDefaults.standard.object(forKey: "KippleHotkeyCode") as? Int, Int(keyCode))
-            XCTAssertEqual(UserDefaults.standard.object(forKey: "KippleHotkeyModifiers") as? UInt, modifiers.rawValue)
-            XCTAssertEqual(UserDefaults.standard.object(forKey: "KippleHotkeyEnabled") as? Bool, enabled)
+            XCTAssertEqual(UserDefaults.standard.object(forKey: "KippleHotkeyCode") as? Int, Int(operation.keyCode))
+            XCTAssertEqual(UserDefaults.standard.object(forKey: "KippleHotkeyModifiers") as? UInt, operation.modifiers.rawValue)
+            XCTAssertEqual(UserDefaults.standard.object(forKey: "KippleHotkeyEnabled") as? Bool, operation.enabled)
         }
     }
 

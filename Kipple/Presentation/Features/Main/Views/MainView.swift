@@ -43,6 +43,9 @@ struct MainView: View {
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
     }
+}
+
+extension MainView {
     
     private func handleItemSelection(_ item: ClipItem) {
         if viewModel.isEditorInsertEnabled() && viewModel.shouldInsertToEditor() {
@@ -99,13 +102,17 @@ struct MainView: View {
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
-        .onReceive(NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        ) { _ in
             // エディタセクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             editorRefreshID = UUID()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .historyFontSettingsChanged)
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: .historyFontSettingsChanged)
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        ) { _ in
             // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
         }
@@ -119,10 +126,12 @@ struct MainView: View {
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let copyModifiers = NSEvent.ModifierFlags(
                     rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)
-                ).intersection(.deviceIndependentFlagsMask)
+                )
+                    .intersection(.deviceIndependentFlagsMask)
                 let clearModifiers = NSEvent.ModifierFlags(
                     rawValue: UInt(appSettings.editorClearHotkeyModifierFlags)
-                ).intersection(.deviceIndependentFlagsMask)
+                )
+                    .intersection(.deviceIndependentFlagsMask)
 
                 // Editor Copy Hotkey
                 if appSettings.enableEditorCopyHotkey,
