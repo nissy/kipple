@@ -116,6 +116,28 @@ struct MainView: View {
                 keyDownMonitor = nil
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                let copyModifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)).intersection(.deviceIndependentFlagsMask)
+                let clearModifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorClearHotkeyModifierFlags)).intersection(.deviceIndependentFlagsMask)
+
+                // Editor Copy Hotkey
+                if appSettings.enableEditorCopyHotkey,
+                   appSettings.editorCopyHotkeyKeyCode > 0,
+                   event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
+                   eventModifiers == copyModifiers {
+                    confirmAction()
+                    return nil
+                }
+
+                // Editor Clear Hotkey
+                if appSettings.enableEditorClearHotkey,
+                   appSettings.editorClearHotkeyKeyCode > 0,
+                   event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
+                   eventModifiers == clearModifiers {
+                    clearAction()
+                    return nil
+                }
+
                 // Enter キーでアクションを実行
                 if event.keyCode == 36 { // Enter key
                     if let selectedItem = selectedHistoryItem,

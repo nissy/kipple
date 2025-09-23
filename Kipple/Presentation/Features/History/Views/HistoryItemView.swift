@@ -458,7 +458,7 @@ private struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
         context.coordinator.update(
             isPresented: $isPresented,
             arrowEdge: arrowEdge
-        )            { AnyView(content()) }
+        ) { AnyView(content()) }
     }
 
     final class AnchorView: NSView {
