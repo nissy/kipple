@@ -63,6 +63,10 @@ struct MainViewHistorySection: View {
                     }
                 }
                 .frame(height: 32)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
+                )
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
