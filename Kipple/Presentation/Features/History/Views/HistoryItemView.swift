@@ -20,7 +20,7 @@ struct HistoryItemView: View {
     
     @State private var isHovered = false
     @State private var isShowingPopover = false
-    @State private var popoverTimer: Timer?
+    @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool? // 初期値をnilに設定
     @State private var isScrolling = false
     
@@ -147,7 +147,7 @@ struct HistoryItemView: View {
             
             isHovered = hovering
             
-            cancelPopoverTimer()
+            cancelPopoverTask()
             
             if hovering {
                 schedulePopoverPresentation()
@@ -217,9 +217,9 @@ struct HistoryItemView: View {
     }
 
     private func schedulePopoverPresentation() {
-        cancelPopoverTimer()
-        
-        popoverTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+        cancelPopoverTask()
+
+        let workItem = DispatchWorkItem {
             if isHovered && !isScrolling {
                 if windowPosition == nil {
                     windowPosition = checkWindowPosition()
@@ -227,15 +227,17 @@ struct HistoryItemView: View {
                 isShowingPopover = true
             }
         }
+        popoverTask = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
-    private func cancelPopoverTimer() {
-        popoverTimer?.invalidate()
-        popoverTimer = nil
+    private func cancelPopoverTask() {
+        popoverTask?.cancel()
+        popoverTask = nil
     }
 
     private func closePopover() {
-        cancelPopoverTimer()
+        cancelPopoverTask()
         if isShowingPopover {
             isShowingPopover = false
         }

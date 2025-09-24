@@ -232,6 +232,7 @@ struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
         weak var anchorView: AnchorView?
 
         private var popover: NSPopover?
+        private var hostingController: NSHostingController<AnyView>?
         private var needsPresentation = false
 
         func update(
@@ -278,22 +279,26 @@ struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
 
             needsPresentation = false
 
+            let controller: NSHostingController<AnyView>
+            if let existing = hostingController {
+                controller = existing
+                controller.rootView = contentProvider()
+            } else {
+                let newController = NSHostingController(rootView: contentProvider())
+                hostingController = newController
+                controller = newController
+            }
+
             if let popover {
-                if let hosting = popover.contentViewController as? NSHostingController<AnyView> {
-                    hosting.rootView = contentProvider()
-                } else {
-                    let hosting = NSHostingController(rootView: contentProvider())
-                    popover.contentViewController = hosting
-                }
-                popover.contentViewController?.view.layoutSubtreeIfNeeded()
-                popover.contentSize = popover.contentViewController?.view.fittingSize ?? popover.contentSize
+                popover.contentViewController = controller
+                controller.view.layoutSubtreeIfNeeded()
+                popover.contentSize = controller.view.fittingSize
                 popover.positioningRect = anchorView.bounds
             } else {
                 let popover = makePopover()
-                let hosting = NSHostingController(rootView: contentProvider())
-                popover.contentViewController = hosting
-                hosting.view.layoutSubtreeIfNeeded()
-                popover.contentSize = hosting.view.fittingSize
+                popover.contentViewController = controller
+                controller.view.layoutSubtreeIfNeeded()
+                popover.contentSize = controller.view.fittingSize
                 popover.show(
                     relativeTo: anchorView.bounds,
                     of: anchorView,
@@ -312,17 +317,35 @@ struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
         }
 
         private func dismissPopover() {
-            popover?.performClose(nil)
-            popover = nil
+            guard let popover else {
+                contentProvider = nil
+                hostingController = nil
+                needsPresentation = false
+                if isPresented.wrappedValue {
+                    isPresented.wrappedValue = false
+                }
+                return
+            }
+
+            popover.delegate = nil
+            popover.contentViewController = nil
+            popover.close()
+            self.popover = nil
             needsPresentation = false
+            contentProvider = nil
+            hostingController = nil
             if isPresented.wrappedValue {
                 isPresented.wrappedValue = false
             }
         }
 
         func popoverDidClose(_ notification: Notification) {
+            popover?.delegate = nil
+            popover?.contentViewController = nil
             popover = nil
             needsPresentation = false
+            contentProvider = nil
+            hostingController = nil
             if isPresented.wrappedValue {
                 isPresented.wrappedValue = false
             }

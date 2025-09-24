@@ -31,6 +31,9 @@ final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, NSLayoutM
     }
     
     func setupNotifications() {
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         notificationObserver = NotificationCenter.default.addObserver(
             forName: .editorLayoutSettingsChanged,
             object: nil,
