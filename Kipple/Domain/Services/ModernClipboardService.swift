@@ -58,17 +58,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func initializeRepository() async {
-        // Initialize repository
-        await MainActor.run { [weak self] in
-            do {
-                let repo = try RepositoryProvider.resolve()
-                Task { [weak self] in
-                    await self?.setRepository(repo)
-                }
-            } catch {
-                Logger.shared.error("Failed to initialize repository: \(error)")
-            }
-        }
+        let repository = await RepositoryProvider.resolve()
+        await setRepository(repository)
     }
 
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
@@ -625,6 +616,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Cleanup if needed
     }
 }
+
+#if DEBUG
+extension ModernClipboardService {
+    func reloadHistoryForTesting() async {
+        await initializeRepository()
+        await loadHistoryFromRepository()
+    }
+}
+#endif
 
 // swiftlint:enable type_body_length
 

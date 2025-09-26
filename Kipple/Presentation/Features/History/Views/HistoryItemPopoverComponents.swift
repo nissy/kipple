@@ -299,6 +299,7 @@ struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
                 popover.contentViewController = controller
                 controller.view.layoutSubtreeIfNeeded()
                 popover.contentSize = controller.view.fittingSize
+                popover.positioningRect = anchorView.bounds
                 popover.show(
                     relativeTo: anchorView.bounds,
                     of: anchorView,
@@ -350,6 +351,66 @@ struct HoverPopoverPresenter<Content: View>: NSViewRepresentable {
                 isPresented.wrappedValue = false
             }
         }
+
+#if DEBUG
+        struct DebugState {
+            let hasPopover: Bool
+            let hasHostingController: Bool
+            let hasContentProvider: Bool
+        }
+
+        func debugState() -> DebugState {
+            DebugState(
+                hasPopover: popover != nil,
+                hasHostingController: hostingController != nil,
+                hasContentProvider: contentProvider != nil
+            )
+        }
+
+        func debugHostingControllerObject() -> NSHostingController<AnyView>? {
+            hostingController
+        }
+
+        func debugDismissPopover() {
+            dismissPopover()
+        }
+
+        func debugPopoverObject() -> NSPopover? {
+            popover
+        }
+
+        func debugForcePresentation(
+            isPresented: Binding<Bool>,
+            arrowEdge: Edge,
+            content: @escaping () -> AnyView
+        ) {
+            self.isPresented = isPresented
+            self.arrowEdge = arrowEdge
+            contentProvider = content
+
+            let controller: NSHostingController<AnyView>
+            if let existing = hostingController {
+                controller = existing
+                controller.rootView = content()
+            } else {
+                let newController = NSHostingController(rootView: content())
+                hostingController = newController
+                controller = newController
+            }
+
+            if popover == nil {
+                let newPopover = NSPopover()
+                newPopover.behavior = .transient
+                newPopover.animates = false
+                newPopover.delegate = self
+                popover = newPopover
+            }
+
+            popover?.contentViewController = controller
+            needsPresentation = false
+        }
+
+#endif
     }
 }
 

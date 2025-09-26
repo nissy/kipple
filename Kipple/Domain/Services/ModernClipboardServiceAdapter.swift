@@ -17,6 +17,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private let modernService = ModernClipboardService.shared
     private var refreshTask: Task<Void, Never>?
     private nonisolated(unsafe) var autoClearTimer: Timer?
+    private var pendingClipboardContent: String?
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -58,6 +59,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func copyToClipboard(_ content: String, fromEditor: Bool) {
+        pendingClipboardContent = content
         currentClipboardContent = content
         Task {
             await modernService.copyToClipboard(content, fromEditor: fromEditor)
@@ -66,6 +68,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func recopyFromHistory(_ item: ClipItem) {
+        pendingClipboardContent = item.content
+        currentClipboardContent = item.content
         Task {
             await modernService.recopyFromHistory(item)
             await refreshHistory()
@@ -74,6 +78,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     func clearSystemClipboard() async {
         await modernService.clearSystemClipboard()
+        pendingClipboardContent = nil
         currentClipboardContent = nil
         await refreshHistory()
     }
@@ -244,7 +249,12 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
 
         // Update current clipboard content if changed
-        if currentClipboardContent != newCurrentContent {
+        if let pending = pendingClipboardContent {
+            if newCurrentContent == pending {
+                currentClipboardContent = pending
+                pendingClipboardContent = nil
+            }
+        } else if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent
         }
     }
@@ -256,6 +266,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         history = []
         currentClipboardContent = nil
         autoClearRemainingTime = nil
+        pendingClipboardContent = nil
 
         // Ensure we are in sync with the service after it resets.
         await refreshHistory()

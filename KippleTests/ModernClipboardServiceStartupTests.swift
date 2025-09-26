@@ -66,6 +66,28 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
         }
     }
 
+    func testStartupReloadLoadsPersistedHistory() async throws {
+#if DEBUG
+        // Given: Persisted items exist before the service loads them
+        let persistedItems = (1...5).map { index in
+            ClipItem(content: "Persisted Item \(index)")
+        }
+        try await repository.save(persistedItems)
+
+        // When: Simulate startup reload sequence
+        await ModernClipboardService.shared.reloadHistoryForTesting()
+
+        // Then: History should contain all persisted items in newest-first order
+        let history = await ModernClipboardService.shared.getHistory()
+        XCTAssertEqual(history.count, persistedItems.count,
+                       "Startup reload should hydrate all persisted items")
+        XCTAssertEqual(history.first?.content, persistedItems.last?.content,
+                       "Newest persisted item should appear at the top")
+#else
+        throw XCTSkip("Requires DEBUG configuration")
+#endif
+    }
+
     func testPinnedItemsPreservedDuringStartupTrim() async throws {
         // Given: Repository has mix of pinned and unpinned items
         var testItems: [ClipItem] = []
