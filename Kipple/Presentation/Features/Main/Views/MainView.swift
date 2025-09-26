@@ -10,7 +10,6 @@ import SwiftUI
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
     @State private var selectedHistoryItem: ClipItem?
-    @State private var hoveredHistoryItem: ClipItem?
     @State private var isShowingCopiedNotification = false
     @State private var currentNotificationType: CopiedNotificationView.NotificationType = .copied
     @State private var isAlwaysOnTop = false
@@ -304,7 +303,6 @@ extension MainView {
                 history: viewModel.history,
                 currentClipboardContent: viewModel.currentClipboardContent,
                 selectedHistoryItem: $selectedHistoryItem,
-                hoveredHistoryItem: $hoveredHistoryItem,
                 onSelectItem: handleItemSelection,
                 onTogglePin: { item in
                     if !viewModel.togglePinSync(for: item) {
@@ -318,7 +316,15 @@ extension MainView {
                 onCategoryFilter: { category in
                     viewModel.toggleCategoryFilter(category)
                 },
-                selectedCategory: $viewModel.selectedCategory
+                selectedCategory: $viewModel.selectedCategory,
+                initialSearchText: viewModel.searchText,
+                onSearchTextChanged: { text in
+                    viewModel.searchText = text
+                },
+                onLoadMore: { item in
+                    viewModel.loadMoreHistoryIfNeeded(currentItem: item)
+                },
+                hasMoreItems: viewModel.hasMoreHistory
             )
             .id(historyRefreshID)
         }

@@ -28,7 +28,11 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var pinnedItems: [ClipItem] = []
     @Published var filteredHistory: [ClipItem] = []
     @Published var pinnedHistory: [ClipItem] = []
-    @Published var searchText: String = ""
+    @Published var searchText: String = "" {
+        didSet {
+            applyFilters()
+        }
+    }
     @Published var showOnlyURLs: Bool = false
     @Published var showOnlyPinned: Bool = false {
         didSet {
@@ -40,11 +44,18 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String?
-    
+
     // 自動消去タイマーの残り時間
     @Published var autoClearRemainingTime: TimeInterval?
-    
-    init(clipboardService: (any ClipboardServiceProtocol)? = nil) {
+
+    // ページネーション関連
+    @Published private(set) var hasMoreHistory: Bool = false
+    private let pageSize: Int
+    private var currentHistoryLimit: Int = 0
+    private var isLoadingMore = false
+
+    init(clipboardService: (any ClipboardServiceProtocol)? = nil, pageSize: Int = 50) {
+        self.pageSize = max(1, pageSize)
         // 保存されたエディタテキストを読み込む（なければ空文字）
         self.editorText = UserDefaults.standard.string(forKey: "lastEditorText") ?? ""
         // Use provided service or get default service
@@ -80,7 +91,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
                 self.updateFilteredItems(self.clipboardService.history)
             }
             .store(in: &cancellables)
-        
+
         // 初回読み込み
         updateFilteredItems(self.clipboardService.history)
         currentClipboardContent = self.clipboardService.currentClipboardContent
@@ -189,16 +200,39 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             filtered = filtered.filter { $0.isPinned }
         }
 
-        // Update filtered results
+        updatePagination(with: filtered)
+    }
+
+    func loadMoreHistoryIfNeeded(currentItem: ClipItem) {
+        guard history.count < filteredHistory.count else { return }
+        guard !isLoadingMore else { return }
+        guard let lastItem = history.last, lastItem.id == currentItem.id else { return }
+
+        isLoadingMore = true
+        let newLimit = min(history.count + pageSize, filteredHistory.count)
+        currentHistoryLimit = newLimit
+        history = Array(filteredHistory.prefix(currentHistoryLimit))
+        hasMoreHistory = history.count < filteredHistory.count
+        isLoadingMore = false
+    }
+
+    private func updatePagination(with filtered: [ClipItem]) {
         filteredHistory = filtered
 
-        // Keep backward compatibility
-        if isPinnedFilterActive {
-            self.pinnedItems = pinnedHistory
-            self.history = filtered  // Set to filtered items (which are pinned when isPinnedFilterActive is true)
+        let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
+        if shouldPaginate {
+            currentHistoryLimit = min(pageSize, filtered.count)
         } else {
-            self.history = filtered
-            self.pinnedItems = []
+            currentHistoryLimit = filtered.count
+        }
+
+        history = Array(filtered.prefix(currentHistoryLimit))
+        hasMoreHistory = history.count < filtered.count
+
+        if isPinnedFilterActive {
+            pinnedItems = filtered
+        } else {
+            pinnedItems = []
         }
     }
     

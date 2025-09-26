@@ -30,6 +30,7 @@
 		21E8ABF485231AE29F2B3456 /* SimpleLineNumberRulerView+LineNumbers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC27626F1475139B9F815EB /* SimpleLineNumberRulerView+LineNumbers.swift */; };
 		224A0B5AE732714A9A33A1FE /* LastActiveAppTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67BF4F2A209B66F653AED625 /* LastActiveAppTracker.swift */; };
 		25AA8D9F6A665B653B9657DD /* FontSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F5321279A2B28308DD4153 /* FontSettingsTests.swift */; };
+		27C4BEC2A8ED50140609BDE8 /* HistoryPopoverManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37B053808436025713478005 /* HistoryPopoverManager.swift */; };
 		2A58F52BC11A37BCE8E90C57 /* SimpleLineNumberRulerView+Highlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA50AE051B732AFB81BD1A91 /* SimpleLineNumberRulerView+Highlight.swift */; };
 		2BB533E97643D168E96F55AE /* ClipItemEqualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D5369E6F3C814F606861FF /* ClipItemEqualityTests.swift */; };
 		2BFF305F6C7562391A4F2518 /* SettingsRestorationExampleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E522102080E9938FBB8FA69D /* SettingsRestorationExampleTests.swift */; };
@@ -72,6 +73,7 @@
 		8C8003ED3513195C1FF9D59B /* ClipboardServiceProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9C5F08C099B7059A59ACB71 /* ClipboardServiceProviderTests.swift */; };
 		8F38595FFA66609AB4C620F2 /* ModernClipboardServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 306656767496DF766095D811 /* ModernClipboardServiceTests.swift */; };
 		906C0F98B6A60A0BE9DCD168 /* ModernClipboardServiceStartupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95A21AC6929667A00FB9B0DF /* ModernClipboardServiceStartupTests.swift */; };
+		912EBEE831AE6A278DA19BC8 /* HoverTrackingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867532273CB00F98FCD94839 /* HoverTrackingView.swift */; };
 		91675D34939D0309CDB56412 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67D10EA29EF23E2F13D534D /* AppSettings.swift */; };
 		919E67E084CDE81E36F92C5A /* FontSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5631CC7079AE76AEAA33198B /* FontSettings.swift */; };
 		9307F620E4668D5E10D09EB4 /* LastActiveAppTrackingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E96A9E775E48366E37AA17 /* LastActiveAppTrackingTests.swift */; };
@@ -179,6 +181,7 @@
 		34D3F54D8BF77BCDF6FAAEBD /* SimplifiedHotkeyManagerFullTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimplifiedHotkeyManagerFullTests.swift; sourceTree = "<group>"; };
 		36A80E91253CCD851C6231CB /* AppInfoRecordingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfoRecordingTests.swift; sourceTree = "<group>"; };
 		3794E8C4BD8C40F2E779C777 /* HistoryPopoverLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverLifecycleTests.swift; sourceTree = "<group>"; };
+		37B053808436025713478005 /* HistoryPopoverManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPopoverManager.swift; sourceTree = "<group>"; };
 		387A45AAD067D49821C821E4 /* FontMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontMetrics.swift; sourceTree = "<group>"; };
 		39C58001947462F24A05B563 /* ModernClipboardServiceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceAdapter.swift; sourceTree = "<group>"; };
 		39DDD245847721061AFF60BA /* HotkeyManagerProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerProvider.swift; sourceTree = "<group>"; };
@@ -215,6 +218,7 @@
 		76F433A1E4092D8E995AB41D /* SwiftDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataModels.swift; sourceTree = "<group>"; };
 		86673766DAAA80021DEC9AB0 /* SimpleLineNumberRulerView+Drawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SimpleLineNumberRulerView+Drawing.swift"; sourceTree = "<group>"; };
 		866EF79DC1C4FABC144A5F04 /* LoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerTests.swift; sourceTree = "<group>"; };
+		867532273CB00F98FCD94839 /* HoverTrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoverTrackingView.swift; sourceTree = "<group>"; };
 		86EB3075FA086F96EAF118D1 /* HistoryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryItemView.swift; sourceTree = "<group>"; };
 		88B10B53A06B353B8ABDB1C3 /* DeleteItemSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteItemSyncTests.swift; sourceTree = "<group>"; };
 		88CC5DBC53E0C2D680CCE42D /* SwiftDataPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataPersistenceTests.swift; sourceTree = "<group>"; };
@@ -387,6 +391,14 @@
 			path = ViewModifiers;
 			sourceTree = "<group>";
 		};
+		31F0562AA4302B17DAC50853 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				37B053808436025713478005 /* HistoryPopoverManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		3E9396C40D6169A3D2111AAF /* ServiceProviders */ = {
 			isa = PBXGroup;
 			children = (
@@ -403,6 +415,7 @@
 			children = (
 				05243238D42C5917E20B6BFA /* HistoryItemPopoverComponents.swift */,
 				86EB3075FA086F96EAF118D1 /* HistoryItemView.swift */,
+				867532273CB00F98FCD94839 /* HoverTrackingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -530,6 +543,7 @@
 		8ED5D21466EFFE074E27EAAF /* History */ = {
 			isa = PBXGroup;
 			children = (
+				31F0562AA4302B17DAC50853 /* Services */,
 				3EC0F8FCE0EB669AEF8006A6 /* Views */,
 			);
 			path = History;
@@ -895,8 +909,10 @@
 				D756FBE1A9DB7DC26355B941 /* GeneralSettingsView.swift in Sources */,
 				C51B1B3F901D602D9A26EF2C /* HistoryItemPopoverComponents.swift in Sources */,
 				ABA16FADADE89FB7D04377B0 /* HistoryItemView.swift in Sources */,
+				27C4BEC2A8ED50140609BDE8 /* HistoryPopoverManager.swift in Sources */,
 				975C219CF1E3B59DF6699A1A /* HotkeyManagerProvider.swift in Sources */,
 				1C47AD62906E6AEA7116C89E /* HotkeyRecorderView.swift in Sources */,
+				912EBEE831AE6A278DA19BC8 /* HoverTrackingView.swift in Sources */,
 				1AD90183D200D3474E6F4F72 /* KippleApp.swift in Sources */,
 				224A0B5AE732714A9A33A1FE /* LastActiveAppTracker.swift in Sources */,
 				0A4AB5ED9A6E60E627A0EE50 /* LaunchAtLogin.swift in Sources */,

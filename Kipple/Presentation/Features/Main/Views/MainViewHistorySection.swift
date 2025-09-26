@@ -12,21 +12,48 @@ struct MainViewHistorySection: View {
     let history: [ClipItem]
     let currentClipboardContent: String?
     @Binding var selectedHistoryItem: ClipItem?
-    @Binding var hoveredHistoryItem: ClipItem?
-    @State private var searchText = ""
-    @State private var debouncedSearchText = ""
-    @State private var searchCancellable: AnyCancellable?
     let onSelectItem: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     let onCategoryFilter: ((ClipItemCategory) -> Void)?
     @Binding var selectedCategory: ClipItemCategory?
+    let onSearchTextChanged: (String) -> Void
+    let onLoadMore: (ClipItem) -> Void
+    let hasMoreItems: Bool
     @ObservedObject private var fontManager = FontManager.shared
-    
+
+    @State private var searchText: String
+    @State private var searchCancellable: AnyCancellable?
+
+    init(
+        history: [ClipItem],
+        currentClipboardContent: String?,
+        selectedHistoryItem: Binding<ClipItem?>,
+        onSelectItem: @escaping (ClipItem) -> Void,
+        onTogglePin: @escaping (ClipItem) -> Void,
+        onDelete: ((ClipItem) -> Void)?,
+        onCategoryFilter: ((ClipItemCategory) -> Void)?,
+        selectedCategory: Binding<ClipItemCategory?>,
+        initialSearchText: String,
+        onSearchTextChanged: @escaping (String) -> Void,
+        onLoadMore: @escaping (ClipItem) -> Void,
+        hasMoreItems: Bool
+    ) {
+        self.history = history
+        self.currentClipboardContent = currentClipboardContent
+        self._selectedHistoryItem = selectedHistoryItem
+        self.onSelectItem = onSelectItem
+        self.onTogglePin = onTogglePin
+        self.onDelete = onDelete
+        self.onCategoryFilter = onCategoryFilter
+        self._selectedCategory = selectedCategory
+        self.onSearchTextChanged = onSearchTextChanged
+        self.onLoadMore = onLoadMore
+        self.hasMoreItems = hasMoreItems
+        _searchText = State(initialValue: initialSearchText)
+    }
+
     var body: some View {
-        let filteredHistory = debouncedSearchText.isEmpty ? history : 
-            history.filter { $0.content.localizedCaseInsensitiveContains(debouncedSearchText) }
-        
         return VStack(spacing: 0) {
             // 検索バー（常に表示）
             HStack(spacing: 12) {
@@ -74,7 +101,7 @@ struct MainViewHistorySection: View {
                 // 履歴リスト
                 ScrollView {
                     LazyVStack(spacing: 3, pinnedViews: []) {
-                        ForEach(filteredHistory) { item in
+                        ForEach(history) { item in
                             HistoryItemView(
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
@@ -98,6 +125,15 @@ struct MainViewHistorySection: View {
                             .frame(height: 36) // 固定高さでパフォーマンス向上
                             .transition(.opacity)
                             .animation(.easeInOut(duration: 0.2), value: item.isPinned)
+                            .onAppear {
+                                onLoadMore(item)
+                            }
+                        }
+                        if hasMoreItems {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -113,8 +149,11 @@ struct MainViewHistorySection: View {
             searchCancellable = Just(newValue)
                 .delay(for: .milliseconds(300), scheduler: RunLoop.main)
                 .sink { value in
-                    debouncedSearchText = value
+                    onSearchTextChanged(value)
                 }
+        }
+        .onAppear {
+            onSearchTextChanged(searchText)
         }
     }
 }

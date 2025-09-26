@@ -187,6 +187,48 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(pinnedItems.count, 1)
         XCTAssertEqual(pinnedItems.first?.content, "Pinned")
     }
+
+    func testInitialPaginationShowsFirstPageOnly() {
+        // Given
+        mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }
+
+        // When
+        viewModel.loadHistory()
+
+        // Then
+        XCTAssertEqual(viewModel.history.count, 50)
+        XCTAssertTrue(viewModel.hasMoreHistory)
+    }
+
+    func testLoadMoreHistoryAppendsNextPage() {
+        // Given
+        mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }
+        viewModel.loadHistory()
+        let lastVisible = viewModel.history.last
+
+        // When
+        if let lastVisible {
+            viewModel.loadMoreHistoryIfNeeded(currentItem: lastVisible)
+        }
+
+        // Then
+        XCTAssertEqual(viewModel.history.count, 100)
+        XCTAssertTrue(viewModel.hasMoreHistory)
+    }
+
+    func testSearchDisablesPagination() {
+        // Given
+        mockClipboardService.history = (1...30).map { ClipItem(content: "Item \($0)") }
+        viewModel.loadHistory()
+
+        // When
+        viewModel.searchText = "Item 2"
+
+        // Then
+        XCTAssertFalse(viewModel.hasMoreHistory)
+        XCTAssertEqual(viewModel.history.count, viewModel.filteredHistory.count)
+        XCTAssertTrue(viewModel.history.allSatisfy { $0.content.contains("Item 2") })
+    }
     
     // MARK: - Performance Tests
     
