@@ -51,11 +51,30 @@ final class HistoryPopoverManager {
         let anchorRectOnScreen = window.convertToScreen(anchorRectInWindow)
 
         let spacing: CGFloat = 8
-        var origin = CGPoint(x: trailingEdge ? anchorRectOnScreen.maxX + spacing
-                                             : anchorRectOnScreen.minX - fittingSize.width - spacing,
-                              y: anchorRectOnScreen.maxY - fittingSize.height)
-
         let visibleFrame = screen.visibleFrame
+
+        let hasSpaceOnRight = anchorRectOnScreen.maxX + spacing + fittingSize.width <= visibleFrame.maxX
+        let hasSpaceOnLeft = anchorRectOnScreen.minX - spacing - fittingSize.width >= visibleFrame.minX
+        let preferredTrailing = anchorRectOnScreen.midX <= visibleFrame.midX
+
+        let resolvedTrailing: Bool
+        switch (hasSpaceOnLeft, hasSpaceOnRight) {
+        case (false, true):
+            resolvedTrailing = true
+        case (true, false):
+            resolvedTrailing = false
+        case (true, true):
+            resolvedTrailing = preferredTrailing
+        default:
+            resolvedTrailing = trailingEdge
+        }
+
+        var origin = CGPoint(
+            x: resolvedTrailing ? anchorRectOnScreen.maxX + spacing
+                                 : anchorRectOnScreen.minX - fittingSize.width - spacing,
+            y: anchorRectOnScreen.maxY - fittingSize.height
+        )
+
         origin.x = max(visibleFrame.minX, min(origin.x, visibleFrame.maxX - fittingSize.width))
         origin.y = max(visibleFrame.minY, min(origin.y, visibleFrame.maxY - fittingSize.height))
 
