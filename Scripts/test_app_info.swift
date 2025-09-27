@@ -3,12 +3,6 @@
 import Cocoa
 import ApplicationServices
 
-// アクセシビリティ権限の確認
-func checkAccessibilityPermission() -> Bool {
-    let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true]
-    return AXIsProcessTrustedWithOptions(options)
-}
-
 // 現在のフロントアプリ情報を取得
 func getCurrentAppInfo() {
     guard let frontApp = NSWorkspace.shared.frontmostApplication else {
@@ -77,8 +71,6 @@ func monitorAppActivation() {
 
 // メイン処理
 print("=== Kipple App Info Test ===")
-print("Accessibility Permission: \(checkAccessibilityPermission())")
-
 getCurrentAppInfo()
 getWindowsInfo()
 monitorAppActivation()

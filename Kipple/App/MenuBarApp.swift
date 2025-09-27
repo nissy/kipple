@@ -87,26 +87,13 @@ final class MenuBarApp: NSObject, ObservableObject {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Open Kipple", action: #selector(openMainWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        
-        // Accessibility permission menu item
-        let permissionItem = NSMenuItem(
-            title: "Grant Accessibility Permission…",
-            action: #selector(checkAccessibilityPermission),
-            keyEquivalent: ""
-        )
-        permissionItem.tag = 100
-        menu.addItem(permissionItem)
-        menu.addItem(NSMenuItem.separator())
-        
+
         menu.addItem(NSMenuItem(title: "Preferences…", action: #selector(openPreferences), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit Kipple", action: #selector(quit), keyEquivalent: "q"))
-        
+
         menu.items.forEach { $0.target = self }
-        
-        // Set menu delegate for dynamic updates
-        menu.delegate = self
-        
+
         return menu
     }
     
@@ -138,32 +125,6 @@ final class MenuBarApp: NSObject, ObservableObject {
     
     @objc private func showAbout() {
         windowManager.showAbout()
-    }
-    
-    @objc private func checkAccessibilityPermission() {
-        AccessibilityManager.shared.refreshPermissionStatus()  // Force refresh
-        
-        if AccessibilityManager.shared.hasPermission {
-            // Permission already granted
-            showPermissionGrantedNotification()
-        } else {
-            // No permission - show alert and request
-            AccessibilityManager.shared.showAccessibilityAlert()
-        }
-    }
-    
-    private func showPermissionGrantedNotification() {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Permission Already Granted"
-            alert.informativeText = """
-                Kipple already has accessibility permission.
-                App names and window titles are being captured.
-                """
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-        }
     }
     
     @objc private func quit() {
@@ -234,19 +195,6 @@ final class MenuBarApp: NSObject, ObservableObject {
             Logger.shared.log("Calling reply(toApplicationShouldTerminate: true) from forceTerminate")
             NSApplication.shared.reply(toApplicationShouldTerminate: true)
             Logger.shared.log("forceTerminate completed")
-        }
-    }
-}
-
-// MARK: - NSMenuDelegate
-extension MenuBarApp: NSMenuDelegate {
-    func menuWillOpen(_ menu: NSMenu) {
-        // Update permission menu item
-        for item in menu.items where item.tag == 100 {
-            let hasPermission = AccessibilityManager.shared.hasPermission
-            item.title = hasPermission ? "Accessibility Permission Granted ✓" : "Grant Accessibility Permission…"
-            // Always enable the menu item to allow checking status
-            item.isEnabled = true
         }
     }
 }

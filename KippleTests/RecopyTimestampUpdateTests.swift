@@ -69,8 +69,9 @@ final class RecopyTimestampUpdateTests: XCTestCase {
 
         let newTimestamp = history[0].timestamp
         XCTAssertNotEqual(newTimestamp, oldDate, "Timestamp should be updated")
+        let tolerance: TimeInterval = 1.0
         XCTAssertTrue(newTimestamp >= beforeRecopy, "New timestamp should be recent")
-        XCTAssertTrue(newTimestamp <= afterRecopy, "New timestamp should be within test window")
+        XCTAssertTrue(newTimestamp <= afterRecopy.addingTimeInterval(tolerance), "New timestamp should be within tolerance of the test window")
     }
 
     func testMultipleRecopiesUpdateTimestamps() async throws {

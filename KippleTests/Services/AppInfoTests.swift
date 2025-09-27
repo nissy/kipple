@@ -6,14 +6,13 @@
 //
 //  SPECS.md準拠: アプリ情報取得機能の統合テスト
 //  - コピー元アプリ名の取得
-//  - ウィンドウタイトルの取得（アクセシビリティ権限）
+//  - ウィンドウタイトルの取得
 //  - バンドルID、プロセスIDの取得
 //  - CGWindowList APIによるフォールバック
 //  - Kipple自身からのコピー処理
 
 import XCTest
 import Cocoa
-import Carbon
 @testable import Kipple
 
 @MainActor
@@ -99,17 +98,6 @@ final class AppInfoTests: XCTestCase {
             }
         }
         XCTAssertTrue(foundValidWindow, "Should find at least one valid window")
-    }
-    
-    // MARK: - アクセシビリティ権限テスト
-    
-    func testAccessibilityPermissionCheck() {
-        // SPECS.md: アクセシビリティ権限チェック（キャッシュ付き、1秒間有効）
-        // Note: Testing accessibility permission check without prompting
-        let hasPermission = AXIsProcessTrusted()
-
-        // 権限の有無に関わらず、チェック機能が動作することを確認
-        XCTAssertNotNil(hasPermission)
     }
     
     // MARK: - Kipple自身からのコピー処理
