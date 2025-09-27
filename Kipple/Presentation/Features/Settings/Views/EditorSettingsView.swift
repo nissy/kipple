@@ -39,8 +39,7 @@ struct EditorSettingsView: View {
                 // Editor Copy Hotkey
                 SettingsGroup("Editor Copy Hotkey") {
                     SettingsRow(
-                        label: "Enable editor copy hotkey",
-                        description: "Quickly copy editor content to clipboard",
+                        label: "Enable copy hotkey",
                         isOn: $appSettings.enableEditorCopyHotkey
                     )
                     .onChange(of: appSettings.enableEditorCopyHotkey) { newValue in
@@ -68,8 +67,7 @@ struct EditorSettingsView: View {
                 // Editor Clear Hotkey
                 SettingsGroup("Editor Clear Hotkey") {
                     SettingsRow(
-                        label: "Enable editor clear hotkey",
-                        description: "Quickly clear editor content",
+                        label: "Enable clear hotkey",
                         isOn: $appSettings.enableEditorClearHotkey
                     )
                     .onChange(of: appSettings.enableEditorClearHotkey) { newValue in

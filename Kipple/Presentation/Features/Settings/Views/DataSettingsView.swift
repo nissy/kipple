@@ -38,140 +38,132 @@ struct DataSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Font Settings
                 ClipboardFontSettingsView()
-                
+
                 // Category Filter Settings Section
                 SettingsGroup("Category Filter Settings") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Choose which categories can be filtered in the history view")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .padding(.bottom, 8)
-                        
-                        VStack(spacing: 0) {
-                            SettingsRow(label: "URL", isOn: $filterCategoryURL)
-                            SettingsRow(label: "Email", isOn: $filterCategoryEmail)
-                            SettingsRow(label: "Code", isOn: $filterCategoryCode)
-                            SettingsRow(label: "File Path", isOn: $filterCategoryFilePath)
-                            SettingsRow(label: "Short Text", isOn: $filterCategoryShortText)
-                            SettingsRow(label: "Long Text", isOn: $filterCategoryLongText)
-                            SettingsRow(label: "General", isOn: $filterCategoryGeneral)
-                            SettingsRow(label: "Kipple", isOn: $filterCategoryKipple)
-                        }
+                    let checkboxColumns = [
+                        GridItem(.flexible(minimum: 120), alignment: .leading),
+                        GridItem(.flexible(minimum: 120), alignment: .leading)
+                    ]
+
+                    LazyVGrid(columns: checkboxColumns, alignment: .leading, spacing: 8) {
+                        Toggle("URL", isOn: $filterCategoryURL)
+                            .toggleStyle(.checkbox)
+                        Toggle("Email", isOn: $filterCategoryEmail)
+                            .toggleStyle(.checkbox)
+                        Toggle("Code", isOn: $filterCategoryCode)
+                            .toggleStyle(.checkbox)
+                        Toggle("File Path", isOn: $filterCategoryFilePath)
+                            .toggleStyle(.checkbox)
+                        Toggle("Short Text", isOn: $filterCategoryShortText)
+                            .toggleStyle(.checkbox)
+                        Toggle("Long Text", isOn: $filterCategoryLongText)
+                            .toggleStyle(.checkbox)
+                        Toggle("General", isOn: $filterCategoryGeneral)
+                            .toggleStyle(.checkbox)
+                        Toggle("Kipple", isOn: $filterCategoryKipple)
+                            .toggleStyle(.checkbox)
                     }
                 }
                 
                 // Auto-Clear Settings Section
                 SettingsGroup("Auto-Clear") {
-                    VStack(spacing: 0) {
-                        SettingsRow(label: "Enable Auto-Clear", isOn: $enableAutoClear)
-                            .onChange(of: enableAutoClear) { _ in
-                                updateAutoClearConfiguration()
-                            }
-                        
-                        SettingsRow(
-                            label: "Clear Interval",
-                            description: "Automatically clear system clipboard content after this duration"
-                        ) {
-                            HStack {
-                                TextField(
-                                    "",
-                                    value: Binding(
-                                        get: { Double(autoClearInterval) },
-                                        set: { autoClearInterval = Int(max(1, min(1440, $0))) }
-                                    ),
-                                    formatter: makeNumberFormatter(minimum: 1, maximum: 1440)
-                                )
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 80)
-                                .disabled(!enableAutoClear)
-                                
-                                Text("minutes")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
-                                
-                                Stepper(
-                                    "",
-                                    value: Binding(
-                                        get: { Double(autoClearInterval) },
-                                        set: { autoClearInterval = Int($0) }
-                                    ),
-                                    in: 1...1440,
-                                    step: 1
-                                )
-                                .labelsHidden()
-                                .disabled(!enableAutoClear)
-                            }
-                        }
-                        .onChange(of: autoClearInterval) { _ in
+                    SettingsRow(label: "Enable Auto-Clear", isOn: $enableAutoClear)
+                        .onChange(of: enableAutoClear) { _ in
                             updateAutoClearConfiguration()
                         }
+                    
+                    SettingsRow(label: "Clear interval") {
+                        HStack {
+                            TextField(
+                                "",
+                                value: Binding(
+                                    get: { Double(autoClearInterval) },
+                                    set: { autoClearInterval = Int(max(1, min(1440, $0))) }
+                                ),
+                                formatter: makeNumberFormatter(minimum: 1, maximum: 1440)
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                            .disabled(!enableAutoClear)
+
+                            Text("minutes")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+
+                            Stepper(
+                                "",
+                                value: Binding(
+                                    get: { Double(autoClearInterval) },
+                                    set: { autoClearInterval = Int($0) }
+                                ),
+                                in: 1...1440,
+                                step: 1
+                            )
+                            .labelsHidden()
+                            .disabled(!enableAutoClear)
+                        }
+                    }
+                    .onChange(of: autoClearInterval) { _ in
+                        updateAutoClearConfiguration()
                     }
                 }
                 
                 // Storage Limits Section
                 SettingsGroup("Storage Limits") {
-                    VStack(spacing: 0) {
-                        SettingsRow(
-                            label: "Maximum History Items",
-                            description: "Maximum number of clipboard history items to keep"
-                        ) {
-                            HStack {
-                                TextField(
-                                    "",
-                                    value: Binding(
-                                        get: { Double(maxHistoryItems) },
-                                        set: { maxHistoryItems = Int(max(10, min(1000, $0))) }
-                                    ),
-                                    formatter: makeNumberFormatter(minimum: 10, maximum: 1000)
-                                )
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 80)
-                                .onChange(of: maxHistoryItems) { newValue in
-                                    updateHistoryLimit(newValue)
-                                }
+                    SettingsRow(label: "Maximum history items") {
+                        HStack {
+                            TextField(
+                                "",
+                                value: Binding(
+                                    get: { Double(maxHistoryItems) },
+                                    set: { maxHistoryItems = Int(max(10, min(1000, $0))) }
+                                ),
+                                formatter: makeNumberFormatter(minimum: 10, maximum: 1000)
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                            .onChange(of: maxHistoryItems) { newValue in
+                                updateHistoryLimit(newValue)
+                            }
 
-                                Stepper(
-                                    "",
-                                    value: Binding(
-                                        get: { Double(maxHistoryItems) },
-                                        set: { maxHistoryItems = Int($0) }
-                                    ),
-                                    in: 10...1000,
-                                    step: 10
-                                )
-                                .labelsHidden()
-                            }
+                            Stepper(
+                                "",
+                                value: Binding(
+                                    get: { Double(maxHistoryItems) },
+                                    set: { maxHistoryItems = Int($0) }
+                                ),
+                                in: 10...1000,
+                                step: 10
+                            )
+                            .labelsHidden()
                         }
-                        
-                        SettingsRow(
-                            label: "Maximum Pinned Items",
-                            description: "Maximum number of items that can be pinned"
-                        ) {
-                            HStack {
-                                TextField(
-                                    "",
-                                    value: Binding(
-                                        get: { Double(maxPinnedItems) },
-                                        set: { maxPinnedItems = Int(max(1, min(100, $0))) }
-                                    ),
-                                    formatter: makeNumberFormatter(minimum: 1, maximum: 100)
-                                )
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 80)
-                                
-                                Stepper(
-                                    "",
-                                    value: Binding(
-                                        get: { Double(maxPinnedItems) },
-                                        set: { maxPinnedItems = Int($0) }
-                                    ),
-                                    in: 1...100,
-                                    step: 1
-                                )
-                                .labelsHidden()
-                            }
+                    }
+                    
+                    SettingsRow(label: "Maximum pinned items") {
+                        HStack {
+                            TextField(
+                                "",
+                                value: Binding(
+                                    get: { Double(maxPinnedItems) },
+                                    set: { maxPinnedItems = Int(max(1, min(100, $0))) }
+                                ),
+                                formatter: makeNumberFormatter(minimum: 1, maximum: 100)
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                            
+                            Stepper(
+                                "",
+                                value: Binding(
+                                    get: { Double(maxPinnedItems) },
+                                    set: { maxPinnedItems = Int($0) }
+                                ),
+                                in: 1...100,
+                                step: 1
+                            )
+                            .labelsHidden()
                         }
                     }
                 }
@@ -179,11 +171,11 @@ struct DataSettingsView: View {
                 // Data Management Section
                 SettingsGroup("Data Management") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Remove all clipboard history items (pinned items will be kept)")
+                        Text("Remove all clipboard history items (pinned items stay)")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
-                            .padding(.bottom, 8)
-                        
+                            .padding(.bottom, 4)
+
                         HStack {
                             Button(action: {
                                 showClearHistoryAlert = true
@@ -232,7 +224,8 @@ struct DataSettingsView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
         }
         .task {
             updateAutoClearConfiguration()

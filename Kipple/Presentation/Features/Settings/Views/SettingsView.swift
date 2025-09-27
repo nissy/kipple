@@ -6,18 +6,35 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject private var fontManager = FontManager.shared
-    
+    @Environment(\.controlActiveState) private var controlActiveState
+    @State private var activeTab: SettingsViewModel.Tab
+
+    init(viewModel: SettingsViewModel = SettingsViewModel()) {
+        _viewModel = ObservedObject(wrappedValue: viewModel)
+        _activeTab = State(initialValue: viewModel.selectedTab)
+    }
+
     var body: some View {
-        NavigationView {
-            sidebar
-            contentArea
+        VStack(spacing: 0) {
+            tabContent
+                .id(activeTab)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .frame(width: 620, height: 590)
-        .background(Color(NSColor.windowBackgroundColor))
+        .animation(nil, value: activeTab)
+        .onReceive(viewModel.$selectedTab) { newTab in
+            if activeTab != newTab {
+                activeTab = newTab
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(minWidth: 480, alignment: .topLeading)
+        .background(glassBackground)
         .sheet(isPresented: $viewModel.showingAddFallbackSheet) {
             AddFallbackFontSheet(
                 selectedFont: $viewModel.selectedFallbackFont,
@@ -39,82 +56,68 @@ struct SettingsView: View {
             Text(viewModel.launchAtLoginErrorMessage)
         }
     }
-    
-    // MARK: - Sidebar
-    private var sidebar: some View {
-        List {
-            SettingsSidebarItem(
-                title: "General",
-                icon: "gear",
-                color: .blue,
-                isSelected: viewModel.selectedTab == 0
-            ) {
-                viewModel.selectedTab = 0
-            }
-            
-            SettingsSidebarItem(
-                title: "Editor",
-                icon: "pencil",
-                color: .green,
-                isSelected: viewModel.selectedTab == 1
-            ) {
-                viewModel.selectedTab = 1
-            }
-            
-            SettingsSidebarItem(
-                title: "Clipboard",
-                icon: "doc.on.clipboard",
-                color: .orange,
-                isSelected: viewModel.selectedTab == 2
-            ) {
-                viewModel.selectedTab = 2
-            }
-        }
-        .listStyle(SidebarListStyle())
-        .frame(width: 170)
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-    }
-    
-    // MARK: - Content Area
-    private var contentArea: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Content Header
-            HStack {
-                Image(systemName: viewModel.tabIcon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(viewModel.tabColor)
-                
-                Text(viewModel.tabTitle)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            
-            Divider()
-            
-            // Tab Content
-            tabContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .background(Color(NSColor.windowBackgroundColor))
-    }
-    
+
     @ViewBuilder
     private var tabContent: some View {
-        switch viewModel.selectedTab {
-        case 0:
+        switch activeTab {
+        case .general:
             GeneralSettingsView()
-        case 1:
+        case .editor:
             EditorSettingsView()
-        case 2:
+        case .clipboard:
             DataSettingsView()
-        default:
-            GeneralSettingsView()
         }
+    }
+
+    private var glassBackground: some View {
+        ZStack {
+            GlassView(
+                material: controlActiveState == .inactive ? .underWindowBackground : .menu,
+                isActive: controlActiveState != .inactive
+            )
+            .allowsHitTesting(false)
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(controlActiveState == .inactive ? 0.95 : 0.99),
+                            Color.white.opacity(controlActiveState == .inactive ? 0.92 : 0.96)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .padding(3)
+                .allowsHitTesting(false)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color.black.opacity(0.04), lineWidth: 1)
+                        .padding(3)
+                )
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private struct GlassView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    let isActive: Bool
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .withinWindow
+        view.state = isActive ? .active : .inactive
+        view.isEmphasized = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = .withinWindow
+        nsView.state = isActive ? .active : .inactive
+        nsView.isEmphasized = true
     }
 }
 
@@ -124,6 +127,7 @@ struct AddFallbackFontSheet: View {
     let availableFonts: [String]
     let onAdd: () -> Void
     let onCancel: () -> Void
+    @Environment(\.controlActiveState) private var controlActiveState
     
     var body: some View {
         VStack(spacing: 14) {
@@ -188,6 +192,27 @@ struct AddFallbackFontSheet: View {
         }
         .padding(20)
         .frame(width: 360, height: 220)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(
+            ZStack {
+                GlassView(
+                    material: controlActiveState == .inactive ? .underWindowBackground : .menu,
+                    isActive: controlActiveState != .inactive
+                )
+                .allowsHitTesting(false)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(controlActiveState == .inactive ? 0.64 : 0.82),
+                        Color.white.opacity(controlActiveState == .inactive ? 0.56 : 0.74)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+                Color.accentColor
+                    .opacity(controlActiveState == .inactive ? 0.02 : 0.05)
+                    .allowsHitTesting(false)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        )
     }
 }

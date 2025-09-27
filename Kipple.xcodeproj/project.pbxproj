@@ -86,6 +86,7 @@
 		9D5DE584D34C9C952A6DE350 /* SimplifiedHotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC6B91B179AA5EFABC7CD87 /* SimplifiedHotkeyManagerTests.swift */; };
 		9D89CC36C54BF7F32256335B /* InternalOperationFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5147540CFEA499BC47D2B4 /* InternalOperationFlagTests.swift */; };
 		A3DE9ECB686BA72A32C2CDDA /* SettingsGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36EF972EACF9279EE76CFE9 /* SettingsGroup.swift */; };
+		A667220B99F23F60D12B4E36 /* SettingsWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */; };
 		ABA16FADADE89FB7D04377B0 /* HistoryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86EB3075FA086F96EAF118D1 /* HistoryItemView.swift */; };
 		AC14F54787977FD78290F104 /* ClipboardFontSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ED56E8888BBC7EF54BB602 /* ClipboardFontSettingsView.swift */; };
 		AF778ECCA9E520AC5A8CD4B8 /* MainViewHistorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1088BA3F9356CC79A508A02 /* MainViewHistorySection.swift */; };
@@ -103,6 +104,7 @@
 		BE83F3D96570EC1EAEDCD33C /* SwiftDataPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CC5DBC53E0C2D680CCE42D /* SwiftDataPersistenceTests.swift */; };
 		C17A8F50F8EF6738C84200D9 /* PerformanceMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A8A074D41803EB02702E99 /* PerformanceMetricsTests.swift */; };
 		C30A1B79D01E7251AD5EEF60 /* SwiftUIViewPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9933CB969F2A6FE705ED3B16 /* SwiftUIViewPerformanceTests.swift */; };
+		C369B11A9F7AC498D6F5EBCB /* SettingsToolbarControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454EAFBA24D6EE7B5D2C1B78 /* SettingsToolbarControllerTests.swift */; };
 		C3D9E5C592ED115B7C44E64B /* HotkeySettingsSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF40741FF97648B5350B9F3 /* HotkeySettingsSyncTests.swift */; };
 		C3F57A591CBE99A48E9E705F /* ClipboardServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202AE76511A06BF28D5FB2FE /* ClipboardServiceProtocol.swift */; };
 		C44B02C21FC84E4D5E494F82 /* DebouncingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEAB0897562E07633C08A4F1 /* DebouncingTests.swift */; };
@@ -189,6 +191,7 @@
 		3FFDAC614C09BD018C9DA2DB /* ModernClipboardService+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModernClipboardService+Testing.swift"; sourceTree = "<group>"; };
 		44469F027281459864B47E6B /* EditorSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorSettingsView.swift; sourceTree = "<group>"; };
 		451A69AE150DEDD1B6155CAD /* AppInfoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfoTests.swift; sourceTree = "<group>"; };
+		454EAFBA24D6EE7B5D2C1B78 /* SettingsToolbarControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsToolbarControllerTests.swift; sourceTree = "<group>"; };
 		4661A4D60B3DA10C5BACE2F5 /* RepositoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryProvider.swift; sourceTree = "<group>"; };
 		46F53824EF6E3465F75E9B79 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		46F59BE9F660F6741711F637 /* TrimmedHistoryRecopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrimmedHistoryRecopyTests.swift; sourceTree = "<group>"; };
@@ -273,6 +276,7 @@
 		E5778807D1EE8AD4AF29AB95 /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
 		E5E8F672B5F8DCE4239D1494 /* SimpleLineNumberRulerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberRulerView.swift; sourceTree = "<group>"; };
 		E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarApp.swift; sourceTree = "<group>"; };
+		E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowCoordinator.swift; sourceTree = "<group>"; };
 		EA50AE051B732AFB81BD1A91 /* SimpleLineNumberRulerView+Highlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SimpleLineNumberRulerView+Highlight.swift"; sourceTree = "<group>"; };
 		EF8A8B95993EEAACDF0AB18B /* ClipboardServiceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardServiceProvider.swift; sourceTree = "<group>"; };
 		F1964394C2CC0F206796038A /* LoggerLazyEvaluationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerLazyEvaluationTests.swift; sourceTree = "<group>"; };
@@ -332,6 +336,7 @@
 		0EFAC2D50C28C828E420ADA3 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */,
 				297CBB8448A107E022CAC728 /* WindowManager.swift */,
 			);
 			path = Managers;
@@ -359,6 +364,7 @@
 			isa = PBXGroup;
 			children = (
 				DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */,
+				454EAFBA24D6EE7B5D2C1B78 /* SettingsToolbarControllerTests.swift */,
 			);
 			path = Infrastructure;
 			sourceTree = "<group>";
@@ -934,6 +940,7 @@
 				EB49D860628367B9F51E6F0D /* SettingsSidebarItem.swift in Sources */,
 				3F055E4767378CD68AA83E39 /* SettingsView.swift in Sources */,
 				E35B55A93E5023845EE31DA6 /* SettingsViewModel.swift in Sources */,
+				A667220B99F23F60D12B4E36 /* SettingsWindowCoordinator.swift in Sources */,
 				FCE770890167AE86972B9B78 /* SimpleFontSettingsView.swift in Sources */,
 				9D20AFC44AD4B4F660C3A584 /* SimpleLineNumberCoordinator.swift in Sources */,
 				0C68CC6460E7373706FBB829 /* SimpleLineNumberRulerView+Drawing.swift in Sources */,
@@ -1008,6 +1015,7 @@
 				76F04D59D6CF00DA20D0E32D /* SearchAndFilterTests.swift in Sources */,
 				FE559C2AA720A6221F37680D /* SettingsBackupTests.swift in Sources */,
 				2BFF305F6C7562391A4F2518 /* SettingsRestorationExampleTests.swift in Sources */,
+				C369B11A9F7AC498D6F5EBCB /* SettingsToolbarControllerTests.swift in Sources */,
 				DF8A5EC8443873C9568465A9 /* SimplifiedHotkeyManagerFullTests.swift in Sources */,
 				9D5DE584D34C9C952A6DE350 /* SimplifiedHotkeyManagerTests.swift in Sources */,
 				BE83F3D96570EC1EAEDCD33C /* SwiftDataPersistenceTests.swift in Sources */,

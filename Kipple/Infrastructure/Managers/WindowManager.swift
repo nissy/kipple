@@ -19,6 +19,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var settingsCoordinator: SettingsToolbarController?
     private var mainViewModel: MainViewModel?
     private var isAlwaysOnTop = false {
         didSet {
@@ -386,30 +387,50 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     func openSettings() {
         if settingsWindow == nil {
-            let settingsView = SettingsView()
-            let hostingController = NSHostingController(rootView: settingsView)
-            
-            settingsWindow = NSWindow(contentViewController: hostingController)
-            settingsWindow?.title = "Kipple Preferences"
-            settingsWindow?.styleMask = [.titled, .closable, .miniaturizable]
-            settingsWindow?.setContentSize(NSSize(width: 450, height: 400))
-            settingsWindow?.center()
-            settingsWindow?.isReleasedWhenClosed = false
+            let viewModel = SettingsViewModel()
+            let settingsView = SettingsView(viewModel: viewModel)
+            let hostingController = SettingsHostingController(rootView: settingsView)
+
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "Kipple Settings"
+            window.styleMask = [.titled, .closable]
+            window.setContentSize(NSSize(width: 520, height: 480))
+            window.center()
+            window.isReleasedWhenClosed = false
+            window.titleVisibility = .visible
+            window.titlebarAppearsTransparent = false
+            window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            window.standardWindowButton(.zoomButton)?.isHidden = true
+            if #available(macOS 11.0, *) {
+                window.toolbarStyle = .preference
+            }
+
+            let coordinator = SettingsToolbarController(viewModel: viewModel)
+            coordinator.attach(to: window)
+            settingsCoordinator = coordinator
+
+            settingsWindow = window
         }
-        
+
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
-        
+
         if let observer = settingsObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        
+
         settingsObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: settingsWindow,
             queue: .main
-        ) { _ in
+        ) { [weak self] _ in
             NSApp.setActivationPolicy(.accessory)
+            if let observer = self?.settingsObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self?.settingsObserver = nil
+            }
+            self?.settingsCoordinator = nil
+            self?.settingsWindow = nil
         }
     }
     
