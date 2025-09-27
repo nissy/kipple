@@ -22,9 +22,9 @@ struct GeneralSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 // Startup
-                SettingsGroup("Startup") {
+                SettingsGroup("Startup", includeTopDivider: false) {
                     SettingsRow(
                         label: "Launch at login",
                         isOn: $autoLaunchAtLogin

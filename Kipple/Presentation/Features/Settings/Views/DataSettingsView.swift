@@ -37,7 +37,7 @@ struct DataSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 ClipboardFontSettingsView()
 
                 // Category Filter Settings Section

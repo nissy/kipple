@@ -11,7 +11,7 @@ struct ClipboardFontSettingsView: View {
     @ObservedObject var fontManager = FontManager.shared
     
     var body: some View {
-        SettingsGroup("History Font") {
+        SettingsGroup("History Font", includeTopDivider: false) {
             SettingsRow(label: "Font") {
                 SearchableFontPicker(selectedFont: fontNameBinding)
                     .frame(width: 200)

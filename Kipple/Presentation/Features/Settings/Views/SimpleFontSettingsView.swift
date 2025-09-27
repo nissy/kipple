@@ -11,7 +11,7 @@ struct SimpleFontSettingsView: View {
     @ObservedObject var fontManager = FontManager.shared
     
     var body: some View {
-        SettingsGroup("Editor Font") {
+        SettingsGroup("Editor Font", includeTopDivider: false) {
             SettingsRow(label: "Font") {
                 SearchableFontPicker(selectedFont: fontNameBinding)
                     .frame(width: 200)

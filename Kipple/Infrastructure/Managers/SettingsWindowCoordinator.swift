@@ -65,6 +65,9 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
                     self.window?.subtitle = tab.title
                 }
                 self.updateWindowSize(animated: true)
+                DispatchQueue.main.async { [weak self] in
+                    self?.updateWindowSize(animated: true)
+                }
             }
             .store(in: &cancellables)
     }

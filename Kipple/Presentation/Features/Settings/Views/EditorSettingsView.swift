@@ -16,12 +16,9 @@ struct EditorSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 // Font Settings
                 SimpleFontSettingsView()
-                
-                Divider()
-                
                 // Editor Position
                 SettingsGroup("Editor Position") {
                     SettingsRow(label: "Position") {
@@ -33,9 +30,6 @@ struct EditorSettingsView: View {
                         .frame(width: 150)
                     }
                 }
-                
-                Divider()
-                
                 // Editor Copy Hotkey
                 SettingsGroup("Editor Copy Hotkey") {
                     SettingsRow(
@@ -61,9 +55,6 @@ struct EditorSettingsView: View {
                         .onChange(of: tempCopyModifierFlags) { _ in updateCopyHotkey() }
                     }
                 }
-                
-                Divider()
-                
                 // Editor Clear Hotkey
                 SettingsGroup("Editor Clear Hotkey") {
                     SettingsRow(

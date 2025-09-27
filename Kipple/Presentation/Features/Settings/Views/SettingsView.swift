@@ -70,33 +70,7 @@ struct SettingsView: View {
     }
 
     private var glassBackground: some View {
-        ZStack {
-            GlassView(
-                material: controlActiveState == .inactive ? .underWindowBackground : .menu,
-                isActive: controlActiveState != .inactive
-            )
-            .allowsHitTesting(false)
-
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(controlActiveState == .inactive ? 0.95 : 0.99),
-                            Color.white.opacity(controlActiveState == .inactive ? 0.92 : 0.96)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .padding(3)
-                .allowsHitTesting(false)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.black.opacity(0.04), lineWidth: 1)
-                        .padding(3)
-                )
-        }
-        .ignoresSafeArea()
+        Color(NSColor.windowBackgroundColor)
     }
 }
 

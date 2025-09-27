@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SettingsRow<Content: View>: View {
-    private let labelColumnWidth: CGFloat = 110
+    private let labelColumnWidth: CGFloat = 160
     let label: String
     let description: String?
     let content: () -> Content
@@ -45,15 +45,11 @@ struct SettingsRow<Content: View>: View {
                     }
                 }
             } else {
-                Grid(horizontalSpacing: 14, verticalSpacing: 4) {
-                    GridRow(alignment: .firstTextBaseline) {
-                        labelView
+                HStack(alignment: .top, spacing: 16) {
+                    labelView
+                    VStack(alignment: .leading, spacing: 4) {
                         content()
-                    }
-                    
-                    if let description = description {
-                        GridRow(alignment: .top) {
-                            spacerCell
+                        if let description = description {
                             Text(description)
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
@@ -65,17 +61,13 @@ struct SettingsRow<Content: View>: View {
         }
         .padding(.vertical, 3)
     }
-    
+
     private var labelView: some View {
         Text(label)
             .font(.system(size: 13))
             .foregroundColor(.primary)
             .frame(width: labelColumnWidth, alignment: .leading)
-    }
-    
-    private var spacerCell: some View {
-        Color.clear
-            .frame(width: labelColumnWidth, height: 0)
+            .lineLimit(1)
     }
 }
 
