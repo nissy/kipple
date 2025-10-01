@@ -109,6 +109,7 @@ struct FontSettings: Codable, Equatable {
 }
 
 // MARK: - Font Manager
+@MainActor
 class FontManager: ObservableObject {
     static let shared = FontManager()
     
@@ -376,6 +377,10 @@ extension FontManager {
             return .default
         }
         return settings
+    }
+
+    nonisolated static func currentEditorLayoutSettings() -> EditorLayoutSettings {
+        MainActor.assumeIsolated { shared.editorLayoutSettings }
     }
 }
 

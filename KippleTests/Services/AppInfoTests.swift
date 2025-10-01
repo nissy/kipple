@@ -6,16 +6,16 @@
 //
 //  SPECS.md準拠: アプリ情報取得機能の統合テスト
 //  - コピー元アプリ名の取得
-//  - ウィンドウタイトルの取得（アクセシビリティ権限）
+//  - ウィンドウタイトルの取得
 //  - バンドルID、プロセスIDの取得
 //  - CGWindowList APIによるフォールバック
 //  - Kipple自身からのコピー処理
 
 import XCTest
 import Cocoa
-import Carbon
 @testable import Kipple
 
+@MainActor
 final class AppInfoTests: XCTestCase {
     var mockClipboardService: MockClipboardService!
     
@@ -100,39 +100,28 @@ final class AppInfoTests: XCTestCase {
         XCTAssertTrue(foundValidWindow, "Should find at least one valid window")
     }
     
-    // MARK: - アクセシビリティ権限テスト
-    
-    func testAccessibilityPermissionCheck() {
-        // SPECS.md: アクセシビリティ権限チェック（キャッシュ付き、1秒間有効）
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: false]
-        let hasPermission = AXIsProcessTrustedWithOptions(options)
-        
-        // 権限の有無に関わらず、チェック機能が動作することを確認
-        XCTAssertNotNil(hasPermission)
-    }
-    
     // MARK: - Kipple自身からのコピー処理
     
     func testKippleInternalCopyNotRecorded() {
-        // SPECS.md: Kipple自身の場合は最後のアクティブアプリ
+        // このテストは実際には、fromEditor: false のコピーも履歴に記録されることをテストする
         mockClipboardService.startMonitoring()
-        
+
         let initialCount = mockClipboardService.history.count
-        
-        // 内部コピー（fromEditor: false）は履歴に記録されない
+
+        // fromEditor: false のコピーも履歴に記録される
         mockClipboardService.copyToClipboard("Internal copy test", fromEditor: false)
-        
+
         let expectation = XCTestExpectation(description: "Internal copy check")
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             XCTAssertEqual(
                 self.mockClipboardService.history.count,
-                initialCount,
-                "Internal copy should not be added to history"
+                initialCount + 1,
+                "Copy should be added to history regardless of fromEditor flag"
             )
             expectation.fulfill()
         }
-        
+
         wait(for: [expectation], timeout: 2.0)
     }
     

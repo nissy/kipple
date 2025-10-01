@@ -98,6 +98,7 @@ final class FontSettingsTests: XCTestCase {
         XCTAssertNotNil(font)
     }
     
+    @MainActor
     func testFontManagerSingleton() {
         // Given
         let manager1 = FontManager.shared
@@ -107,6 +108,7 @@ final class FontSettingsTests: XCTestCase {
         XCTAssertTrue(manager1 === manager2)
     }
     
+    @MainActor
     func testFontManagerSaveAndLoad() {
         // Given
         let customSettings = FontSettings(
@@ -127,6 +129,7 @@ final class FontSettingsTests: XCTestCase {
         XCTAssertEqual(loadedSettings.fallbackFontNames, ["Menlo", "SF Mono"])
     }
     
+    @MainActor
     func testFontManagerNotification() {
         // Given
         let expectation = self.expectation(description: "Font settings changed notification")
@@ -150,6 +153,7 @@ final class FontSettingsTests: XCTestCase {
         NotificationCenter.default.removeObserver(observer)
     }
     
+    @MainActor
     func testAvailableMonospacedFonts() {
         // When
         let fonts = FontManager.availableMonospacedFonts()

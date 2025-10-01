@@ -22,6 +22,7 @@ final class LaunchAtLoginTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "autoLaunchAtLogin")
     }
     
+    @MainActor
     func testLaunchAtLoginSingleton() {
         // Given
         let instance1 = LaunchAtLogin.shared
@@ -31,6 +32,7 @@ final class LaunchAtLoginTests: XCTestCase {
         XCTAssertTrue(instance1 === instance2, "LaunchAtLogin should be a singleton")
     }
     
+    @MainActor
     func testCheckStatus() {
         // Given
         let launchAtLogin = LaunchAtLogin.shared
@@ -39,6 +41,7 @@ final class LaunchAtLoginTests: XCTestCase {
         launchAtLogin.checkStatus()
     }
     
+    @MainActor
     func testIsEnabledGetter() {
         // Given
         let launchAtLogin = LaunchAtLogin.shared
@@ -51,6 +54,7 @@ final class LaunchAtLoginTests: XCTestCase {
         XCTAssertTrue(isEnabled == true || isEnabled == false, "isEnabled should return a boolean")
     }
     
+    @MainActor
     func testSetEnabledNotification() {
         // Given
         let launchAtLogin = LaunchAtLogin.shared
@@ -81,6 +85,7 @@ final class LaunchAtLoginTests: XCTestCase {
         NotificationCenter.default.removeObserver(observer)
     }
     
+    @MainActor
     func testUserDefaultsSynchronization() {
         // Given
         let launchAtLogin = LaunchAtLogin.shared

@@ -15,30 +15,42 @@ enum ClipItemKind: String, Codable {
     case url
 }
 
-enum ClipItemCategory: String {
+enum ClipItemCategory: String, CaseIterable {
+    case all = "All"
     case url = "URL"
+    case urls = "URLs"  // Alias for compatibility
     case email = "Email"
+    case emails = "Emails"  // Alias for compatibility
     case code = "Code"
     case filePath = "File"
+    case files = "Files"  // Alias for compatibility
     case shortText = "Short"
     case longText = "Long"
+    case numbers = "Numbers"
+    case json = "JSON"
     case general = "General"
     case kipple = "Kipple"
     
     var icon: String {
         switch self {
-        case .url:
+        case .all:
+            return "square.grid.2x2"
+        case .url, .urls:
             return "link"
-        case .email:
+        case .email, .emails:
             return "envelope"
         case .code:
             return "chevron.left.forwardslash.chevron.right"
-        case .filePath:
+        case .filePath, .files:
             return "folder"
         case .shortText:
             return "text.quote"
         case .longText:
             return "doc.text"
+        case .numbers:
+            return "number"
+        case .json:
+            return "curlybraces.square"
         case .general:
             return "doc"
         case .kipple:
@@ -50,7 +62,7 @@ enum ClipItemCategory: String {
 struct ClipItem: Identifiable, Codable, Equatable {
     let id: UUID
     let content: String
-    let timestamp: Date
+    var timestamp: Date
     var isPinned: Bool
     let kind: ClipItemKind
     let sourceApp: String?
@@ -60,18 +72,18 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let isFromEditor: Bool?
     
     // パフォーマンス最適化用の静的フォーマッタ
-    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+    private static func makeRelativeDateFormatter() -> RelativeDateTimeFormatter {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter
-    }()
+    }
     
-    private static let timestampFormatter: DateFormatter = {
+    private static func makeTimestampFormatter() -> DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter
-    }()
+    }
     
     // Computed properties
     var fullContent: String {
@@ -92,11 +104,11 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     var timeAgo: String {
-        Self.relativeDateFormatter.localizedString(for: timestamp, relativeTo: Date())
+        Self.makeRelativeDateFormatter().localizedString(for: timestamp, relativeTo: Date())
     }
     
     var formattedTimestamp: String {
-        Self.timestampFormatter.string(from: timestamp)
+        Self.makeTimestampFormatter().string(from: timestamp)
     }
     
     var category: ClipItemCategory {
@@ -150,7 +162,16 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.content == rhs.content &&
+        lhs.isPinned == rhs.isPinned &&
+        lhs.timestamp == rhs.timestamp &&
+        lhs.kind == rhs.kind &&
+        lhs.sourceApp == rhs.sourceApp &&
+        lhs.windowTitle == rhs.windowTitle &&
+        lhs.bundleIdentifier == rhs.bundleIdentifier &&
+        lhs.processID == rhs.processID &&
+        lhs.isFromEditor == rhs.isFromEditor
     }
     
     // 行数を計算

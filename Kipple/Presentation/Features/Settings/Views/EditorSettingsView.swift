@@ -16,12 +16,9 @@ struct EditorSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 // Font Settings
                 SimpleFontSettingsView()
-                
-                Divider()
-                
                 // Editor Position
                 SettingsGroup("Editor Position") {
                     SettingsRow(label: "Position") {
@@ -33,14 +30,10 @@ struct EditorSettingsView: View {
                         .frame(width: 150)
                     }
                 }
-                
-                Divider()
-                
                 // Editor Copy Hotkey
                 SettingsGroup("Editor Copy Hotkey") {
                     SettingsRow(
-                        label: "Enable editor copy hotkey",
-                        description: "Quickly copy editor content to clipboard",
+                        label: "Enable copy hotkey",
                         isOn: $appSettings.enableEditorCopyHotkey
                     )
                     .onChange(of: appSettings.enableEditorCopyHotkey) { newValue in
@@ -62,14 +55,10 @@ struct EditorSettingsView: View {
                         .onChange(of: tempCopyModifierFlags) { _ in updateCopyHotkey() }
                     }
                 }
-                
-                Divider()
-                
                 // Editor Clear Hotkey
                 SettingsGroup("Editor Clear Hotkey") {
                     SettingsRow(
-                        label: "Enable editor clear hotkey",
-                        description: "Quickly clear editor content",
+                        label: "Enable clear hotkey",
                         isOn: $appSettings.enableEditorClearHotkey
                     )
                     .onChange(of: appSettings.enableEditorClearHotkey) { newValue in

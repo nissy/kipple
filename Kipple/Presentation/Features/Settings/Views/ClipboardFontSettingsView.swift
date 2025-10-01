@@ -11,7 +11,7 @@ struct ClipboardFontSettingsView: View {
     @ObservedObject var fontManager = FontManager.shared
     
     var body: some View {
-        SettingsGroup("History Font") {
+        SettingsGroup("History Font", includeTopDivider: false) {
             SettingsRow(label: "Font") {
                 SearchableFontPicker(selectedFont: fontNameBinding)
                     .frame(width: 200)
@@ -35,37 +35,6 @@ struct ClipboardFontSettingsView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
-            }
-            
-            Divider()
-                .padding(.vertical, 8)
-            
-            // Preview
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Preview")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.secondary)
-                
-                ScrollView {
-                    Text("""
-                        The quick brown fox jumps over the lazy dog
-                        素早い茶色のキツネが怠け者の犬を飛び越える
-                        1234567890 !@#$%^&*()
-                        😀🎉🚀 ∑∏∫√∞ ™®©
-                        """)
-                        .font(previewFont)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                }
-                .frame(height: 80)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(NSColor.textBackgroundColor))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                )
             }
         }
     }
@@ -91,11 +60,6 @@ struct ClipboardFontSettingsView: View {
     
     private var fontSizeBinding: Binding<CGFloat> {
         return $fontManager.historySettings.primaryFontSize
-    }
-    
-    private var previewFont: Font {
-        // FontManagerから実際のフォント（フォールバックチェーン含む）を取得
-        return Font(fontManager.historyFont)
     }
     
     private func makeFontSizeFormatter() -> NumberFormatter {

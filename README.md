@@ -36,19 +36,18 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 
 ## Requirements
 - macOS 13.0 or later
-- Accessibility permission (for capturing app names)
 
 ## Installation
 1. Download the latest release from the [Releases](https://github.com/nissy/kipple/releases)
 2. Move Kipple.app to Applications folder
 3. Launch Kipple from Applications or Spotlight
-4. Grant accessibility permission when prompted (required for capturing app names)
+4. Follow the first-run guide to configure hotkeys and history size
 
 ## Privacy
 - All data stays on your Mac
 - No network connections
 - No analytics or tracking
-- Accessibility permission only used to capture app names when copying
+
 
 ## License
 MIT License

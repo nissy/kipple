@@ -9,7 +9,8 @@ import Foundation
 import SwiftUI
 import Combine
 
-class MainViewModel: ObservableObject {
+@MainActor
+class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var editorText: String {
         didSet {
             // パフォーマンス最適化：デバウンスを使用して保存処理を遅延
@@ -19,25 +20,52 @@ class MainViewModel: ObservableObject {
     
     private let saveDebouncer = PassthroughSubject<String, Never>()
     
-    let clipboardService: ClipboardServiceProtocol
+    let clipboardService: any ClipboardServiceProtocol
     private var cancellables = Set<AnyCancellable>()
+    private var serviceCancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
     @Published var pinnedItems: [ClipItem] = []
+    @Published var filteredHistory: [ClipItem] = []
+    @Published var pinnedHistory: [ClipItem] = []
+    @Published var searchText: String = "" {
+        didSet {
+            applyFilters()
+        }
+    }
+    @Published var showOnlyURLs: Bool = false
+    @Published var showOnlyPinned: Bool = false {
+        didSet {
+            applyFilters()
+        }
+    }
     @Published var selectedCategory: ClipItemCategory?
     @Published var isPinnedFilterActive: Bool = false
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String?
-    
+
     // 自動消去タイマーの残り時間
     @Published var autoClearRemainingTime: TimeInterval?
-    
-    init(clipboardService: ClipboardServiceProtocol = ClipboardService.shared) {
+
+    // ページネーション関連
+    @Published private(set) var hasMoreHistory: Bool = false
+    private let pageSize: Int
+    private var currentHistoryLimit: Int = 0
+    private var isLoadingMore = false
+
+    init(clipboardService: (any ClipboardServiceProtocol)? = nil, pageSize: Int = 50) {
+        self.pageSize = max(1, pageSize)
         // 保存されたエディタテキストを読み込む（なければ空文字）
         self.editorText = UserDefaults.standard.string(forKey: "lastEditorText") ?? ""
-        self.clipboardService = clipboardService
-        
+        // Use provided service or get default service
+        if let service = clipboardService {
+            self.clipboardService = service
+        } else {
+            // Fallback to default service
+            self.clipboardService = ClipboardServiceProvider.resolve()
+        }
+
         // デバウンスされた保存処理を設定
         saveDebouncer
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
@@ -50,29 +78,7 @@ class MainViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Subscribe to clipboard service changes
-        if let observableService = clipboardService as? ClipboardService {
-            observableService.$history
-            .sink { [weak self] items in
-                guard let self = self else { return }
-                self.updateFilteredItems(items)
-            }
-            .store(in: &cancellables)
-            
-            // 現在のクリップボード内容の変更を監視
-            observableService.$currentClipboardContent
-            .sink { [weak self] content in
-                self?.currentClipboardContent = content
-            }
-            .store(in: &cancellables)
-            
-            // 自動消去タイマーの残り時間を監視
-            observableService.$autoClearRemainingTime
-            .sink { [weak self] remainingTime in
-                self?.autoClearRemainingTime = remainingTime
-            }
-            .store(in: &cancellables)
-        }
+        subscribeToClipboardService()
         
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
         // 注: UserDefaultsの変更通知は特定のキーを識別できないため、
@@ -85,39 +91,149 @@ class MainViewModel: ObservableObject {
                 self.updateFilteredItems(self.clipboardService.history)
             }
             .store(in: &cancellables)
-        
+
         // 初回読み込み
-        updateFilteredItems(clipboardService.history)
-        currentClipboardContent = clipboardService.currentClipboardContent
+        updateFilteredItems(self.clipboardService.history)
+        currentClipboardContent = self.clipboardService.currentClipboardContent
+    }
+
+    private func subscribeToClipboardService() {
+        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
+            bindModernService(modernService)
+        }
+    }
+
+        private func bindModernService(_ service: ModernClipboardServiceAdapter) {
+        serviceCancellables.removeAll()
+
+        service.$history
+            .sink { [weak self] items in
+                guard let self = self else { return }
+                self.updateFilteredItems(items)
+            }
+            .store(in: &serviceCancellables)
+
+        service.$currentClipboardContent
+            .sink { [weak self] content in
+                self?.currentClipboardContent = content
+            }
+            .store(in: &serviceCancellables)
+
+        service.$autoClearRemainingTime
+            .sink { [weak self] remainingTime in
+                self?.autoClearRemainingTime = remainingTime
+            }
+            .store(in: &serviceCancellables)
     }
     
+    func loadHistory() {
+        let items = clipboardService.history
+        updateFilteredItems(items)
+    }
+
+    func copyToClipboard(_ item: ClipItem) {
+        clipboardService.copyToClipboard(item.content, fromEditor: false)
+    }
+
+    func clearHistory(keepPinned: Bool) async {
+        if keepPinned {
+            await clipboardService.clearAllHistory()
+        } else {
+            await clipboardService.clearHistory(keepPinned: false)
+        }
+        loadHistory()
+    }
+
+    func deleteItem(_ item: ClipItem) async {
+        await clipboardService.deleteItem(item)
+        loadHistory()
+    }
+
+    func togglePin(for item: ClipItem) async {
+        _ = clipboardService.togglePin(for: item)
+        loadHistory()
+    }
+
+    private func applyFilters() {
+        updateFilteredItems(clipboardService.history)
+    }
+
     func updateFilteredItems(_ items: [ClipItem]) {
-        // フィルタ無しの場合は全アイテムを使用
-        if !isPinnedFilterActive && selectedCategory == nil {
-            self.history = items
-            self.pinnedItems = []
-            return
-        }
-        
-        // フィルタありの場合
-        var filteredItems: [ClipItem] = []
-        
-        for item in items {
-            // ピンフィルタ
-            if isPinnedFilterActive && !item.isPinned {
-                continue
+        // Separate pinned items
+        pinnedHistory = items.filter { $0.isPinned }
+
+        // Apply filters
+        var filtered = items
+
+        // Apply search filter
+        if !searchText.isEmpty {
+            filtered = filtered.filter { item in
+                item.content.localizedCaseInsensitiveContains(searchText) ||
+                (item.sourceApp?.localizedCaseInsensitiveContains(searchText) ?? false)
             }
-            
-            // カテゴリフィルタ
-            if let selectedCategory = selectedCategory, item.category != selectedCategory {
-                continue
-            }
-            
-            filteredItems.append(item)
         }
-        
-        self.history = filteredItems
-        self.pinnedItems = []
+
+        // Apply category filter with alias handling
+        if let category = selectedCategory {
+            filtered = filtered.filter { item in
+                // Handle category aliases
+                switch (category, item.category) {
+                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
+                    return true
+                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
+                    return true
+                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
+                    return true
+                default:
+                    return item.category == category
+                }
+            }
+        }
+
+        // URL filter
+        if showOnlyURLs {
+            filtered = filtered.filter { $0.kind == .url }
+        }
+
+        // Apply pinned filter
+        if showOnlyPinned || isPinnedFilterActive {
+            filtered = filtered.filter { $0.isPinned }
+        }
+
+        updatePagination(with: filtered)
+    }
+
+    func loadMoreHistoryIfNeeded(currentItem: ClipItem) {
+        guard history.count < filteredHistory.count else { return }
+        guard !isLoadingMore else { return }
+        guard let lastItem = history.last, lastItem.id == currentItem.id else { return }
+
+        isLoadingMore = true
+        let newLimit = min(history.count + pageSize, filteredHistory.count)
+        currentHistoryLimit = newLimit
+        history = Array(filteredHistory.prefix(currentHistoryLimit))
+        hasMoreHistory = history.count < filteredHistory.count
+        isLoadingMore = false
+    }
+
+    private func updatePagination(with filtered: [ClipItem]) {
+        filteredHistory = filtered
+
+        let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
+        if shouldPaginate {
+            currentHistoryLimit = min(pageSize, filtered.count)
+        } else {
+            currentHistoryLimit = filtered.count
+        }
+
+        history = Array(filtered.prefix(currentHistoryLimit))
+        hasMoreHistory = history.count < filtered.count
+
+        if isPinnedFilterActive {
+            pinnedItems = filtered
+        } else {
+            pinnedItems = []
+        }
     }
     
     func copyEditor() {
@@ -134,11 +250,12 @@ class MainViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "lastEditorText")
     }
     
-    func togglePin(for item: ClipItem) -> Bool {
+    // These are now async methods above, keeping for backward compatibility
+    func togglePinSync(for item: ClipItem) -> Bool {
         return clipboardService.togglePin(for: item)
     }
-    
-    func deleteItem(_ item: ClipItem) {
+
+    func deleteItemSync(_ item: ClipItem) {
         clipboardService.deleteItem(item)
     }
     
@@ -177,13 +294,16 @@ class MainViewModel: ObservableObject {
         if forceInsert || shouldInsertToEditor() {
             insertToEditor(content: item.content)
         } else {
-            clipboardService.copyToClipboard(item.content, fromEditor: false)
+            clipboardService.recopyFromHistory(item)
         }
     }
     
     /// カテゴリフィルタの切り替え
     func toggleCategoryFilter(_ category: ClipItemCategory) {
-        if selectedCategory == category {
+        if category == .all {
+            // "All" カテゴリはフィルタをクリア
+            selectedCategory = nil
+        } else if selectedCategory == category {
             selectedCategory = nil
         } else {
             selectedCategory = category

@@ -163,6 +163,8 @@ struct PrivacyStatement: View {
     }
 }
 
+#if !CI_BUILD
 #Preview {
     AboutView()
 }
+#endif

@@ -10,7 +10,6 @@ import SwiftUI
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
     @State private var selectedHistoryItem: ClipItem?
-    @State private var hoveredHistoryItem: ClipItem?
     @State private var isShowingCopiedNotification = false
     @State private var currentNotificationType: CopiedNotificationView.NotificationType = .copied
     @State private var isAlwaysOnTop = false
@@ -43,6 +42,9 @@ struct MainView: View {
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
     }
+}
+
+extension MainView {
     
     private func handleItemSelection(_ item: ClipItem) {
         if viewModel.isEditorInsertEnabled() && viewModel.shouldInsertToEditor() {
@@ -99,13 +101,17 @@ struct MainView: View {
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
-        .onReceive(NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        ) { _ in
             // エディタセクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             editorRefreshID = UUID()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .historyFontSettingsChanged)
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)) { _ in
+        .onReceive(
+            NotificationCenter.default.publisher(for: .historyFontSettingsChanged)
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        ) { _ in
             // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
         }
@@ -116,6 +122,34 @@ struct MainView: View {
                 keyDownMonitor = nil
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                let copyModifiers = NSEvent.ModifierFlags(
+                    rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)
+                )
+                    .intersection(.deviceIndependentFlagsMask)
+                let clearModifiers = NSEvent.ModifierFlags(
+                    rawValue: UInt(appSettings.editorClearHotkeyModifierFlags)
+                )
+                    .intersection(.deviceIndependentFlagsMask)
+
+                // Editor Copy Hotkey
+                if appSettings.enableEditorCopyHotkey,
+                   appSettings.editorCopyHotkeyKeyCode > 0,
+                   event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
+                   eventModifiers == copyModifiers {
+                    confirmAction()
+                    return nil
+                }
+
+                // Editor Clear Hotkey
+                if appSettings.enableEditorClearHotkey,
+                   appSettings.editorClearHotkeyKeyCode > 0,
+                   event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
+                   eventModifiers == clearModifiers {
+                    clearAction()
+                    return nil
+                }
+
                 // Enter キーでアクションを実行
                 if event.keyCode == 36 { // Enter key
                     if let selectedItem = selectedHistoryItem,
@@ -269,21 +303,28 @@ struct MainView: View {
                 history: viewModel.history,
                 currentClipboardContent: viewModel.currentClipboardContent,
                 selectedHistoryItem: $selectedHistoryItem,
-                hoveredHistoryItem: $hoveredHistoryItem,
                 onSelectItem: handleItemSelection,
                 onTogglePin: { item in
-                    if !viewModel.togglePin(for: item) {
+                    if !viewModel.togglePinSync(for: item) {
                         // ピン留め失敗（最大数に達している）
                         showCopiedNotification(.pinLimitReached)
                     }
                 },
                 onDelete: { item in
-                    viewModel.deleteItem(item)
+                    viewModel.deleteItemSync(item)
                 },
                 onCategoryFilter: { category in
                     viewModel.toggleCategoryFilter(category)
                 },
-                selectedCategory: $viewModel.selectedCategory
+                selectedCategory: $viewModel.selectedCategory,
+                initialSearchText: viewModel.searchText,
+                onSearchTextChanged: { text in
+                    viewModel.searchText = text
+                },
+                onLoadMore: { item in
+                    viewModel.loadMoreHistoryIfNeeded(currentItem: item)
+                },
+                hasMoreItems: viewModel.hasMoreHistory
             )
             .id(historyRefreshID)
         }
@@ -456,18 +497,24 @@ struct MainView: View {
     
     private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
         switch category {
-        case .url:
+        case .all:
+            return true // All is always enabled
+        case .url, .urls:
             return appSettings.filterCategoryURL
-        case .email:
+        case .email, .emails:
             return appSettings.filterCategoryEmail
         case .code:
             return appSettings.filterCategoryCode
-        case .filePath:
+        case .filePath, .files:
             return appSettings.filterCategoryFilePath
         case .shortText:
             return appSettings.filterCategoryShortText
         case .longText:
             return appSettings.filterCategoryLongText
+        case .numbers:
+            return true // Numbers doesn't have a specific setting
+        case .json:
+            return true // JSON doesn't have a specific setting
         case .general:
             return appSettings.filterCategoryGeneral
         case .kipple:
@@ -487,7 +534,8 @@ struct MainView: View {
     }
     
     private func clearSystemClipboard() {
-        NSPasteboard.general.clearContents()
-        viewModel.currentClipboardContent = nil
+        Task {
+            await viewModel.clipboardService.clearSystemClipboard()
+        }
     }
 }

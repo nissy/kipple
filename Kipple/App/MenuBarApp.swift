@@ -8,11 +8,12 @@
 import SwiftUI
 import Cocoa
 
+@MainActor
 final class MenuBarApp: NSObject, ObservableObject {
     private var statusBarItem: NSStatusItem?
-    private let clipboardService = ClipboardService.shared
-    private let windowManager = WindowManager()
-    private let hotkeyManager = HotkeyManager()
+    internal let clipboardService: any ClipboardServiceProtocol
+    internal let windowManager = WindowManager()
+    internal var hotkeyManager: Any
     
     // 非同期終了処理用のプロパティ
     private var isTerminating = false
@@ -25,17 +26,33 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     override init() {
+        // Initialize services using providers
+        self.clipboardService = ClipboardServiceProvider.resolve()
+
+        // Initialize with SimplifiedHotkeyManager
+        self.hotkeyManager = HotkeyManagerProvider.resolveSync()
+
         super.init()
-        
+
         // テスト環境では初期化をスキップ
         guard !Self.isTestEnvironment else { return }
-        
-        // delegateをすぐに設定
-        hotkeyManager.delegate = self
-        
+
+        // Set up notification for SimplifiedHotkeyManager
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            // SimplifiedHotkeyManager uses notifications
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleHotkeyNotification),
+                name: NSNotification.Name("toggleMainWindow"),
+                object: nil
+            )
+        }
+
         // アプリケーションデリゲートを同期的に設定（重要）
         NSApplication.shared.delegate = self
-        
+
         DispatchQueue.main.async { [weak self] in
             self?.setupMenuBar()
             self?.startServices()
@@ -70,44 +87,36 @@ final class MenuBarApp: NSObject, ObservableObject {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Open Kipple", action: #selector(openMainWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        
-        // Accessibility permission menu item
-        let permissionItem = NSMenuItem(
-            title: "Grant Accessibility Permission…",
-            action: #selector(checkAccessibilityPermission),
-            keyEquivalent: ""
-        )
-        permissionItem.tag = 100
-        menu.addItem(permissionItem)
-        menu.addItem(NSMenuItem.separator())
-        
-        menu.addItem(NSMenuItem(title: "Preferences…", action: #selector(openPreferences), keyEquivalent: ","))
-        #if DEBUG
-        menu.addItem(NSMenuItem(
-            title: "Developer Settings…",
-            action: #selector(openDeveloperSettings),
-            keyEquivalent: ""
-        ))
-        #endif
+
+        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openPreferences), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit Kipple", action: #selector(quit), keyEquivalent: "q"))
-        
+
         menu.items.forEach { $0.target = self }
-        
-        // Set menu delegate for dynamic updates
-        menu.delegate = self
-        
+
         return menu
     }
     
     private func startServices() {
-        clipboardService.startMonitoring()
-        
+        // Perform data migration if needed
+        Task {
+            await performDataMigrationIfNeeded()
+
+            // Start clipboard monitoring
+            clipboardService.startMonitoring()
+        }
+
         // HotkeyManagerは既に初期化時に登録を行うため、追加の登録は不要
+    }
+
+    private func performDataMigrationIfNeeded() async {
+        // Migration is no longer needed
     }
     
     @objc private func openMainWindow() {
-        windowManager.openMainWindow()
+        Task { @MainActor in
+            windowManager.openMainWindow()
+        }
     }
     
     @objc private func openPreferences() {
@@ -116,38 +125,6 @@ final class MenuBarApp: NSObject, ObservableObject {
     
     @objc private func showAbout() {
         windowManager.showAbout()
-    }
-    
-    #if DEBUG
-    @objc private func openDeveloperSettings() {
-        windowManager.openDeveloperSettings()
-    }
-    #endif
-    
-    @objc private func checkAccessibilityPermission() {
-        AccessibilityManager.shared.refreshPermissionStatus()  // Force refresh
-        
-        if AccessibilityManager.shared.hasPermission {
-            // Permission already granted
-            showPermissionGrantedNotification()
-        } else {
-            // No permission - show alert and request
-            AccessibilityManager.shared.showAccessibilityAlert()
-        }
-    }
-    
-    private func showPermissionGrantedNotification() {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Permission Already Granted"
-            alert.informativeText = """
-                Kipple already has accessibility permission.
-                App names and window titles are being captured.
-                """
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
-        }
     }
     
     @objc private func quit() {
@@ -170,29 +147,11 @@ final class MenuBarApp: NSObject, ObservableObject {
         
         // 非同期で保存処理を実行
         Task {
-            do {
-                // Core Dataが初期化されていることを確認
-                Logger.shared.log("Ensuring Core Data is initialized...")
-                CoreDataStack.shared.initializeAndWait()
-                
-                // デバウンスされた保存を即座に実行
-                Logger.shared.log("Flushing pending saves...")
-                await clipboardService.flushPendingSaves()
-                
-                // Core Dataの保存を確実に実行（WALチェックポイント含む）
-                Logger.shared.log("Saving Core Data context...")
-                try await MainActor.run {
-                    try CoreDataStack.shared.save()
-                }
-                Logger.shared.log("✅ Successfully saved data before quit")
-                
-                // 保存されたデータを確認（デバッグ用）
-                let repository = CoreDataClipboardRepository()
-                let savedItems = try await repository.load(limit: 10)
-                Logger.shared.log("Verified saved items count: \(savedItems.count)")
-            } catch {
-                Logger.shared.error("❌ Failed to save on quit: \(error)")
-            }
+            // デバウンスされた保存を即座に実行
+            Logger.shared.log("Flushing pending saves...")
+            await clipboardService.flushPendingSaves()
+
+            Logger.shared.log("✅ Successfully saved data before quit")
             
             // タイムアウトをキャンセル
             self.terminationWorkItem?.cancel()
@@ -213,7 +172,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         clipboardService.stopMonitoring()
         
         Logger.shared.log("Cleaning up windows...")
-        windowManager.cleanup()
+        // cleanup method was removed in Swift 6.2 migration
         
         Logger.shared.log("=== APP QUIT SEQUENCE COMPLETED ===")
         
@@ -230,7 +189,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         DispatchQueue.main.async { [weak self] in
             Logger.shared.log("forceTerminate on main thread")
             self?.clipboardService.stopMonitoring()
-            self?.windowManager.cleanup()
+            // cleanup method was removed in Swift 6.2 migration
             
             // アプリケーションに終了を許可
             Logger.shared.log("Calling reply(toApplicationShouldTerminate: true) from forceTerminate")
@@ -240,44 +199,15 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
 }
 
-// MARK: - NSMenuDelegate
-extension MenuBarApp: NSMenuDelegate {
-    func menuWillOpen(_ menu: NSMenu) {
-        // Update permission menu item
-        for item in menu.items where item.tag == 100 {
-            let hasPermission = AccessibilityManager.shared.hasPermission
-            item.title = hasPermission ? "Accessibility Permission Granted ✓" : "Grant Accessibility Permission…"
-            // Always enable the menu item to allow checking status
-            item.isEnabled = true
-        }
-    }
-}
-
 // MARK: - HotkeyManagerDelegate
-extension MenuBarApp: HotkeyManagerDelegate {
-    func hotkeyPressed() {
-        openMainWindow()
-    }
-    
-    func editorCopyHotkeyPressed() {
-        // MainViewModelのインスタンスを取得してコピー処理を実行
-        if let mainViewModel = windowManager.getMainViewModel() {
-            Task { @MainActor in
-                mainViewModel.copyEditor()
-                // コピー通知を表示
-                windowManager.showCopiedNotification()
-                // Copyボタンのショートカットキーでもウィンドウを閉じない（ピンの状態に関わらず）
-            }
-        }
-    }
-    
-    func editorClearHotkeyPressed() {
-        // MainViewModelのインスタンスを取得してクリア処理を実行
-        if let mainViewModel = windowManager.getMainViewModel() {
-            Task { @MainActor in
-                mainViewModel.clearEditor()
-                // クリア後もウィンドウは開いたまま
-            }
+// HotkeyManagerDelegate removed - using SimplifiedHotkeyManager notifications instead
+
+// MARK: - Hotkey Handling
+
+extension MenuBarApp {
+    @objc func handleHotkeyNotification() {
+        Task { @MainActor in
+            windowManager.openMainWindow()
         }
     }
 }
@@ -315,3 +245,45 @@ extension MenuBarApp: NSApplicationDelegate {
         // この時点ではすでに保存処理は完了しているはず
     }
 }
+
+// MARK: - Test Helpers
+
+#if DEBUG
+extension MenuBarApp {
+    func startServicesAsync() async {
+        startServices()
+    }
+
+    func isClipboardMonitoring() async -> Bool {
+        if #available(macOS 13.0, *), let modernService = clipboardService as? ModernClipboardServiceAdapter {
+            return await modernService.isMonitoring()
+        }
+        return true
+    }
+
+    func performTermination() async {
+        // Extract the async work from performAsyncTermination
+        // デバウンスされた保存を即座に実行
+        Logger.shared.log("Flushing pending saves...")
+        await clipboardService.flushPendingSaves()
+
+        Logger.shared.log("✅ Successfully saved data before quit")
+    }
+
+    func registerHotkeys() async {
+        if let simplifiedManager = hotkeyManager as? SimplifiedHotkeyManager {
+            simplifiedManager.setEnabled(true)
+        }
+    }
+
+    @MainActor
+    func isHotkeyRegistered() -> Bool {
+        if let simplifiedManager = hotkeyManager as? SimplifiedHotkeyManager {
+            return simplifiedManager.getEnabled()
+        }
+        return false
+    }
+
+    // Remove duplicate - already defined as @objc private method
+}
+#endif

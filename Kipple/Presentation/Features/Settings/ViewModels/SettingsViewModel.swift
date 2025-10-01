@@ -8,8 +8,9 @@
 import SwiftUI
 import Combine
 
+@MainActor
 class SettingsViewModel: ObservableObject {
-    @Published var selectedTab = 0
+    @Published var selectedTab: Tab = .general
     @Published var showLaunchAtLoginError = false
     @Published var launchAtLoginErrorMessage = ""
     @Published var showingAddFallbackSheet = false
@@ -38,33 +39,6 @@ class SettingsViewModel: ObservableObject {
         availableFonts = FontManager.availableMonospacedFonts()
     }
     
-    var tabIcon: String {
-        switch selectedTab {
-        case 0: return "gear"
-        case 1: return "pencil"
-        case 2: return "doc.on.clipboard"
-        default: return "gear"
-        }
-    }
-    
-    var tabColor: Color {
-        switch selectedTab {
-        case 0: return .blue
-        case 1: return .green
-        case 2: return .orange
-        default: return .blue
-        }
-    }
-    
-    var tabTitle: String {
-        switch selectedTab {
-        case 0: return "General"
-        case 1: return "Editor"
-        case 2: return "Clipboard"
-        default: return "General"
-        }
-    }
-    
     func addFallbackFont() {
         let usedFonts = Set([FontManager.shared.editorSettings.primaryFontName] + 
                            FontManager.shared.editorSettings.fallbackFontNames)
@@ -76,5 +50,35 @@ class SettingsViewModel: ObservableObject {
     
     func removeFallbackFont(at index: Int) {
         FontManager.shared.editorSettings.fallbackFontNames.remove(at: index)
+    }
+
+    enum Tab: Int, CaseIterable {
+        case general
+        case editor
+        case clipboard
+
+        var title: String {
+            switch self {
+            case .general: return "General"
+            case .editor: return "Editor"
+            case .clipboard: return "Clipboard"
+            }
+        }
+
+        var symbolName: String {
+            switch self {
+            case .general: return "gear"
+            case .editor: return "pencil"
+            case .clipboard: return "doc.on.clipboard"
+            }
+        }
+
+        var accentColor: Color {
+            switch self {
+            case .general: return .blue
+            case .editor: return .green
+            case .clipboard: return .orange
+            }
+        }
     }
 }

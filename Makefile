@@ -19,6 +19,8 @@ CONFIGURATION_RELEASE = Release
 BUILD_DIR = build
 DEV_BUILD_DIR = $(BUILD_DIR)/dev
 PROD_BUILD_DIR = $(BUILD_DIR)/release
+DERIVED_DATA_DIR = $(BUILD_DIR)/DerivedData
+TEST_DERIVED_DATA_DIR = $(DERIVED_DATA_DIR)/Test
 ARCHIVE_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).xcarchive
 EXPORT_PATH = $(PROD_BUILD_DIR)/export
 DMG_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).dmg
@@ -192,11 +194,13 @@ build: generate ## Build production version
 test: generate ## Run all tests
 	@echo "$(BLUE)Running tests…$(NC)"
 	@rm -rf build/TestResults.xcresult build/TestResults
+	@mkdir -p $(TEST_DERIVED_DATA_DIR)
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
 		-destination $(DESTINATION) \
 		-resultBundlePath build/TestResults \
+		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
@@ -205,11 +209,13 @@ test: generate ## Run all tests
 test-coverage: generate ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage…$(NC)"
 	@rm -rf build/TestResults.xcresult build/TestResults
+	@mkdir -p $(TEST_DERIVED_DATA_DIR)
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
 		-destination $(DESTINATION) \
 		-resultBundlePath build/TestResults \
+		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		-enableCodeCoverage YES \
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
@@ -222,10 +228,12 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		exit 1; \
 	fi
 	@echo "$(BLUE)Running test: $(TEST)…$(NC)"
+	@mkdir -p $(TEST_DERIVED_DATA_DIR)
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
 		-destination $(DESTINATION) \
+		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
@@ -476,10 +484,10 @@ show-version: ## Show version from xcconfig files
 	@echo "Marketing Version: $$(grep '^MARKETING_VERSION' Config/Version.xcconfig | cut -d'=' -f2 | xargs)"
 	@echo "Build Number: $$(grep '^CURRENT_PROJECT_VERSION' Config/Version.xcconfig | cut -d'=' -f2 | xargs)"
 
-bump-version: ## Update version (usage: make bump-version VERSION=1.1.1)
+bump-version: ## Update version (usage: make bump-version VERSION=2.0.0)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "$(RED)Error: VERSION not specified$(NC)"; \
-		echo "Usage: make bump-version VERSION=1.1.1"; \
+		echo "Usage: make bump-version VERSION=2.0.0"; \
 		exit 1; \
 	fi
 	@./Scripts/update_version.sh $(VERSION)

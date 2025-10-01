@@ -7,6 +7,9 @@
 
 import Foundation
 
+// swiftlint:disable cyclomatic_complexity
+// swiftlint:disable function_body_length
+
 final class CategoryClassifier {
     static let shared = CategoryClassifier()
     private let cache: CategoryClassifierCache
@@ -244,3 +247,8 @@ final class CategoryClassifier {
         return false
     }
 }
+
+// swiftlint:enable function_body_length
+// swiftlint:enable cyclomatic_complexity
+
+extension CategoryClassifier: @unchecked Sendable {}

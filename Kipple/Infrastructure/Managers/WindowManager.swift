@@ -14,13 +14,12 @@ extension Notification.Name {
     static let mainWindowDidResignKey = Notification.Name("KippleMainWindowDidResignKey")
 }
 
+@MainActor
 final class WindowManager: NSObject, NSWindowDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
-    #if DEBUG
-    private var developerSettingsWindow: NSWindow?
-    #endif
+    private var settingsCoordinator: SettingsToolbarController?
     private var mainViewModel: MainViewModel?
     private var isAlwaysOnTop = false {
         didSet {
@@ -41,49 +40,48 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var appDidBecomeActiveObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
-    #if DEBUG
-    private var developerSettingsObserver: NSObjectProtocol?
-    #endif
     
     // MARK: - Main Window
     
+    @MainActor
     func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        
+
         // 既存のウィンドウがある場合は再利用
         if let existingWindow = mainWindow {
             // ウィンドウが最小化されている場合は復元
             if existingWindow.isMiniaturized {
                 existingWindow.deminiaturize(nil)
             }
-            
+
             // ウィンドウが画面に表示されていない場合は中央に配置
             if !existingWindow.isVisible {
                 existingWindow.center()
             }
-            
+
             // ウィンドウを最前面に表示してフォーカスを当てる
             existingWindow.makeKeyAndOrderFront(nil)
-            
+
             // カーソル位置に再配置
             positionWindowAtCursor(existingWindow)
-            
+
             // エディタにフォーカスを設定
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.focusOnEditor()
             }
             return
         }
-        
+
         // 新規ウィンドウ作成
         let window = createMainWindow()
         guard let window = window else { return }
-        
+
         configureMainWindow(window)
         setupMainWindowObservers(window)
         animateWindowOpen(window)
     }
     
+    @MainActor
     private func createMainWindow() -> NSWindow? {
         // MainViewModelを作成または再利用
         if mainViewModel == nil {
@@ -338,6 +336,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func handleMainWindowClose() {
         NSApp.setActivationPolicy(.accessory)
+        HistoryPopoverManager.shared.forceClose()
         // 余計な参照を明示的に解放して解体順序を安定化
         if let window = mainWindow {
             window.delegate = nil
@@ -347,12 +346,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
         mainWindow = nil
         isAlwaysOnTop = false
         removeMainWindowObservers()
-        
+
         // ウィンドウクローズ時にカテゴリフィルタをリセット
-        if let viewModel = mainViewModel {
-            viewModel.selectedCategory = nil
-            // フィルタ解除後に履歴を再更新
-            viewModel.updateFilteredItems(viewModel.clipboardService.history)
+        Task { @MainActor in
+            if let viewModel = mainViewModel {
+                viewModel.selectedCategory = nil
+                // フィルタ解除後に履歴を再更新
+                viewModel.updateFilteredItems(viewModel.clipboardService.history)
+            }
         }
     }
     
@@ -362,6 +363,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         mainWindow?.close()
     }
     
+    @MainActor
     func getMainViewModel() -> MainViewModel? {
         if mainViewModel == nil {
             mainViewModel = MainViewModel()
@@ -385,30 +387,50 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     func openSettings() {
         if settingsWindow == nil {
-            let settingsView = SettingsView()
-            let hostingController = NSHostingController(rootView: settingsView)
-            
-            settingsWindow = NSWindow(contentViewController: hostingController)
-            settingsWindow?.title = "Kipple Preferences"
-            settingsWindow?.styleMask = [.titled, .closable, .miniaturizable]
-            settingsWindow?.setContentSize(NSSize(width: 450, height: 400))
-            settingsWindow?.center()
-            settingsWindow?.isReleasedWhenClosed = false
+            let viewModel = SettingsViewModel()
+            let settingsView = SettingsView(viewModel: viewModel)
+            let hostingController = SettingsHostingController(rootView: settingsView)
+
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "Kipple Settings"
+            window.styleMask = [.titled, .closable]
+            window.setContentSize(NSSize(width: 520, height: 480))
+            window.center()
+            window.isReleasedWhenClosed = false
+            window.titleVisibility = .visible
+            window.titlebarAppearsTransparent = false
+            window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            window.standardWindowButton(.zoomButton)?.isHidden = true
+            if #available(macOS 11.0, *) {
+                window.toolbarStyle = .preference
+            }
+
+            let coordinator = SettingsToolbarController(viewModel: viewModel)
+            coordinator.attach(to: window)
+            settingsCoordinator = coordinator
+
+            settingsWindow = window
         }
-        
+
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
-        
+
         if let observer = settingsObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        
+
         settingsObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: settingsWindow,
             queue: .main
-        ) { _ in
+        ) { [weak self] _ in
             NSApp.setActivationPolicy(.accessory)
+            if let observer = self?.settingsObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self?.settingsObserver = nil
+            }
+            self?.settingsCoordinator = nil
+            self?.settingsWindow = nil
         }
     }
     
@@ -441,45 +463,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
             object: aboutWindow,
             queue: .main
         ) { _ in
-            NSApp.setActivationPolicy(.accessory)
+            Task { @MainActor in
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
-    
-    // MARK: - Developer Settings Window
-    
-    #if DEBUG
-    func openDeveloperSettings() {
-        if developerSettingsWindow == nil {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 500, height: 600),
-                styleMask: [.titled, .closable, .miniaturizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.title = "Developer Settings"
-            window.center()
-            window.contentView = NSHostingView(rootView: DeveloperSettingsView())
-            window.isReleasedWhenClosed = false
-            developerSettingsWindow = window
-        }
-        
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        developerSettingsWindow?.makeKeyAndOrderFront(nil)
-        
-        if let observer = developerSettingsObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        
-        developerSettingsObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: developerSettingsWindow,
-            queue: .main
-        ) { _ in
-            NSApp.setActivationPolicy(.accessory)
-        }
-    }
-    #endif
     
     // MARK: - Focus Management
     
@@ -508,28 +496,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
         for subview in view.subviews {
             findAndFocusTextView(in: subview)
         }
-    }
-    
-    // MARK: - Cleanup
-    
-    func cleanup() {
-        var observers: [NSObjectProtocol?] = [
-            windowObserver,
-            windowResignObserver,
-            windowResizeObserver,
-            appDidResignActiveObserver,
-            appDidBecomeActiveObserver,
-            settingsObserver,
-            aboutObserver
-        ]
-        #if DEBUG
-        observers.append(developerSettingsObserver)
-        #endif
-        observers.compactMap { $0 }.forEach { NotificationCenter.default.removeObserver($0) }
-    }
-    
-    deinit {
-        cleanup()
     }
     
     // MARK: - NSWindowDelegate (moved to extension below)

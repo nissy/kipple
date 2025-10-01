@@ -22,20 +22,17 @@ struct GeneralSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 // Startup
-                SettingsGroup("Startup") {
+                SettingsGroup("Startup", includeTopDivider: false) {
                     SettingsRow(
                         label: "Launch at login",
-                        description: "Automatically start Kipple when you log in",
                         isOn: $autoLaunchAtLogin
                     )
                     .onChange(of: autoLaunchAtLogin) { newValue in
                         LaunchAtLogin.shared.isEnabled = newValue
                     }
                 }
-                
-                Divider()
                 
                 // Global Hotkey
                 SettingsGroup("Global Hotkey") {
@@ -63,13 +60,10 @@ struct GeneralSettingsView: View {
                     }
                 }
                 
-                Divider()
-                
                 // Editor Insert
                 SettingsGroup("Editor Insert") {
                     SettingsRow(
-                        label: "Enable quick insert with modifier key",
-                        description: "Quickly insert selected text into the editor",
+                        label: "Enable quick insert",
                         isOn: $enableEditorInsert
                     )
                     
@@ -87,13 +81,10 @@ struct GeneralSettingsView: View {
                     }
                 }
                 
-                Divider()
-                
                 // Window Animation
                 SettingsGroup("Window Animation") {
                     SettingsRow(
-                        label: "Animation style",
-                        description: "Choose how the window appears and disappears"
+                        label: "Animation style"
                     ) {
                         Picker("", selection: $windowAnimation) {
                             Text("None").tag("none")
@@ -106,11 +97,9 @@ struct GeneralSettingsView: View {
                         .labelsHidden()
                     }
                 }
-                
-                Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
         }
         .onAppear {
             tempKeyCode = UInt16(hotkeyKeyCode)

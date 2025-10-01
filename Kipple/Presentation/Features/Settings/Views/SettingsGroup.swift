@@ -9,24 +9,37 @@ import SwiftUI
 
 struct SettingsGroup<Content: View>: View {
     let title: String
+    let includeTopDivider: Bool
     let content: () -> Content
     
-    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+    init(
+        _ title: String,
+        includeTopDivider: Bool = true,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
         self.title = title
+        self.includeTopDivider = includeTopDivider
         self.content = content
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
+            if includeTopDivider {
+                Divider()
+                    .padding(.bottom, 6)
+            }
+
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.primary)
-                .padding(.bottom, 4)
-            
-            VStack(alignment: .leading, spacing: 0) {
+                .padding(.leading, 1)
+
+            VStack(alignment: .leading, spacing: 8) {
                 content()
             }
-            .padding(.horizontal, 16)
+            .padding(.leading, 14)
         }
+        .padding(.top, includeTopDivider ? 10 : 2)
+        .padding(.bottom, 10)
     }
 }

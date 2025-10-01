@@ -18,8 +18,13 @@ final class WindowBehaviorTests: XCTestCase {
         super.setUp()
         
         // UserDefaultsをクリアしてテスト間の独立性を確保
-        let keysToRemove = ["windowWidth", "windowHeight", "windowAnimation", 
-                            "editorSectionHeight", "historySectionHeight"]
+        let keysToRemove = [
+            "windowWidth",
+            "windowHeight",
+            "windowAnimation",
+            "editorSectionHeight",
+            "historySectionHeight"
+        ]
         for key in keysToRemove {
             UserDefaults.standard.removeObject(forKey: key)
         }
@@ -28,8 +33,13 @@ final class WindowBehaviorTests: XCTestCase {
     
     override func tearDown() {
         // UserDefaultsをクリア
-        let keysToRemove = ["windowWidth", "windowHeight", "windowAnimation", 
-                            "editorSectionHeight", "historySectionHeight"]
+        let keysToRemove = [
+            "windowWidth",
+            "windowHeight",
+            "windowAnimation",
+            "editorSectionHeight",
+            "historySectionHeight"
+        ]
         for key in keysToRemove {
             UserDefaults.standard.removeObject(forKey: key)
         }
@@ -130,7 +140,12 @@ final class WindowBehaviorTests: XCTestCase {
         XCTAssertEqual(defaultAnimation, "fade")
         
         // 各アニメーションタイプを設定できることを確認
-        let animations = ["fade", "scale", "slide", "none"]
+        let animations = [
+            "fade",
+            "scale",
+            "slide",
+            "none"
+        ]
         for animation in animations {
             UserDefaults.standard.set(animation, forKey: "windowAnimation")
             let saved = UserDefaults.standard.string(forKey: "windowAnimation")
