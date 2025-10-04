@@ -267,11 +267,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         editorText = content
     }
     
-    /// エディタ挿入機能が有効かチェック
-    func isEditorInsertEnabled() -> Bool {
-        return UserDefaults.standard.bool(forKey: "enableEditorInsert")
-    }
-    
     /// 設定された修飾キーを取得
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
         let rawValue = UserDefaults.standard.integer(forKey: "editorInsertModifiers")
@@ -280,11 +275,10 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 現在の修飾キーがエディタ挿入用かチェック
     func shouldInsertToEditor() -> Bool {
-        guard isEditorInsertEnabled() else { return false }
-        
         let currentModifiers = NSEvent.modifierFlags
         let requiredModifiers = getEditorInsertModifiers()
-        
+        // None(=0) のときは無効
+        if requiredModifiers.isEmpty { return false }
         // 必要な修飾キーがすべて押されているかチェック
         return currentModifiers.intersection(requiredModifiers) == requiredModifiers
     }

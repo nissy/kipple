@@ -172,14 +172,11 @@ final class ObservableMainViewModel: MainViewModelProtocol {
     }
 
     private func shouldInsertToEditor() -> Bool {
-        // Check if editor insert is enabled and modifier keys are pressed
-        guard UserDefaults.standard.bool(forKey: "enableEditorInsert") else { return false }
-
         let currentModifiers = NSEvent.modifierFlags
         let requiredModifiers = NSEvent.ModifierFlags(
             rawValue: UInt(UserDefaults.standard.integer(forKey: "editorInsertModifiers"))
         )
-
+        if requiredModifiers.isEmpty { return false }
         return currentModifiers.intersection(requiredModifiers) == requiredModifiers
     }
 

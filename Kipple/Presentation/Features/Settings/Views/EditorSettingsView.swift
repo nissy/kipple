@@ -32,50 +32,22 @@ struct EditorSettingsView: View {
                 }
                 // Editor Copy Hotkey
                 SettingsGroup("Editor Copy Hotkey") {
-                    SettingsRow(
-                        label: "Enable copy hotkey",
-                        isOn: $appSettings.enableEditorCopyHotkey
-                    )
-                    .onChange(of: appSettings.enableEditorCopyHotkey) { newValue in
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("EditorCopyHotkeySettingsChanged"),
-                            object: nil,
-                            userInfo: ["enabled": newValue]
-                        )
-                    }
-                    
                     SettingsRow(label: "Copy editor content") {
                         HotkeyRecorderField(
                             keyCode: $tempCopyKeyCode,
                             modifierFlags: $tempCopyModifierFlags
                         )
-                        .disabled(!appSettings.enableEditorCopyHotkey)
-                        .opacity(appSettings.enableEditorCopyHotkey ? 1.0 : 0.5)
                         .onChange(of: tempCopyKeyCode) { _ in updateCopyHotkey() }
                         .onChange(of: tempCopyModifierFlags) { _ in updateCopyHotkey() }
                     }
                 }
                 // Editor Clear Hotkey
                 SettingsGroup("Editor Clear Hotkey") {
-                    SettingsRow(
-                        label: "Enable clear hotkey",
-                        isOn: $appSettings.enableEditorClearHotkey
-                    )
-                    .onChange(of: appSettings.enableEditorClearHotkey) { newValue in
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("EditorClearHotkeySettingsChanged"),
-                            object: nil,
-                            userInfo: ["enabled": newValue]
-                        )
-                    }
-                    
                     SettingsRow(label: "Clear editor content") {
                         HotkeyRecorderField(
                             keyCode: $tempClearKeyCode,
                             modifierFlags: $tempClearModifierFlags
                         )
-                        .disabled(!appSettings.enableEditorClearHotkey)
-                        .opacity(appSettings.enableEditorClearHotkey ? 1.0 : 0.5)
                         .onChange(of: tempClearKeyCode) { _ in updateClearHotkey() }
                         .onChange(of: tempClearModifierFlags) { _ in updateClearHotkey() }
                     }

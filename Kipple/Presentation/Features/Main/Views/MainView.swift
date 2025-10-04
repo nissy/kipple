@@ -47,7 +47,7 @@ struct MainView: View {
 extension MainView {
     
     private func handleItemSelection(_ item: ClipItem) {
-        if viewModel.isEditorInsertEnabled() && viewModel.shouldInsertToEditor() {
+        if viewModel.shouldInsertToEditor() {
             viewModel.insertToEditor(content: item.content)
             // エディタ挿入の場合はウィンドウを閉じない
         } else {
@@ -132,18 +132,16 @@ extension MainView {
                 )
                     .intersection(.deviceIndependentFlagsMask)
 
-                // Editor Copy Hotkey
-                if appSettings.enableEditorCopyHotkey,
-                   appSettings.editorCopyHotkeyKeyCode > 0,
+                // Editor Copy Hotkey (always enabled)
+                if appSettings.editorCopyHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
                    eventModifiers == copyModifiers {
                     confirmAction()
                     return nil
                 }
 
-                // Editor Clear Hotkey
-                if appSettings.enableEditorClearHotkey,
-                   appSettings.editorClearHotkeyKeyCode > 0,
+                // Editor Clear Hotkey (always enabled)
+                if appSettings.editorClearHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
                    eventModifiers == clearModifiers {
                     clearAction()
@@ -158,14 +156,7 @@ extension MainView {
                         return nil // イベントを消費
                     }
                 }
-                // Cmd+O でアクションを実行
-                else if event.keyCode == 31 && event.modifierFlags.contains(.command) { // O key with Cmd
-                    if let selectedItem = selectedHistoryItem,
-                       selectedItem.isActionable {
-                        selectedItem.performAction()
-                        return nil // イベントを消費
-                    }
-                }
+                // Cmd+O 実行は不要（削除）
                 return event
             }
         }

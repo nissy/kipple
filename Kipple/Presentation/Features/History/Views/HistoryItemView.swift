@@ -23,6 +23,8 @@ struct HistoryItemView: View {
     @State private var windowPosition: Bool?
     @State private var isScrolling = false
     @State private var currentAnchorView: NSView?
+    @State private var isActionKeyActive = false
+    @State private var flagsMonitor: Any?
 
     var body: some View {
         HoverTrackingView(content: rowContent) { hovering, anchor in
@@ -60,6 +62,19 @@ struct HistoryItemView: View {
         }
         .onDisappear {
             HistoryPopoverManager.shared.hide()
+            if let monitor = flagsMonitor {
+                NSEvent.removeMonitor(monitor)
+                flagsMonitor = nil
+            }
+        }
+        .onAppear {
+            updateActionKeyActive()
+            if flagsMonitor == nil {
+                flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                    updateActionKeyActive(with: event.modifierFlags)
+                    return event
+                }
+            }
         }
     }
 
@@ -67,14 +82,10 @@ struct HistoryItemView: View {
         ZStack {
             backgroundView
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    closePopover()
-                    onTap()
-                }
+                .onTapGesture { handleTap() }
 
             HStack(spacing: 8) {
                 pinButton
-                categoryIcon
                 historyText
                 deleteButton
             }
@@ -129,20 +140,17 @@ struct HistoryItemView: View {
         if item.isActionable {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.accentColor)
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
                     .frame(width: 24, height: 24)
 
                 Image(systemName: item.category.icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(isSelected ? .white : .secondary)
             }
             .frame(width: 24, height: 24)
             .contentShape(Circle())
-            .onTapGesture {
-                closePopover()
-                item.performAction()
-            }
-            .help(item.actionTitle ?? "")
+            .onTapGesture { handleTap() }
+            .help(actionHelpText)
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
                 Circle()
@@ -173,19 +181,18 @@ struct HistoryItemView: View {
     }
 
     private var historyText: some View {
-        Text(getDisplayContent())
+        let isLinkActive = isActionKeyActive && item.isActionable
+        return Text(getDisplayContent())
             .font(historyFont)
             .lineLimit(1)
             .truncationMode(.tail)
-            .foregroundColor(isSelected ? .white : .primary)
+            .underline(isLinkActive, color: linkColor)
+            .foregroundColor(isLinkActive ? linkColor : (isSelected ? .white : .primary))
             .padding(.vertical, 4)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture {
-                closePopover()
-                onTap()
-            }
+            .onTapGesture { handleTap() }
     }
 
     @ViewBuilder
@@ -262,5 +269,54 @@ struct HistoryItemView: View {
 
     var pinButtonRotation: Double {
         item.isPinned ? 0 : -45
+    }
+}
+
+// MARK: - Action helpers
+private extension HistoryItemView {
+    var linkColor: Color { Color(NSColor.linkColor) }
+
+    func handleTap() {
+        closePopover()
+        let current = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let required = NSEvent.ModifierFlags(
+            rawValue: UInt(AppSettings.shared.actionClickModifiers)
+        ).intersection(.deviceIndependentFlagsMask)
+
+        // None の場合はアクション無効
+        if required.isEmpty {
+            onTap()
+            return
+        }
+
+        if item.isActionable && current == required {
+            item.performAction()
+        } else {
+            onTap()
+        }
+    }
+
+    func updateActionKeyActive(with flags: NSEvent.ModifierFlags? = nil) {
+        let required = NSEvent.ModifierFlags(
+            rawValue: UInt(AppSettings.shared.actionClickModifiers)
+        ).intersection(.deviceIndependentFlagsMask)
+        let current = (flags ?? NSEvent.modifierFlags).intersection(.deviceIndependentFlagsMask)
+        // None の場合はリンク表示しない
+        guard !required.isEmpty else { isActionKeyActive = false; return }
+        isActionKeyActive = (current == required)
+    }
+
+    var actionHelpText: String {
+        guard item.isActionable else { return "" }
+        let required = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
+        let key: String
+        switch required {
+        case .command: key = "⌘"
+        case .option: key = "⌥"
+        case .control: key = "⌃"
+        case .shift: key = "⇧"
+        default: key = "⌘"
+        }
+        return "\(key)+Click to \(item.actionTitle ?? "Open")"
     }
 }

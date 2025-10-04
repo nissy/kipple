@@ -179,53 +179,33 @@ struct ClipItem: Identifiable, Codable, Equatable {
         content.components(separatedBy: .newlines).count
     }
     
-    // アクション可能かどうか
+    // アクション可能かどうか（テキストかつURIスキーム判定のみ）
     var isActionable: Bool {
-        switch category {
-        case .url, .email, .filePath:
-            return true
-        default:
-            return false
-        }
+        return kind == .text && resolveURISchemeURL() != nil
     }
     
     // アクションタイトル
     var actionTitle: String? {
-        switch category {
-        case .url:
-            return "Open in Browser"
-        case .email:
-            return "Send Email"
-        case .filePath:
-            return "Show in Finder"
-        default:
-            return nil
+        if let scheme = resolveURISchemeURL()?.scheme?.uppercased() {
+            return "Open \(scheme)"
         }
+        return nil
     }
     
-    // アクションを実行
+    // アクションを実行（URIスキームのみ）
     func performAction() {
-        switch category {
-        case .url:
-            if let url = URL(string: content.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                NSWorkspace.shared.open(url)
-            }
-        case .email:
-            let emailString = content.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let url = URL(string: "mailto:\(emailString)") {
-                NSWorkspace.shared.open(url)
-            }
-        case .filePath:
-            let path = content.trimmingCharacters(in: .whitespacesAndNewlines)
-            let expandedPath = NSString(string: path).expandingTildeInPath
-            let fileURL = URL(fileURLWithPath: expandedPath)
-            
-            // ファイルまたはディレクトリが存在するかチェック
-            if FileManager.default.fileExists(atPath: expandedPath) {
-                NSWorkspace.shared.activateFileViewerSelecting([fileURL])
-            }
-        default:
-            break
+        guard let uri = resolveURISchemeURL() else { return }
+        NSWorkspace.shared.open(uri)
+    }
+
+    // 最初に解釈可能なURIスキームURLを返す（mailto自動付与はしない）
+    private func resolveURISchemeURL() -> URL? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 先頭にスキームがある場合
+        if trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
+           let url = URL(string: trimmed) {
+            return url
         }
+        return nil
     }
 }

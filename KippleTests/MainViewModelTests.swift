@@ -79,27 +79,9 @@ class MainViewModelTests: XCTestCase {
 
     // MARK: - Editor Insert Tests
 
-    func testIsEditorInsertEnabled() {
-        // Given
-        let userDefaults = UserDefaults.standard
-
-        // When: デフォルト状態
-        userDefaults.set(false, forKey: "enableEditorInsert")
-
-        // Then
-        XCTAssertFalse(viewModel.isEditorInsertEnabled())
-
-        // When: 有効化
-        userDefaults.set(true, forKey: "enableEditorInsert")
-
-        // Then
-        XCTAssertTrue(viewModel.isEditorInsertEnabled())
-    }
-
     func testShouldInsertToEditor() {
         // Given
         let userDefaults = UserDefaults.standard
-        userDefaults.set(true, forKey: "enableEditorInsert")
         userDefaults.set(Int(NSEvent.ModifierFlags.shift.rawValue), forKey: "editorInsertModifiers")
 
         // When: エディタ挿入モードが有効な場合

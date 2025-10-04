@@ -33,14 +33,12 @@ final class AppSettings: ObservableObject {
     @AppStorage("hotkeyModifierFlags") var hotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.control.rawValue)  // CTRL
     
-    // Editor Copy Hotkey Settings
-    @AppStorage("enableEditorCopyHotkey") var enableEditorCopyHotkey: Bool = false
+    // Editor Copy Hotkey Settings (always enabled)
     @AppStorage("editorCopyHotkeyKeyCode") var editorCopyHotkeyKeyCode: Int = 1  // S key
     @AppStorage("editorCopyHotkeyModifierFlags") var editorCopyHotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
     
-    // Editor Clear Hotkey Settings
-    @AppStorage("enableEditorClearHotkey") var enableEditorClearHotkey: Bool = false
+    // Editor Clear Hotkey Settings (always enabled)
     @AppStorage("editorClearHotkeyKeyCode") var editorClearHotkeyKeyCode: Int = 37  // L key
     @AppStorage("editorClearHotkeyModifierFlags") var editorClearHotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
@@ -61,6 +59,9 @@ final class AppSettings: ObservableObject {
     // Auto-Clear Settings
     @AppStorage("enableAutoClear") var enableAutoClear: Bool = false
     @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
+
+    // Action Click Settings (modifier required to trigger item action by click)
+    @AppStorage("actionClickModifiers") var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     
     private init() {}
     
@@ -79,10 +80,10 @@ final class AppSettings: ObservableObject {
         static let enableHotkey = "enableHotkey"
         static let hotkeyKeyCode = "hotkeyKeyCode"
         static let hotkeyModifierFlags = "hotkeyModifierFlags"
-        static let enableEditorCopyHotkey = "enableEditorCopyHotkey"
+        // enableEditorCopyHotkey removed: always enabled
         static let editorCopyHotkeyKeyCode = "editorCopyHotkeyKeyCode"
         static let editorCopyHotkeyModifierFlags = "editorCopyHotkeyModifierFlags"
-        static let enableEditorClearHotkey = "enableEditorClearHotkey"
+        // enableEditorClearHotkey removed: always enabled
         static let editorClearHotkeyKeyCode = "editorClearHotkeyKeyCode"
         static let editorClearHotkeyModifierFlags = "editorClearHotkeyModifierFlags"
         static let launchAtLogin = "launchAtLogin"
