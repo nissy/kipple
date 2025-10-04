@@ -61,6 +61,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func copyToClipboard(_ content: String, fromEditor: Bool) {
         pendingClipboardContent = content
         currentClipboardContent = content
+        restartAutoClearTimerIfNeeded()
         Task {
             await modernService.copyToClipboard(content, fromEditor: fromEditor)
             await refreshHistory()
@@ -70,6 +71,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func recopyFromHistory(_ item: ClipItem) {
         pendingClipboardContent = item.content
         currentClipboardContent = item.content
+        restartAutoClearTimerIfNeeded()
         Task {
             await modernService.recopyFromHistory(item)
             await refreshHistory()
@@ -80,6 +82,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await modernService.clearSystemClipboard()
         pendingClipboardContent = nil
         currentClipboardContent = nil
+        stopAutoClearTimer()
         await refreshHistory()
     }
 
@@ -184,17 +187,18 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         autoClearTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self else { return }
-                    if let remaining = self.autoClearRemainingTime {
-                        self.autoClearRemainingTime = max(0, remaining - 1)
-                        if remaining <= 0 {
-                            // Clear only system clipboard, not history (matches legacy behavior)
-                            Task { @MainActor [weak self] in
-                                guard let self else { return }
-                                await self.performAutoClear()
-                                self.stopAutoClearTimer(resetRemaining: false)
-                            }
+                if let remaining = self.autoClearRemainingTime {
+                    self.autoClearRemainingTime = max(0, remaining - 1)
+                    if remaining <= 0 {
+                        self.autoClearRemainingTime = nil
+                        // Clear only system clipboard, not history (matches legacy behavior)
+                        Task { @MainActor [weak self] in
+                            guard let self else { return }
+                            await self.performAutoClear()
+                            self.stopAutoClearTimer()
                         }
                     }
+                }
             }
         }
         }
@@ -233,6 +237,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     private func refreshHistory() async {
+        let previousClipboardContent = currentClipboardContent
         let newHistory = await modernService.getHistory()
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
@@ -256,6 +261,12 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             }
         } else if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent
+        }
+
+        if let updatedContent = currentClipboardContent,
+           updatedContent != previousClipboardContent,
+           !updatedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            restartAutoClearTimerIfNeeded()
         }
     }
 
@@ -304,5 +315,23 @@ extension ModernClipboardServiceAdapter {
     func setMaxHistoryItems(_ max: Int) async {
         await modernService.setMaxHistoryItems(max)
         await refreshHistory()
+    }
+}
+
+private extension ModernClipboardServiceAdapter {
+    func restartAutoClearTimerIfNeeded() {
+        let settings = AppSettings.shared
+        guard settings.enableAutoClear else {
+            stopAutoClearTimer()
+            return
+        }
+
+        let interval = settings.autoClearInterval
+        guard interval > 0 else {
+            stopAutoClearTimer()
+            return
+        }
+
+        startAutoClearTimer(minutes: interval)
     }
 }
