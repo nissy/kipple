@@ -48,13 +48,8 @@ final class AppSettings: ObservableObject {
     
     // Category Filter Settings
     @AppStorage("filterCategoryURL") var filterCategoryURL: Bool = true
-    @AppStorage("filterCategoryEmail") var filterCategoryEmail: Bool = false
-    @AppStorage("filterCategoryCode") var filterCategoryCode: Bool = true
-    @AppStorage("filterCategoryFilePath") var filterCategoryFilePath: Bool = true
-    @AppStorage("filterCategoryShortText") var filterCategoryShortText: Bool = false
-    @AppStorage("filterCategoryLongText") var filterCategoryLongText: Bool = false
-    @AppStorage("filterCategoryGeneral") var filterCategoryGeneral: Bool = false
-    @AppStorage("filterCategoryKipple") var filterCategoryKipple: Bool = true
+    @AppStorage("filterCategoryShortText") var filterCategoryShortText: Bool = true
+    @AppStorage("filterCategoryLongText") var filterCategoryLongText: Bool = true
     
     // Auto-Clear Settings
     @AppStorage("enableAutoClear") var enableAutoClear: Bool = false
@@ -88,11 +83,7 @@ final class AppSettings: ObservableObject {
         static let editorClearHotkeyModifierFlags = "editorClearHotkeyModifierFlags"
         static let launchAtLogin = "launchAtLogin"
         static let filterCategoryURL = "filterCategoryURL"
-        static let filterCategoryEmail = "filterCategoryEmail"
-        static let filterCategoryCode = "filterCategoryCode"
-        static let filterCategoryFilePath = "filterCategoryFilePath"
         static let filterCategoryShortText = "filterCategoryShortText"
         static let filterCategoryLongText = "filterCategoryLongText"
-        static let filterCategoryGeneral = "filterCategoryGeneral"
     }
 }

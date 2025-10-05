@@ -279,11 +279,9 @@ private extension HistoryItemView {
     func handleTap() {
         closePopover()
         let current = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let required = NSEvent.ModifierFlags(
-            rawValue: UInt(AppSettings.shared.actionClickModifiers)
-        ).intersection(.deviceIndependentFlagsMask)
+        let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
+        let required = requiredBase.intersection(.deviceIndependentFlagsMask)
 
-        // None の場合はアクション無効
         if required.isEmpty {
             onTap()
             return
@@ -297,12 +295,13 @@ private extension HistoryItemView {
     }
 
     func updateActionKeyActive(with flags: NSEvent.ModifierFlags? = nil) {
-        let required = NSEvent.ModifierFlags(
-            rawValue: UInt(AppSettings.shared.actionClickModifiers)
-        ).intersection(.deviceIndependentFlagsMask)
+        let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
+        let required = requiredBase.intersection(.deviceIndependentFlagsMask)
         let current = (flags ?? NSEvent.modifierFlags).intersection(.deviceIndependentFlagsMask)
-        // None の場合はリンク表示しない
-        guard !required.isEmpty else { isActionKeyActive = false; return }
+        guard !required.isEmpty else {
+            isActionKeyActive = false
+            return
+        }
         isActionKeyActive = (current == required)
     }
 

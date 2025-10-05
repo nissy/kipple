@@ -173,21 +173,9 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
         }
 
-        // Apply category filter with alias handling
-        if let category = selectedCategory {
-            filtered = filtered.filter { item in
-                // Handle category aliases
-                switch (category, item.category) {
-                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
-                    return true
-                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
-                    return true
-                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
-                    return true
-                default:
-                    return item.category == category
-                }
-            }
+        // Apply category filter
+        if let category = selectedCategory, category != .all {
+            filtered = filtered.filter { $0.category == category }
         }
 
         // URL filter

@@ -12,7 +12,7 @@ import XCTest
 class SettingsRestorationExampleTests: XCTestCase {
     
     // 元の設定値を保存する変数
-    private var originalFilterCategoryKipple: Bool!
+    private var originalFilterCategoryShortText: Bool!
     private var originalMaxHistoryItems: Int!
     
     override func setUp() {
@@ -20,14 +20,14 @@ class SettingsRestorationExampleTests: XCTestCase {
         
         // テスト前の設定値を保存
         let defaults = UserDefaults.standard
-        originalFilterCategoryKipple = defaults.object(forKey: "filterCategoryKipple") as? Bool ?? true
+        originalFilterCategoryShortText = defaults.object(forKey: "filterCategoryShortText") as? Bool ?? true
         originalMaxHistoryItems = defaults.object(forKey: "maxHistoryItems") as? Int ?? 300
     }
     
     override func tearDown() {
         // テスト後に元の設定値を復元
         let defaults = UserDefaults.standard
-        defaults.set(originalFilterCategoryKipple, forKey: "filterCategoryKipple")
+        defaults.set(originalFilterCategoryShortText, forKey: "filterCategoryShortText")
         defaults.set(originalMaxHistoryItems, forKey: "maxHistoryItems")
         defaults.synchronize()
         
@@ -37,10 +37,10 @@ class SettingsRestorationExampleTests: XCTestCase {
     func testFilterSettingChange() {
         // テスト実行
         let defaults = UserDefaults.standard
-        defaults.set(false, forKey: "filterCategoryKipple")
+        defaults.set(false, forKey: "filterCategoryShortText")
         
         // テストロジック
-        XCTAssertFalse(defaults.bool(forKey: "filterCategoryKipple"))
+        XCTAssertFalse(defaults.bool(forKey: "filterCategoryShortText"))
         
         // tearDownで自動的に元の値に復元される
     }

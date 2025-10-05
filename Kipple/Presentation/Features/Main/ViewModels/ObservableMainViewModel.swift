@@ -1,8 +1,6 @@
 import SwiftUI
 import Combine
 
-// swiftlint:disable function_body_length
-
 @available(macOS 14.0, iOS 17.0, *)
 @Observable
 @MainActor
@@ -236,20 +234,8 @@ final class ObservableMainViewModel: MainViewModelProtocol {
         }
 
         // Apply category filter
-        if let category = selectedCategory {
-            items = items.filter { item in
-                // Handle category aliases
-                switch (category, item.category) {
-                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
-                    return true
-                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
-                    return true
-                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
-                    return true
-                default:
-                    return item.category == category
-                }
-            }
+        if let category = selectedCategory, category != .all {
+            items = items.filter { $0.category == category }
         }
 
         // URL filter
@@ -274,20 +260,8 @@ final class ObservableMainViewModel: MainViewModelProtocol {
             }
         }
 
-        if let category = selectedCategory {
-            nonPinnedItems = nonPinnedItems.filter { item in
-                // Handle category aliases
-                switch (category, item.category) {
-                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
-                    return true
-                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
-                    return true
-                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
-                    return true
-                default:
-                    return item.category == category
-                }
-            }
+        if let category = selectedCategory, category != .all {
+            nonPinnedItems = nonPinnedItems.filter { $0.category == category }
         }
 
         if showOnlyURLs {
@@ -319,5 +293,3 @@ final class ObservableMainViewModel: MainViewModelProtocol {
         // invalidated when the object is deallocated
     }
 }
-
-// swiftlint:enable function_body_length

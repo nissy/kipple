@@ -171,13 +171,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
 
         // Add to history immediately with metadata
+        let monitoringState = isMonitoringFlag
+        let metadata = fromEditor ? appInfo : await MainActor.run { sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState) }
         let item = ClipItem(
             content: content,
             isPinned: false,
-            sourceApp: fromEditor ? "Kipple" : appInfo.appName,
-            windowTitle: fromEditor ? "Quick Editor" : appInfo.windowTitle,
-            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
-            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
+            sourceApp: fromEditor ? "Kipple" : metadata.appName,
+            windowTitle: fromEditor ? "Quick Editor" : metadata.windowTitle,
+            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
+            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
             isFromEditor: fromEditor
         )
         addToHistory(item)
@@ -443,12 +445,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             }
 
             let isFromEditor = await state.getFromEditor()
+            let monitoringState = isMonitoringFlag
+            let metadata = isFromEditor ? appInfo : await MainActor.run { sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState) }
             let item = ClipItem(
                 content: content,
-                sourceApp: isFromEditor ? "Kipple" : appInfo.appName,
-                windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,
-                bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
-                processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
+                sourceApp: isFromEditor ? "Kipple" : metadata.appName,
+                windowTitle: isFromEditor ? "Quick Editor" : metadata.windowTitle,
+                bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
+                processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
                 isFromEditor: isFromEditor
             )
 
@@ -517,6 +521,34 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             windowTitle: windowTitle,
             bundleId: appInfo.bundleId,
             pid: appInfo.pid
+        )
+    }
+
+    @MainActor
+    private func sanitizeExternalAppInfo(_ info: ActiveAppInfo, isMonitoring: Bool) -> ActiveAppInfo {
+        let bundleIdentifier = Bundle.main.bundleIdentifier
+        let isKipple = info.bundleId == bundleIdentifier || info.appName == "Kipple"
+        guard isKipple else { return info }
+
+        let fallback = LastActiveAppTracker.shared.getSourceAppInfo()
+        if fallback.bundleId != bundleIdentifier && fallback.name != "Kipple" {
+            let title = getWindowTitle(for: fallback.pid)
+            return ActiveAppInfo(
+                appName: fallback.name,
+                windowTitle: title,
+                bundleId: fallback.bundleId,
+                pid: fallback.pid
+            )
+        }
+
+        guard isMonitoring else { return info }
+
+        let syntheticPid = info.pid == 0 ? -1 : info.pid
+        return ActiveAppInfo(
+            appName: info.appName == "Kipple" ? "External Source" : info.appName,
+            windowTitle: info.windowTitle,
+            bundleId: info.bundleId == bundleIdentifier ? "external.app" : info.bundleId,
+            pid: syntheticPid
         )
     }
 

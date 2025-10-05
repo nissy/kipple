@@ -111,14 +111,20 @@ struct HotkeyRecorderField: View {
                 )
                 .onTapGesture {
                     isRecording = true
-                    NotificationCenter.default.post(name: NSNotification.Name("SuspendGlobalHotkeyCapture"), object: nil)
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+                        object: nil
+                    )
                 }
-            
+
             Button("Clear") {
                 keyCode = 0
                 modifierFlags = .init()
                 isRecording = false
-                NotificationCenter.default.post(name: NSNotification.Name("ResumeGlobalHotkeyCapture"), object: nil)
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+                    object: nil
+                )
             }
             .buttonStyle(.borderless)
             .font(.system(size: 12))
@@ -131,7 +137,10 @@ struct HotkeyRecorderField: View {
         .background(KeyEventHandler(isRecording: $isRecording, keyCode: $keyCode, modifierFlags: $modifierFlags))
         .onChange(of: isRecording) { recording in
             if !recording {
-                NotificationCenter.default.post(name: NSNotification.Name("ResumeGlobalHotkeyCapture"), object: nil)
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+                    object: nil
+                )
             }
         }
     }

@@ -18,43 +18,19 @@ enum ClipItemKind: String, Codable {
 enum ClipItemCategory: String, CaseIterable {
     case all = "All"
     case url = "URL"
-    case urls = "URLs"  // Alias for compatibility
-    case email = "Email"
-    case emails = "Emails"  // Alias for compatibility
-    case code = "Code"
-    case filePath = "File"
-    case files = "Files"  // Alias for compatibility
-    case shortText = "Short"
-    case longText = "Long"
-    case numbers = "Numbers"
-    case json = "JSON"
-    case general = "General"
-    case kipple = "Kipple"
-    
+    case shortText = "Short Text"
+    case longText = "Long Text"
+
     var icon: String {
         switch self {
         case .all:
             return "square.grid.2x2"
-        case .url, .urls:
+        case .url:
             return "link"
-        case .email, .emails:
-            return "envelope"
-        case .code:
-            return "chevron.left.forwardslash.chevron.right"
-        case .filePath, .files:
-            return "folder"
         case .shortText:
             return "text.quote"
         case .longText:
             return "doc.text"
-        case .numbers:
-            return "number"
-        case .json:
-            return "curlybraces.square"
-        case .general:
-            return "doc"
-        case .kipple:
-            return "square.and.pencil"
         }
     }
 }

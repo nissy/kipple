@@ -198,8 +198,7 @@ extension MainView {
         HStack(spacing: 0) {
             // 有効なフィルターを取得
             let enabledCategories = [
-                ClipItemCategory.url, .email, .code, .filePath,
-                .shortText, .longText, .general, .kipple
+                ClipItemCategory.url, .shortText, .longText
             ]
                 .filter { isCategoryFilterEnabled($0) }
             
@@ -490,26 +489,12 @@ extension MainView {
         switch category {
         case .all:
             return true // All is always enabled
-        case .url, .urls:
+        case .url:
             return appSettings.filterCategoryURL
-        case .email, .emails:
-            return appSettings.filterCategoryEmail
-        case .code:
-            return appSettings.filterCategoryCode
-        case .filePath, .files:
-            return appSettings.filterCategoryFilePath
         case .shortText:
             return appSettings.filterCategoryShortText
         case .longText:
             return appSettings.filterCategoryLongText
-        case .numbers:
-            return true // Numbers doesn't have a specific setting
-        case .json:
-            return true // JSON doesn't have a specific setting
-        case .general:
-            return appSettings.filterCategoryGeneral
-        case .kipple:
-            return appSettings.filterCategoryKipple
         }
     }
     

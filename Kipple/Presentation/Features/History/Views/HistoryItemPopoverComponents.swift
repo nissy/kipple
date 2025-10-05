@@ -108,16 +108,9 @@ struct ClipboardItemPopover: View {
     private var categoryColor: Color {
         switch item.category {
         case .all: return .gray
-        case .url, .urls: return .blue
-        case .email, .emails: return .green
-        case .code: return .purple
-        case .filePath, .files: return .orange
+        case .url: return .blue
         case .shortText: return .orange
         case .longText: return .indigo
-        case .numbers: return .cyan
-        case .json: return .purple
-        case .general: return .gray
-        case .kipple: return .accentColor
         }
     }
 }
