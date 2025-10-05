@@ -319,7 +319,7 @@ private extension HistoryItemView {
         })
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .frame(width: 52, alignment: .leading)
+        .frame(width: 35, alignment: .leading)
     }
 }
 
