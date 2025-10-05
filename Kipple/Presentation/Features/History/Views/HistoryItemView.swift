@@ -281,20 +281,28 @@ private extension HistoryItemView {
     @ViewBuilder
     var categoryMenu: some View {
         Menu(content: {
-            Button(role: .none) {
-                let noneId = UserCategoryStore.shared.noneCategoryId()
-                onChangeCategory?(noneId)
-            } label: {
-                Label("None", systemImage: "tag")
-            }
+            Button(
+                role: .none,
+                action: {
+                    let noneId = UserCategoryStore.shared.noneCategoryId()
+                    onChangeCategory?(noneId)
+                },
+                label: {
+                    Label("None", systemImage: "tag")
+                }
+            )
             Divider()
             ForEach(UserCategoryStore.shared.userDefined()) { cat in
-                Button(action: { onChangeCategory?(cat.id) }) {
+                Button {
+                    onChangeCategory?(cat.id)
+                } label: {
                     Label(cat.name, systemImage: UserCategoryStore.shared.iconName(for: cat))
                 }
             }
             Divider()
-            Button("Manage Categories…") { onOpenCategoryManager?() }
+            Button("Manage Categories…") {
+                onOpenCategoryManager?()
+            }
         }, label: {
             let current = UserCategoryStore.shared.category(id: item.userCategoryId)
             let iconName = current.map { UserCategoryStore.shared.iconName(for: $0) } ?? "tag"
@@ -311,7 +319,7 @@ private extension HistoryItemView {
         })
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .frame(width: 35, alignment: .leading)
+        .frame(width: 52, alignment: .leading)
     }
 }
 

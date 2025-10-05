@@ -96,6 +96,8 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     onTogglePin: {},
                     onDelete: {},
                     onCategoryTap: {},
+                    onChangeCategory: { _ in },
+                    onOpenCategoryManager: {},
                     historyFont: .system(size: 13)
                 )
             }

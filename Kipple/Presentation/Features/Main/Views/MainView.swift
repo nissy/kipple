@@ -552,8 +552,6 @@ extension MainView {
             return true // All is always enabled
         case .url:
             return appSettings.filterCategoryURL
-        case .shortText, .longText:
-            return false
         }
     }
     

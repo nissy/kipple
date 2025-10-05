@@ -83,13 +83,15 @@ struct CategoryManagerView: View {
                             .disabled(store.isBuiltIn(category.id))
 
                         if !store.isBuiltIn(category.id) {
-                            Button(role: .destructive) {
-                                deleteCategoryAndReassign(category)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .frame(width: deleteColumnWidth, height: 24)
-                            }
+                            Button(
+                                role: .destructive,
+                                action: { deleteCategoryAndReassign(category) },
+                                label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .frame(width: deleteColumnWidth, height: 24)
+                                }
+                            )
                             .buttonStyle(.borderless)
                             .help("Delete category")
                         } else {
@@ -103,17 +105,24 @@ struct CategoryManagerView: View {
                         if !store.isBuiltIn(category.id) {
                             Menu("Change Icon") {
                                 ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
-                                    Button(action: { store.changeIcon(id: category.id, to: s) }) {
-                                        Label(s, systemImage: s).labelStyle(.titleAndIcon)
-                                    }
+                                    Button(
+                                        action: { store.changeIcon(id: category.id, to: s) },
+                                        label: {
+                                            Label(s, systemImage: s).labelStyle(.titleAndIcon)
+                                        }
+                                    )
                                 }
                             }
-                            Button("Delete", role: .destructive) { deleteCategoryAndReassign(category) }
+                            Button("Delete", role: .destructive) {
+                                deleteCategoryAndReassign(category)
+                            }
                         }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         if !store.isBuiltIn(category.id) {
-                            Button(role: .destructive) { deleteCategoryAndReassign(category) } label: {
+                            Button(role: .destructive) {
+                                deleteCategoryAndReassign(category)
+                            } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }

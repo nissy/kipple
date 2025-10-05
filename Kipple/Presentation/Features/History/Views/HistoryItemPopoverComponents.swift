@@ -117,28 +117,50 @@ struct ClipboardItemPopover: View {
         }
     }
 
-    private var displayCategory: (name: String, icon: String, color: Color) {
+    private struct DisplayCategoryInfo {
+        let name: String
+        let icon: String
+        let color: Color
+    }
+
+    private var displayCategory: DisplayCategoryInfo {
         if let categoryId = item.userCategoryId,
            let category = categoryStore.category(id: categoryId) {
             if let kind = categoryStore.builtInKind(for: category.id) {
                 switch kind {
                 case .none:
-                    return (category.name, categoryStore.iconName(for: category), .gray)
+                    return DisplayCategoryInfo(
+                        name: category.name,
+                        icon: categoryStore.iconName(for: category),
+                        color: .gray
+                    )
                 case .url:
-                    return (category.name, categoryStore.iconName(for: category), .blue)
+                    return DisplayCategoryInfo(
+                        name: category.name,
+                        icon: categoryStore.iconName(for: category),
+                        color: .blue
+                    )
                 }
             } else {
-                return (category.name, categoryStore.iconName(for: category), Color.accentColor)
+                return DisplayCategoryInfo(
+                    name: category.name,
+                    icon: categoryStore.iconName(for: category),
+                    color: Color.accentColor
+                )
             }
         }
 
         // Fallback to automatic classification
         switch item.category {
         case .url:
-            return ("URL", "link", .blue)
-        case .all, .shortText, .longText:
+            return DisplayCategoryInfo(name: "URL", icon: "link", color: .blue)
+        case .all:
             let none = categoryStore.noneCategory()
-            return (none.name, categoryStore.iconName(for: none), .gray)
+            return DisplayCategoryInfo(
+                name: none.name,
+                icon: categoryStore.iconName(for: none),
+                color: .gray
+            )
         }
     }
 }

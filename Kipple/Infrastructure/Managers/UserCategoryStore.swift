@@ -23,24 +23,28 @@ final class UserCategoryStore: ObservableObject {
     static let allowedSymbols: [String] = [
         // Documents & text
         "doc.text", "doc", "doc.richtext", "doc.append",
-        "text.quote", "text.alignleft", "text.aligncenter", "text.alignright", "text.justify",
-        "textformat", "textformat.size", "textformat.abc", "text.badge.plus",
+        "text.quote", "text.alignleft", "text.aligncenter", "text.alignright",
+        "text.justify", "textformat", "textformat.size", "textformat.abc",
+        "text.badge.plus",
 
         // Editing & annotations
-        "pencil", "pencil.circle", "square.and.pencil", "highlighter", "paintbrush",
-        "scribble", "lasso", "magicwand", "rectangle.and.pencil.and.ellipsis",
+        "pencil", "pencil.circle", "square.and.pencil", "highlighter",
+        "paintbrush", "scribble", "lasso", "magicwand", "rectangle.and.pencil.and.ellipsis",
 
         // Lists & organization
-        "list.bullet", "list.bullet.rectangle", "list.number", "list.triangle", "checklist",
-        "calendar", "calendar.badge.clock", "clock", "bookmark", "bookmark.fill",
+        "list.bullet", "list.bullet.rectangle", "list.number", "list.triangle",
+        "checklist", "calendar", "calendar.badge.clock", "clock",
+        "bookmark", "bookmark.fill",
 
         // Communication & references
         "paperclip", "tray.and.arrow.down", "envelope", "at", "number",
-        "link", "link.badge.plus", "doc.on.clipboard", "quote.bubble", "bubble.left.and.bubble.right",
+        "link", "link.badge.plus", "doc.on.clipboard", "quote.bubble",
+        "bubble.left.and.bubble.right",
 
         // Code & markup
-        "curlybraces", "curlybraces.square", "angle.brackets", "angle.bracket.square", "chevron.left.slash.chevron.right",
-        "terminal", "text.cursor", "keyboard", "command", "rectangle.and.text.magnifyingglass",
+        "curlybraces", "curlybraces.square", "angle.brackets", "angle.bracket.square",
+        "chevron.left.slash.chevron.right", "terminal", "text.cursor", "keyboard",
+        "command", "rectangle.and.text.magnifyingglass",
 
         // Tags & metadata
         "tag", "tag.circle", "folder", "folder.badge.plus", "rectangle.stack",

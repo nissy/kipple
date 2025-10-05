@@ -19,9 +19,11 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         super.init()
     }
 
-    func open(relativeTo anchorWindow: NSWindow? = nil,
-              onOpen: (() -> Void)? = nil,
-              onClose: (() -> Void)? = nil) {
+    func open(
+        relativeTo anchorWindow: NSWindow? = nil,
+        onOpen: (() -> Void)? = nil,
+        onClose: (() -> Void)? = nil
+    ) {
         if let onOpen { onOpen() }
         if let onClose { onCloseHandlers.append(onClose) }
 

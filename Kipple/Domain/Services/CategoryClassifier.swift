@@ -10,7 +10,6 @@ import Foundation
 final class CategoryClassifier {
     static let shared = CategoryClassifier()
     private let cache: CategoryClassifierCache
-    private let shortTextThreshold = 200
 
     init(cache: CategoryClassifierCache = .shared) {
         self.cache = cache

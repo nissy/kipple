@@ -18,19 +18,13 @@ enum ClipItemKind: String, Codable {
 enum ClipItemCategory: String, CaseIterable {
     case all = "All"
     case url = "URL"
-    case shortText = "Short Text"
-    case longText = "Long Text"
 
     var icon: String {
         switch self {
         case .all:
-            return "square.grid.2x2"
+            return "tag"
         case .url:
             return "link"
-        case .shortText:
-            return "text.quote"
-        case .longText:
-            return "doc.text"
         }
     }
 }

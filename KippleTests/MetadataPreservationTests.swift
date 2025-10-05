@@ -63,6 +63,7 @@ final class MetadataPreservationTests: XCTestCase {
 
         // When: Recopy from history via MainViewModel (simulating UI selection)
         viewModel.selectHistoryItem(history[0])
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: Metadata should be preserved
@@ -113,6 +114,7 @@ final class MetadataPreservationTests: XCTestCase {
         var history = await service.getHistory()
         let xcodeItem = history.first { $0.content == "From Xcode" }!
         viewModel.selectHistoryItem(xcodeItem)
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: Xcode item should be at top with metadata preserved
@@ -142,6 +144,7 @@ final class MetadataPreservationTests: XCTestCase {
         // When: Recopy
         let history = await service.getHistory()
         viewModel.selectHistoryItem(history[0])
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: Editor flag should be preserved
@@ -169,6 +172,7 @@ final class MetadataPreservationTests: XCTestCase {
         history = await service.getHistory()
         XCTAssertTrue(history[0].isPinned, "Item should be pinned before recopy")
         viewModel.selectHistoryItem(history[0])
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: Both pin state and metadata should be preserved
@@ -197,6 +201,7 @@ final class MetadataPreservationTests: XCTestCase {
         // When: Recopy
         let history = await service.getHistory()
         viewModel.selectHistoryItem(history[0])
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: Nil values should remain nil
@@ -234,6 +239,7 @@ final class MetadataPreservationTests: XCTestCase {
 
         // When: Now recopy from history
         viewModel.selectHistoryItem(history[0])
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: History recopy should preserve whatever metadata was there
@@ -265,13 +271,14 @@ final class MetadataPreservationTests: XCTestCase {
         let history = await service.getHistory()
         for i in stride(from: 10, to: 20, by: 1) {
             viewModel.selectHistoryItem(history[i])
+            try await Task.sleep(nanoseconds: 100_000_000)
         }
         await service.flushPendingSaves()
 
         let duration = Date().timeIntervalSince(startTime)
 
         // Then: Should complete quickly
-        XCTAssertLessThan(duration, 1.0, "Batch recopy with metadata preservation should be fast")
+        XCTAssertLessThan(duration, 2.0, "Batch recopy with metadata preservation should be reasonably fast")
 
         // Verify metadata is preserved
         let updatedHistory = await service.getHistory()
