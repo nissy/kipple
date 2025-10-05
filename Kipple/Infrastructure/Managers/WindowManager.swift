@@ -31,6 +31,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
         }
     }
+    private var preventAutoClose = false
     
     // Observers
     private var windowObserver: NSObjectProtocol?
@@ -97,6 +98,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             },
             onOpenSettings: { [weak self] in
                 self?.openSettings()
+            },
+            onSetPreventAutoClose: { [weak self] flag in
+                self?.setPreventAutoClose(flag)
             }
         )
         .environmentObject(mainViewModel!)
@@ -129,6 +133,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         
         // カーソル位置にウィンドウを配置
         positionWindowAtCursor(window)
+    }
+    
+    private func setPreventAutoClose(_ flag: Bool) {
+        Logger.shared.log("setPreventAutoClose: \(flag)")
+        preventAutoClose = flag
     }
     
     private func configureWindowSize(_ window: NSWindow) {
@@ -530,12 +539,12 @@ extension WindowManager {
         Logger.shared.log("window.level: \(window.level.rawValue)")
         Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
 
-        if !isAlwaysOnTop {
+        if !isAlwaysOnTop && !preventAutoClose {
             Logger.shared.log("Closing window via NSWindowDelegate because it's not always on top")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
-                      !window.isKeyWindow && !self.isAlwaysOnTop else {
+                      !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose else {
                     Logger.shared.log("Window became key again or is always on top, not closing")
                     return
                 }

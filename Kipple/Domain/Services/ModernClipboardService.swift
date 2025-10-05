@@ -208,10 +208,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Check if an item with same content exists and preserve its pin state
         if let existingIndex = history.firstIndex(where: { $0.content == item.content }) {
             let existingItem = history[existingIndex]
-            // Preserve pin state from existing item
-            if existingItem.isPinned {
-                newItem.isPinned = true
-            }
+            // Preserve pin state and user category from existing item
+            if existingItem.isPinned { newItem.isPinned = true }
+            newItem.userCategoryId = existingItem.userCategoryId
             // Remove the existing item
             history.remove(at: existingIndex)
         }
@@ -473,10 +472,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         var newItem = item
         if let existingIndex = history.firstIndex(where: { $0.content == item.content }) {
             let existingItem = history[existingIndex]
-            // Preserve pin state and other metadata from existing item
-            if existingItem.isPinned {
-                newItem.isPinned = true
-            }
+            // Preserve pin state and user-assigned category from existing item
+            if existingItem.isPinned { newItem.isPinned = true }
+            newItem.userCategoryId = existingItem.userCategoryId
             // Remove the existing item
             history.remove(at: existingIndex)
         }

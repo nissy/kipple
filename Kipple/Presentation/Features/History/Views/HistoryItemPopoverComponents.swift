@@ -8,8 +8,20 @@
 import SwiftUI
 
 struct ClipboardItemPopover: View {
-    let item: ClipItem
+    private let initialItem: ClipItem
+    private let itemID: UUID
+    @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var categoryStore = UserCategoryStore.shared
+
+    init(item: ClipItem) {
+        self.initialItem = item
+        self.itemID = item.id
+    }
+
+    private var item: ClipItem {
+        adapter.history.first { $0.id == itemID }?? initialItem
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,15 +52,15 @@ struct ClipboardItemPopover: View {
     private var headerSection: some View {
         HStack {
             HStack(spacing: 6) {
-                Image(systemName: item.category.icon)
+                Image(systemName: displayCategory.icon)
                     .font(.system(size: 12))
-                Text(item.category.rawValue)
+                Text(displayCategory.name)
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Capsule().fill(categoryColor))
+            .background(Capsule().fill(displayCategory.color))
 
             Spacer()
 
@@ -105,12 +117,28 @@ struct ClipboardItemPopover: View {
         }
     }
 
-    private var categoryColor: Color {
+    private var displayCategory: (name: String, icon: String, color: Color) {
+        if let category = categoryStore.category(id: item.userCategoryId) {
+            if let kind = categoryStore.builtInKind(for: category.id) {
+                switch kind {
+                case .none:
+                    return (category.name, category.iconSystemName, .gray)
+                case .url:
+                    return (category.name, category.iconSystemName, .blue)
+                }
+            } else {
+                return (category.name, category.iconSystemName, Color.accentColor)
+            }
+        }
+
+        // Fallback to automatic classification
         switch item.category {
-        case .all: return .gray
-        case .url: return .blue
-        case .shortText: return .orange
-        case .longText: return .indigo
+        case .all:
+            return ("All", "square.grid.2x2", .gray)
+        case .url:
+            return ("URL", "link", .blue)
+        case .shortText, .longText:
+            return ("Text", "text.quote", .orange)
         }
     }
 }

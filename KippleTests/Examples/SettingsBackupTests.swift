@@ -38,8 +38,7 @@ class SettingsBackupTests: XCTestCase {
     private let backupHelper = SettingsBackupHelper()
     private let settingsKeys = [
         "filterCategoryURL",
-        "filterCategoryShortText",
-        "filterCategoryLongText",
+        "filterCategoryNone",
         "maxHistoryItems",
         "maxPinnedItems"
     ]
@@ -59,12 +58,12 @@ class SettingsBackupTests: XCTestCase {
         
         // 複数の設定を変更
         defaults.set(false, forKey: "filterCategoryURL")
-        defaults.set(false, forKey: "filterCategoryShortText")
+        defaults.set(true, forKey: "filterCategoryNone")
         defaults.set(50, forKey: "maxHistoryItems")
         
         // テストロジック
         XCTAssertFalse(defaults.bool(forKey: "filterCategoryURL"))
-        XCTAssertFalse(defaults.bool(forKey: "filterCategoryShortText"))
+        XCTAssertTrue(defaults.bool(forKey: "filterCategoryNone"))
         XCTAssertEqual(defaults.integer(forKey: "maxHistoryItems"), 50)
         
         // tearDownですべて自動復元

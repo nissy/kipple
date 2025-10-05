@@ -20,7 +20,7 @@ class IsolatedSettingsTests: XCTestCase {
         testDefaults = TestUserDefaults(suiteName: nil)
         
         // 必要に応じてデフォルト値を設定
-        testDefaults.set(true, forKey: "filterCategoryShortText")
+        testDefaults.set(false, forKey: "filterCategoryNone")
         testDefaults.set(300, forKey: "maxHistoryItems")
     }
     
@@ -34,13 +34,13 @@ class IsolatedSettingsTests: XCTestCase {
     
     func testSettingsInIsolation() {
         // テスト用UserDefaultsで操作
-        testDefaults.set(false, forKey: "filterCategoryShortText")
+        testDefaults.set(true, forKey: "filterCategoryNone")
         
-        XCTAssertFalse(testDefaults.bool(forKey: "filterCategoryShortText"))
+        XCTAssertTrue(testDefaults.bool(forKey: "filterCategoryNone"))
         
         // 本番のUserDefaultsには影響なし
         let realDefaults = UserDefaults.standard
-        let realValue = realDefaults.object(forKey: "filterCategoryShortText") as? Bool ?? true
+        let realValue = realDefaults.object(forKey: "filterCategoryNone") as? Bool ?? false
         // realValueは変更されていない
     }
 }

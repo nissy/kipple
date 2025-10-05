@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
@@ -17,6 +18,7 @@ struct MainView: View {
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
@@ -30,17 +32,20 @@ struct MainView: View {
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
+    let onSetPreventAutoClose: ((Bool) -> Void)?
     
     // 設定値を読み込み
     
     init(
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onSetPreventAutoClose: ((Bool) -> Void)? = nil
     ) {
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
+        self.onSetPreventAutoClose = onSetPreventAutoClose
     }
 }
 
@@ -198,9 +203,16 @@ extension MainView {
         HStack(spacing: 0) {
             // 有効なフィルターを取得
             let enabledCategories = [
-                ClipItemCategory.url, .shortText, .longText
+                ClipItemCategory.url
             ]
                 .filter { isCategoryFilterEnabled($0) }
+            let customCategories: [UserCategory] = {
+                var list = userCategoryStore.userDefinedFilters()
+                if appSettings.filterCategoryNone {
+                    list.insert(userCategoryStore.noneCategory(), at: 0)
+                }
+                return list
+            }()
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
                 VStack(spacing: 8) {
@@ -280,6 +292,45 @@ extension MainView {
                         .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
                         .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
                     }
+                    // ユーザ定義カテゴリのフィルタ
+                    ForEach(customCategories) { cat in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                viewModel.toggleUserCategoryFilter(cat.id)
+                            }
+                        }, label: {
+                            VStack(spacing: 4) {
+                                ZStack {
+                                    Circle()
+                                        .fill(viewModel.selectedUserCategoryId == cat.id ?
+                                              Color.accentColor :
+                                              Color.secondary.opacity(0.1))
+                                        .frame(width: 36, height: 36)
+                                        .shadow(
+                                            color: viewModel.selectedUserCategoryId == cat.id ?
+                                                Color.accentColor.opacity(0.3) : .clear,
+                                            radius: 4,
+                                            y: 2
+                                        )
+
+                                    Image(systemName: cat.iconSystemName)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
+                                                         .white : .secondary)
+                                }
+
+                                Text(cat.name)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
+                                                     .primary : .secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 60)
+                        })
+                        .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(viewModel.selectedUserCategoryId == cat.id ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.3), value: viewModel.selectedUserCategoryId)
+                    }
                     
                     Spacer()
                 }
@@ -306,6 +357,16 @@ extension MainView {
                 onCategoryFilter: { category in
                     viewModel.toggleCategoryFilter(category)
                 },
+                onChangeUserCategory: { item, catId in
+                    Task { @MainActor in
+                        var updated = item
+                        updated.userCategoryId = catId
+                        if let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter {
+                            await adapter.updateItem(updated)
+                        }
+                    }
+                },
+                onOpenCategoryManager: { presentCategoryManager() },
                 selectedCategory: $viewModel.selectedCategory,
                 initialSearchText: viewModel.searchText,
                 onSearchTextChanged: { text in
@@ -319,7 +380,7 @@ extension MainView {
             .id(historyRefreshID)
         }
     }
-    
+
     // 下部バー
     @ViewBuilder
     private var bottomBar: some View {
@@ -491,10 +552,8 @@ extension MainView {
             return true // All is always enabled
         case .url:
             return appSettings.filterCategoryURL
-        case .shortText:
-            return appSettings.filterCategoryShortText
-        case .longText:
-            return appSettings.filterCategoryLongText
+        case .shortText, .longText:
+            return false
         }
     }
     
@@ -508,10 +567,19 @@ extension MainView {
             return String(format: "00:%02d", seconds)
         }
     }
-    
+
     private func clearSystemClipboard() {
         Task {
             await viewModel.clipboardService.clearSystemClipboard()
         }
+    }
+
+    private func presentCategoryManager() {
+        let anchor = NSApp.keyWindow
+        CategoryManagerWindowCoordinator.shared.open(
+            relativeTo: anchor,
+            onOpen: { onSetPreventAutoClose?(true) },
+            onClose: { onSetPreventAutoClose?(false) }
+        )
     }
 }

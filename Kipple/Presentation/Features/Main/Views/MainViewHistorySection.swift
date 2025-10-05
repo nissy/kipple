@@ -16,6 +16,9 @@ struct MainViewHistorySection: View {
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     let onCategoryFilter: ((ClipItemCategory) -> Void)?
+    // 追加: ユーザカテゴリ変更/管理
+    let onChangeUserCategory: ((ClipItem, UUID?) -> Void)?
+    let onOpenCategoryManager: (() -> Void)?
     @Binding var selectedCategory: ClipItemCategory?
     let onSearchTextChanged: (String) -> Void
     let onLoadMore: (ClipItem) -> Void
@@ -33,6 +36,8 @@ struct MainViewHistorySection: View {
         onTogglePin: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
         onCategoryFilter: ((ClipItemCategory) -> Void)?,
+        onChangeUserCategory: ((ClipItem, UUID?) -> Void)? = nil,
+        onOpenCategoryManager: (() -> Void)? = nil,
         selectedCategory: Binding<ClipItemCategory?>,
         initialSearchText: String,
         onSearchTextChanged: @escaping (String) -> Void,
@@ -46,6 +51,8 @@ struct MainViewHistorySection: View {
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onCategoryFilter = onCategoryFilter
+        self.onChangeUserCategory = onChangeUserCategory
+        self.onOpenCategoryManager = onOpenCategoryManager
         self._selectedCategory = selectedCategory
         self.onSearchTextChanged = onSearchTextChanged
         self.onLoadMore = onLoadMore
@@ -120,6 +127,10 @@ struct MainViewHistorySection: View {
                                     }
                                 } : nil,
                                 onCategoryTap: nil, // カテゴリタップは無効化
+                                onChangeCategory: onChangeUserCategory != nil ? { catId in
+                                    onChangeUserCategory?(item, catId)
+                                } : nil,
+                                onOpenCategoryManager: onOpenCategoryManager,
                                 historyFont: Font(fontManager.historyFont)
                             )
                             .frame(height: 36) // 固定高さでパフォーマンス向上

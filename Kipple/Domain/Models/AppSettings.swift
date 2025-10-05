@@ -48,8 +48,7 @@ final class AppSettings: ObservableObject {
     
     // Category Filter Settings
     @AppStorage("filterCategoryURL") var filterCategoryURL: Bool = true
-    @AppStorage("filterCategoryShortText") var filterCategoryShortText: Bool = true
-    @AppStorage("filterCategoryLongText") var filterCategoryLongText: Bool = true
+    @AppStorage("filterCategoryNone") var filterCategoryNone: Bool = false
     
     // Auto-Clear Settings
     @AppStorage("enableAutoClear") var enableAutoClear: Bool = false
@@ -83,7 +82,6 @@ final class AppSettings: ObservableObject {
         static let editorClearHotkeyModifierFlags = "editorClearHotkeyModifierFlags"
         static let launchAtLogin = "launchAtLogin"
         static let filterCategoryURL = "filterCategoryURL"
-        static let filterCategoryShortText = "filterCategoryShortText"
-        static let filterCategoryLongText = "filterCategoryLongText"
+        static let filterCategoryNone = "filterCategoryNone"
     }
 }

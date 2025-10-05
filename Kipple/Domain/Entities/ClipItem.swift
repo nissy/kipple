@@ -46,6 +46,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let bundleIdentifier: String?
     let processID: Int32?
     let isFromEditor: Bool?
+    // User-defined category
+    var userCategoryId: UUID?
     
     // パフォーマンス最適化用の静的フォーマッタ
     private static func makeRelativeDateFormatter() -> RelativeDateTimeFormatter {
@@ -99,7 +101,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         windowTitle: String? = nil,
         bundleIdentifier: String? = nil,
         processID: Int32? = nil,
-        isFromEditor: Bool = false
+        isFromEditor: Bool = false,
+        userCategoryId: UUID? = nil
     ) {
         self.id = UUID()
         self.content = content
@@ -111,6 +114,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.bundleIdentifier = bundleIdentifier
         self.processID = processID
         self.isFromEditor = isFromEditor
+        self.userCategoryId = userCategoryId
     }
     
     init(
@@ -123,7 +127,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         windowTitle: String?,
         bundleIdentifier: String?,
         processID: Int32?,
-        isFromEditor: Bool?
+        isFromEditor: Bool?,
+        userCategoryId: UUID? = nil
     ) {
         self.id = id
         self.content = content
@@ -135,6 +140,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.bundleIdentifier = bundleIdentifier
         self.processID = processID
         self.isFromEditor = isFromEditor
+        self.userCategoryId = userCategoryId
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
@@ -147,7 +153,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         lhs.windowTitle == rhs.windowTitle &&
         lhs.bundleIdentifier == rhs.bundleIdentifier &&
         lhs.processID == rhs.processID &&
-        lhs.isFromEditor == rhs.isFromEditor
+        lhs.isFromEditor == rhs.isFromEditor &&
+        lhs.userCategoryId == rhs.userCategoryId
     }
     
     // 行数を計算

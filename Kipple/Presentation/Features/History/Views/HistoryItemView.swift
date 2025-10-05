@@ -16,6 +16,9 @@ struct HistoryItemView: View {
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
     let onCategoryTap: (() -> Void)?
+    // ユーザカテゴリ変更/管理
+    let onChangeCategory: ((UUID?) -> Void)?
+    let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
 
     @State private var isHovered = false
@@ -86,6 +89,7 @@ struct HistoryItemView: View {
 
             HStack(spacing: 8) {
                 pinButton
+                categoryMenu
                 historyText
                 deleteButton
             }
@@ -269,6 +273,49 @@ struct HistoryItemView: View {
 
     var pinButtonRotation: Double {
         item.isPinned ? 0 : -45
+    }
+}
+
+// MARK: - Category Menu
+private extension HistoryItemView {
+    @ViewBuilder
+    var categoryMenu: some View {
+        Menu(content: {
+            Button(role: .none) {
+                let noneId = UserCategoryStore.shared.noneCategoryId()
+                onChangeCategory?(noneId)
+            } label: {
+                Label("None", systemImage: "tag")
+            }
+            Divider()
+            ForEach(UserCategoryStore.shared.userDefined()) { cat in
+                Button(action: { onChangeCategory?(cat.id) }) {
+                    Label(cat.name, systemImage: cat.iconSystemName)
+                }
+            }
+            Divider()
+            Button("Manage Categories…") { onOpenCategoryManager?() }
+        }, label: {
+            HStack(spacing: 4) {
+                let current = UserCategoryStore.shared.category(id: item.userCategoryId)
+                Image(systemName: current?.iconSystemName ?? "tag")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(isSelected ? .white : .secondary)
+                if let name = current?.name, !name.isEmpty {
+                    Text(name)
+                        .font(.system(size: 10))
+                        .foregroundColor(isSelected ? .white.opacity(0.9) : .secondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                Capsule().fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+            )
+        })
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 }
 

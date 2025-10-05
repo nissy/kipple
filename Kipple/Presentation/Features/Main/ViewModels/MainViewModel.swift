@@ -40,6 +40,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
     @Published var selectedCategory: ClipItemCategory?
+    @Published var selectedUserCategoryId: UUID?
     @Published var isPinnedFilterActive: Bool = false
     
     // 現在のクリップボードコンテンツを公開
@@ -173,8 +174,15 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
         }
 
-        // Apply category filter
-        if let category = selectedCategory, category != .all {
+        // Apply category filter (built-in) or user-defined (exclusive)
+        if let userCatId = selectedUserCategoryId {
+            let noneId = UserCategoryStore.shared.noneCategoryId()
+            if userCatId == noneId {
+                filtered = filtered.filter { $0.userCategoryId == nil || $0.userCategoryId == userCatId }
+            } else {
+                filtered = filtered.filter { $0.userCategoryId == userCatId }
+            }
+        } else if let category = selectedCategory, category != .all {
             filtered = filtered.filter { $0.category == category }
         }
 
@@ -285,12 +293,15 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         if category == .all {
             // "All" カテゴリはフィルタをクリア
             selectedCategory = nil
+            selectedUserCategoryId = nil
         } else if selectedCategory == category {
             selectedCategory = nil
         } else {
             selectedCategory = category
             // ピンフィルターをクリア
             isPinnedFilterActive = false
+            // ユーザカテゴリフィルタは排他
+            selectedUserCategoryId = nil
         }
         // フィルタを適用
         updateFilteredItems(clipboardService.history)
@@ -302,8 +313,21 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         // カテゴリフィルタをクリア
         if isPinnedFilterActive {
             selectedCategory = nil
+            selectedUserCategoryId = nil
         }
         // フィルタを適用
+        updateFilteredItems(clipboardService.history)
+    }
+
+    /// ユーザカテゴリフィルタの切り替え（内製カテゴリとは排他）
+    func toggleUserCategoryFilter(_ id: UUID) {
+        if selectedUserCategoryId == id {
+            selectedUserCategoryId = nil
+        } else {
+            selectedUserCategoryId = id
+            selectedCategory = nil
+            isPinnedFilterActive = false
+        }
         updateFilteredItems(clipboardService.history)
     }
 }
