@@ -140,8 +140,7 @@ final class AppInfoTests: XCTestCase {
             if let item = self.mockClipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertEqual(item.sourceApp, "Kipple", "Editor copy should have 'Kipple' as source app")
                 XCTAssertEqual(item.windowTitle, "Quick Editor")
-                let expectedCategory: ClipItemCategory = testContent.count <= 200 ? .shortText : .longText
-                XCTAssertEqual(item.category, expectedCategory)
+                XCTAssertEqual(item.category, .all)
                 XCTAssertTrue(item.isFromEditor ?? false)
                 XCTAssertNotNil(item.bundleIdentifier)
                 XCTAssertEqual(item.bundleIdentifier, Bundle.main.bundleIdentifier)

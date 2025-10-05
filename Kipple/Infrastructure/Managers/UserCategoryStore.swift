@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 @MainActor
 final class UserCategoryStore: ObservableObject {
@@ -20,11 +21,45 @@ final class UserCategoryStore: ObservableObject {
 
     // 単色かつテキスト関連の推奨シンボル一覧
     static let allowedSymbols: [String] = [
-        "doc.text", "doc", "text.quote", "pencil", "square.and.pencil",
-        "list.bullet", "list.number", "text.alignleft", "text.justify",
-        "paperclip", "tag", "at", "link", "doc.on.clipboard",
-        "curlybraces", "angle.brackets"
+        // Documents & text
+        "doc.text", "doc", "doc.richtext", "doc.append",
+        "text.quote", "text.alignleft", "text.aligncenter", "text.alignright", "text.justify",
+        "textformat", "textformat.size", "textformat.abc", "text.badge.plus",
+
+        // Editing & annotations
+        "pencil", "pencil.circle", "square.and.pencil", "highlighter", "paintbrush",
+        "scribble", "lasso", "magicwand", "rectangle.and.pencil.and.ellipsis",
+
+        // Lists & organization
+        "list.bullet", "list.bullet.rectangle", "list.number", "list.triangle", "checklist",
+        "calendar", "calendar.badge.clock", "clock", "bookmark", "bookmark.fill",
+
+        // Communication & references
+        "paperclip", "tray.and.arrow.down", "envelope", "at", "number",
+        "link", "link.badge.plus", "doc.on.clipboard", "quote.bubble", "bubble.left.and.bubble.right",
+
+        // Code & markup
+        "curlybraces", "curlybraces.square", "angle.brackets", "angle.bracket.square", "chevron.left.slash.chevron.right",
+        "terminal", "text.cursor", "keyboard", "command", "rectangle.and.text.magnifyingglass",
+
+        // Tags & metadata
+        "tag", "tag.circle", "folder", "folder.badge.plus", "rectangle.stack",
+        "archivebox", "tray.full", "magnifyingglass", "magnifyingglass.circle", "pin",
+
+        // Symbols for notes and emphasis
+        "star", "star.circle", "flag", "flag.checkered", "bookmark.circle",
+        "lightbulb", "bolt", "exclamationmark.circle", "info.circle", "questionmark.circle",
+
+        // Shapes useful for categorization
+        "circle", "square", "triangle", "diamond", "octagon",
+        "circle.grid.2x2", "square.grid.3x3", "rhombus", "shield"
     ]
+
+    static let availableSymbols: [String] = {
+        allowedSymbols.filter { symbol in
+            NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil
+        }
+    }()
 
     // ビルトインカテゴリ（削除不可）
     private static let builtInNone = UserCategory(
@@ -66,11 +101,18 @@ final class UserCategoryStore: ObservableObject {
 
     func category(id: UUID?) -> UserCategory? {
         guard let id else { return nil }
+        if let builtin = Self.builtIns.first(where: { $0.id == id }) {
+            return builtin
+        }
         return categories.first { $0.id == id }
     }
 
+    func iconName(for category: UserCategory) -> String {
+        Self.resolvedIconName(category.iconSystemName)
+    }
+
     func add(name: String, iconSystemName: String) {
-        let symbol = UserCategoryStore.allowedSymbols.contains(iconSystemName)
+        let symbol = UserCategoryStore.availableSymbols.contains(iconSystemName)
             ? iconSystemName : "tag"
         let new = UserCategory(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                                iconSystemName: symbol,
@@ -90,7 +132,9 @@ final class UserCategoryStore: ObservableObject {
 
     func changeIcon(id: UUID, to systemName: String) {
         guard !isBuiltIn(id), let index = categories.firstIndex(where: { $0.id == id }) else { return }
-        categories[index].iconSystemName = UserCategoryStore.allowedSymbols.contains(systemName) ? systemName : categories[index].iconSystemName
+        if UserCategoryStore.availableSymbols.contains(systemName) {
+            categories[index].iconSystemName = systemName
+        }
     }
 
     func setFilterEnabled(id: UUID, _ enabled: Bool) {
@@ -114,10 +158,26 @@ final class UserCategoryStore: ObservableObject {
             return
         }
         do {
-            categories = try JSONDecoder().decode([UserCategory].self, from: data)
+            categories = try JSONDecoder().decode([UserCategory].self, from: data).map { category in
+                var updated = category
+                if Self.resolvedIconName(category.iconSystemName) != category.iconSystemName {
+                    updated.iconSystemName = "tag"
+                }
+                return updated
+            }
         } catch {
             Logger.shared.error("Failed to load categories: \(error)")
             categories = []
         }
+    }
+
+    private static func resolvedIconName(_ symbol: String) -> String {
+        if availableSymbols.contains(symbol) {
+            return symbol
+        }
+        if NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil {
+            return symbol
+        }
+        return "tag"
     }
 }

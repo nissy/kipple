@@ -290,32 +290,28 @@ private extension HistoryItemView {
             Divider()
             ForEach(UserCategoryStore.shared.userDefined()) { cat in
                 Button(action: { onChangeCategory?(cat.id) }) {
-                    Label(cat.name, systemImage: cat.iconSystemName)
+                    Label(cat.name, systemImage: UserCategoryStore.shared.iconName(for: cat))
                 }
             }
             Divider()
             Button("Manage Categories…") { onOpenCategoryManager?() }
         }, label: {
-            HStack(spacing: 4) {
-                let current = UserCategoryStore.shared.category(id: item.userCategoryId)
-                Image(systemName: current?.iconSystemName ?? "tag")
-                    .font(.system(size: 11, weight: .regular))
+            let current = UserCategoryStore.shared.category(id: item.userCategoryId)
+            let iconName = current.map { UserCategoryStore.shared.iconName(for: $0) } ?? "tag"
+            ZStack {
+                Capsule()
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .frame(width: 36, height: 24)
+
+                Image(systemName: iconName)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(isSelected ? .white : .secondary)
-                if let name = current?.name, !name.isEmpty {
-                    Text(name)
-                        .font(.system(size: 10))
-                        .foregroundColor(isSelected ? .white.opacity(0.9) : .secondary)
-                        .lineLimit(1)
-                }
+                    .frame(width: 16, height: 16)
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(
-                Capsule().fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-            )
         })
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .frame(width: 35, alignment: .leading)
     }
 }
 

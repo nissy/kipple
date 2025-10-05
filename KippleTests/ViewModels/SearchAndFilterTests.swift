@@ -2,7 +2,7 @@
 //  SearchAndFilterTests.swift
 //  KippleTests
 //
-//  カテゴリ（URL/Short Text/Long Text）とピンフィルターの挙動を検証します。
+//  カテゴリ（URL または None）とピンフィルターの挙動を検証します。
 
 import XCTest
 import Combine
@@ -32,11 +32,11 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
     }
 
     private func setupTestHistory() {
-        let longText = String(repeating: "Long text sample. ", count: 15)
         mockClipboardService.history = [
             ClipItem(content: "https://example.com", isPinned: false), // URL
-            ClipItem(content: "Short memo", isPinned: true),             // Short
-            ClipItem(content: longText, isPinned: false)                  // Long
+            ClipItem(content: "Short memo", isPinned: true),            // None
+            ClipItem(content: String(repeating: "Long text sample. ", count: 15),
+                    isPinned: false)                                     // None
         ]
     }
 
@@ -47,20 +47,6 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(viewModel.filteredHistory.count, 1)
         XCTAssertEqual(viewModel.filteredHistory.first?.category, .url)
         XCTAssertEqual(viewModel.selectedCategory, .url)
-    }
-
-    func testCategoryFilterShortText() {
-        viewModel.toggleCategoryFilter(.shortText)
-        XCTAssertEqual(viewModel.filteredHistory.count, 1)
-        XCTAssertEqual(viewModel.filteredHistory.first?.category, .shortText)
-        XCTAssertEqual(viewModel.selectedCategory, .shortText)
-    }
-
-    func testCategoryFilterLongText() {
-        viewModel.toggleCategoryFilter(.longText)
-        XCTAssertEqual(viewModel.filteredHistory.count, 1)
-        XCTAssertEqual(viewModel.filteredHistory.first?.category, .longText)
-        XCTAssertEqual(viewModel.selectedCategory, .longText)
     }
 
     func testCategoryFilterAllResetsSelection() {
@@ -79,15 +65,6 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
         viewModel.showOnlyPinned = true
         XCTAssertEqual(viewModel.filteredHistory.count, 1)
         XCTAssertTrue(viewModel.filteredHistory.allSatisfy { $0.isPinned })
-    }
-
-    func testPinnedAndCategoryFilterCombination() {
-        viewModel.toggleCategoryFilter(.shortText)
-        viewModel.showOnlyPinned = true
-
-        XCTAssertEqual(viewModel.filteredHistory.count, 1)
-        XCTAssertTrue(viewModel.filteredHistory.first?.isPinned ?? false)
-        XCTAssertEqual(viewModel.filteredHistory.first?.category, .shortText)
     }
 
     // MARK: - Toggle Behavior

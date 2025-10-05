@@ -28,9 +28,8 @@ final class CategoryClassifier {
             return .url
         }
 
-        let category: ClipItemCategory = trimmed.count <= shortTextThreshold ? .shortText : .longText
-        cache.set(category, for: content)
-        return category
+        cache.set(.all, for: content)
+        return .all
     }
 
     private func isLikelyURL(_ text: String) -> Bool {

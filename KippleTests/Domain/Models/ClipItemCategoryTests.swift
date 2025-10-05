@@ -52,44 +52,24 @@ final class ClipItemCategoryTests: XCTestCase {
         }
     }
 
-    func testShortTextClassification() {
-        let shortSamples = [
+    func testNonURLClassificationReturnsAll() {
+        let samples = [
             "Quick note",
-            "Remember to call John",
             String(repeating: "A", count: 50),
-            "Line one\nLine two", // newline trimmed count
+            "Line one\nLine two",
+            String(repeating: "Long text sample. ", count: 20),
             "https://not-a-url because of space"
         ]
 
-        for text in shortSamples {
+        for text in samples {
             let item = ClipItem(content: text)
-            XCTAssertEqual(item.category, .shortText, "'\(text)' should be classified as Short Text")
+            XCTAssertEqual(item.category, .all, "'\(text)' should be categorized as All/None")
         }
-    }
-
-    func testLongTextClassification() {
-        let paragraph = String(repeating: "Long text sample. ", count: 20)
-        let item = ClipItem(content: paragraph)
-        XCTAssertEqual(item.category, .longText)
-    }
-
-    func testTrimmedLengthMatters() {
-        let text = "   " + String(repeating: "a", count: 40) + "   "
-        let item = ClipItem(content: text)
-        XCTAssertEqual(item.category, .shortText)
-    }
-
-    func testThresholdBoundary() {
-        let threshold = 200
-        let shortText = String(repeating: "a", count: threshold)
-        let longText = String(repeating: "b", count: threshold + 1)
-        XCTAssertEqual(ClipItem(content: shortText).category, .shortText)
-        XCTAssertEqual(ClipItem(content: longText).category, .longText)
     }
 
     func testCachingUsesRawValue() {
         let cache = CategoryClassifierCache.shared
-        cache.set(.shortText, for: "cached text")
-        XCTAssertEqual(cache.get(for: "cached text"), .shortText)
+        cache.set(.all, for: "cached text")
+        XCTAssertEqual(cache.get(for: "cached text"), .all)
     }
 }

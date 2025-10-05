@@ -20,7 +20,7 @@ struct ClipboardItemPopover: View {
     }
 
     private var item: ClipItem {
-        adapter.history.first { $0.id == itemID }?? initialItem
+        adapter.history.first { $0.id == itemID } ?? initialItem
     }
 
     var body: some View {
@@ -118,27 +118,27 @@ struct ClipboardItemPopover: View {
     }
 
     private var displayCategory: (name: String, icon: String, color: Color) {
-        if let category = categoryStore.category(id: item.userCategoryId) {
+        if let categoryId = item.userCategoryId,
+           let category = categoryStore.category(id: categoryId) {
             if let kind = categoryStore.builtInKind(for: category.id) {
                 switch kind {
                 case .none:
-                    return (category.name, category.iconSystemName, .gray)
+                    return (category.name, categoryStore.iconName(for: category), .gray)
                 case .url:
-                    return (category.name, category.iconSystemName, .blue)
+                    return (category.name, categoryStore.iconName(for: category), .blue)
                 }
             } else {
-                return (category.name, category.iconSystemName, Color.accentColor)
+                return (category.name, categoryStore.iconName(for: category), Color.accentColor)
             }
         }
 
         // Fallback to automatic classification
         switch item.category {
-        case .all:
-            return ("All", "square.grid.2x2", .gray)
         case .url:
             return ("URL", "link", .blue)
-        case .shortText, .longText:
-            return ("Text", "text.quote", .orange)
+        case .all, .shortText, .longText:
+            let none = categoryStore.noneCategory()
+            return (none.name, categoryStore.iconName(for: none), .gray)
         }
     }
 }

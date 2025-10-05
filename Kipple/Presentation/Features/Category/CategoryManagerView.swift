@@ -13,7 +13,7 @@ struct CategoryManagerView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var symbol: String = UserCategoryStore.allowedSymbols.first ?? "tag"
+    @State private var symbol: String = UserCategoryStore.availableSymbols.first ?? "tag"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -21,13 +21,16 @@ struct CategoryManagerView: View {
 
             // 各カテゴリ列にフィルタ表示チェックを配置（設定から移動）
 
+            let toggleColumnWidth: CGFloat = 140
+            let deleteColumnWidth: CGFloat = 40
+
             HStack(spacing: 8) {
                 TextField("Name", text: $name)
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: 160)
 
                 Picker("Icon", selection: $symbol) {
-                    ForEach(UserCategoryStore.allowedSymbols, id: \.self) { s in
+                    ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
                         Label(s, systemImage: s).labelStyle(.iconOnly)
                             .tag(s)
                     }
@@ -45,7 +48,8 @@ struct CategoryManagerView: View {
             Divider()
 
             List {
-                HStack {
+                HStack(spacing: 8) {
+                    Color.clear.frame(width: 24, height: 1)
                     Text("Name")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -53,12 +57,18 @@ struct CategoryManagerView: View {
                     Text("Show in filter")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .frame(width: toggleColumnWidth, alignment: .center)
+                    Text("Delete")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: deleteColumnWidth, alignment: .center)
                 }
                 .padding(.vertical, 4)
 
                 ForEach(store.all()) { category in
                     HStack(spacing: 8) {
-                        Image(systemName: category.iconSystemName)
+                        Image(systemName: store.iconName(for: category))
+                            .frame(width: 24)
                             .font(.system(size: 14))
                         TextField("Name", text: Binding(
                             get: { category.name },
@@ -69,6 +79,8 @@ struct CategoryManagerView: View {
                         Toggle("Show in filter", isOn: filterBinding(for: category))
                             .toggleStyle(.checkbox)
                             .labelsHidden()
+                            .frame(width: toggleColumnWidth, alignment: .center)
+                            .disabled(store.isBuiltIn(category.id))
 
                         if !store.isBuiltIn(category.id) {
                             Button(role: .destructive) {
@@ -76,15 +88,21 @@ struct CategoryManagerView: View {
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 12, weight: .medium))
+                                    .frame(width: deleteColumnWidth, height: 24)
                             }
                             .buttonStyle(.borderless)
                             .help("Delete category")
+                        } else {
+                            Image(systemName: "trash")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary.opacity(0.3))
+                                .frame(width: deleteColumnWidth, height: 24)
                         }
                     }
                     .contextMenu {
                         if !store.isBuiltIn(category.id) {
                             Menu("Change Icon") {
-                                ForEach(UserCategoryStore.allowedSymbols, id: \.self) { s in
+                                ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
                                     Button(action: { store.changeIcon(id: category.id, to: s) }) {
                                         Label(s, systemImage: s).labelStyle(.titleAndIcon)
                                     }

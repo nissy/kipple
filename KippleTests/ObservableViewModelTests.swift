@@ -355,7 +355,7 @@ final class ObservableMainViewModelTests: XCTestCase, @unchecked Sendable {
             }
 
             // Concurrent category changes
-            for category in [ClipItemCategory.url, .shortText, .longText] {
+            for category in [ClipItemCategory.url, .all] {
                 group.addTask {
                     await viewModel.setSelectedCategory(category)
                 }
