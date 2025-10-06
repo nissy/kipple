@@ -43,7 +43,9 @@ final class ClipItemCategoryTests: XCTestCase {
             "example-.com",
             "Swift 5.0 is great.",
             "192.168.1.1",
-            "image.png"
+            "image.png",
+            "transaction.go",
+            "notes.pg.hcl"
         ]
 
         for text in nonURLs {

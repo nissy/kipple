@@ -31,49 +31,49 @@ final class CategoryClassifier {
         return .all
     }
 
-    private func isLikelyURL(_ text: String) -> Bool {
-        guard text.count >= 4 else { return false }
+    private static let urlDetector: NSDataDetector? = {
+        try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    }()
 
-        if text.contains(" ") || text.contains("\n") || text.contains("@") {
+    private static let excludedFileExtensions: [String] = [
+        ".txt", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp",
+        ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav",
+        ".zip", ".rar", ".7z", ".tar", ".gz", ".dmg",
+        ".app", ".exe", ".pkg", ".deb", ".rpm",
+        ".swift", ".py", ".js", ".java", ".cpp", ".c", ".h",
+        ".html", ".css", ".xml", ".json", ".yml", ".yaml", ".md"
+    ]
+
+    private func isLikelyURL(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 4 else { return false }
+
+        if trimmed.contains(" ") || trimmed.contains("\n") || trimmed.contains("@") {
             return false
         }
 
-        let lowercased = text.lowercased()
+        let lowercased = trimmed.lowercased()
 
         if lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://") ||
             lowercased.hasPrefix("ftp://") || lowercased.hasPrefix("file://") {
-            return true
-        }
-
-        let fileExtensions = [
-            ".txt", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp",
-            ".mp3", ".mp4", ".avi", ".mov", ".mkv", ".wav",
-            ".zip", ".rar", ".7z", ".tar", ".gz", ".dmg",
-            ".app", ".exe", ".pkg", ".deb", ".rpm",
-            ".swift", ".py", ".js", ".java", ".cpp", ".c", ".h",
-            ".html", ".css", ".xml", ".json", ".yml", ".yaml", ".md"
-        ]
-        if fileExtensions.contains(where: { lowercased.hasSuffix($0) }) {
-            return false
-        }
-
-        let components = lowercased.split(separator: ".")
-        guard components.count >= 2, components.count <= 4 else { return false }
-        guard let tld = components.last, (2...10).contains(tld.count) else { return false }
-
-        let tldPattern = "^[A-Za-z]{2,10}$"
-        guard tld.range(of: tldPattern, options: .regularExpression) != nil else { return false }
-
-        let domainPattern = "^[A-Za-z0-9][A-Za-z0-9-]*[A-Za-z0-9]$"
-        for component in components.dropLast() {
-            if component.count < 1 ||
-                component.range(of: domainPattern, options: .regularExpression) == nil {
-                return false
+            if let url = URL(string: trimmed), url.scheme != nil {
+                return true
             }
         }
 
-        return true
+        if Self.excludedFileExtensions.contains(where: { lowercased.hasSuffix($0) }) {
+            return false
+        }
+
+        let nsText = trimmed as NSString
+        let range = NSRange(location: 0, length: nsText.length)
+        guard let detector = Self.urlDetector,
+              let match = detector.firstMatch(in: trimmed, options: [], range: range) else {
+            return false
+        }
+
+        return match.resultType == .link && match.range == range
     }
 }
 
