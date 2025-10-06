@@ -8,10 +8,10 @@
 import SwiftUI
 
 struct DataSettingsView: View {
-    @AppStorage("maxHistoryItems") private var maxHistoryItems = 100
-    @AppStorage("maxPinnedItems") private var maxPinnedItems = 10
+    @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
+    @AppStorage("maxPinnedItems") private var maxPinnedItems = 50
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
-    @AppStorage("enableAutoClear") private var enableAutoClear = false
+    @AppStorage("enableAutoClear") private var enableAutoClear = true
     @AppStorage("autoClearInterval") private var autoClearInterval = 10
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false

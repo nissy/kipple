@@ -9,15 +9,14 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @AppStorage("autoLaunchAtLogin") private var autoLaunchAtLogin = false
-    @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 9 // V key
-    @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags = 
-        Int(NSEvent.ModifierFlags.command.rawValue | NSEvent.ModifierFlags.option.rawValue) // CMD + Option
-    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
-    @AppStorage("windowAnimation") private var windowAnimation: String = "fade"
+    @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 0
+    @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
+    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
+    @AppStorage("windowAnimation") private var windowAnimation: String = "none"
     @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     
-    @State private var tempKeyCode: UInt16 = 9
-    @State private var tempModifierFlags: NSEvent.ModifierFlags = [.command, .option]
+    @State private var tempKeyCode: UInt16 = 0
+    @State private var tempModifierFlags: NSEvent.ModifierFlags = []
     
     var body: some View {
         ScrollView {

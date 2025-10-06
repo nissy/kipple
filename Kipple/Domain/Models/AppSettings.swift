@@ -14,24 +14,24 @@ final class AppSettings: ObservableObject {
     // Window Settings
     @AppStorage("windowHeight") var windowHeight: Double = 600
     @AppStorage("windowWidth") var windowWidth: Double = 420
-    @AppStorage("windowAnimation") var windowAnimation: String = "fade"
+    @AppStorage("windowAnimation") var windowAnimation: String = "none"
     @AppStorage("editorSectionHeight") var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") var historySectionHeight: Double = 300
     
     // Editor Settings
     @AppStorage("lastEditorText") var lastEditorText: String = ""
     @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
-    @AppStorage("editorPosition") var editorPosition: String = "top"  // "top" or "bottom"
+    @AppStorage("editorPosition") var editorPosition: String = "bottom"  // "top" or "bottom"
+    @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
     
     // History Settings
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
-    @AppStorage("maxPinnedItems") var maxPinnedItems = 20
+    @AppStorage("maxPinnedItems") var maxPinnedItems = 50
     
     // Hotkey Settings
     @AppStorage("enableHotkey") var enableHotkey: Bool = false  // デフォルトで無効
-    @AppStorage("hotkeyKeyCode") var hotkeyKeyCode: Int = 9  // V key
-    @AppStorage("hotkeyModifierFlags") var hotkeyModifierFlags = 
-        Int(NSEvent.ModifierFlags.control.rawValue)  // CTRL
+    @AppStorage("hotkeyKeyCode") var hotkeyKeyCode: Int = 0  // None by default
+    @AppStorage("hotkeyModifierFlags") var hotkeyModifierFlags: Int = 0  // None by default
     
     // Editor Copy Hotkey Settings (always enabled)
     @AppStorage("editorCopyHotkeyKeyCode") var editorCopyHotkeyKeyCode: Int = 1  // S key
@@ -51,7 +51,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("filterCategoryNone") var filterCategoryNone: Bool = false
     
     // Auto-Clear Settings
-    @AppStorage("enableAutoClear") var enableAutoClear: Bool = false
+    @AppStorage("enableAutoClear") var enableAutoClear: Bool = true
     @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
 
     // Action Click Settings (modifier required to trigger item action by click)
@@ -69,6 +69,7 @@ final class AppSettings: ObservableObject {
         static let lastEditorText = "lastEditorText"
         static let editorInsertMode = "editorInsertMode"
         static let editorPosition = "editorPosition"
+        static let editorInsertModifiers = "editorInsertModifiers"
         static let maxHistoryItems = "maxHistoryItems"
         static let maxPinnedItems = "maxPinnedItems"
         static let enableHotkey = "enableHotkey"

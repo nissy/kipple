@@ -180,7 +180,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func animateWindowOpen(_ window: NSWindow) {
-        let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "fade"
+        let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
         
         switch animationType {
         case "scale":

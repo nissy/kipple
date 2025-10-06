@@ -133,11 +133,11 @@ final class WindowBehaviorTests: XCTestCase {
     
     func testWindowAnimationSettings() {
         // SPECS.md: fade、scale、slide、none
-        // 注意: デフォルトアニメーションは "fade" に変更されている（AppSettings.swift参照）
-        
+        // 注意: デフォルトアニメーションは "none" に設定されている（AppSettings.swift参照）
+
         // デフォルトアニメーションの確認
-        let defaultAnimation = UserDefaults.standard.string(forKey: "windowAnimation") ?? "fade"
-        XCTAssertEqual(defaultAnimation, "fade")
+        let defaultAnimation = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+        XCTAssertEqual(defaultAnimation, "none")
         
         // 各アニメーションタイプを設定できることを確認
         let animations = [
