@@ -305,7 +305,7 @@ private extension HistoryItemView {
             }
         }, label: {
             let current = UserCategoryStore.shared.category(id: item.userCategoryId)
-            let iconName = current.map { UserCategoryStore.shared.iconName(for: $0) } ?? "tag"
+            let iconName = current.map { UserCategoryStore.shared.iconName(for: $0) } ?? item.category.icon
             ZStack {
                 Capsule()
                     .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))

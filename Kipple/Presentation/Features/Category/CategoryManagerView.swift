@@ -7,6 +7,23 @@
 
 import SwiftUI
 
+private enum CategoryManagerLayout {
+    static let columnSpacing: CGFloat = 8
+    static let iconColumnWidth: CGFloat = 36
+    static let nameColumnMinWidth: CGFloat = 180
+    static let toggleColumnWidth: CGFloat = 140
+    static let deleteColumnWidth: CGFloat = 40
+    static let spacerMinWidth: CGFloat = 12
+    static let listHorizontalPadding: CGFloat = 32
+    static let minimumHeight: CGFloat = 520
+
+    static var minimumWidth: CGFloat {
+        let columns = iconColumnWidth + nameColumnMinWidth + toggleColumnWidth + deleteColumnWidth
+        let spacing = spacerMinWidth + columnSpacing * 4 + listHorizontalPadding * 2
+        return max(420, columns + spacing)
+    }
+}
+
 struct CategoryManagerView: View {
     @ObservedObject private var store = UserCategoryStore.shared
     @ObservedObject private var appSettings = AppSettings.shared
@@ -21,13 +38,10 @@ struct CategoryManagerView: View {
 
             // 各カテゴリ列にフィルタ表示チェックを配置（設定から移動）
 
-            let toggleColumnWidth: CGFloat = 140
-            let deleteColumnWidth: CGFloat = 40
-
-            HStack(spacing: 8) {
+            HStack(spacing: CategoryManagerLayout.columnSpacing) {
                 TextField("Name", text: $name)
                     .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 160)
+                    .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth)
 
                 Picker("Icon", selection: $symbol) {
                     ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
@@ -48,38 +62,42 @@ struct CategoryManagerView: View {
             Divider()
 
             List {
-                HStack(spacing: 8) {
-                    Color.clear.frame(width: 24, height: 1)
+                HStack(spacing: CategoryManagerLayout.columnSpacing) {
+                    Text("Icon")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: CategoryManagerLayout.iconColumnWidth, alignment: .leading)
                     Text("Name")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
-                    Spacer()
+                        .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth, alignment: .leading)
+                    Spacer(minLength: CategoryManagerLayout.spacerMinWidth)
                     Text("Show in filter")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
-                        .frame(width: toggleColumnWidth, alignment: .center)
+                        .frame(width: CategoryManagerLayout.toggleColumnWidth, alignment: .center)
                     Text("Delete")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
-                        .frame(width: deleteColumnWidth, alignment: .center)
+                        .frame(width: CategoryManagerLayout.deleteColumnWidth, alignment: .center)
                 }
                 .padding(.vertical, 4)
 
                 ForEach(store.all()) { category in
-                    HStack(spacing: 8) {
-                        Image(systemName: store.iconName(for: category))
-                            .frame(width: 24)
-                            .font(.system(size: 14))
+                    HStack(spacing: CategoryManagerLayout.columnSpacing) {
+                        iconSelector(for: category)
+                            .frame(width: CategoryManagerLayout.iconColumnWidth, alignment: .leading)
                         TextField("Name", text: Binding(
                             get: { category.name },
                             set: { store.rename(id: category.id, to: $0) }
                         ))
                         .disabled(store.isBuiltIn(category.id))
-                        Spacer()
+                        .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth, alignment: .leading)
+                        Spacer(minLength: CategoryManagerLayout.spacerMinWidth)
                         Toggle("Show in filter", isOn: filterBinding(for: category))
                             .toggleStyle(.checkbox)
                             .labelsHidden()
-                            .frame(width: toggleColumnWidth, alignment: .center)
+                            .frame(width: CategoryManagerLayout.toggleColumnWidth, alignment: .center)
                             .disabled(store.isBuiltIn(category.id))
 
                         if !store.isBuiltIn(category.id) {
@@ -89,7 +107,7 @@ struct CategoryManagerView: View {
                                 label: {
                                     Image(systemName: "trash")
                                         .font(.system(size: 12, weight: .medium))
-                                        .frame(width: deleteColumnWidth, height: 24)
+                                        .frame(width: CategoryManagerLayout.deleteColumnWidth, height: 24)
                                 }
                             )
                             .buttonStyle(.borderless)
@@ -98,7 +116,7 @@ struct CategoryManagerView: View {
                             Image(systemName: "trash")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary.opacity(0.3))
-                                .frame(width: deleteColumnWidth, height: 24)
+                                .frame(width: CategoryManagerLayout.deleteColumnWidth, height: 24)
                         }
                     }
                     .contextMenu {
@@ -144,12 +162,38 @@ struct CategoryManagerView: View {
             }
         }
         .padding(16)
-        .frame(minWidth: 460, minHeight: 520)
+        .frame(minWidth: CategoryManagerView.minimumWidth, minHeight: CategoryManagerLayout.minimumHeight)
     }
 }
 
 // MARK: - Helpers
 private extension CategoryManagerView {
+    @ViewBuilder
+    func iconSelector(for category: UserCategory) -> some View {
+        if store.isBuiltIn(category.id) {
+            Image(systemName: store.iconName(for: category))
+                .frame(width: 24, height: 24)
+                .font(.system(size: 14))
+        } else {
+            Menu {
+                ForEach(UserCategoryStore.availableSymbols, id: \.self) { symbol in
+                    Button {
+                        store.changeIcon(id: category.id, to: symbol)
+                    } label: {
+                        Label(symbol, systemImage: symbol)
+                    }
+                }
+            } label: {
+                Image(systemName: store.iconName(for: category))
+                    .frame(width: 24, height: 24)
+                    .font(.system(size: 14))
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("アイコンを変更")
+        }
+    }
+
     func filterBinding(for category: UserCategory) -> Binding<Bool> {
         if let kind = store.builtInKind(for: category.id) {
             switch kind {
@@ -178,4 +222,9 @@ private extension CategoryManagerView {
             store.remove(id: targetId)
         }
     }
+}
+
+extension CategoryManagerView {
+    static var minimumWidth: CGFloat { CategoryManagerLayout.minimumWidth }
+    static var minimumHeight: CGFloat { CategoryManagerLayout.minimumHeight }
 }

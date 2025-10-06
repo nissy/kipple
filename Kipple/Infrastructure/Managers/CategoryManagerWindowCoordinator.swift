@@ -40,7 +40,8 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         let window = NSWindow(contentViewController: controller)
         window.title = "Manage Categories"
         window.styleMask = [.titled, .closable, .resizable]
-        window.setContentSize(NSSize(width: 460, height: 520))
+
+        applyContentSize(controller, to: window)
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -54,6 +55,14 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         window.collectionBehavior.insert(.fullScreenAuxiliary)
         position(window: window, near: anchorWindow)
         window.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard
+                let self,
+                let window,
+                let controller = window.contentViewController as? NSHostingController<CategoryManagerView>
+            else { return }
+            self.applyContentSize(controller, to: window)
+        }
     }
 
     func close() {
@@ -66,6 +75,23 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         }
         onCloseHandlers.removeAll()
         window = nil
+    }
+
+    private func applyContentSize(_ controller: NSHostingController<CategoryManagerView>, to window: NSWindow) {
+        let fallbackSize = NSSize(width: CategoryManagerView.minimumWidth, height: CategoryManagerView.minimumHeight)
+
+        controller.view.layoutSubtreeIfNeeded()
+        var fitting = controller.view.fittingSize
+        if !fitting.width.isFinite || fitting.width <= 0 { fitting.width = fallbackSize.width }
+        if !fitting.height.isFinite || fitting.height <= 0 { fitting.height = fallbackSize.height }
+
+        let targetSize = NSSize(
+            width: max(fitting.width, fallbackSize.width),
+            height: max(fitting.height, fallbackSize.height)
+        )
+
+        window.setContentSize(targetSize)
+        window.contentMinSize = fallbackSize
     }
 
     private func position(window: NSWindow, near anchorWindow: NSWindow?) {
