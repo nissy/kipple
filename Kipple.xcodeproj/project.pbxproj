@@ -139,6 +139,7 @@
 		F966E51835F9076A927428EA /* ViewModelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2600BD25E19697B1D92FE5B /* ViewModelProvider.swift */; };
 		FB1BCF2185DA68F62529EAAE /* MainViewControlSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */; };
 		FB9D3338A86658CEC827EFC0 /* ClearButtonRegressionTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */; };
+		FBC0FA1820FBC53EDA7626E4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 697EBB69F4BEBE93D9865E28 /* PrivacyInfo.xcprivacy */; };
 		FC6F95815A0E3BDD680FDA59 /* SearchableFontPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */; };
 		FCE770890167AE86972B9B78 /* SimpleFontSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D4179B0C1405E38A94135F /* SimpleFontSettingsView.swift */; };
 		FD2257A01775EBF6AFBFF297 /* TestUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03132BE081C4F4DD5B430EB3 /* TestUserDefaults.swift */; };
@@ -219,6 +220,7 @@
 		67BF4F2A209B66F653AED625 /* LastActiveAppTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastActiveAppTracker.swift; sourceTree = "<group>"; };
 		6805FAF51BA5FFDDC8167C46 /* ModernClipboardServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceProtocol.swift; sourceTree = "<group>"; };
 		68AE691F1C10B06D450798F8 /* KippleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KippleApp.swift; sourceTree = "<group>"; };
+		697EBB69F4BEBE93D9865E28 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6AE27F632B10A5817688AA5E /* MockClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockClipboardService.swift; sourceTree = "<group>"; };
 		6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearButtonRegressionTest.swift; sourceTree = "<group>"; };
 		704FBF789F27F0E1F5DA71F8 /* UserCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserCategory.swift; sourceTree = "<group>"; };
@@ -323,6 +325,7 @@
 			isa = PBXGroup;
 			children = (
 				313C2DE548F71294936CF09C /* Assets.xcassets */,
+				697EBB69F4BEBE93D9865E28 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -905,6 +908,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D8951BA3E254756423C4A6C5 /* Assets.xcassets in Resources */,
+				FBC0FA1820FBC53EDA7626E4 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

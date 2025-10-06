@@ -47,6 +47,8 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 - All data stays on your Mac
 - No network connections
 - No analytics or tracking
+- Clipboard history is accessed only to surface your own copies back to you in the app; nothing leaves the device
+- Preferences like hotkeys and window layout are saved with UserDefaults, and the values never leave your Mac
 
 
 ## License
