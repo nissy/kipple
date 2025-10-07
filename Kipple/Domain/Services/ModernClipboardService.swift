@@ -540,8 +540,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
 
         let isFromEditor = await state.getFromEditor()
+        let monitoringState = isMonitoringFlag
         let metadata = isFromEditor ? appInfo : await MainActor.run {
-            sanitizeExternalAppInfo(appInfo, isMonitoring: isMonitoringFlag)
+            sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState)
         }
 
         return ClipItem(
