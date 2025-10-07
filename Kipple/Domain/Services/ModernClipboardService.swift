@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import Combine
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
@@ -29,6 +29,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private let saveSubject = PassthroughSubject<[ClipItem], Never>()
     private var saveCancellable: AnyCancellable?
     private var persistedSnapshot: [UUID: ClipItem] = [:]
+    private var snapshotNeedsPriming = false
 
     // MARK: - Singleton
 
@@ -65,6 +66,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
         persistedSnapshot = [:]
+        snapshotNeedsPriming = false
     }
 
     private func setupSavePipeline() {
@@ -82,23 +84,73 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard let repository = repository else { return }
 
         do {
-            // Load all items first (repository may have more than current limit)
-            let items = try await repository.load(limit: 1000)
-            history = items
-            Logger.shared.log("Loaded \(items.count) items from repository")
+            let pinnedItems = try await repository.loadPinned()
+            history = pinnedItems
 
-            // Apply current user's limit setting
-            trimHistory()
-            Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
+            if !pinnedItems.isEmpty {
+                Logger.shared.log("Loaded \(pinnedItems.count) pinned items from repository")
+                notifyHistoryObservers()
+            }
 
-            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
+            let fetchLimit = await initialLoadLimit(pinnedCount: pinnedItems.count)
+            Logger.shared.debug("Initial history load limit set to \(fetchLimit) entries")
+
+            async let allItemsTask = repository.load(limit: fetchLimit)
+            let loadedItems = try await allItemsTask
+
+            let pinnedIDSet = Set(pinnedItems.map { $0.id })
+            let loadedByID = Dictionary(uniqueKeysWithValues: loadedItems.map { ($0.id, $0) })
+
+            var combinedItems: [ClipItem] = []
+            combinedItems.reserveCapacity(loadedItems.count + pinnedItems.count)
+
+            for pinned in pinnedItems {
+                if let refreshed = loadedByID[pinned.id] {
+                    combinedItems.append(refreshed)
+                } else {
+                    combinedItems.append(pinned)
+                }
+            }
+
+            for item in loadedItems where !pinnedIDSet.contains(item.id) {
+                combinedItems.append(item)
+            }
+
+            history = combinedItems
+            let wasTrimmed = trimHistory()
+
+            if wasTrimmed {
+                Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
+            } else {
+                Logger.shared.log("Loaded \(history.count) items from repository (max: \(maxHistoryItems))")
+            }
+
+            snapshotNeedsPriming = true
+            saveSubject.send(history)
+            notifyHistoryObservers()
         } catch {
             Logger.shared.error("Failed to load history: \(error)")
         }
     }
 
+    private func initialLoadLimit(pinnedCount: Int) async -> Int {
+        let configuredPinned = await MainActor.run {
+            AppSettings.shared.maxPinnedItems
+        }
+        let headroom = 10
+        let pinnedAllowance = max(configuredPinned, pinnedCount)
+        let computedLimit = maxHistoryItems + pinnedAllowance + headroom
+        return max(computedLimit, pinnedCount)
+    }
+
     private func persistHistoryDiff(_ items: [ClipItem]) async {
         guard let repository = repository else { return }
+
+        if snapshotNeedsPriming || persistedSnapshot.isEmpty {
+            persistedSnapshot = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+            snapshotNeedsPriming = false
+            return
+        }
 
         let previousSnapshot = persistedSnapshot
         let currentSnapshot = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
@@ -652,6 +704,16 @@ extension ModernClipboardService {
     func reloadHistoryForTesting() async {
         await initializeRepository()
         await loadHistoryFromRepository()
+    }
+
+    func clearRepositoryForTesting() async {
+        guard let repository else { return }
+        do {
+            try await repository.clear()
+            persistedSnapshot = [:]
+        } catch {
+            Logger.shared.error("Failed to clear repository: \(error)")
+        }
     }
 }
 #endif

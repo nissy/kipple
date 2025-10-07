@@ -44,18 +44,20 @@ struct ClipItem: Identifiable, Codable, Equatable {
     var userCategoryId: UUID?
     
     // パフォーマンス最適化用の静的フォーマッタ
-    private static func makeRelativeDateFormatter() -> RelativeDateTimeFormatter {
+    @MainActor
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter
-    }
+    }()
     
-    private static func makeTimestampFormatter() -> DateFormatter {
+    @MainActor
+    private static let timestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter
-    }
+    }()
     
     // Computed properties
     var fullContent: String {
@@ -75,12 +77,14 @@ struct ClipItem: Identifiable, Codable, Equatable {
         content.count
     }
     
+    @MainActor
     var timeAgo: String {
-        Self.makeRelativeDateFormatter().localizedString(for: timestamp, relativeTo: Date())
+        Self.relativeDateFormatter.localizedString(for: timestamp, relativeTo: Date())
     }
     
+    @MainActor
     var formattedTimestamp: String {
-        Self.makeTimestampFormatter().string(from: timestamp)
+        Self.timestampFormatter.string(from: timestamp)
     }
     
     var category: ClipItemCategory {

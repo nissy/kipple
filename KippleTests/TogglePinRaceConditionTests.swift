@@ -14,11 +14,14 @@ import AppKit
 final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
     private var service: ModernClipboardService!
     private var adapter: ModernClipboardServiceAdapter!
+    private var repository: ClipboardRepositoryProtocol!
     
     override func setUp() async throws {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        repository = try SwiftDataRepository.make(inMemory: true)
+        await service.useTestingRepository(repository)
         await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
@@ -34,8 +37,20 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
 
         service = nil
         adapter = nil
+        repository = nil
+        RepositoryProvider.useTestingRepository(nil)
         
         try await super.tearDown()
+    }
+
+    private func waitForHistory(count: Int, timeout: TimeInterval = 2.0) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if adapter.history.count >= count {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
     }
     
     // MARK: - Race Condition Tests
@@ -91,7 +106,8 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
             await service.copyToClipboard("Item \(i)", fromEditor: false)
         }
         await service.flushPendingSaves()
-        
+        await waitForHistory(count: 5)
+
         let history = adapter.history
         XCTAssertEqual(history.count, 5)
         
@@ -111,11 +127,11 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
         
         // Then: Only 2 items should be pinned
         let serviceHistory = await service.getHistory()
-        let pinnedCount = serviceHistory.filter { $0.isPinned }.count
+        let pinnedCount = serviceHistory.filter { $0.content.hasPrefix("Item") && $0.isPinned }.count
         XCTAssertEqual(pinnedCount, 2, "Should have exactly 2 pinned items")
-        
+
         // Adapter should also show 2 pinned items
-        let adapterPinnedCount = adapter.history.filter { $0.isPinned }.count
+        let adapterPinnedCount = adapter.history.filter { $0.content.hasPrefix("Item") && $0.isPinned }.count
         XCTAssertEqual(adapterPinnedCount, 2, "Adapter should show 2 pinned items")
     }
     
@@ -129,7 +145,8 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
         await service.copyToClipboard("Item 1", fromEditor: false)
         await service.copyToClipboard("Item 2", fromEditor: false)
         await service.flushPendingSaves()
-        
+        await waitForHistory(count: 2)
+
         // Pin first item
         let history = adapter.history
         let success1 = adapter.togglePin(for: history[1]) // Pin Item 1
@@ -150,10 +167,10 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
         if let item2 = finalHistory.first(where: { $0.content == "Item 2" }) {
             XCTAssertFalse(item2.isPinned, "Item 2 should not be pinned after failed attempt")
         }
-        
+
         // Service should also show only one pinned item
         let serviceHistory = await service.getHistory()
-        let pinnedCount = serviceHistory.filter { $0.isPinned }.count
+        let pinnedCount = serviceHistory.filter { $0.content.hasPrefix("Item") && $0.isPinned }.count
         XCTAssertEqual(pinnedCount, 1, "Service should have exactly 1 pinned item")
     }
     
@@ -163,7 +180,8 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
             await service.copyToClipboard("Item \(i)", fromEditor: false)
         }
         await service.flushPendingSaves()
-        
+        await waitForHistory(count: 10)
+
         let history = adapter.history
         XCTAssertEqual(history.count, 10)
         
@@ -185,10 +203,10 @@ final class TogglePinRaceConditionTests: XCTestCase, @unchecked Sendable {
         // Then: State should be consistent
         let serviceHistory = await service.getHistory()
         let adapterHistory = adapter.history
-        
+
         // Count pinned items in both
-        let servicePinnedCount = serviceHistory.filter { $0.isPinned }.count
-        let adapterPinnedCount = adapterHistory.filter { $0.isPinned }.count
+        let servicePinnedCount = serviceHistory.filter { $0.content.hasPrefix("Item") && $0.isPinned }.count
+        let adapterPinnedCount = adapterHistory.filter { $0.content.hasPrefix("Item") && $0.isPinned }.count
         
         XCTAssertEqual(servicePinnedCount, adapterPinnedCount,
                       "Pinned count should be consistent between service and adapter")

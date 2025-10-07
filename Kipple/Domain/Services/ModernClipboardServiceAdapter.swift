@@ -113,14 +113,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         history[index].isPinned.toggle()
         let newState = history[index].isPinned
 
-        Task {
-            let result = await modernService.togglePin(for: item)
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await self.modernService.togglePin(for: item)
+
             if result != newState {
-                // Backend rejected change (e.g. limit), revert local state
-                history[index].isPinned = result
+                await MainActor.run {
+                    if let currentIndex = self.history.firstIndex(where: { $0.id == item.id }) {
+                        self.history[currentIndex].isPinned = result
+                    }
+                }
             }
+
             // Always refresh history to ensure consistency
-            await refreshHistory()
+            await self.refreshHistory()
         }
 
         // Return expected new state (backend will be updated async)

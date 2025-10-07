@@ -6,6 +6,7 @@ extension ModernClipboardService {
         await stopMonitoring()
         await clearHistory(keepPinned: false)
         await clearAllHistory()
+        await clearRepositoryForTesting()
         await setMaxHistoryItems(300)
         await MainActor.run {
             AppSettings.shared.maxHistoryItems = 300
