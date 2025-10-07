@@ -126,7 +126,9 @@ struct CategoryManagerView: View {
                                     Button(
                                         action: { store.changeIcon(id: category.id, to: s) },
                                         label: {
-                                            Label(s, systemImage: s).labelStyle(.titleAndIcon)
+                                            Label(s, systemImage: s)
+                                                .labelStyle(.iconOnly)
+                                                .accessibilityLabel(Text(s))
                                         }
                                     )
                                 }
@@ -181,6 +183,8 @@ private extension CategoryManagerView {
                         store.changeIcon(id: category.id, to: symbol)
                     } label: {
                         Label(symbol, systemImage: symbol)
+                            .labelStyle(.iconOnly)
+                            .accessibilityLabel(Text(symbol))
                     }
                 }
             } label: {
