@@ -166,6 +166,7 @@ final class ObservableMainViewModel: MainViewModelProtocol {
             insertToEditor(content: item.content)
         } else {
             clipboardService.copyToClipboard(item.content, fromEditor: false)
+            resetFiltersAfterCopy()
         }
     }
 
@@ -272,6 +273,15 @@ final class ObservableMainViewModel: MainViewModelProtocol {
 
         // Update filteredItems
         filteredItems = items
+    }
+
+    private func resetFiltersAfterCopy() {
+        searchText = ""
+        showOnlyURLs = false
+        showOnlyPinned = false
+        selectedCategory = nil
+        isPinnedFilterActive = false
+        applyFilters()
     }
 
     private func showCopiedNotification() {

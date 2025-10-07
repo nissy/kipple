@@ -134,6 +134,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     func copyToClipboard(_ item: ClipItem) {
         clipboardService.copyToClipboard(item.content, fromEditor: false)
+        resetFiltersAfterCopy()
     }
 
     func clearHistory(keepPinned: Bool) async {
@@ -285,6 +286,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             insertToEditor(content: item.content)
         } else {
             clipboardService.recopyFromHistory(item)
+            resetFiltersAfterCopy()
         }
     }
     
@@ -328,6 +330,16 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             selectedCategory = nil
             isPinnedFilterActive = false
         }
+        updateFilteredItems(clipboardService.history)
+    }
+
+    private func resetFiltersAfterCopy() {
+        searchText = ""
+        showOnlyURLs = false
+        showOnlyPinned = false
+        selectedCategory = nil
+        selectedUserCategoryId = nil
+        isPinnedFilterActive = false
         updateFilteredItems(clipboardService.history)
     }
 }
