@@ -24,6 +24,10 @@ private enum CategoryManagerLayout {
     }
 }
 
+private enum CategoryManagerAppearance {
+    static let builtInColor = Color.secondary.opacity(0.55)
+}
+
 struct CategoryManagerView: View {
     @ObservedObject private var store = UserCategoryStore.shared
     @ObservedObject private var appSettings = AppSettings.shared
@@ -87,20 +91,27 @@ struct CategoryManagerView: View {
                     HStack(spacing: CategoryManagerLayout.columnSpacing) {
                         iconSelector(for: category)
                             .frame(width: CategoryManagerLayout.iconColumnWidth, alignment: .leading)
-                        TextField("Name", text: Binding(
-                            get: { category.name },
-                            set: { store.rename(id: category.id, to: $0) }
-                        ))
-                        .disabled(store.isBuiltIn(category.id))
-                        .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth, alignment: .leading)
+                        let builtInKind = store.builtInKind(for: category.id)
+                        let isBuiltIn = store.isBuiltIn(category.id)
+                        if isBuiltIn {
+                            Text(category.name)
+                                .foregroundColor(CategoryManagerAppearance.builtInColor)
+                                .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth, alignment: .leading)
+                        } else {
+                            TextField("Name", text: Binding(
+                                get: { category.name },
+                                set: { store.rename(id: category.id, to: $0) }
+                            ))
+                            .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth, alignment: .leading)
+                        }
                         Spacer(minLength: CategoryManagerLayout.spacerMinWidth)
                         Toggle("Show in filter", isOn: filterBinding(for: category))
                             .toggleStyle(.checkbox)
                             .labelsHidden()
                             .frame(width: CategoryManagerLayout.toggleColumnWidth, alignment: .center)
-                            .disabled(store.isBuiltIn(category.id))
+                            .disabled(builtInKind == .url)
 
-                        if !store.isBuiltIn(category.id) {
+                        if !isBuiltIn {
                             Button(
                                 role: .destructive,
                                 action: { deleteCategoryAndReassign(category) },
@@ -113,10 +124,11 @@ struct CategoryManagerView: View {
                             .buttonStyle(.borderless)
                             .help("Delete category")
                         } else {
-                            Image(systemName: "trash")
+                            Image(systemName: "lock.fill")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary.opacity(0.3))
+                                .foregroundColor(CategoryManagerAppearance.builtInColor)
                                 .frame(width: CategoryManagerLayout.deleteColumnWidth, height: 24)
+                                .help("Built-in categories cannot be deleted")
                         }
                     }
                     .contextMenu {
@@ -176,6 +188,7 @@ private extension CategoryManagerView {
             Image(systemName: store.iconName(for: category))
                 .frame(width: 24, height: 24)
                 .font(.system(size: 14))
+                .foregroundColor(CategoryManagerAppearance.builtInColor)
         } else {
             Menu {
                 ForEach(UserCategoryStore.availableSymbols, id: \.self) { symbol in
@@ -202,9 +215,15 @@ private extension CategoryManagerView {
         if let kind = store.builtInKind(for: category.id) {
             switch kind {
             case .url:
-                return $appSettings.filterCategoryURL
+                return Binding(
+                    get: { appSettings.filterCategoryURL },
+                    set: { appSettings.filterCategoryURL = $0 }
+                )
             case .none:
-                return $appSettings.filterCategoryNone
+                return Binding(
+                    get: { appSettings.filterCategoryNone },
+                    set: { appSettings.filterCategoryNone = $0 }
+                )
             }
         }
         return Binding(

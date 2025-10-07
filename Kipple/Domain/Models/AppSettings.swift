@@ -47,8 +47,26 @@ final class AppSettings: ObservableObject {
     @AppStorage("autoLaunchAtLogin") var autoLaunchAtLogin: Bool = false
     
     // Category Filter Settings
-    @AppStorage("filterCategoryURL") var filterCategoryURL: Bool = true
-    @AppStorage("filterCategoryNone") var filterCategoryNone: Bool = false
+    @AppStorage("filterCategoryURL") private var storedFilterCategoryURL: Bool = true
+    @AppStorage("filterCategoryNone") private var storedFilterCategoryNone: Bool = false
+    
+    var filterCategoryURL: Bool {
+        get { storedFilterCategoryURL }
+        set {
+            guard storedFilterCategoryURL != newValue else { return }
+            objectWillChange.send()
+            storedFilterCategoryURL = newValue
+        }
+    }
+    
+    var filterCategoryNone: Bool {
+        get { storedFilterCategoryNone }
+        set {
+            guard storedFilterCategoryNone != newValue else { return }
+            objectWillChange.send()
+            storedFilterCategoryNone = newValue
+        }
+    }
     
     // Auto-Clear Settings
     @AppStorage("enableAutoClear") var enableAutoClear: Bool = true
@@ -57,7 +75,11 @@ final class AppSettings: ObservableObject {
     // Action Click Settings (modifier required to trigger item action by click)
     @AppStorage("actionClickModifiers") var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     
-    private init() {}
+    private init() {
+        if storedFilterCategoryNone {
+            storedFilterCategoryNone = false
+        }
+    }
     
     // Settings Keys for consistency
     struct Keys {

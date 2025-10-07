@@ -70,7 +70,7 @@ final class UserCategoryStore: ObservableObject {
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!,
         name: "None",
         iconSystemName: "tag",
-        isFilterEnabled: true
+        isFilterEnabled: false
     )
     private static let builtInURL = UserCategory(
         id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
