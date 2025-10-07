@@ -124,14 +124,14 @@ struct HistoryItemView: View {
         ZStack {
             Circle()
                 .fill(pinButtonBackground)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
 
             Image(systemName: pinButtonIcon)
                 .foregroundColor(pinButtonForeground)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .rotationEffect(.degrees(pinButtonRotation))
         }
-        .frame(width: 24, height: 24)
+        .frame(width: 22, height: 22)
         .contentShape(Circle())
         .onTapGesture {
             closePopover()
@@ -145,13 +145,13 @@ struct HistoryItemView: View {
             ZStack {
                 Circle()
                     .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 24, height: 24)
+                    .frame(width: 22, height: 22)
 
                 Image(systemName: item.category.icon)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isSelected ? .white : .secondary)
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 22, height: 22)
             .contentShape(Circle())
             .onTapGesture { handleTap() }
             .help(actionHelpText)
@@ -159,13 +159,13 @@ struct HistoryItemView: View {
             ZStack {
                 Circle()
                     .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 24, height: 24)
+                    .frame(width: 22, height: 22)
 
                 Image(systemName: item.category.icon)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isSelected ? .white : .secondary)
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 22, height: 22)
             .contentShape(Circle())
             .onTapGesture {
                 closePopover()
@@ -174,9 +174,9 @@ struct HistoryItemView: View {
             .help("「\(item.category.rawValue)」でフィルタ")
         } else {
             Image(systemName: item.category.icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(isSelected ? .white : .secondary)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
                 .background(
                     Circle()
                         .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
@@ -192,8 +192,8 @@ struct HistoryItemView: View {
             .truncationMode(.tail)
             .underline(isLinkActive, color: linkColor)
             .foregroundColor(isLinkActive ? linkColor : (isSelected ? .white : .primary))
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { handleTap() }
@@ -203,7 +203,7 @@ struct HistoryItemView: View {
     private var deleteButton: some View {
         if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundColor(.secondary)
                 .contentShape(Circle())
                 .onTapGesture {

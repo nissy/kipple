@@ -63,21 +63,21 @@ struct MainViewHistorySection: View {
     var body: some View {
         return VStack(spacing: 0) {
             // 検索バー（常に表示）
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color(NSColor.textBackgroundColor))
-                        .shadow(color: Color.black.opacity(0.05), radius: 3, y: 2)
+                        .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
-                            .padding(.leading, 10)
+                            .padding(.leading, 8)
                         
                         TextField("Search", text: $searchText)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 12))
+                            .font(Font(fontManager.historyFont))
                             .foregroundColor(.primary)
                         
                         if !searchText.isEmpty {
@@ -87,11 +87,11 @@ struct MainViewHistorySection: View {
                                 }
                             }, label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                             })
                             .buttonStyle(PlainButtonStyle())
-                            .padding(.trailing, 10)
+                            .padding(.trailing, 8)
                             .transition(.scale.combined(with: .opacity))
                         }
                     }
@@ -102,12 +102,12 @@ struct MainViewHistorySection: View {
                         .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
                 )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             
                 // 履歴リスト
                 ScrollView {
-                    LazyVStack(spacing: 3, pinnedViews: []) {
+                    LazyVStack(spacing: 2, pinnedViews: []) {
                         ForEach(history) { item in
                             HistoryItemView(
                                 item: item,
@@ -133,7 +133,7 @@ struct MainViewHistorySection: View {
                                 onOpenCategoryManager: onOpenCategoryManager,
                                 historyFont: Font(fontManager.historyFont)
                             )
-                            .frame(height: 36) // 固定高さでパフォーマンス向上
+                            .frame(height: 32) // 固定高さでパフォーマンス向上
                             .transition(.opacity)
                             .animation(.easeInOut(duration: 0.2), value: item.isPinned)
                             .onAppear {
@@ -144,11 +144,11 @@ struct MainViewHistorySection: View {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 10)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                 }
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.3)

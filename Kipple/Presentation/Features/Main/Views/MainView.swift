@@ -215,40 +215,40 @@ extension MainView {
             }()
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     // ピン留めフィルター（一番上に配置）
                     Button(action: {
                         withAnimation(.spring(response: 0.3)) {
                             viewModel.togglePinnedFilter()
                         }
                     }, label: {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 3) {
                             ZStack {
                                 Circle()
                                     .fill(viewModel.isPinnedFilterActive ? 
                                         Color.accentColor : 
                                         Color.secondary.opacity(0.1))
-                                    .frame(width: 36, height: 36)
+                                    .frame(width: 30, height: 30)
                                     .shadow(
                                         color: viewModel.isPinnedFilterActive ? 
                                             Color.accentColor.opacity(0.3) : .clear,
-                                        radius: 4,
+                                        radius: 3,
                                         y: 2
                                     )
                                 
                                 Image(systemName: "pin.fill")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(viewModel.isPinnedFilterActive ? 
                                         .white : .secondary)
                             }
                             
                             Text("Pinned")
-                                .font(.system(size: 10))
+                                .font(.system(size: 9))
                                 .foregroundColor(viewModel.isPinnedFilterActive ? 
                                     .primary : .secondary)
                                 .lineLimit(1)
                         }
-                        .frame(width: 60)
+                        .frame(width: 52)
                     })
                     .buttonStyle(PlainButtonStyle())
                     .scaleEffect(viewModel.isPinnedFilterActive ? 1.05 : 1.0)
@@ -260,33 +260,33 @@ extension MainView {
                                 viewModel.toggleCategoryFilter(category)
                             }
                         }, label: {
-                            VStack(spacing: 4) {
+                            VStack(spacing: 3) {
                                 ZStack {
                                     Circle()
                                         .fill(viewModel.selectedCategory == category ? 
                                             Color.accentColor : 
                                             Color.secondary.opacity(0.1))
-                                        .frame(width: 36, height: 36)
+                                        .frame(width: 30, height: 30)
                                         .shadow(
                                             color: viewModel.selectedCategory == category ? 
                                                 Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 4,
+                                            radius: 3,
                                             y: 2
                                         )
                                     
                                     Image(systemName: category.icon)
-                                        .font(.system(size: 16, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(viewModel.selectedCategory == category ? 
                                             .white : .secondary)
                                 }
                                 
                                 Text(category.rawValue)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 9))
                                     .foregroundColor(viewModel.selectedCategory == category ? 
                                         .primary : .secondary)
                                     .lineLimit(1)
                             }
-                            .frame(width: 60)
+                            .frame(width: 52)
                         })
                         .buttonStyle(PlainButtonStyle())
                         .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
@@ -299,33 +299,33 @@ extension MainView {
                                 viewModel.toggleUserCategoryFilter(cat.id)
                             }
                         }, label: {
-                            VStack(spacing: 4) {
+                            VStack(spacing: 3) {
                                 ZStack {
                                     Circle()
                                         .fill(viewModel.selectedUserCategoryId == cat.id ?
                                               Color.accentColor :
                                               Color.secondary.opacity(0.1))
-                                        .frame(width: 36, height: 36)
+                                        .frame(width: 30, height: 30)
                                         .shadow(
                                             color: viewModel.selectedUserCategoryId == cat.id ?
                                                 Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 4,
+                                            radius: 3,
                                             y: 2
                                         )
 
                                     Image(systemName: cat.iconSystemName)
-                                        .font(.system(size: 16, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
                                                          .white : .secondary)
                                 }
 
                                 Text(cat.name)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 9))
                                     .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
                                                      .primary : .secondary)
                                     .lineLimit(1)
                             }
-                            .frame(width: 60)
+                            .frame(width: 52)
                         })
                         .buttonStyle(PlainButtonStyle())
                         .scaleEffect(viewModel.selectedUserCategoryId == cat.id ? 1.05 : 1.0)
@@ -334,7 +334,7 @@ extension MainView {
                     
                     Spacer()
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.5)
                 )
