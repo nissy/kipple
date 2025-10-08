@@ -241,7 +241,7 @@ final class ObservableMainViewModel: MainViewModelProtocol {
 
         // URL filter
         if showOnlyURLs {
-            items = items.filter { $0.kind == .url }
+            items = items.filter { $0.category == .url }
         }
 
         // Apply pinned filter
@@ -266,7 +266,7 @@ final class ObservableMainViewModel: MainViewModelProtocol {
         }
 
         if showOnlyURLs {
-            nonPinnedItems = nonPinnedItems.filter { $0.kind == .url }
+            nonPinnedItems = nonPinnedItems.filter { $0.category == .url }
         }
 
         filteredHistory = nonPinnedItems

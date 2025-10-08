@@ -228,6 +228,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         let item = ClipItem(
             content: content,
             isPinned: false,
+            kind: determineKind(for: content, isFromEditor: fromEditor),
             sourceApp: fromEditor ? "Kipple" : metadata.appName,
             windowTitle: fromEditor ? "Quick Editor" : metadata.windowTitle,
             bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
@@ -547,6 +548,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         return ClipItem(
             content: content,
+            kind: determineKind(for: content, isFromEditor: isFromEditor),
             sourceApp: isFromEditor ? "Kipple" : metadata.appName,
             windowTitle: isFromEditor ? "Quick Editor" : metadata.windowTitle,
             bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
@@ -709,6 +711,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private func stopAppSwitchObserver() async {
         // Cleanup if needed
+    }
+
+    private func determineKind(for content: String, isFromEditor: Bool) -> ClipItemKind {
+        let category = CategoryClassifier.shared.classify(content: content, isFromEditor: isFromEditor)
+        switch category {
+        case .url:
+            return .url
+        case .all:
+            return .text
+        }
     }
 }
 

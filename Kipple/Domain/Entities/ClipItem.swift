@@ -162,7 +162,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     // アクション可能かどうか（テキストかつURIスキーム判定のみ）
     var isActionable: Bool {
-        return kind == .text && resolveURISchemeURL() != nil
+        resolveURISchemeURL() != nil
     }
     
     // アクションタイトル

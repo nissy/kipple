@@ -189,7 +189,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         // URL filter
         if showOnlyURLs {
-            filtered = filtered.filter { $0.kind == .url }
+            filtered = filtered.filter { $0.category == .url }
         }
 
         // Apply pinned filter
