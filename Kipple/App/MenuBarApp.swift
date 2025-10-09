@@ -14,6 +14,18 @@ final class MenuBarApp: NSObject, ObservableObject {
     internal let clipboardService: any ClipboardServiceProtocol
     internal let windowManager = WindowManager()
     internal var hotkeyManager: Any
+    private let openKippleMenuTitle = "Open Kipple"
+    private let openKippleMenuItem = NSMenuItem(
+        title: "Open Kipple",
+        action: #selector(openMainWindow),
+        keyEquivalent: ""
+    )
+    private let screenTextCaptureMenuTitle = "Screen Text Capture"
+    private let screenTextCaptureMenuItem = NSMenuItem(
+        title: "Screen Text Capture",
+        action: #selector(captureTextFromScreen),
+        keyEquivalent: ""
+    )
     private let screenCaptureStatusItem = NSMenuItem()
     private lazy var textRecognitionService: any TextRecognitionServiceProtocol =
         TextRecognitionServiceProvider.resolve()
@@ -26,6 +38,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     }()
     private var textCaptureHotkeyManager: TextCaptureHotkeyManager?
     private var textCaptureHotkeyObserver: NSObjectProtocol?
+    private var openKippleHotkeyObserver: NSObjectProtocol?
     
     // 非同期終了処理用のプロパティ
     private var isTerminating = false
@@ -92,6 +105,23 @@ final class MenuBarApp: NSObject, ObservableObject {
         let menu = createMenu()
         statusBarItem?.menu = menu
         statusBarItem?.isVisible = true
+
+        observeOpenKippleHotkeyChanges()
+    }
+
+    private func observeOpenKippleHotkeyChanges() {
+        if let observer = openKippleHotkeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            openKippleHotkeyObserver = nil
+        }
+
+        openKippleHotkeyObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("HotkeySettingsChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateOpenKippleMenuItemShortcut()
+        }
     }
     
     private func createMenu() -> NSMenu {
@@ -100,7 +130,8 @@ final class MenuBarApp: NSObject, ObservableObject {
         
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Open Kipple", action: #selector(openMainWindow), keyEquivalent: ""))
+        menu.addItem(openKippleMenuEntry())
+        menu.addItem(screenTextCaptureMenuEntry())
         menu.addItem(screenCaptureMenuItem())
         menu.addItem(NSMenuItem.separator())
 
@@ -111,6 +142,8 @@ final class MenuBarApp: NSObject, ObservableObject {
         menu.items.forEach { $0.target = self }
 
         updateScreenCaptureMenuItem()
+        updateOpenKippleMenuItemShortcut()
+        updateScreenTextCaptureMenuItemShortcut()
         return menu
     }
     
@@ -245,8 +278,8 @@ extension MenuBarApp {
             forName: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
             object: nil,
             queue: .main
-        ) { [weak manager] notification in
-            guard let manager else { return }
+        ) { [weak self] notification in
+            guard let self, let manager = self.textCaptureHotkeyManager else { return }
             guard
                 let userInfo = notification.userInfo,
                 let keyCode = userInfo["keyCode"] as? Int,
@@ -254,18 +287,208 @@ extension MenuBarApp {
             else { return }
 
             let enabled = userInfo["enabled"] as? Bool ?? true
-            let flags = NSEvent.ModifierFlags(rawValue: UInt(modifierFlags))
+            let resolvedModifiers = NSEvent.ModifierFlags(rawValue: UInt(modifierFlags)).intersection([.command, .control, .option, .shift])
+            let resolvedKeyCode = UInt16(keyCode)
 
-            if enabled, keyCode != 0, !flags.isEmpty {
-                _ = manager.applyHotKey(keyCode: UInt16(keyCode), modifiers: flags)
+            if enabled, resolvedKeyCode != 0, !resolvedModifiers.isEmpty {
+                if manager.applyHotKey(keyCode: resolvedKeyCode, modifiers: resolvedModifiers) {
+                    self.updateScreenTextCaptureMenuItemShortcut(with: resolvedKeyCode, modifiers: resolvedModifiers)
+                }
             } else {
-                _ = manager.applyHotKey(keyCode: 0, modifiers: [])
+                if manager.applyHotKey(keyCode: 0, modifiers: []) {
+                    self.updateScreenTextCaptureMenuItemShortcut()
+                }
             }
         }
+
+        updateScreenTextCaptureMenuItemShortcut()
     }
 }
 
 extension MenuBarApp {
+    private func openKippleMenuEntry() -> NSMenuItem {
+        openKippleMenuItem.title = openKippleMenuTitle
+        openKippleMenuItem.target = self
+        openKippleMenuItem.action = #selector(openMainWindow)
+        return openKippleMenuItem
+    }
+
+    private func screenTextCaptureMenuEntry() -> NSMenuItem {
+        screenTextCaptureMenuItem.title = screenTextCaptureMenuTitle
+        screenTextCaptureMenuItem.target = self
+        screenTextCaptureMenuItem.action = #selector(captureTextFromScreen)
+        return screenTextCaptureMenuItem
+    }
+
+    private func updateOpenKippleMenuItemShortcut() {
+        guard let manager = hotkeyManager as? SimplifiedHotkeyManager else {
+            applyShortcut(to: openKippleMenuItem, title: openKippleMenuTitle, combination: nil)
+            return
+        }
+
+        guard manager.getEnabled() else {
+            applyShortcut(to: openKippleMenuItem, title: openKippleMenuTitle, combination: nil)
+            return
+        }
+
+        let hotkey = manager.getHotkey()
+        let sanitizedModifiers = hotkey.modifiers.intersection([.command, .control, .option, .shift])
+
+        if hotkey.keyCode == 0 || sanitizedModifiers.isEmpty {
+            applyShortcut(to: openKippleMenuItem, title: openKippleMenuTitle, combination: nil)
+            return
+        }
+
+        applyShortcut(
+            to: openKippleMenuItem,
+            title: openKippleMenuTitle,
+            combination: (hotkey.keyCode, sanitizedModifiers)
+        )
+    }
+
+    private func updateScreenTextCaptureMenuItemShortcut(
+        with keyCode: UInt16? = nil,
+        modifiers: NSEvent.ModifierFlags? = nil
+    ) {
+        let baseTitle = screenTextCaptureMenuTitle
+        let combination: (UInt16, NSEvent.ModifierFlags)?
+
+        if let keyCode, let modifiers {
+            combination = (keyCode, modifiers)
+        } else if let hotkey = textCaptureHotkeyManager?.currentHotkey ?? TextCaptureHotkeyManager.shared.currentHotkey {
+            combination = hotkey
+        } else {
+            combination = nil
+        }
+
+        if let combination {
+            let sanitizedModifiers = combination.1.intersection([.command, .control, .option, .shift])
+            if combination.0 == 0 || sanitizedModifiers.isEmpty {
+                applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
+            } else {
+                applyShortcut(
+                    to: screenTextCaptureMenuItem,
+                    title: baseTitle,
+                    combination: (combination.0, sanitizedModifiers)
+                )
+            }
+        } else {
+            applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
+        }
+    }
+
+    private func shortcutDisplayString(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> String {
+        var parts: [String] = []
+
+        if modifiers.contains(.control) { parts.append("⌃") }
+        if modifiers.contains(.option) { parts.append("⌥") }
+        if modifiers.contains(.shift) { parts.append("⇧") }
+        if modifiers.contains(.command) { parts.append("⌘") }
+
+        if let mapping = shortcutMapping(for: keyCode) {
+            parts.append(mapping.display)
+        }
+
+        return parts.joined()
+    }
+
+    private func applyShortcut(
+        to menuItem: NSMenuItem,
+        title: String,
+        combination: (UInt16, NSEvent.ModifierFlags)?
+    ) {
+        guard let (keyCode, modifiers) = combination else {
+            menuItem.title = title
+            menuItem.keyEquivalent = ""
+            menuItem.keyEquivalentModifierMask = []
+            menuItem.toolTip = nil
+            return
+        }
+
+        let mapping = shortcutMapping(for: keyCode)
+        let displayString = shortcutDisplayString(keyCode: keyCode, modifiers: modifiers)
+
+        if let keyEquivalent = mapping?.keyEquivalent {
+            menuItem.title = title
+            menuItem.keyEquivalent = keyEquivalent
+            menuItem.keyEquivalentModifierMask = modifiers
+            menuItem.toolTip = displayString.isEmpty ? nil : displayString
+        } else if !displayString.isEmpty {
+            menuItem.title = "\(title) (\(displayString))"
+            menuItem.keyEquivalent = ""
+            menuItem.keyEquivalentModifierMask = []
+            menuItem.toolTip = displayString
+        } else {
+            menuItem.title = title
+            menuItem.keyEquivalent = ""
+            menuItem.keyEquivalentModifierMask = []
+            menuItem.toolTip = nil
+        }
+    }
+
+    private func shortcutMapping(for keyCode: UInt16) -> (display: String, keyEquivalent: String?)? {
+        let map: [UInt16: (String, String?)] = [
+            1: ("S", "s"),
+            2: ("D", "d"),
+            3: ("F", "f"),
+            4: ("H", "h"),
+            5: ("G", "g"),
+            6: ("Z", "z"),
+            7: ("X", "x"),
+            8: ("C", "c"),
+            9: ("V", "v"),
+            11: ("B", "b"),
+            12: ("Q", "q"),
+            13: ("W", "w"),
+            14: ("E", "e"),
+            15: ("R", "r"),
+            16: ("Y", "y"),
+            17: ("T", "t"),
+            18: ("1", "1"),
+            19: ("2", "2"),
+            20: ("3", "3"),
+            21: ("4", "4"),
+            22: ("6", "6"),
+            23: ("5", "5"),
+            24: ("=", "="),
+            25: ("9", "9"),
+            26: ("7", "7"),
+            27: ("-", "-"),
+            28: ("8", "8"),
+            29: ("0", "0"),
+            30: ("]", "]"),
+            31: ("O", "o"),
+            32: ("U", "u"),
+            33: ("[", "["),
+            34: ("I", "i"),
+            35: ("P", "p"),
+            36: ("↩︎", "\r"),
+            37: ("L", "l"),
+            38: ("J", "j"),
+            39: ("'", "'"),
+            40: ("K", "k"),
+            41: (";", ";"),
+            42: ("\\", "\\"),
+            43: (",", ","),
+            44: ("/", "/"),
+            45: ("N", "n"),
+            46: ("M", "m"),
+            47: (".", "."),
+            48: ("⇥", "\t"),
+            49: ("Space", " "),
+            50: ("`", "`"),
+            51: ("⌫", "\u{8}"),
+            53: ("⎋", "\u{1b}"),
+            117: ("⌦", "\u{7f}"),
+            123: ("←", nil),
+            124: ("→", nil),
+            125: ("↓", nil),
+            126: ("↑", nil)
+        ]
+
+        return map[keyCode]
+    }
+
     private func screenCaptureMenuItem() -> NSMenuItem {
         screenCaptureStatusItem.target = self
         screenCaptureStatusItem.action = #selector(openScreenRecordingSettingsFromMenu)
@@ -298,6 +521,8 @@ extension MenuBarApp {
 extension MenuBarApp: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         updateScreenCaptureMenuItem()
+        updateOpenKippleMenuItemShortcut()
+        updateScreenTextCaptureMenuItemShortcut()
     }
 }
 

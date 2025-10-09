@@ -14,9 +14,7 @@ struct GeneralSettingsView: View {
     @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
     @AppStorage("textCaptureHotkeyKeyCode") private var textCaptureHotkeyKeyCode: Int = 0
     @AppStorage("textCaptureHotkeyModifierFlags") private var textCaptureHotkeyModifierFlags: Int = 0
-    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
     @AppStorage("windowAnimation") private var windowAnimation: String = "none"
-    @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     
     @State private var tempKeyCode: UInt16 = 0
     @State private var tempModifierFlags: NSEvent.ModifierFlags = []
@@ -44,8 +42,11 @@ struct GeneralSettingsView: View {
                 }
                 
                 // Global Hotkey
-                SettingsGroup("Global Hotkey") {
-                    SettingsRow(label: "Show/hide window") {
+                SettingsGroup("Open Kipple") {
+                    SettingsRow(
+                        label: "Global Hotkey",
+                        description: "Show the main window."
+                    ) {
                         HotkeyRecorderField(
                             keyCode: $tempKeyCode,
                             modifierFlags: $tempModifierFlags
@@ -95,7 +96,8 @@ struct GeneralSettingsView: View {
                     }
                     
                     SettingsRow(
-                        label: "Shortcut",
+                        label: "Global Hotkey",
+                        description: "Start screen text capture."
                     ) {
                         HotkeyRecorderField(
                             keyCode: $tempCaptureKeyCode,
@@ -111,32 +113,6 @@ struct GeneralSettingsView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.red)
                             .padding(.leading, 4)
-                    }
-                }
-                
-                // Editor Insert
-                SettingsGroup("Editor Insert") {
-                    SettingsRow(label: "Modifier key") {
-                        HStack {
-                            ModifierKeyPicker(selection: $editorInsertModifiers)
-                                .frame(width: 120)
-                            Text("+ click to insert")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-
-                // Action Click
-                SettingsGroup("Action Click") {
-                    SettingsRow(label: "Modifier key") {
-                        HStack {
-                            ModifierKeyPicker(selection: $actionClickModifiers)
-                                .frame(width: 120)
-                            Text("+ click to open URI")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
                     }
                 }
                 

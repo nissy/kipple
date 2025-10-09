@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
@@ -13,6 +14,7 @@ struct DataSettingsView: View {
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
     @AppStorage("enableAutoClear") private var enableAutoClear = true
     @AppStorage("autoClearInterval") private var autoClearInterval = 10
+    @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
@@ -32,6 +34,17 @@ struct DataSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 ClipboardFontSettingsView()
+
+                // Action Click
+                SettingsGroup("Action Click") {
+                    SettingsRow(
+                        label: "Shortcut",
+                        description: "Use modifier + click to open item actions."
+                    ) {
+                        ModifierKeyPicker(selection: $actionClickModifiers)
+                            .frame(width: 120)
+                    }
+                }
 
                 // Categories management entry (moved from Settings to Manager)
                 SettingsGroup("Categories") {

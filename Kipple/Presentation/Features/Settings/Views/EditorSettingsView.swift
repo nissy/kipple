@@ -6,9 +6,11 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct EditorSettingsView: View {
     @ObservedObject private var appSettings = AppSettings.shared
+    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
     @State private var tempCopyKeyCode: UInt16 = 6  // Z key
     @State private var tempCopyModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var tempClearKeyCode: UInt16 = 7  // X key
@@ -31,8 +33,8 @@ struct EditorSettingsView: View {
                     }
                 }
                 // Editor Copy Hotkey
-                SettingsGroup("Editor Copy Hotkey") {
-                    SettingsRow(label: "Copy editor content") {
+                SettingsGroup("Editor Copy") {
+                    SettingsRow(label: "Hot Key") {
                         HotkeyRecorderField(
                             keyCode: $tempCopyKeyCode,
                             modifierFlags: $tempCopyModifierFlags
@@ -50,6 +52,17 @@ struct EditorSettingsView: View {
                         )
                         .onChange(of: tempClearKeyCode) { _ in updateClearHotkey() }
                         .onChange(of: tempClearModifierFlags) { _ in updateClearHotkey() }
+                    }
+                }
+
+                // Editor Insert
+                SettingsGroup("Editor Insert") {
+                    SettingsRow(
+                        label: "Hot Key",
+                        description: "Use modifier + click to insert content."
+                    ) {
+                        ModifierKeyPicker(selection: $editorInsertModifiers)
+                            .frame(width: 120)
                     }
                 }
                 

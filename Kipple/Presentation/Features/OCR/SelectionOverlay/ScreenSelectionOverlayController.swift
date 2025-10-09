@@ -26,6 +26,7 @@ final class ScreenSelectionOverlayController: NSObject {
     func present() {
         guard !isActive else { return }
         isActive = true
+        NSApp.activate(ignoringOtherApps: true)
 
         overlayWindows = NSScreen.screens.map { screen in
             let window = SelectionOverlayWindow(screen: screen)
@@ -41,6 +42,7 @@ final class ScreenSelectionOverlayController: NSObject {
             NSCursor.crosshair.push()
             cursorPushed = true
         }
+        NSCursor.crosshair.set()
     }
 
     func cancel() {

@@ -25,6 +25,11 @@ final class TextCaptureHotkeyManager {
 
     var onHotkeyTriggered: (() -> Void)?
 
+    var currentHotkey: (keyCode: UInt16, modifiers: NSEvent.ModifierFlags)? {
+        guard currentKeyCode != 0, !currentModifiers.isEmpty else { return nil }
+        return (currentKeyCode, currentModifiers)
+    }
+
     private init() {
         loadInitialHotkey()
     }
