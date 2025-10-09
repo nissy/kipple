@@ -34,7 +34,7 @@ struct EditorSettingsView: View {
                 }
                 // Editor Copy Hotkey
                 SettingsGroup("Editor Copy") {
-                    SettingsRow(label: "Hot Key") {
+                    SettingsRow(label: "Hotkey") {
                         HotkeyRecorderField(
                             keyCode: $tempCopyKeyCode,
                             modifierFlags: $tempCopyModifierFlags
@@ -44,8 +44,8 @@ struct EditorSettingsView: View {
                     }
                 }
                 // Editor Clear Hotkey
-                SettingsGroup("Editor Clear Hotkey") {
-                    SettingsRow(label: "Clear editor content") {
+                SettingsGroup("Editor Clear") {
+                    SettingsRow(label: "Hotkey") {
                         HotkeyRecorderField(
                             keyCode: $tempClearKeyCode,
                             modifierFlags: $tempClearModifierFlags
@@ -56,10 +56,10 @@ struct EditorSettingsView: View {
                 }
 
                 // Editor Insert
-                SettingsGroup("Editor Insert") {
+                SettingsGroup("Editor History Insert") {
                     SettingsRow(
-                        label: "Hot Key",
-                        description: "Use modifier + click to insert content."
+                        label: "Modified click",
+                        description: "Use modifier + click"
                     ) {
                         ModifierKeyPicker(selection: $editorInsertModifiers)
                             .frame(width: 120)

@@ -44,8 +44,7 @@ struct GeneralSettingsView: View {
                 // Global Hotkey
                 SettingsGroup("Open Kipple") {
                     SettingsRow(
-                        label: "Global Hotkey",
-                        description: "Show the main window."
+                        label: "Global Hotkey"
                     ) {
                         HotkeyRecorderField(
                             keyCode: $tempKeyCode,
@@ -96,8 +95,7 @@ struct GeneralSettingsView: View {
                     }
                     
                     SettingsRow(
-                        label: "Global Hotkey",
-                        description: "Start screen text capture."
+                        label: "Global Hotkey"
                     ) {
                         HotkeyRecorderField(
                             keyCode: $tempCaptureKeyCode,

@@ -36,10 +36,10 @@ struct DataSettingsView: View {
                 ClipboardFontSettingsView()
 
                 // Action Click
-                SettingsGroup("Action Click") {
+                SettingsGroup("Open URI") {
                     SettingsRow(
-                        label: "Shortcut",
-                        description: "Use modifier + click to open item actions."
+                        label: "Modified click",
+                        description: "Use modifier + click"
                     ) {
                         ModifierKeyPicker(selection: $actionClickModifiers)
                             .frame(width: 120)
@@ -54,8 +54,8 @@ struct DataSettingsView: View {
                 }
                 
                 // Auto-Clear Settings Section
-                SettingsGroup("Auto-Clear") {
-                    SettingsRow(label: "Enable Auto-Clear", isOn: $enableAutoClear)
+                SettingsGroup("Auto Clipboard Clear") {
+                    SettingsRow(label: "Enable Auto Clipboard Clear", isOn: $enableAutoClear)
                         .onChange(of: enableAutoClear) { _ in
                             updateAutoClearConfiguration()
                         }
