@@ -9,16 +9,14 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @AppStorage("autoLaunchAtLogin") private var autoLaunchAtLogin = false
-    @AppStorage("enableHotkey") private var enableHotkey = false
-    @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 9 // V key
-    @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags = 
-        Int(NSEvent.ModifierFlags.command.rawValue | NSEvent.ModifierFlags.option.rawValue) // CMD + Option
-    @AppStorage("enableEditorInsert") private var enableEditorInsert = true
-    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
-    @AppStorage("windowAnimation") private var windowAnimation: String = "fade"
+    @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 0
+    @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
+    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
+    @AppStorage("windowAnimation") private var windowAnimation: String = "none"
+    @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     
-    @State private var tempKeyCode: UInt16 = 9
-    @State private var tempModifierFlags: NSEvent.ModifierFlags = [.command, .option]
+    @State private var tempKeyCode: UInt16 = 0
+    @State private var tempModifierFlags: NSEvent.ModifierFlags = []
     
     var body: some View {
         ScrollView {
@@ -36,25 +34,11 @@ struct GeneralSettingsView: View {
                 
                 // Global Hotkey
                 SettingsGroup("Global Hotkey") {
-                    SettingsRow(
-                        label: "Enable global hotkey",
-                        isOn: $enableHotkey
-                    )
-                    .onChange(of: enableHotkey) { newValue in
-                        NotificationCenter.default.post(
-                            name: NSNotification.Name("HotkeySettingsChanged"),
-                            object: nil,
-                            userInfo: ["enabled": newValue]
-                        )
-                    }
-                    
                     SettingsRow(label: "Show/hide window") {
                         HotkeyRecorderField(
                             keyCode: $tempKeyCode,
                             modifierFlags: $tempModifierFlags
                         )
-                        .disabled(!enableHotkey)
-                        .opacity(enableHotkey ? 1.0 : 0.5)
                         .onChange(of: tempKeyCode) { _ in updateHotkey() }
                         .onChange(of: tempModifierFlags) { _ in updateHotkey() }
                     }
@@ -62,19 +46,24 @@ struct GeneralSettingsView: View {
                 
                 // Editor Insert
                 SettingsGroup("Editor Insert") {
-                    SettingsRow(
-                        label: "Enable quick insert",
-                        isOn: $enableEditorInsert
-                    )
-                    
                     SettingsRow(label: "Modifier key") {
                         HStack {
                             ModifierKeyPicker(selection: $editorInsertModifiers)
                                 .frame(width: 120)
-                                .disabled(!enableEditorInsert)
-                                .opacity(enableEditorInsert ? 1.0 : 0.5)
-                            
                             Text("+ click to insert")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                // Action Click
+                SettingsGroup("Action Click") {
+                    SettingsRow(label: "Modifier key") {
+                        HStack {
+                            ModifierKeyPicker(selection: $actionClickModifiers)
+                                .frame(width: 120)
+                            Text("+ click to open URI")
                                 .font(.system(size: 12))
                                 .foregroundColor(.secondary)
                         }
@@ -110,13 +99,17 @@ struct GeneralSettingsView: View {
     private func updateHotkey() {
         hotkeyKeyCode = Int(tempKeyCode)
         hotkeyModifierFlags = Int(tempModifierFlags.rawValue)
+        // Clear(= no key) の場合は無効と見なす
+        let shouldEnable = (hotkeyKeyCode != 0) && (hotkeyModifierFlags != 0)
+        UserDefaults.standard.set(shouldEnable, forKey: "enableHotkey")
         
         NotificationCenter.default.post(
             name: NSNotification.Name("HotkeySettingsChanged"),
             object: nil,
             userInfo: [
                 "keyCode": hotkeyKeyCode,
-                "modifierFlags": hotkeyModifierFlags
+                "modifierFlags": hotkeyModifierFlags,
+                "enabled": shouldEnable
             ]
         )
     }
@@ -133,6 +126,9 @@ struct ModifierKeyPicker: View {
     
     var body: some View {
         Menu {
+            Button("None") {
+                selection = 0
+            }
             Button("⌘ Command") {
                 selection = Int(NSEvent.ModifierFlags.command.rawValue)
             }
@@ -162,6 +158,7 @@ struct ModifierKeyPicker: View {
     }
     
     private var modifierKeyDisplayName: String {
+        if modifierFlags.isEmpty { return "None" }
         switch modifierFlags {
         case .command: return "⌘ Command"
         case .option: return "⌥ Option"

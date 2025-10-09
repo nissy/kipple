@@ -18,43 +18,13 @@ enum ClipItemKind: String, Codable {
 enum ClipItemCategory: String, CaseIterable {
     case all = "All"
     case url = "URL"
-    case urls = "URLs"  // Alias for compatibility
-    case email = "Email"
-    case emails = "Emails"  // Alias for compatibility
-    case code = "Code"
-    case filePath = "File"
-    case files = "Files"  // Alias for compatibility
-    case shortText = "Short"
-    case longText = "Long"
-    case numbers = "Numbers"
-    case json = "JSON"
-    case general = "General"
-    case kipple = "Kipple"
-    
+
     var icon: String {
         switch self {
         case .all:
-            return "square.grid.2x2"
-        case .url, .urls:
+            return "tag"
+        case .url:
             return "link"
-        case .email, .emails:
-            return "envelope"
-        case .code:
-            return "chevron.left.forwardslash.chevron.right"
-        case .filePath, .files:
-            return "folder"
-        case .shortText:
-            return "text.quote"
-        case .longText:
-            return "doc.text"
-        case .numbers:
-            return "number"
-        case .json:
-            return "curlybraces.square"
-        case .general:
-            return "doc"
-        case .kipple:
-            return "square.and.pencil"
         }
     }
 }
@@ -70,20 +40,24 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let bundleIdentifier: String?
     let processID: Int32?
     let isFromEditor: Bool?
+    // User-defined category
+    var userCategoryId: UUID?
     
     // パフォーマンス最適化用の静的フォーマッタ
-    private static func makeRelativeDateFormatter() -> RelativeDateTimeFormatter {
+    @MainActor
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter
-    }
+    }()
     
-    private static func makeTimestampFormatter() -> DateFormatter {
+    @MainActor
+    private static let timestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         return formatter
-    }
+    }()
     
     // Computed properties
     var fullContent: String {
@@ -103,12 +77,14 @@ struct ClipItem: Identifiable, Codable, Equatable {
         content.count
     }
     
+    @MainActor
     var timeAgo: String {
-        Self.makeRelativeDateFormatter().localizedString(for: timestamp, relativeTo: Date())
+        Self.relativeDateFormatter.localizedString(for: timestamp, relativeTo: Date())
     }
     
+    @MainActor
     var formattedTimestamp: String {
-        Self.makeTimestampFormatter().string(from: timestamp)
+        Self.timestampFormatter.string(from: timestamp)
     }
     
     var category: ClipItemCategory {
@@ -123,7 +99,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         windowTitle: String? = nil,
         bundleIdentifier: String? = nil,
         processID: Int32? = nil,
-        isFromEditor: Bool = false
+        isFromEditor: Bool = false,
+        userCategoryId: UUID? = nil
     ) {
         self.id = UUID()
         self.content = content
@@ -135,6 +112,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.bundleIdentifier = bundleIdentifier
         self.processID = processID
         self.isFromEditor = isFromEditor
+        self.userCategoryId = userCategoryId
     }
     
     init(
@@ -147,7 +125,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         windowTitle: String?,
         bundleIdentifier: String?,
         processID: Int32?,
-        isFromEditor: Bool?
+        isFromEditor: Bool?,
+        userCategoryId: UUID? = nil
     ) {
         self.id = id
         self.content = content
@@ -159,6 +138,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.bundleIdentifier = bundleIdentifier
         self.processID = processID
         self.isFromEditor = isFromEditor
+        self.userCategoryId = userCategoryId
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
@@ -171,7 +151,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         lhs.windowTitle == rhs.windowTitle &&
         lhs.bundleIdentifier == rhs.bundleIdentifier &&
         lhs.processID == rhs.processID &&
-        lhs.isFromEditor == rhs.isFromEditor
+        lhs.isFromEditor == rhs.isFromEditor &&
+        lhs.userCategoryId == rhs.userCategoryId
     }
     
     // 行数を計算
@@ -179,53 +160,33 @@ struct ClipItem: Identifiable, Codable, Equatable {
         content.components(separatedBy: .newlines).count
     }
     
-    // アクション可能かどうか
+    // アクション可能かどうか（テキストかつURIスキーム判定のみ）
     var isActionable: Bool {
-        switch category {
-        case .url, .email, .filePath:
-            return true
-        default:
-            return false
-        }
+        resolveURISchemeURL() != nil
     }
     
     // アクションタイトル
     var actionTitle: String? {
-        switch category {
-        case .url:
-            return "Open in Browser"
-        case .email:
-            return "Send Email"
-        case .filePath:
-            return "Show in Finder"
-        default:
-            return nil
+        if let scheme = resolveURISchemeURL()?.scheme?.uppercased() {
+            return "Open \(scheme)"
         }
+        return nil
     }
     
-    // アクションを実行
+    // アクションを実行（URIスキームのみ）
     func performAction() {
-        switch category {
-        case .url:
-            if let url = URL(string: content.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                NSWorkspace.shared.open(url)
-            }
-        case .email:
-            let emailString = content.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let url = URL(string: "mailto:\(emailString)") {
-                NSWorkspace.shared.open(url)
-            }
-        case .filePath:
-            let path = content.trimmingCharacters(in: .whitespacesAndNewlines)
-            let expandedPath = NSString(string: path).expandingTildeInPath
-            let fileURL = URL(fileURLWithPath: expandedPath)
-            
-            // ファイルまたはディレクトリが存在するかチェック
-            if FileManager.default.fileExists(atPath: expandedPath) {
-                NSWorkspace.shared.activateFileViewerSelecting([fileURL])
-            }
-        default:
-            break
+        guard let uri = resolveURISchemeURL() else { return }
+        NSWorkspace.shared.open(uri)
+    }
+
+    // 最初に解釈可能なURIスキームURLを返す（mailto自動付与はしない）
+    private func resolveURISchemeURL() -> URL? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 先頭にスキームがある場合
+        if trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
+           let url = URL(string: trimmed) {
+            return url
         }
+        return nil
     }
 }

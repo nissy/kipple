@@ -1,8 +1,6 @@
 import SwiftUI
 import Combine
 
-// swiftlint:disable function_body_length
-
 @available(macOS 14.0, iOS 17.0, *)
 @Observable
 @MainActor
@@ -168,18 +166,16 @@ final class ObservableMainViewModel: MainViewModelProtocol {
             insertToEditor(content: item.content)
         } else {
             clipboardService.copyToClipboard(item.content, fromEditor: false)
+            resetFiltersAfterCopy()
         }
     }
 
     private func shouldInsertToEditor() -> Bool {
-        // Check if editor insert is enabled and modifier keys are pressed
-        guard UserDefaults.standard.bool(forKey: "enableEditorInsert") else { return false }
-
         let currentModifiers = NSEvent.modifierFlags
         let requiredModifiers = NSEvent.ModifierFlags(
             rawValue: UInt(UserDefaults.standard.integer(forKey: "editorInsertModifiers"))
         )
-
+        if requiredModifiers.isEmpty { return false }
         return currentModifiers.intersection(requiredModifiers) == requiredModifiers
     }
 
@@ -239,25 +235,13 @@ final class ObservableMainViewModel: MainViewModelProtocol {
         }
 
         // Apply category filter
-        if let category = selectedCategory {
-            items = items.filter { item in
-                // Handle category aliases
-                switch (category, item.category) {
-                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
-                    return true
-                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
-                    return true
-                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
-                    return true
-                default:
-                    return item.category == category
-                }
-            }
+        if let category = selectedCategory, category != .all {
+            items = items.filter { $0.category == category }
         }
 
         // URL filter
         if showOnlyURLs {
-            items = items.filter { $0.kind == .url }
+            items = items.filter { $0.category == .url }
         }
 
         // Apply pinned filter
@@ -277,30 +261,27 @@ final class ObservableMainViewModel: MainViewModelProtocol {
             }
         }
 
-        if let category = selectedCategory {
-            nonPinnedItems = nonPinnedItems.filter { item in
-                // Handle category aliases
-                switch (category, item.category) {
-                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
-                    return true
-                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
-                    return true
-                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
-                    return true
-                default:
-                    return item.category == category
-                }
-            }
+        if let category = selectedCategory, category != .all {
+            nonPinnedItems = nonPinnedItems.filter { $0.category == category }
         }
 
         if showOnlyURLs {
-            nonPinnedItems = nonPinnedItems.filter { $0.kind == .url }
+            nonPinnedItems = nonPinnedItems.filter { $0.category == .url }
         }
 
         filteredHistory = nonPinnedItems
 
         // Update filteredItems
         filteredItems = items
+    }
+
+    private func resetFiltersAfterCopy() {
+        searchText = ""
+        showOnlyURLs = false
+        showOnlyPinned = false
+        selectedCategory = nil
+        isPinnedFilterActive = false
+        applyFilters()
     }
 
     private func showCopiedNotification() {
@@ -322,5 +303,3 @@ final class ObservableMainViewModel: MainViewModelProtocol {
         // invalidated when the object is deallocated
     }
 }
-
-// swiftlint:enable function_body_length

@@ -8,17 +8,10 @@
 import SwiftUI
 
 struct DataSettingsView: View {
-    @AppStorage("maxHistoryItems") private var maxHistoryItems = 100
-    @AppStorage("maxPinnedItems") private var maxPinnedItems = 10
+    @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
+    @AppStorage("maxPinnedItems") private var maxPinnedItems = 50
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
-    @AppStorage("filterCategoryEmail") private var filterCategoryEmail = true
-    @AppStorage("filterCategoryCode") private var filterCategoryCode = true
-    @AppStorage("filterCategoryFilePath") private var filterCategoryFilePath = true
-    @AppStorage("filterCategoryShortText") private var filterCategoryShortText = true
-    @AppStorage("filterCategoryLongText") private var filterCategoryLongText = true
-    @AppStorage("filterCategoryGeneral") private var filterCategoryGeneral = true
-    @AppStorage("filterCategoryKipple") private var filterCategoryKipple = true
-    @AppStorage("enableAutoClear") private var enableAutoClear = false
+    @AppStorage("enableAutoClear") private var enableAutoClear = true
     @AppStorage("autoClearInterval") private var autoClearInterval = 10
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
@@ -40,30 +33,10 @@ struct DataSettingsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 ClipboardFontSettingsView()
 
-                // Category Filter Settings Section
-                SettingsGroup("Category Filter Settings") {
-                    let checkboxColumns = [
-                        GridItem(.flexible(minimum: 120), alignment: .leading),
-                        GridItem(.flexible(minimum: 120), alignment: .leading)
-                    ]
-
-                    LazyVGrid(columns: checkboxColumns, alignment: .leading, spacing: 8) {
-                        Toggle("URL", isOn: $filterCategoryURL)
-                            .toggleStyle(.checkbox)
-                        Toggle("Email", isOn: $filterCategoryEmail)
-                            .toggleStyle(.checkbox)
-                        Toggle("Code", isOn: $filterCategoryCode)
-                            .toggleStyle(.checkbox)
-                        Toggle("File Path", isOn: $filterCategoryFilePath)
-                            .toggleStyle(.checkbox)
-                        Toggle("Short Text", isOn: $filterCategoryShortText)
-                            .toggleStyle(.checkbox)
-                        Toggle("Long Text", isOn: $filterCategoryLongText)
-                            .toggleStyle(.checkbox)
-                        Toggle("General", isOn: $filterCategoryGeneral)
-                            .toggleStyle(.checkbox)
-                        Toggle("Kipple", isOn: $filterCategoryKipple)
-                            .toggleStyle(.checkbox)
+                // Categories management entry (moved from Settings to Manager)
+                SettingsGroup("Categories") {
+                    SettingsRow(label: "Manage Categories") {
+                        ManageCategoriesButton()
                     }
                 }
                 

@@ -203,8 +203,38 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         // Then - Auto-clear should have been triggered
         // Note: The auto-clear implementation may not actually clear history in test environment
         // So we just verify the timer was set up and expired
-        XCTAssertNotNil(adapter.autoClearRemainingTime) // Timer may still exist
+        XCTAssertNil(adapter.autoClearRemainingTime)
         // XCTAssertTrue(adapter.history.isEmpty) // This may not work in test environment
+    }
+
+    func testAutoClearTimerRestartsAfterNewCopy() async {
+        let service = ModernClipboardService.shared
+        await service.resetForTesting()
+
+        let settings = AppSettings.shared
+        defer {
+            adapter.stopAutoClearTimer()
+        }
+        let previousEnableAutoClear = settings.enableAutoClear
+        let previousInterval = settings.autoClearInterval
+
+        settings.enableAutoClear = true
+        settings.autoClearInterval = 1
+
+        defer {
+            settings.enableAutoClear = previousEnableAutoClear
+            settings.autoClearInterval = previousInterval
+        }
+
+        adapter.copyToClipboard("Initial", fromEditor: false)
+        XCTAssertEqual(adapter.autoClearRemainingTime, 60)
+
+        adapter.startAutoClearTimer(minutes: 0)
+        try? await Task.sleep(for: .seconds(1))
+        XCTAssertNil(adapter.autoClearRemainingTime)
+
+        adapter.copyToClipboard("Restart", fromEditor: false)
+        XCTAssertEqual(adapter.autoClearRemainingTime, 60)
     }
 
     func testPeriodicRefresh() async {

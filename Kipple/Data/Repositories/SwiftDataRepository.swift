@@ -171,7 +171,8 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 windowTitle: item.windowTitle,
                 bundleId: item.bundleIdentifier,
                 processId: item.processID,
-                isFromEditor: item.isFromEditor ?? false
+                isFromEditor: item.isFromEditor ?? false,
+                userCategoryId: item.userCategoryId
             )
             context.insert(model)
         }
@@ -202,7 +203,8 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 windowTitle: item.windowTitle,
                 bundleId: item.bundleIdentifier,
                 processId: item.processID,
-                isFromEditor: item.isFromEditor ?? false
+                isFromEditor: item.isFromEditor ?? false,
+                userCategoryId: item.userCategoryId
             ))
         }
     }
@@ -231,5 +233,6 @@ private extension ClipItemModel {
         bundleId = item.bundleIdentifier
         processId = item.processID
         isFromEditor = item.isFromEditor ?? false
+        userCategoryId = item.userCategoryId
     }
 }

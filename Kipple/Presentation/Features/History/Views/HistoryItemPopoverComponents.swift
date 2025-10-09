@@ -8,8 +8,20 @@
 import SwiftUI
 
 struct ClipboardItemPopover: View {
-    let item: ClipItem
+    private let initialItem: ClipItem
+    private let itemID: UUID
+    @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var categoryStore = UserCategoryStore.shared
+
+    init(item: ClipItem) {
+        self.initialItem = item
+        self.itemID = item.id
+    }
+
+    private var item: ClipItem {
+        adapter.history.first { $0.id == itemID } ?? initialItem
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,15 +52,15 @@ struct ClipboardItemPopover: View {
     private var headerSection: some View {
         HStack {
             HStack(spacing: 6) {
-                Image(systemName: item.category.icon)
+                Image(systemName: displayCategory.icon)
                     .font(.system(size: 12))
-                Text(item.category.rawValue)
+                Text(displayCategory.name)
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Capsule().fill(categoryColor))
+            .background(Capsule().fill(displayCategory.color))
 
             Spacer()
 
@@ -105,19 +117,50 @@ struct ClipboardItemPopover: View {
         }
     }
 
-    private var categoryColor: Color {
+    private struct DisplayCategoryInfo {
+        let name: String
+        let icon: String
+        let color: Color
+    }
+
+    private var displayCategory: DisplayCategoryInfo {
+        if let categoryId = item.userCategoryId,
+           let category = categoryStore.category(id: categoryId) {
+            if let kind = categoryStore.builtInKind(for: category.id) {
+                switch kind {
+                case .none:
+                    return DisplayCategoryInfo(
+                        name: category.name,
+                        icon: categoryStore.iconName(for: category),
+                        color: .gray
+                    )
+                case .url:
+                    return DisplayCategoryInfo(
+                        name: category.name,
+                        icon: categoryStore.iconName(for: category),
+                        color: .blue
+                    )
+                }
+            } else {
+                return DisplayCategoryInfo(
+                    name: category.name,
+                    icon: categoryStore.iconName(for: category),
+                    color: Color.accentColor
+                )
+            }
+        }
+
+        // Fallback to automatic classification
         switch item.category {
-        case .all: return .gray
-        case .url, .urls: return .blue
-        case .email, .emails: return .green
-        case .code: return .purple
-        case .filePath, .files: return .orange
-        case .shortText: return .orange
-        case .longText: return .indigo
-        case .numbers: return .cyan
-        case .json: return .purple
-        case .general: return .gray
-        case .kipple: return .accentColor
+        case .url:
+            return DisplayCategoryInfo(name: "URL", icon: "link", color: .blue)
+        case .all:
+            let none = categoryStore.noneCategory()
+            return DisplayCategoryInfo(
+                name: none.name,
+                icon: categoryStore.iconName(for: none),
+                color: .gray
+            )
         }
     }
 }

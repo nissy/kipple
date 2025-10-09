@@ -16,6 +16,9 @@ struct HistoryItemView: View {
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
     let onCategoryTap: (() -> Void)?
+    // ユーザカテゴリ変更/管理
+    let onChangeCategory: ((UUID?) -> Void)?
+    let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
 
     @State private var isHovered = false
@@ -23,6 +26,8 @@ struct HistoryItemView: View {
     @State private var windowPosition: Bool?
     @State private var isScrolling = false
     @State private var currentAnchorView: NSView?
+    @State private var isActionKeyActive = false
+    @State private var flagsMonitor: Any?
 
     var body: some View {
         HoverTrackingView(content: rowContent) { hovering, anchor in
@@ -60,6 +65,19 @@ struct HistoryItemView: View {
         }
         .onDisappear {
             HistoryPopoverManager.shared.hide()
+            if let monitor = flagsMonitor {
+                NSEvent.removeMonitor(monitor)
+                flagsMonitor = nil
+            }
+        }
+        .onAppear {
+            updateActionKeyActive()
+            if flagsMonitor == nil {
+                flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                    updateActionKeyActive(with: event.modifierFlags)
+                    return event
+                }
+            }
         }
     }
 
@@ -67,14 +85,11 @@ struct HistoryItemView: View {
         ZStack {
             backgroundView
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    closePopover()
-                    onTap()
-                }
+                .onTapGesture { handleTap() }
 
             HStack(spacing: 8) {
                 pinButton
-                categoryIcon
+                categoryMenu
                 historyText
                 deleteButton
             }
@@ -109,14 +124,14 @@ struct HistoryItemView: View {
         ZStack {
             Circle()
                 .fill(pinButtonBackground)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
 
             Image(systemName: pinButtonIcon)
                 .foregroundColor(pinButtonForeground)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 10, weight: .medium))
                 .rotationEffect(.degrees(pinButtonRotation))
         }
-        .frame(width: 24, height: 24)
+        .frame(width: 22, height: 22)
         .contentShape(Circle())
         .onTapGesture {
             closePopover()
@@ -129,31 +144,28 @@ struct HistoryItemView: View {
         if item.isActionable {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.accentColor)
-                    .frame(width: 24, height: 24)
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .frame(width: 22, height: 22)
 
                 Image(systemName: item.category.icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .secondary)
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 22, height: 22)
             .contentShape(Circle())
-            .onTapGesture {
-                closePopover()
-                item.performAction()
-            }
-            .help(item.actionTitle ?? "")
+            .onTapGesture { handleTap() }
+            .help(actionHelpText)
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
                 Circle()
                     .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 24, height: 24)
+                    .frame(width: 22, height: 22)
 
                 Image(systemName: item.category.icon)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isSelected ? .white : .secondary)
             }
-            .frame(width: 24, height: 24)
+            .frame(width: 22, height: 22)
             .contentShape(Circle())
             .onTapGesture {
                 closePopover()
@@ -162,9 +174,9 @@ struct HistoryItemView: View {
             .help("「\(item.category.rawValue)」でフィルタ")
         } else {
             Image(systemName: item.category.icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(isSelected ? .white : .secondary)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
                 .background(
                     Circle()
                         .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
@@ -173,26 +185,25 @@ struct HistoryItemView: View {
     }
 
     private var historyText: some View {
-        Text(getDisplayContent())
+        let isLinkActive = isActionKeyActive && item.isActionable
+        return Text(getDisplayContent())
             .font(historyFont)
             .lineLimit(1)
             .truncationMode(.tail)
-            .foregroundColor(isSelected ? .white : .primary)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .underline(isLinkActive, color: linkColor)
+            .foregroundColor(isLinkActive ? linkColor : (isSelected ? .white : .primary))
+            .padding(.vertical, 3)
+            .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture {
-                closePopover()
-                onTap()
-            }
+            .onTapGesture { handleTap() }
     }
 
     @ViewBuilder
     private var deleteButton: some View {
         if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundColor(.secondary)
                 .contentShape(Circle())
                 .onTapGesture {
@@ -262,5 +273,100 @@ struct HistoryItemView: View {
 
     var pinButtonRotation: Double {
         item.isPinned ? 0 : -45
+    }
+}
+
+// MARK: - Category Menu
+private extension HistoryItemView {
+    @ViewBuilder
+    var categoryMenu: some View {
+        Menu(content: {
+            Button(
+                role: .none,
+                action: {
+                    let noneId = UserCategoryStore.shared.noneCategoryId()
+                    onChangeCategory?(noneId)
+                },
+                label: {
+                    Label("None", systemImage: "tag")
+                }
+            )
+            Divider()
+            ForEach(UserCategoryStore.shared.userDefined()) { cat in
+                Button {
+                    onChangeCategory?(cat.id)
+                } label: {
+                    Label(cat.name, systemImage: UserCategoryStore.shared.iconName(for: cat))
+                }
+            }
+            Divider()
+            Button("Manage Categories…") {
+                onOpenCategoryManager?()
+            }
+        }, label: {
+            let current = UserCategoryStore.shared.category(id: item.userCategoryId)
+            let iconName = current.map { UserCategoryStore.shared.iconName(for: $0) } ?? item.category.icon
+            ZStack {
+                Capsule()
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .frame(width: 36, height: 24)
+
+                Image(systemName: iconName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .secondary)
+                    .frame(width: 16, height: 16)
+            }
+        })
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .frame(width: 35, alignment: .leading)
+    }
+}
+
+// MARK: - Action helpers
+private extension HistoryItemView {
+    var linkColor: Color { Color(NSColor.linkColor) }
+
+    func handleTap() {
+        closePopover()
+        let current = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
+        let required = requiredBase.intersection(.deviceIndependentFlagsMask)
+
+        if required.isEmpty {
+            onTap()
+            return
+        }
+
+        if item.isActionable && current == required {
+            item.performAction()
+        } else {
+            onTap()
+        }
+    }
+
+    func updateActionKeyActive(with flags: NSEvent.ModifierFlags? = nil) {
+        let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
+        let required = requiredBase.intersection(.deviceIndependentFlagsMask)
+        let current = (flags ?? NSEvent.modifierFlags).intersection(.deviceIndependentFlagsMask)
+        guard !required.isEmpty else {
+            isActionKeyActive = false
+            return
+        }
+        isActionKeyActive = (current == required)
+    }
+
+    var actionHelpText: String {
+        guard item.isActionable else { return "" }
+        let required = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
+        let key: String
+        switch required {
+        case .command: key = "⌘"
+        case .option: key = "⌥"
+        case .control: key = "⌃"
+        case .shift: key = "⇧"
+        default: key = "⌘"
+        }
+        return "\(key)+Click to \(item.actionTitle ?? "Open")"
     }
 }

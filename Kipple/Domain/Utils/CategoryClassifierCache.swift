@@ -3,7 +3,7 @@
 //  Kipple
 //
 //  Lightweight in‑process cache for ClipItem category classification.
-//  Caches by content only. Editor-origin items bypass cache (always .kipple).
+//  Caches by content only.
 //
 
 import Foundation

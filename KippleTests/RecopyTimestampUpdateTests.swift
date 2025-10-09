@@ -58,6 +58,7 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
         viewModel.selectHistoryItem(oldItem)
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         let afterRecopy = Date()
@@ -96,6 +97,7 @@ final class RecopyTimestampUpdateTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         viewModel.selectHistoryItem(firstItem)
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: First item should be at top with new timestamp
@@ -152,6 +154,7 @@ final class RecopyTimestampUpdateTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         viewModel.selectHistoryItem(oldestItem)
+        try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
         // Then: Item 5 should be first with newest timestamp
@@ -183,6 +186,7 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         // When: Recopy pinned item
         let beforeRecopy = Date()
         viewModel.selectHistoryItem(pinnedItem)
+        try await Task.sleep(nanoseconds: 150_000_000)
 
         var history: [ClipItem] = []
         for _ in 0..<10 {
@@ -229,6 +233,7 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         // When: Rapidly recopy multiple times
         for _ in 1...5 {
             viewModel.selectHistoryItem(item)
+            try await Task.sleep(nanoseconds: 150_000_000)
             await service.flushPendingSaves()
 
             let history = await service.getHistory()

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
@@ -17,6 +18,7 @@ struct MainView: View {
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject private var appSettings = AppSettings.shared
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
@@ -30,24 +32,27 @@ struct MainView: View {
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
+    let onSetPreventAutoClose: ((Bool) -> Void)?
     
     // 設定値を読み込み
     
     init(
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
-        onOpenSettings: (() -> Void)? = nil
+        onOpenSettings: (() -> Void)? = nil,
+        onSetPreventAutoClose: ((Bool) -> Void)? = nil
     ) {
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
+        self.onSetPreventAutoClose = onSetPreventAutoClose
     }
 }
 
 extension MainView {
     
     private func handleItemSelection(_ item: ClipItem) {
-        if viewModel.isEditorInsertEnabled() && viewModel.shouldInsertToEditor() {
+        if viewModel.shouldInsertToEditor() {
             viewModel.insertToEditor(content: item.content)
             // エディタ挿入の場合はウィンドウを閉じない
         } else {
@@ -132,18 +137,16 @@ extension MainView {
                 )
                     .intersection(.deviceIndependentFlagsMask)
 
-                // Editor Copy Hotkey
-                if appSettings.enableEditorCopyHotkey,
-                   appSettings.editorCopyHotkeyKeyCode > 0,
+                // Editor Copy Hotkey (always enabled)
+                if appSettings.editorCopyHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
                    eventModifiers == copyModifiers {
                     confirmAction()
                     return nil
                 }
 
-                // Editor Clear Hotkey
-                if appSettings.enableEditorClearHotkey,
-                   appSettings.editorClearHotkeyKeyCode > 0,
+                // Editor Clear Hotkey (always enabled)
+                if appSettings.editorClearHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
                    eventModifiers == clearModifiers {
                     clearAction()
@@ -158,14 +161,7 @@ extension MainView {
                         return nil // イベントを消費
                     }
                 }
-                // Cmd+O でアクションを実行
-                else if event.keyCode == 31 && event.modifierFlags.contains(.command) { // O key with Cmd
-                    if let selectedItem = selectedHistoryItem,
-                       selectedItem.isActionable {
-                        selectedItem.performAction()
-                        return nil // イベントを消費
-                    }
-                }
+                // Cmd+O 実行は不要（削除）
                 return event
             }
         }
@@ -207,46 +203,52 @@ extension MainView {
         HStack(spacing: 0) {
             // 有効なフィルターを取得
             let enabledCategories = [
-                ClipItemCategory.url, .email, .code, .filePath,
-                .shortText, .longText, .general, .kipple
+                ClipItemCategory.url
             ]
                 .filter { isCategoryFilterEnabled($0) }
+            let customCategories: [UserCategory] = {
+                var list = userCategoryStore.userDefinedFilters()
+                if appSettings.filterCategoryNone {
+                    list.insert(userCategoryStore.noneCategory(), at: 0)
+                }
+                return list
+            }()
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     // ピン留めフィルター（一番上に配置）
                     Button(action: {
                         withAnimation(.spring(response: 0.3)) {
                             viewModel.togglePinnedFilter()
                         }
                     }, label: {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 3) {
                             ZStack {
                                 Circle()
                                     .fill(viewModel.isPinnedFilterActive ? 
                                         Color.accentColor : 
                                         Color.secondary.opacity(0.1))
-                                    .frame(width: 36, height: 36)
+                                    .frame(width: 30, height: 30)
                                     .shadow(
                                         color: viewModel.isPinnedFilterActive ? 
                                             Color.accentColor.opacity(0.3) : .clear,
-                                        radius: 4,
+                                        radius: 3,
                                         y: 2
                                     )
                                 
                                 Image(systemName: "pin.fill")
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(viewModel.isPinnedFilterActive ? 
                                         .white : .secondary)
                             }
                             
                             Text("Pinned")
-                                .font(.system(size: 10))
+                                .font(.system(size: 9))
                                 .foregroundColor(viewModel.isPinnedFilterActive ? 
                                     .primary : .secondary)
                                 .lineLimit(1)
                         }
-                        .frame(width: 60)
+                        .frame(width: 52)
                     })
                     .buttonStyle(PlainButtonStyle())
                     .scaleEffect(viewModel.isPinnedFilterActive ? 1.05 : 1.0)
@@ -258,42 +260,81 @@ extension MainView {
                                 viewModel.toggleCategoryFilter(category)
                             }
                         }, label: {
-                            VStack(spacing: 4) {
+                            VStack(spacing: 3) {
                                 ZStack {
                                     Circle()
                                         .fill(viewModel.selectedCategory == category ? 
                                             Color.accentColor : 
                                             Color.secondary.opacity(0.1))
-                                        .frame(width: 36, height: 36)
+                                        .frame(width: 30, height: 30)
                                         .shadow(
                                             color: viewModel.selectedCategory == category ? 
                                                 Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 4,
+                                            radius: 3,
                                             y: 2
                                         )
                                     
                                     Image(systemName: category.icon)
-                                        .font(.system(size: 16, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(viewModel.selectedCategory == category ? 
                                             .white : .secondary)
                                 }
                                 
                                 Text(category.rawValue)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 9))
                                     .foregroundColor(viewModel.selectedCategory == category ? 
                                         .primary : .secondary)
                                     .lineLimit(1)
                             }
-                            .frame(width: 60)
+                            .frame(width: 52)
                         })
                         .buttonStyle(PlainButtonStyle())
                         .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
                         .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
                     }
+                    // ユーザ定義カテゴリのフィルタ
+                    ForEach(customCategories) { cat in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                viewModel.toggleUserCategoryFilter(cat.id)
+                            }
+                        }, label: {
+                            VStack(spacing: 3) {
+                                ZStack {
+                                    Circle()
+                                        .fill(viewModel.selectedUserCategoryId == cat.id ?
+                                              Color.accentColor :
+                                              Color.secondary.opacity(0.1))
+                                        .frame(width: 30, height: 30)
+                                        .shadow(
+                                            color: viewModel.selectedUserCategoryId == cat.id ?
+                                                Color.accentColor.opacity(0.3) : .clear,
+                                            radius: 3,
+                                            y: 2
+                                        )
+
+                                    Image(systemName: cat.iconSystemName)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
+                                                         .white : .secondary)
+                                }
+
+                                Text(cat.name)
+                                    .font(.system(size: 9))
+                                    .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
+                                                     .primary : .secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 52)
+                        })
+                        .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(viewModel.selectedUserCategoryId == cat.id ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.3), value: viewModel.selectedUserCategoryId)
+                    }
                     
                     Spacer()
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.5)
                 )
@@ -316,6 +357,16 @@ extension MainView {
                 onCategoryFilter: { category in
                     viewModel.toggleCategoryFilter(category)
                 },
+                onChangeUserCategory: { item, catId in
+                    Task { @MainActor in
+                        var updated = item
+                        updated.userCategoryId = catId
+                        if let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter {
+                            await adapter.updateItem(updated)
+                        }
+                    }
+                },
+                onOpenCategoryManager: { presentCategoryManager() },
                 selectedCategory: $viewModel.selectedCategory,
                 initialSearchText: viewModel.searchText,
                 onSearchTextChanged: { text in
@@ -329,7 +380,7 @@ extension MainView {
             .id(historyRefreshID)
         }
     }
-    
+
     // 下部バー
     @ViewBuilder
     private var bottomBar: some View {
@@ -499,26 +550,8 @@ extension MainView {
         switch category {
         case .all:
             return true // All is always enabled
-        case .url, .urls:
+        case .url:
             return appSettings.filterCategoryURL
-        case .email, .emails:
-            return appSettings.filterCategoryEmail
-        case .code:
-            return appSettings.filterCategoryCode
-        case .filePath, .files:
-            return appSettings.filterCategoryFilePath
-        case .shortText:
-            return appSettings.filterCategoryShortText
-        case .longText:
-            return appSettings.filterCategoryLongText
-        case .numbers:
-            return true // Numbers doesn't have a specific setting
-        case .json:
-            return true // JSON doesn't have a specific setting
-        case .general:
-            return appSettings.filterCategoryGeneral
-        case .kipple:
-            return appSettings.filterCategoryKipple
         }
     }
     
@@ -532,10 +565,19 @@ extension MainView {
             return String(format: "00:%02d", seconds)
         }
     }
-    
+
     private func clearSystemClipboard() {
         Task {
             await viewModel.clipboardService.clearSystemClipboard()
         }
+    }
+
+    private func presentCategoryManager() {
+        let anchor = NSApp.keyWindow
+        CategoryManagerWindowCoordinator.shared.open(
+            relativeTo: anchor,
+            onOpen: { onSetPreventAutoClose?(true) },
+            onClose: { onSetPreventAutoClose?(false) }
+        )
     }
 }

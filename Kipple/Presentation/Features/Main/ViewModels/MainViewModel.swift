@@ -40,6 +40,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
     @Published var selectedCategory: ClipItemCategory?
+    @Published var selectedUserCategoryId: UUID?
     @Published var isPinnedFilterActive: Bool = false
     
     // 現在のクリップボードコンテンツを公開
@@ -133,6 +134,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     func copyToClipboard(_ item: ClipItem) {
         clipboardService.copyToClipboard(item.content, fromEditor: false)
+        resetFiltersAfterCopy()
     }
 
     func clearHistory(keepPinned: Bool) async {
@@ -173,26 +175,21 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
         }
 
-        // Apply category filter with alias handling
-        if let category = selectedCategory {
-            filtered = filtered.filter { item in
-                // Handle category aliases
-                switch (category, item.category) {
-                case (.url, .url), (.url, .urls), (.urls, .url), (.urls, .urls):
-                    return true
-                case (.email, .email), (.email, .emails), (.emails, .email), (.emails, .emails):
-                    return true
-                case (.filePath, .filePath), (.filePath, .files), (.files, .filePath), (.files, .files):
-                    return true
-                default:
-                    return item.category == category
-                }
+        // Apply category filter (built-in) or user-defined (exclusive)
+        if let userCatId = selectedUserCategoryId {
+            let noneId = UserCategoryStore.shared.noneCategoryId()
+            if userCatId == noneId {
+                filtered = filtered.filter { $0.userCategoryId == nil || $0.userCategoryId == userCatId }
+            } else {
+                filtered = filtered.filter { $0.userCategoryId == userCatId }
             }
+        } else if let category = selectedCategory, category != .all {
+            filtered = filtered.filter { $0.category == category }
         }
 
         // URL filter
         if showOnlyURLs {
-            filtered = filtered.filter { $0.kind == .url }
+            filtered = filtered.filter { $0.category == .url }
         }
 
         // Apply pinned filter
@@ -267,11 +264,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         editorText = content
     }
     
-    /// エディタ挿入機能が有効かチェック
-    func isEditorInsertEnabled() -> Bool {
-        return UserDefaults.standard.bool(forKey: "enableEditorInsert")
-    }
-    
     /// 設定された修飾キーを取得
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
         let rawValue = UserDefaults.standard.integer(forKey: "editorInsertModifiers")
@@ -280,11 +272,10 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 現在の修飾キーがエディタ挿入用かチェック
     func shouldInsertToEditor() -> Bool {
-        guard isEditorInsertEnabled() else { return false }
-        
         let currentModifiers = NSEvent.modifierFlags
         let requiredModifiers = getEditorInsertModifiers()
-        
+        // None(=0) のときは無効
+        if requiredModifiers.isEmpty { return false }
         // 必要な修飾キーがすべて押されているかチェック
         return currentModifiers.intersection(requiredModifiers) == requiredModifiers
     }
@@ -295,6 +286,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             insertToEditor(content: item.content)
         } else {
             clipboardService.recopyFromHistory(item)
+            resetFiltersAfterCopy()
         }
     }
     
@@ -303,12 +295,15 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         if category == .all {
             // "All" カテゴリはフィルタをクリア
             selectedCategory = nil
+            selectedUserCategoryId = nil
         } else if selectedCategory == category {
             selectedCategory = nil
         } else {
             selectedCategory = category
             // ピンフィルターをクリア
             isPinnedFilterActive = false
+            // ユーザカテゴリフィルタは排他
+            selectedUserCategoryId = nil
         }
         // フィルタを適用
         updateFilteredItems(clipboardService.history)
@@ -320,8 +315,31 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         // カテゴリフィルタをクリア
         if isPinnedFilterActive {
             selectedCategory = nil
+            selectedUserCategoryId = nil
         }
         // フィルタを適用
+        updateFilteredItems(clipboardService.history)
+    }
+
+    /// ユーザカテゴリフィルタの切り替え（内製カテゴリとは排他）
+    func toggleUserCategoryFilter(_ id: UUID) {
+        if selectedUserCategoryId == id {
+            selectedUserCategoryId = nil
+        } else {
+            selectedUserCategoryId = id
+            selectedCategory = nil
+            isPinnedFilterActive = false
+        }
+        updateFilteredItems(clipboardService.history)
+    }
+
+    private func resetFiltersAfterCopy() {
+        searchText = ""
+        showOnlyURLs = false
+        showOnlyPinned = false
+        selectedCategory = nil
+        selectedUserCategoryId = nil
+        isPinnedFilterActive = false
         updateFilteredItems(clipboardService.history)
     }
 }

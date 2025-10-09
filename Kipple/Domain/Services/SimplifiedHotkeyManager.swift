@@ -16,6 +16,7 @@ final class SimplifiedHotkeyManager {
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
     private var isEnabled: Bool = true
+    private var startGeneration: UInt64 = 0
     private var hasInputMonitoringPermission = false
     private var hotKeyRef: EventHotKeyRef?
     @MainActor private static var hotKeyEventHandler: EventHandlerRef?
@@ -122,9 +123,17 @@ final class SimplifiedHotkeyManager {
         // Ensure previous monitors are removed before creating new ones
         stopMonitoring()
 
+        // Bump generation to invalidate any pending tasks
+        startGeneration &+= 1
+        let currentGen = startGeneration
+
         // Add small delay to ensure cleanup is complete
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            // Abort if state changed while queued
+            guard self.isEnabled, currentGen == self.startGeneration else { return }
+            // Abort if cleared
+            guard self.keyCode != 0, !self.modifiers.isEmpty else { return }
 
             if !self.isRunningTests && self.registerHotKey() {
                 return
@@ -142,7 +151,8 @@ final class SimplifiedHotkeyManager {
                 // Return nil to consume the event if it matches our hotkey
                 let eventKeyCode = event.keyCode
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                if eventKeyCode == self.keyCode && eventModifiers == self.modifiers {
+                if self.keyCode != 0, !self.modifiers.isEmpty,
+                   eventKeyCode == self.keyCode && eventModifiers == self.modifiers {
                     return nil
                 }
                 return event
@@ -190,6 +200,8 @@ final class SimplifiedHotkeyManager {
 
     @MainActor
     private func registerHotKey() -> Bool {
+        // Do not register for empty/cleared values
+        guard keyCode != 0, !modifiers.isEmpty else { return false }
         installHotKeyHandlerIfNeeded()
 
         var id = EventHotKeyID(signature: SimplifiedHotkeyManager.hotKeySignature, id: 1)
@@ -234,9 +246,13 @@ final class SimplifiedHotkeyManager {
             modifiers = NSEvent.ModifierFlags(rawValue: savedModifiers)
         }
 
+        // If either keyCode or modifiers are cleared, treat as disabled regardless of saved flag
+        let cleared = (keyCode == 0) || modifiers.isEmpty
         if let savedEnabled = (UserDefaults.standard.object(forKey: "enableHotkey")
             ?? UserDefaults.standard.object(forKey: "KippleHotkeyEnabled")) as? Bool {
-            isEnabled = savedEnabled
+            isEnabled = savedEnabled && !cleared
+        } else {
+            isEnabled = !cleared
         }
     }
 
@@ -268,10 +284,32 @@ final class SimplifiedHotkeyManager {
             name: NSNotification.Name("EditorHotkeySettingsChanged"),
             object: nil
         )
+
+        // Suspend/resume during recording in UI to avoid event consumption
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSuspendRecording),
+            name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleResumeRecording),
+            name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+            object: nil
+        )
     }
 
     @objc private func handleHotkeySettingsChanged() {
         // Reload settings from UserDefaults and re-register
+        refreshHotkeys()
+    }
+
+    @objc private func handleSuspendRecording() {
+        stopMonitoring()
+    }
+
+    @objc private func handleResumeRecording() {
         refreshHotkeys()
     }
 

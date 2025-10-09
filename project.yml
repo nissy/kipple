@@ -37,6 +37,7 @@ targets:
         includes:
           - "**/*.xcassets"
           - "**/*.xcdatamodeld"
+          - "**/*.xcprivacy"
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

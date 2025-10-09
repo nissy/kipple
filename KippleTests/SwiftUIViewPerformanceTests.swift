@@ -69,7 +69,7 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
         // When: Multiple rapid updates
         viewModel.searchText = "test"
         viewModel.showOnlyURLs = true
-        viewModel.selectedCategory = .code
+        viewModel.selectedCategory = .all
 
         // Allow time for debouncing
         try? await Task.sleep(nanoseconds: 100_000_000)
@@ -96,6 +96,8 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     onTogglePin: {},
                     onDelete: {},
                     onCategoryTap: {},
+                    onChangeCategory: { _ in },
+                    onOpenCategoryManager: {},
                     historyFont: .system(size: 13)
                 )
             }

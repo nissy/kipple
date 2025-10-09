@@ -85,14 +85,9 @@ Kipple は macOS 向けのクリップボードマネージャーアプリケー
 ### 6. カテゴリ分類機能
 コンテンツに基づいて自動分類：
 
-- **URL**: HTTPスキーマまたはドメイン形式（例: example.com）
-- **Email**: メールアドレス形式
-- **Code**: プログラミング言語の構文を含む
-- **File Path**: ファイルパス形式（Unix/Windows対応）
-- **Short Text**: 50文字以下
-- **Long Text**: 1000文字以上
-- **General**: 51-999文字で他カテゴリに該当しない
-- **Kipple**: エディターからコピーされたテキスト
+- **URL**: HTTP/FTP/fileスキーマ、またはドメイン形式（例: example.com）
+- **Short Text**: 非URLかつ200文字以下のテキスト
+- **Long Text**: 非URLかつ200文字を超えるテキスト
 
 ### 7. フィルタリング機能
 - **カテゴリフィルター**: 
@@ -129,8 +124,7 @@ Kipple は macOS 向けのクリップボードマネージャーアプリケー
 
 #### アクション実行（アクション可能カテゴリのみ）
 - **URL**: ブラウザで開く
-- **Email**: メールクライアントで新規作成
-- **File Path**: Finderで表示
+- **Short/Long Text**: アクションなし
 - **実行方法**: カテゴリアイコンクリックまたはEnterキー
 
 #### ポップオーバー表示
@@ -180,7 +174,7 @@ Kipple は macOS 向けのクリップボードマネージャーアプリケー
 
 #### Clipboard（データ設定）
 - **履歴フォント設定**: ClipboardFontSettingsView
-- **Category Filter Settings**: 各カテゴリの表示/非表示
+- **Category Filter Settings**: URL / Short Text / Long Text の表示/非表示
 - **Storage Limits**:
   - Maximum History Items: 10-1000
   - Maximum Pinned Items: 1-100

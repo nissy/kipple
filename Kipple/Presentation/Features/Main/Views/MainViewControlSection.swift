@@ -18,9 +18,10 @@ struct MainViewControlSection: View {
                 HStack(spacing: 4) {
                     Label("Copy", systemImage: "doc.on.doc")
                     
-                    // ショートカットキー表示
-                    if appSettings.enableEditorCopyHotkey {
-                        Text(getShortcutKeyDisplay())
+                    // ショートカットキー表示（設定なし=非表示）
+                    let shortcut = getShortcutKeyDisplay()
+                    if !shortcut.isEmpty {
+                        Text(shortcut)
                             .font(.caption)
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
@@ -31,7 +32,6 @@ struct MainViewControlSection: View {
                 }
             }
             .buttonStyle(ProminentButtonStyle())
-            .keyboardShortcut(.return, modifiers: .command)
             .fixedSize()
             
             Spacer()
@@ -40,9 +40,10 @@ struct MainViewControlSection: View {
                 HStack(spacing: 4) {
                     Label("Clear", systemImage: "trash")
                     
-                    // ショートカットキー表示
-                    if appSettings.enableEditorClearHotkey {
-                        Text(getClearShortcutKeyDisplay())
+                    // ショートカットキー表示（設定なし=非表示）
+                    let shortcut = getClearShortcutKeyDisplay()
+                    if !shortcut.isEmpty {
+                        Text(shortcut)
                             .font(.caption)
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
@@ -53,7 +54,6 @@ struct MainViewControlSection: View {
                 }
             }
             .buttonStyle(DestructiveButtonStyle())
-            .keyboardShortcut(.delete, modifiers: .command)
             .fixedSize()
         }
         .padding(.horizontal, 12)
@@ -61,6 +61,11 @@ struct MainViewControlSection: View {
     }
     
     private func getShortcutKeyDisplay() -> String {
+        // 設定なし（keyまたは修飾が0）の場合は非表示
+        if appSettings.editorCopyHotkeyKeyCode == 0 || appSettings.editorCopyHotkeyModifierFlags == 0 {
+            return ""
+        }
+
         let modifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags))
         var parts: [String] = []
         
@@ -80,7 +85,8 @@ struct MainViewControlSection: View {
     private func keyCodeToString(_ keyCode: UInt16) -> String? {
         // 一般的なキーコードのマッピング
         let keyMap: [UInt16: String] = [
-            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
+            // 0 は未設定を意味するため文字を返さない
+            1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
             8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
             16: "Y", 17: "T", 18: "1", 19: "2", 20: "3", 21: "4", 22: "6",
             23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
@@ -88,11 +94,16 @@ struct MainViewControlSection: View {
             38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",", 44: "/",
             45: "N", 46: "M", 47: ".", 50: "`"
         ]
-        
+        if keyCode == 0 { return nil }
         return keyMap[keyCode]
     }
     
     private func getClearShortcutKeyDisplay() -> String {
+        // 設定なし（keyまたは修飾が0）の場合は非表示
+        if appSettings.editorClearHotkeyKeyCode == 0 || appSettings.editorClearHotkeyModifierFlags == 0 {
+            return ""
+        }
+
         let modifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorClearHotkeyModifierFlags))
         var parts: [String] = []
         

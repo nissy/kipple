@@ -14,6 +14,7 @@ final class ClipItemModel {
     var bundleId: String?
     var processId: Int32?
     var isFromEditor: Bool
+    var userCategoryId: UUID?
 
     init(
         id: UUID = UUID(),
@@ -25,7 +26,8 @@ final class ClipItemModel {
         windowTitle: String? = nil,
         bundleId: String? = nil,
         processId: Int32? = nil,
-        isFromEditor: Bool = false
+        isFromEditor: Bool = false,
+        userCategoryId: UUID? = nil
     ) {
         self.id = id
         self.content = content
@@ -37,6 +39,7 @@ final class ClipItemModel {
         self.bundleId = bundleId
         self.processId = processId
         self.isFromEditor = isFromEditor
+        self.userCategoryId = userCategoryId
     }
 
     convenience init(from clipItem: ClipItem) {
@@ -50,7 +53,8 @@ final class ClipItemModel {
             windowTitle: clipItem.windowTitle,
             bundleId: clipItem.bundleIdentifier,
             processId: clipItem.processID,
-            isFromEditor: clipItem.isFromEditor ?? false
+            isFromEditor: clipItem.isFromEditor ?? false,
+            userCategoryId: clipItem.userCategoryId
         )
     }
 
@@ -65,7 +69,8 @@ final class ClipItemModel {
             windowTitle: windowTitle,
             bundleIdentifier: bundleId,
             processID: processId,
-            isFromEditor: isFromEditor
+            isFromEditor: isFromEditor,
+            userCategoryId: userCategoryId
         )
     }
 

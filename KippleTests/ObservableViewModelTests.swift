@@ -103,7 +103,7 @@ final class ObservableMainViewModelTests: XCTestCase, @unchecked Sendable {
         await viewModel.refreshItems()
 
         // When
-        await viewModel.setSelectedCategory(.urls)
+        await viewModel.setSelectedCategory(.url)
 
         // Then
         let filtered = await viewModel.filteredItems
@@ -355,7 +355,7 @@ final class ObservableMainViewModelTests: XCTestCase, @unchecked Sendable {
             }
 
             // Concurrent category changes
-            for category in [ClipItemCategory.url, .email, .code] {
+            for category in [ClipItemCategory.url, .all] {
                 group.addTask {
                     await viewModel.setSelectedCategory(category)
                 }

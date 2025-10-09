@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import Combine
 
-// swiftlint:disable type_body_length
+// swiftlint:disable type_body_length file_length
 
 extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
@@ -29,6 +29,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private let saveSubject = PassthroughSubject<[ClipItem], Never>()
     private var saveCancellable: AnyCancellable?
     private var persistedSnapshot: [UUID: ClipItem] = [:]
+    private var snapshotNeedsPriming = false
 
     // MARK: - Singleton
 
@@ -65,6 +66,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
         persistedSnapshot = [:]
+        snapshotNeedsPriming = false
     }
 
     private func setupSavePipeline() {
@@ -82,23 +84,73 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard let repository = repository else { return }
 
         do {
-            // Load all items first (repository may have more than current limit)
-            let items = try await repository.load(limit: 1000)
-            history = items
-            Logger.shared.log("Loaded \(items.count) items from repository")
+            let pinnedItems = try await repository.loadPinned()
+            history = pinnedItems
 
-            // Apply current user's limit setting
-            trimHistory()
-            Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
+            if !pinnedItems.isEmpty {
+                Logger.shared.log("Loaded \(pinnedItems.count) pinned items from repository")
+                notifyHistoryObservers()
+            }
 
-            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
+            let fetchLimit = await initialLoadLimit(pinnedCount: pinnedItems.count)
+            Logger.shared.debug("Initial history load limit set to \(fetchLimit) entries")
+
+            async let allItemsTask = repository.load(limit: fetchLimit)
+            let loadedItems = try await allItemsTask
+
+            let pinnedIDSet = Set(pinnedItems.map { $0.id })
+            let loadedByID = Dictionary(uniqueKeysWithValues: loadedItems.map { ($0.id, $0) })
+
+            var combinedItems: [ClipItem] = []
+            combinedItems.reserveCapacity(loadedItems.count + pinnedItems.count)
+
+            for pinned in pinnedItems {
+                if let refreshed = loadedByID[pinned.id] {
+                    combinedItems.append(refreshed)
+                } else {
+                    combinedItems.append(pinned)
+                }
+            }
+
+            for item in loadedItems where !pinnedIDSet.contains(item.id) {
+                combinedItems.append(item)
+            }
+
+            history = combinedItems
+            let wasTrimmed = trimHistory()
+
+            if wasTrimmed {
+                Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
+            } else {
+                Logger.shared.log("Loaded \(history.count) items from repository (max: \(maxHistoryItems))")
+            }
+
+            snapshotNeedsPriming = true
+            saveSubject.send(history)
+            notifyHistoryObservers()
         } catch {
             Logger.shared.error("Failed to load history: \(error)")
         }
     }
 
+    private func initialLoadLimit(pinnedCount: Int) async -> Int {
+        let configuredPinned = await MainActor.run {
+            AppSettings.shared.maxPinnedItems
+        }
+        let headroom = 10
+        let pinnedAllowance = max(configuredPinned, pinnedCount)
+        let computedLimit = maxHistoryItems + pinnedAllowance + headroom
+        return max(computedLimit, pinnedCount)
+    }
+
     private func persistHistoryDiff(_ items: [ClipItem]) async {
         guard let repository = repository else { return }
+
+        if snapshotNeedsPriming || persistedSnapshot.isEmpty {
+            persistedSnapshot = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+            snapshotNeedsPriming = false
+            return
+        }
 
         let previousSnapshot = persistedSnapshot
         let currentSnapshot = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
@@ -171,13 +223,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
 
         // Add to history immediately with metadata
+        let monitoringState = isMonitoringFlag
+        let metadata = fromEditor ? appInfo : await MainActor.run { sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState) }
         let item = ClipItem(
             content: content,
             isPinned: false,
-            sourceApp: fromEditor ? "Kipple" : appInfo.appName,
-            windowTitle: fromEditor ? "Quick Editor" : appInfo.windowTitle,
-            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
-            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
+            kind: determineKind(for: content, isFromEditor: fromEditor),
+            sourceApp: fromEditor ? "Kipple" : metadata.appName,
+            windowTitle: fromEditor ? "Quick Editor" : metadata.windowTitle,
+            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
+            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
             isFromEditor: fromEditor
         )
         addToHistory(item)
@@ -206,10 +261,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Check if an item with same content exists and preserve its pin state
         if let existingIndex = history.firstIndex(where: { $0.content == item.content }) {
             let existingItem = history[existingIndex]
-            // Preserve pin state from existing item
-            if existingItem.isPinned {
-                newItem.isPinned = true
-            }
+            // Preserve pin state and user category from existing item
+            if existingItem.isPinned { newItem.isPinned = true }
+            newItem.userCategoryId = existingItem.userCategoryId
             // Remove the existing item
             history.remove(at: existingIndex)
         }
@@ -405,60 +459,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         guard changeCount != lastChangeCount else { return }
 
-        // Check if this changeCount is from an expected internal operation
-        let expectedChangeCount = await state.getExpectedChangeCount()
-        if let expected = expectedChangeCount, changeCount == expected {
-            // This is the internal operation we were expecting, skip it
-            lastChangeCount = changeCount
-            await state.setExpectedChangeCount(nil)
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
-            return
-        }
-
-        let isInternalCopy = await state.getInternalCopy()
-        if isInternalCopy && expectedChangeCount == nil {
-            lastChangeCount = changeCount
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
-            return
-        }
-
-        // Clear any stale expected count if we've moved past it
-        if let expected = expectedChangeCount, changeCount > expected {
-            await state.setExpectedChangeCount(nil)
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
-        }
+        if await shouldSkipChange(for: changeCount) { return }
 
         lastChangeCount = changeCount
 
         // Get clipboard content
-        if let content = await MainActor.run(body: {
-            NSPasteboard.general.string(forType: .string)
-        }), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            // Get app info for metadata
-            let appInfo = await MainActor.run {
-                getActiveAppInfo()
-            }
+        guard let item = await fetchClipboardItem() else { return }
 
-            let isFromEditor = await state.getFromEditor()
-            let item = ClipItem(
-                content: content,
-                sourceApp: isFromEditor ? "Kipple" : appInfo.appName,
-                windowTitle: isFromEditor ? "Quick Editor" : appInfo.windowTitle,
-                bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : appInfo.bundleId,
-                processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : appInfo.pid,
-                isFromEditor: isFromEditor
-            )
-
-            // Always add to history - addToHistory handles duplicates by moving them to top
-            addToHistory(item)
-            lastEventTime = Date()
-        } else {
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
-        }
+        // Always add to history - addToHistory handles duplicates by moving them to top
+        addToHistory(item)
+        lastEventTime = Date()
 
         // Reset flags
         await state.setFromEditor(false)
@@ -469,10 +479,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         var newItem = item
         if let existingIndex = history.firstIndex(where: { $0.content == item.content }) {
             let existingItem = history[existingIndex]
-            // Preserve pin state and other metadata from existing item
-            if existingItem.isPinned {
-                newItem.isPinned = true
-            }
+            // Preserve pin state and user-assigned category from existing item
+            if existingItem.isPinned { newItem.isPinned = true }
+            newItem.userCategoryId = existingItem.userCategoryId
             // Remove the existing item
             history.remove(at: existingIndex)
         }
@@ -486,6 +495,66 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Trigger save
         saveSubject.send(history)
         notifyHistoryObservers()
+    }
+
+    private func shouldSkipChange(for changeCount: Int) async -> Bool {
+        let expectedChangeCount = await state.getExpectedChangeCount()
+        if let expected = expectedChangeCount, changeCount == expected {
+            lastChangeCount = changeCount
+            await state.setExpectedChangeCount(nil)
+            await state.setInternalCopy(false)
+            await state.setFromEditor(false)
+            return true
+        }
+
+        let isInternalCopy = await state.getInternalCopy()
+        if isInternalCopy && expectedChangeCount == nil {
+            lastChangeCount = changeCount
+            await state.setInternalCopy(false)
+            await state.setFromEditor(false)
+            return true
+        }
+
+        if let expected = expectedChangeCount, changeCount > expected {
+            await state.setExpectedChangeCount(nil)
+            await state.setInternalCopy(false)
+            await state.setFromEditor(false)
+        }
+
+        return false
+    }
+
+    private func fetchClipboardItem() async -> ClipItem? {
+        guard let content = await MainActor.run(body: {
+            NSPasteboard.general.string(forType: .string)
+        }), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            if await state.getInternalCopy() {
+                return nil
+            }
+            await state.setInternalCopy(false)
+            await state.setFromEditor(false)
+            return nil
+        }
+
+        let appInfo = await MainActor.run {
+            getActiveAppInfo()
+        }
+
+        let isFromEditor = await state.getFromEditor()
+        let monitoringState = isMonitoringFlag
+        let metadata = isFromEditor ? appInfo : await MainActor.run {
+            sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState)
+        }
+
+        return ClipItem(
+            content: content,
+            kind: determineKind(for: content, isFromEditor: isFromEditor),
+            sourceApp: isFromEditor ? "Kipple" : metadata.appName,
+            windowTitle: isFromEditor ? "Quick Editor" : metadata.windowTitle,
+            bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
+            processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
+            isFromEditor: isFromEditor
+        )
     }
 
     // MARK: - Flush Pending Saves
@@ -517,6 +586,34 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             windowTitle: windowTitle,
             bundleId: appInfo.bundleId,
             pid: appInfo.pid
+        )
+    }
+
+    @MainActor
+    private func sanitizeExternalAppInfo(_ info: ActiveAppInfo, isMonitoring: Bool) -> ActiveAppInfo {
+        let bundleIdentifier = Bundle.main.bundleIdentifier
+        let isKipple = info.bundleId == bundleIdentifier || info.appName == "Kipple"
+        guard isKipple else { return info }
+
+        let fallback = LastActiveAppTracker.shared.getSourceAppInfo()
+        if fallback.bundleId != bundleIdentifier && fallback.name != "Kipple" {
+            let title = getWindowTitle(for: fallback.pid)
+            return ActiveAppInfo(
+                appName: fallback.name,
+                windowTitle: title,
+                bundleId: fallback.bundleId,
+                pid: fallback.pid
+            )
+        }
+
+        guard isMonitoring else { return info }
+
+        let syntheticPid = info.pid == 0 ? -1 : info.pid
+        return ActiveAppInfo(
+            appName: info.appName == "Kipple" ? "External Source" : info.appName,
+            windowTitle: info.windowTitle,
+            bundleId: info.bundleId == bundleIdentifier ? "external.app" : info.bundleId,
+            pid: syntheticPid
         )
     }
 
@@ -615,6 +712,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private func stopAppSwitchObserver() async {
         // Cleanup if needed
     }
+
+    private func determineKind(for content: String, isFromEditor: Bool) -> ClipItemKind {
+        let category = CategoryClassifier.shared.classify(content: content, isFromEditor: isFromEditor)
+        switch category {
+        case .url:
+            return .url
+        case .all:
+            return .text
+        }
+    }
 }
 
 #if DEBUG
@@ -622,6 +729,16 @@ extension ModernClipboardService {
     func reloadHistoryForTesting() async {
         await initializeRepository()
         await loadHistoryFromRepository()
+    }
+
+    func clearRepositoryForTesting() async {
+        guard let repository else { return }
+        do {
+            try await repository.clear()
+            persistedSnapshot = [:]
+        } catch {
+            Logger.shared.error("Failed to clear repository: \(error)")
+        }
     }
 }
 #endif

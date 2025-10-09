@@ -126,7 +126,7 @@ final class AppInfoTests: XCTestCase {
     }
     
     func testEditorCopyWithAppInfo() {
-        // SPECS.md: エディターからのコピーはKippleカテゴリ
+        // Editor-origin items now use length-based categories
         mockClipboardService.startMonitoring()
         
         let uuid = UUID().uuidString
@@ -140,7 +140,7 @@ final class AppInfoTests: XCTestCase {
             if let item = self.mockClipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertEqual(item.sourceApp, "Kipple", "Editor copy should have 'Kipple' as source app")
                 XCTAssertEqual(item.windowTitle, "Quick Editor")
-                XCTAssertEqual(item.category, .kipple)
+                XCTAssertEqual(item.category, .all)
                 XCTAssertTrue(item.isFromEditor ?? false)
                 XCTAssertNotNil(item.bundleIdentifier)
                 XCTAssertEqual(item.bundleIdentifier, Bundle.main.bundleIdentifier)

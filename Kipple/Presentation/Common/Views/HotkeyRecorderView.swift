@@ -14,7 +14,7 @@ struct HotkeyRecorderView: NSViewRepresentable {
     
     func makeNSView(context: Context) -> NSTextField {
         let textField = NSTextField()
-        textField.placeholderString = "Click to record hotkey"
+        textField.placeholderString = "None"
         textField.alignment = .center
         textField.isEditable = false
         textField.isSelectable = false
@@ -35,7 +35,7 @@ struct HotkeyRecorderView: NSViewRepresentable {
         
         if keyCode == 0 && modifierFlagsValue.isEmpty {
             textField.stringValue = ""
-            textField.placeholderString = "Click to record hotkey"
+            textField.placeholderString = "None"
             return
         }
         
@@ -111,12 +111,20 @@ struct HotkeyRecorderField: View {
                 )
                 .onTapGesture {
                     isRecording = true
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+                        object: nil
+                    )
                 }
-            
+
             Button("Clear") {
                 keyCode = 0
                 modifierFlags = .init()
                 isRecording = false
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+                    object: nil
+                )
             }
             .buttonStyle(.borderless)
             .font(.system(size: 12))
@@ -127,6 +135,14 @@ struct HotkeyRecorderField: View {
             .cornerRadius(4)
         }
         .background(KeyEventHandler(isRecording: $isRecording, keyCode: $keyCode, modifierFlags: $modifierFlags))
+        .onChange(of: isRecording) { recording in
+            if !recording {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+                    object: nil
+                )
+            }
+        }
     }
 }
 
@@ -142,6 +158,7 @@ struct KeyEventHandler: NSViewRepresentable {
                 keyCode = event.keyCode
                 modifierFlags = event.modifierFlags.intersection([.command, .control, .option, .shift])
                 isRecording = false
+                NotificationCenter.default.post(name: NSNotification.Name("ResumeGlobalHotkeyCapture"), object: nil)
                 return true
             }
             return false
@@ -162,9 +179,13 @@ class KeyCaptureView: NSView {
         didSet {
             if isActive {
                 window?.makeFirstResponder(self)
+                installLocalMonitor()
+            } else {
+                removeLocalMonitor()
             }
         }
     }
+    private var localMonitor: Any?
     
     override var acceptsFirstResponder: Bool { true }
     
@@ -173,5 +194,27 @@ class KeyCaptureView: NSView {
             return
         }
         super.keyDown(with: event)
+    }
+
+    private func installLocalMonitor() {
+        guard localMonitor == nil else { return }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return event }
+            if self.isActive, self.onKeyDown?(event) == true {
+                return nil // consume
+            }
+            return event
+        }
+    }
+
+    private func removeLocalMonitor() {
+        if let m = localMonitor {
+            NSEvent.removeMonitor(m)
+            localMonitor = nil
+        }
+    }
+
+    deinit {
+        removeLocalMonitor()
     }
 }
