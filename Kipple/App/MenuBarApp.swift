@@ -14,6 +14,18 @@ final class MenuBarApp: NSObject, ObservableObject {
     internal let clipboardService: any ClipboardServiceProtocol
     internal let windowManager = WindowManager()
     internal var hotkeyManager: Any
+    private let screenCaptureStatusItem = NSMenuItem()
+    private lazy var textRecognitionService: any TextRecognitionServiceProtocol =
+        TextRecognitionServiceProvider.resolve()
+    private lazy var textCaptureCoordinator: TextCaptureCoordinator = {
+        TextCaptureCoordinator(
+            clipboardService: clipboardService,
+            textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+    }()
+    private var textCaptureHotkeyManager: TextCaptureHotkeyManager?
+    private var textCaptureHotkeyObserver: NSObjectProtocol?
     
     // 非同期終了処理用のプロパティ
     private var isTerminating = false
@@ -54,8 +66,10 @@ final class MenuBarApp: NSObject, ObservableObject {
         NSApplication.shared.delegate = self
 
         DispatchQueue.main.async { [weak self] in
-            self?.setupMenuBar()
-            self?.startServices()
+            guard let self else { return }
+            self.setupMenuBar()
+            self.setupTextCaptureHotkey()
+            self.startServices()
         }
     }
     
@@ -82,10 +96,12 @@ final class MenuBarApp: NSObject, ObservableObject {
     
     private func createMenu() -> NSMenu {
         let menu = NSMenu()
+        menu.delegate = self
         
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Open Kipple", action: #selector(openMainWindow), keyEquivalent: ""))
+        menu.addItem(screenCaptureMenuItem())
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openPreferences), keyEquivalent: ","))
@@ -94,6 +110,7 @@ final class MenuBarApp: NSObject, ObservableObject {
 
         menu.items.forEach { $0.target = self }
 
+        updateScreenCaptureMenuItem()
         return menu
     }
     
@@ -126,7 +143,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     @objc private func showAbout() {
         windowManager.showAbout()
     }
-    
+
     @objc private func quit() {
         Logger.shared.log("=== QUIT MENU CLICKED ===")
         // NSApplication.terminate を呼ぶことで、applicationShouldTerminate を通る
@@ -209,6 +226,78 @@ extension MenuBarApp {
         Task { @MainActor in
             windowManager.openMainWindow()
         }
+    }
+
+    private func setupTextCaptureHotkey() {
+        if let observer = textCaptureHotkeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            textCaptureHotkeyObserver = nil
+        }
+
+        let manager = TextCaptureHotkeyManager.shared
+        textCaptureHotkeyManager = manager
+        manager.onHotkeyTriggered = { [weak self] in
+            guard let self else { return }
+            self.captureTextFromScreen()
+        }
+
+        textCaptureHotkeyObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak manager] notification in
+            guard let manager else { return }
+            guard
+                let userInfo = notification.userInfo,
+                let keyCode = userInfo["keyCode"] as? Int,
+                let modifierFlags = userInfo["modifierFlags"] as? Int
+            else { return }
+
+            let enabled = userInfo["enabled"] as? Bool ?? true
+            let flags = NSEvent.ModifierFlags(rawValue: UInt(modifierFlags))
+
+            if enabled, keyCode != 0, !flags.isEmpty {
+                _ = manager.applyHotKey(keyCode: UInt16(keyCode), modifiers: flags)
+            } else {
+                _ = manager.applyHotKey(keyCode: 0, modifiers: [])
+            }
+        }
+    }
+}
+
+extension MenuBarApp {
+    private func screenCaptureMenuItem() -> NSMenuItem {
+        screenCaptureStatusItem.target = self
+        screenCaptureStatusItem.action = #selector(openScreenRecordingSettingsFromMenu)
+        screenCaptureStatusItem.keyEquivalent = ""
+        return screenCaptureStatusItem
+    }
+
+    private func updateScreenCaptureMenuItem() {
+        let granted = CGPreflightScreenCaptureAccess()
+        screenCaptureStatusItem.title = granted ? "System Permissions Ready" : "Grant Screen Recording Access…"
+        screenCaptureStatusItem.state = granted ? .on : .off
+        screenCaptureStatusItem.isEnabled = !granted
+        screenCaptureStatusItem.target = granted ? nil : self
+        screenCaptureStatusItem.action = granted ? nil : #selector(openScreenRecordingSettingsFromMenu)
+    }
+
+    @objc private func openScreenRecordingSettingsFromMenu() {
+        Task { @MainActor in
+            ScreenRecordingPermissionOpener.openSystemSettings()
+        }
+    }
+
+    @objc private func captureTextFromScreen() {
+        Task { @MainActor [weak self] in
+            self?.textCaptureCoordinator.startCaptureFlow()
+        }
+    }
+}
+
+extension MenuBarApp: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        updateScreenCaptureMenuItem()
     }
 }
 
