@@ -137,6 +137,7 @@
 		D84EAF4152289114721887B5 /* ModernSwiftUIIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE63429F4E8A11653AD5676 /* ModernSwiftUIIntegrationTests.swift */; };
 		D8951BA3E254756423C4A6C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 313C2DE548F71294936CF09C /* Assets.xcassets */; };
 		D9869FAE029BB597ABA3F6C3 /* SettingsLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF59054401118E4A2F90AAB8 /* SettingsLayoutMetrics.swift */; };
+		DB89CEC353681DA6809ABCB7 /* TextCaptureCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02DB9871E840940BDE5310B2 /* TextCaptureCoordinatorTests.swift */; };
 		DF8A5EC8443873C9568465A9 /* SimplifiedHotkeyManagerFullTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34D3F54D8BF77BCDF6FAAEBD /* SimplifiedHotkeyManagerFullTests.swift */; };
 		E35B55A93E5023845EE31DA6 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F53824EF6E3465F75E9B79 /* SettingsViewModel.swift */; };
 		E4A937A59BBA7585438E98DD /* SimpleLineNumberRulerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E8F672B5F8DCE4239D1494 /* SimpleLineNumberRulerView.swift */; };
@@ -171,6 +172,7 @@
 
 /* Begin PBXFileReference section */
 		00AE92DB8787A988472FE57F /* ObservableViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservableViewModelTests.swift; sourceTree = "<group>"; };
+		02DB9871E840940BDE5310B2 /* TextCaptureCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCaptureCoordinatorTests.swift; sourceTree = "<group>"; };
 		03132BE081C4F4DD5B430EB3 /* TestUserDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestUserDefaults.swift; sourceTree = "<group>"; };
 		032B8315C1F7DFED645AAFD5 /* TogglePinSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TogglePinSyncTests.swift; sourceTree = "<group>"; };
 		05243238D42C5917E20B6BFA /* HistoryItemPopoverComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryItemPopoverComponents.swift; sourceTree = "<group>"; };
@@ -855,6 +857,7 @@
 				FAB0F2C9F3E7E841B7C707C6 /* SwiftDataRepositoryComprehensiveTests.swift */,
 				14D69BC2609666CEE0808F3C /* SwiftDataRepositoryTests.swift */,
 				9933CB969F2A6FE705ED3B16 /* SwiftUIViewPerformanceTests.swift */,
+				02DB9871E840940BDE5310B2 /* TextCaptureCoordinatorTests.swift */,
 				7955B9273FADD78F8B637D13 /* TextCaptureHotkeyManagerTests.swift */,
 				F6C881867EE42C1188ADBF97 /* TogglePinRaceConditionTests.swift */,
 				032B8315C1F7DFED645AAFD5 /* TogglePinSyncTests.swift */,
@@ -1135,6 +1138,7 @@
 				C30A1B79D01E7251AD5EEF60 /* SwiftUIViewPerformanceTests.swift in Sources */,
 				B25EFCB5DE5CAAFC06618991 /* TestHelpers.swift in Sources */,
 				FD2257A01775EBF6AFBFF297 /* TestUserDefaults.swift in Sources */,
+				DB89CEC353681DA6809ABCB7 /* TextCaptureCoordinatorTests.swift in Sources */,
 				AB52FE7203F1C9B52E026D23 /* TextCaptureHotkeyManagerTests.swift in Sources */,
 				B11B88A93B8EA0693F92EDAE /* TogglePinRaceConditionTests.swift in Sources */,
 				7EE694319BB60EF09524CC65 /* TogglePinSyncTests.swift in Sources */,

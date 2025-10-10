@@ -8,6 +8,12 @@
 import SwiftUI
 import AppKit
 
+@MainActor
+protocol WindowManaging: AnyObject {
+    func openMainWindow()
+    func showCopiedNotification()
+}
+
 extension Notification.Name {
     static let showCopiedNotification = Notification.Name("showCopiedNotification")
     static let mainWindowDidBecomeKey = Notification.Name("KippleMainWindowDidBecomeKey")
@@ -375,6 +381,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         return isAlwaysOnTop
     }
     
+    @MainActor
     func showCopiedNotification() {
         // MainViewにコピー通知を表示する
         // ウィンドウが開いている場合のみ通知を送信
@@ -550,8 +557,10 @@ extension WindowManager {
 
     func windowWillClose(_ notification: Notification) {
         Logger.shared.log("=== NSWindowDelegate: windowWillClose ===")
-        if notification.object as? NSWindow === mainWindow {
+       if notification.object as? NSWindow === mainWindow {
             handleMainWindowClose()
         }
     }
 }
+
+extension WindowManager: WindowManaging {}

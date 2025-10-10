@@ -12,13 +12,13 @@ import CoreGraphics
 final class TextCaptureCoordinator {
     private let clipboardService: any ClipboardServiceProtocol
     private let textRecognitionService: any TextRecognitionServiceProtocol
-    private let windowManager: WindowManager
+    private let windowManager: WindowManaging
     private var overlayController: ScreenSelectionOverlayController?
 
     init(
         clipboardService: any ClipboardServiceProtocol,
         textRecognitionService: any TextRecognitionServiceProtocol,
-        windowManager: WindowManager
+        windowManager: WindowManaging
     ) {
         self.clipboardService = clipboardService
         self.textRecognitionService = textRecognitionService
@@ -60,9 +60,11 @@ final class TextCaptureCoordinator {
 
         guard let image = captureImage(from: rect, on: screen) else {
             Logger.shared.error("Failed to capture image from selection.")
-            presentErrorAlert(message: "画面キャプチャに失敗しました。システム環境設定の画面収録権限を確認してください。")
+            presentErrorAlert(message: "Failed to capture the screen. Check Screen Recording permissions in System Settings.")
             return
         }
+
+        playShutterSound()
 
         Task {
             do {
@@ -74,7 +76,7 @@ final class TextCaptureCoordinator {
             } catch {
                 Logger.shared.error("OCR failed with error: \(error.localizedDescription)")
                 await MainActor.run { [weak self] in
-                    self?.presentErrorAlert(message: "テキスト抽出に失敗しました。\nもう一度お試しください。")
+                    self?.presentErrorAlert(message: "Could not extract text.\nPlease try again.")
                 }
             }
         }
@@ -85,11 +87,12 @@ final class TextCaptureCoordinator {
 
         guard !trimmed.isEmpty else {
             Logger.shared.warning("No text recognized from selection.")
-            presentErrorAlert(message: "テキストが検出できませんでした。別の範囲でお試しください。")
+            presentErrorAlert(message: "Text could not be detected. Please try another area.")
             return
         }
 
         clipboardService.copyToClipboard(trimmed, fromEditor: false)
+        windowManager.openMainWindow()
         windowManager.showCopiedNotification()
     }
 
@@ -148,10 +151,10 @@ final class TextCaptureCoordinator {
     private func presentPermissionAlert() {
         let alert = NSAlert()
         alert.alertStyle = .critical
-        alert.messageText = "画面収録の許可が必要です"
+        alert.messageText = "Screen Recording Permission Required"
         alert.informativeText = """
-        システム設定 > プライバシーとセキュリティ > 画面収録 で Kipple にチェックを入れてください。
-        許可後、アプリを再起動する必要があります。
+        Enable Kipple in System Settings > Privacy & Security > Screen Recording.
+        Restart the app after granting access.
         """
         alert.addButton(withTitle: "OK")
         alert.runModal()
@@ -160,9 +163,58 @@ final class TextCaptureCoordinator {
     private func presentErrorAlert(message: String) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "OCRエラー"
+        alert.messageText = "OCR Error"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
+
+    private lazy var shutterSound: NSSound? = {
+        let bundledNames = [
+            NSSound.Name("Screen Capture"),
+            NSSound.Name("Grab"),
+            NSSound.Name("Shutter"),
+            NSSound.Name("cameraShutter")
+        ]
+
+        for name in bundledNames {
+            if let sound = NSSound(named: name) {
+                sound.volume = 1.0
+                return sound
+            }
+        }
+
+        let soundDirectoryPath =
+            "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system"
+        let searchDirectory = URL(fileURLWithPath: soundDirectoryPath, isDirectory: true)
+
+        let fileCandidates = ["Screen Capture.aif", "Grab.aif", "Shutter.aif"]
+        for file in fileCandidates {
+            let url = searchDirectory.appendingPathComponent(file)
+            if FileManager.default.fileExists(atPath: url.path),
+               let sound = NSSound(contentsOf: url, byReference: true) {
+                sound.volume = 1.0
+                return sound
+            }
+        }
+
+        return nil
+    }()
+
+    private func playShutterSound() {
+        if let sound = shutterSound {
+            sound.stop()
+            sound.play()
+        } else {
+            NSSound.beep()
+        }
+    }
 }
+
+#if DEBUG
+extension TextCaptureCoordinator {
+    func test_handleRecognizedText(_ text: String) {
+        handleRecognizedText(text)
+    }
+}
+#endif

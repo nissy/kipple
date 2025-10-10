@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Carbon
 
 @MainActor
 final class TextCaptureHotkeyManager {
@@ -17,11 +18,14 @@ final class TextCaptureHotkeyManager {
     private let defaultKeyCode: UInt16 = 17 // T key
     private let defaultModifiers: NSEvent.ModifierFlags = [.command, .shift]
 
+    private static let hotKeySignature: OSType = 0x4B505443 // 'KPTC'
+    private static var hotKeyEventHandler: EventHandlerRef?
+
+    private let isRunningTests: Bool
+
     private var currentKeyCode: UInt16 = 0
     private var currentModifiers: NSEvent.ModifierFlags = []
-    private var globalMonitor: Any?
-    private var localMonitor: Any?
-    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private var hotKeyRef: EventHotKeyRef?
 
     var onHotkeyTriggered: (() -> Void)?
 
@@ -30,7 +34,8 @@ final class TextCaptureHotkeyManager {
         return (currentKeyCode, currentModifiers)
     }
 
-    private init() {
+    private init(isRunningTests: Bool = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil) {
+        self.isRunningTests = isRunningTests
         loadInitialHotkey()
     }
 
@@ -82,27 +87,41 @@ final class TextCaptureHotkeyManager {
             return true
         }
 
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
+        guard installHotKeyHandlerIfNeeded() else {
+            Logger.shared.error("Text capture hotkey handler could not be installed.")
+            return false
         }
 
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self = self else { return event }
-            return self.handleLocalKeyEvent(event)
+        let identifier = EventHotKeyID(signature: Self.hotKeySignature, id: 1)
+        var newHotKeyRef: EventHotKeyRef?
+        let carbonFlags = carbonFlags(from: currentModifiers)
+        let status = RegisterEventHotKey(
+            UInt32(currentKeyCode),
+            carbonFlags,
+            identifier,
+            GetEventDispatcherTarget(),
+            0,
+            &newHotKeyRef
+        )
+
+        guard status == noErr, let registeredRef = newHotKeyRef else {
+            if status != noErr {
+                Logger.shared.error("Text capture hotkey registration failed with status \(status).")
+            } else {
+                Logger.shared.error("Text capture hotkey registration returned no reference.")
+            }
+            return false
         }
 
-        Logger.shared.info("Text capture hotkey registered (monitors). keyCode=\(currentKeyCode), modifiers=\(currentModifiers)")
+        hotKeyRef = registeredRef
+        Logger.shared.info("Text capture hotkey registered (Carbon). keyCode=\(currentKeyCode), modifiers=\(currentModifiers)")
         return true
     }
 
     private func stopMonitoring() {
-        if let monitor = globalMonitor {
-            NSEvent.removeMonitor(monitor)
-            globalMonitor = nil
-        }
-        if let monitor = localMonitor {
-            NSEvent.removeMonitor(monitor)
-            localMonitor = nil
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
         }
     }
 
@@ -130,29 +149,91 @@ final class TextCaptureHotkeyManager {
         _ = startMonitoring()
     }
 
-    private func handleKeyEvent(_ event: NSEvent) {
-        let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard event.keyCode == currentKeyCode,
-              eventModifiers == currentModifiers else {
-            return
+    private func installHotKeyHandlerIfNeeded() -> Bool {
+        if TextCaptureHotkeyManager.hotKeyEventHandler != nil {
+            return true
         }
+
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+
+        let status = InstallEventHandler(
+            GetEventDispatcherTarget(),
+            TextCaptureHotkeyManager.hotKeyEventCallback,
+            1,
+            &eventType,
+            nil,
+            &TextCaptureHotkeyManager.hotKeyEventHandler
+        )
+
+        if status != noErr {
+            TextCaptureHotkeyManager.hotKeyEventHandler = nil
+            return false
+        }
+
+        return true
+    }
+
+    private func carbonFlags(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var carbon: UInt32 = 0
+        if flags.contains(.command) { carbon |= UInt32(cmdKey) }
+        if flags.contains(.option) { carbon |= UInt32(optionKey) }
+        if flags.contains(.control) { carbon |= UInt32(controlKey) }
+        if flags.contains(.shift) { carbon |= UInt32(shiftKey) }
+        return carbon
+    }
+
+    private func handleCarbonHotKey(with identifier: UInt32) {
+        guard identifier == 1 else { return }
         triggerHotkey()
     }
 
-    private func handleLocalKeyEvent(_ event: NSEvent) -> NSEvent? {
-        let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if event.keyCode == currentKeyCode,
-           eventModifiers == currentModifiers {
-            triggerHotkey()
-            return nil
+    private static func processCarbonHotKeyEvent(signature: OSType, identifier: UInt32) -> OSStatus {
+        guard signature == TextCaptureHotkeyManager.hotKeySignature else {
+            return OSStatus(eventNotHandledErr)
         }
-        return event
+
+        Task { @MainActor in
+            TextCaptureHotkeyManager.shared.handleCarbonHotKey(with: identifier)
+        }
+
+        return noErr
+    }
+
+    private static let hotKeyEventCallback: EventHandlerUPP = { _, event, _ in
+        var hotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            event,
+            UInt32(kEventParamDirectObject),
+            UInt32(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+
+        guard status == noErr else {
+            return OSStatus(eventNotHandledErr)
+        }
+
+        return TextCaptureHotkeyManager.processCarbonHotKeyEvent(
+            signature: hotKeyID.signature,
+            identifier: hotKeyID.id
+        )
     }
 
     private func triggerHotkey() {
         guard currentKeyCode != 0, !currentModifiers.isEmpty else { return }
         onHotkeyTriggered?()
     }
+
+    #if DEBUG
+    func debug_processCarbonHotKeyEvent(signature: OSType, identifier: UInt32) -> OSStatus {
+        TextCaptureHotkeyManager.processCarbonHotKeyEvent(signature: signature, identifier: identifier)
+    }
+    #endif
 
     #if DEBUG
     func handleTestEvent(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {

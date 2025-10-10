@@ -8,6 +8,7 @@
 import XCTest
 @testable import Kipple
 import AppKit
+import Carbon
 
 @MainActor
 final class TextCaptureHotkeyManagerTests: XCTestCase {
@@ -78,5 +79,48 @@ final class TextCaptureHotkeyManagerTests: XCTestCase {
             UserDefaults.standard.integer(forKey: TextCaptureHotkeyManager.modifierDefaultsKey),
             Int(NSEvent.ModifierFlags.command.rawValue)
         )
+    }
+
+    func testCurrentHotkeyReflectsAppliedCombination() throws {
+        XCTAssertTrue(manager.applyHotKey(keyCode: 17, modifiers: [.command, .shift]))
+        let current = manager.currentHotkey
+        XCTAssertNotNil(current)
+        XCTAssertEqual(current?.keyCode, 17)
+        XCTAssertEqual(current?.modifiers, NSEvent.ModifierFlags([.command, .shift]))
+    }
+
+    func testDisablingHotkeyClearsCurrentCombination() throws {
+        XCTAssertTrue(manager.applyHotKey(keyCode: 17, modifiers: [.command, .shift]))
+        XCTAssertTrue(manager.applyHotKey(keyCode: 0, modifiers: []))
+        XCTAssertNil(manager.currentHotkey)
+    }
+
+    func testCarbonHandlerIgnoresForeignSignature() throws {
+        let inverted = expectation(description: "Foreign signature should not trigger")
+        inverted.isInverted = true
+
+        manager.onHotkeyTriggered = {
+            inverted.fulfill()
+        }
+
+        XCTAssertTrue(manager.applyHotKey(keyCode: 17, modifiers: [.command, .shift]))
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B50484B, identifier: 1) // 'KPHK'
+        XCTAssertEqual(status, OSStatus(eventNotHandledErr))
+
+        wait(for: [inverted], timeout: 0.1)
+    }
+
+    func testCarbonHandlerTriggersForOwnSignature() throws {
+        let expectation = expectation(description: "Text capture hotkey triggered via Carbon handler")
+
+        manager.onHotkeyTriggered = {
+            expectation.fulfill()
+        }
+
+        XCTAssertTrue(manager.applyHotKey(keyCode: 17, modifiers: [.command, .shift]))
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B505443, identifier: 1) // 'KPTC'
+        XCTAssertEqual(status, noErr)
+
+        wait(for: [expectation], timeout: 0.5)
     }
 }
