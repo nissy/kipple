@@ -65,33 +65,11 @@ struct GeneralSettingsView: View {
                         label: "Screen Recording Access",
                         layout: .inlineControl
                     ) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Button("Open System Settings") {
-                                openScreenRecordingSettings()
-                            }
-                            .buttonStyle(.link)
-                            .font(.system(size: 12))
-
-                            if hasScreenCapturePermission {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Access granted.")
-                                    Text("Open System Settings › Privacy & Security.")
-                                    Text("Select Screen & System Audio Recording to review apps.")
-                                }
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            } else {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Screen access is required for capture overlay.")
-                                    Text("Enable Kipple in System Settings › Privacy & Security.")
-                                    Text("Then open Screen & System Audio Recording.")
-                                }
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            }
+                        Button("Open System Settings") {
+                            openScreenRecordingSettings()
                         }
+                        .buttonStyle(.link)
+                        .font(.system(size: 12))
                     }
                     
                     SettingsRow(
@@ -151,7 +129,7 @@ struct GeneralSettingsView: View {
     private func updateHotkey() {
         hotkeyKeyCode = Int(tempKeyCode)
         hotkeyModifierFlags = Int(tempModifierFlags.rawValue)
-        // Clear(= no key) の場合は無効と見なす
+        // Treat an empty key or modifier combination as disabled
         let shouldEnable = (hotkeyKeyCode != 0) && (hotkeyModifierFlags != 0)
         UserDefaults.standard.set(shouldEnable, forKey: "enableHotkey")
         
@@ -168,9 +146,19 @@ struct GeneralSettingsView: View {
     
     @MainActor
     private func updateCaptureHotkey() {
-        guard hasScreenCapturePermission else { return }
+        let manager = TextCaptureHotkeyManager.shared
+
+        guard hasScreenCapturePermission else {
+            _ = manager.applyHotKey(keyCode: 0, modifiers: [])
+            postCaptureHotkeyUpdate(
+                keyCode: 0,
+                modifierFlags: 0,
+                enabled: false
+            )
+            return
+        }
         
-        // 重複チェック（メインパネル用ホットキーと同一の場合は不可）
+        // Prevent duplicate shortcuts that match the main panel toggle
         if tempCaptureKeyCode != 0,
            !tempCaptureModifierFlags.isEmpty,
            Int(tempCaptureKeyCode) == hotkeyKeyCode,
@@ -180,11 +168,15 @@ struct GeneralSettingsView: View {
             tempCaptureModifierFlags = []
             textCaptureHotkeyKeyCode = 0
             textCaptureHotkeyModifierFlags = 0
-            _ = TextCaptureHotkeyManager.shared.applyHotKey(keyCode: 0, modifiers: [])
+            _ = manager.applyHotKey(keyCode: 0, modifiers: [])
+            postCaptureHotkeyUpdate(
+                keyCode: 0,
+                modifierFlags: 0,
+                enabled: false
+            )
             return
         }
 
-        let manager = TextCaptureHotkeyManager.shared
         let success = manager.applyHotKey(keyCode: tempCaptureKeyCode, modifiers: tempCaptureModifierFlags)
         guard success else {
             captureHotkeyError = "Failed to register shortcut. Try a different combination."
@@ -199,20 +191,15 @@ struct GeneralSettingsView: View {
         textCaptureHotkeyModifierFlags = Int(tempCaptureModifierFlags.rawValue)
         
         let enabled = (tempCaptureKeyCode != 0) && !tempCaptureModifierFlags.isEmpty
-        
-        NotificationCenter.default.post(
-            name: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
-            object: nil,
-            userInfo: [
-                "keyCode": textCaptureHotkeyKeyCode,
-                "modifierFlags": textCaptureHotkeyModifierFlags,
-                "enabled": enabled
-            ]
+        postCaptureHotkeyUpdate(
+            keyCode: textCaptureHotkeyKeyCode,
+            modifierFlags: textCaptureHotkeyModifierFlags,
+            enabled: enabled
         )
     }
     
     private func loadCaptureHotkeyState() {
-        // 初期値未設定の場合はデフォルトを適用
+        // Apply defaults when no prior value has been stored
         if UserDefaults.standard.object(forKey: "textCaptureHotkeyKeyCode") == nil {
             textCaptureHotkeyKeyCode = Int(defaultCaptureKeyCode)
         }
@@ -226,6 +213,13 @@ struct GeneralSettingsView: View {
         if hasScreenCapturePermission {
             captureHotkeyError = nil
             updateCaptureHotkey()
+        } else {
+            _ = TextCaptureHotkeyManager.shared.applyHotKey(keyCode: 0, modifiers: [])
+            postCaptureHotkeyUpdate(
+                keyCode: 0,
+                modifierFlags: 0,
+                enabled: false
+            )
         }
     }
     
@@ -238,6 +232,12 @@ struct GeneralSettingsView: View {
                 loadCaptureHotkeyState()
             } else {
                 captureHotkeyError = nil
+                _ = TextCaptureHotkeyManager.shared.applyHotKey(keyCode: 0, modifiers: [])
+                postCaptureHotkeyUpdate(
+                    keyCode: 0,
+                    modifierFlags: 0,
+                    enabled: false
+                )
             }
         }
     }
@@ -262,6 +262,18 @@ struct GeneralSettingsView: View {
     private func stopPermissionPolling() {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = nil
+    }
+    
+    private func postCaptureHotkeyUpdate(keyCode: Int, modifierFlags: Int, enabled: Bool) {
+        NotificationCenter.default.post(
+            name: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
+            object: nil,
+            userInfo: [
+                "keyCode": keyCode,
+                "modifierFlags": modifierFlags,
+                "enabled": enabled
+            ]
+        )
     }
 }
 

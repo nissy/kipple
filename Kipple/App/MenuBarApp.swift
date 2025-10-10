@@ -40,11 +40,11 @@ final class MenuBarApp: NSObject, ObservableObject {
     private var textCaptureHotkeyObserver: NSObjectProtocol?
     private var openKippleHotkeyObserver: NSObjectProtocol?
     
-    // 非同期終了処理用のプロパティ
+    // Properties for asynchronous termination handling
     private var isTerminating = false
     private var terminationWorkItem: DispatchWorkItem?
     
-    // テスト環境かどうかを検出
+    // Detect whether we are running in a test environment
     private static var isTestEnvironment: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
         NSClassFromString("XCTest") != nil
@@ -59,7 +59,7 @@ final class MenuBarApp: NSObject, ObservableObject {
 
         super.init()
 
-        // テスト環境では初期化をスキップ
+        // Skip heavy initialization when running unit tests
         guard !Self.isTestEnvironment else { return }
 
         // Set up notification for SimplifiedHotkeyManager
@@ -75,7 +75,7 @@ final class MenuBarApp: NSObject, ObservableObject {
             )
         }
 
-        // アプリケーションデリゲートを同期的に設定（重要）
+        // Set the application delegate synchronously (required)
         NSApplication.shared.delegate = self
 
         DispatchQueue.main.async { [weak self] in
@@ -156,7 +156,7 @@ final class MenuBarApp: NSObject, ObservableObject {
             clipboardService.startMonitoring()
         }
 
-        // HotkeyManagerは既に初期化時に登録を行うため、追加の登録は不要
+        // HotkeyManager already registers during initialization
     }
 
     private func performDataMigrationIfNeeded() async {
@@ -179,7 +179,7 @@ final class MenuBarApp: NSObject, ObservableObject {
 
     @objc private func quit() {
         Logger.shared.log("=== QUIT MENU CLICKED ===")
-        // NSApplication.terminate を呼ぶことで、applicationShouldTerminate を通る
+        // Calling terminate triggers applicationShouldTerminate
         NSApplication.shared.terminate(nil)
     }
     
@@ -187,7 +187,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         Logger.shared.log("=== ASYNC APP QUIT SEQUENCE STARTED ===")
         Logger.shared.log("Current history count: \(clipboardService.history.count)")
         
-        // タイムアウト処理（最大2秒）
+        // Timeout handler (maximum 2 seconds)
         let timeoutWorkItem = DispatchWorkItem { [weak self] in
             Logger.shared.error("⚠️ Save operation timed out, forcing quit")
             self?.forceTerminate()
@@ -195,19 +195,19 @@ final class MenuBarApp: NSObject, ObservableObject {
         self.terminationWorkItem = timeoutWorkItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: timeoutWorkItem)
         
-        // 非同期で保存処理を実行
+        // Execute the save work asynchronously
         Task {
-            // デバウンスされた保存を即座に実行
+            // Flush any debounced saves immediately
             Logger.shared.log("Flushing pending saves...")
             await clipboardService.flushPendingSaves()
 
             Logger.shared.log("✅ Successfully saved data before quit")
             
-            // タイムアウトをキャンセル
+            // Cancel the watchdog timeout
             self.terminationWorkItem?.cancel()
             Logger.shared.log("Save operation completed, cancelling timeout")
             
-            // メインスレッドで終了処理を実行
+            // Finish termination on the main thread
             await MainActor.run { [weak self] in
                 Logger.shared.log("Calling completeTermination on main thread")
                 self?.completeTermination()
@@ -226,7 +226,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         
         Logger.shared.log("=== APP QUIT SEQUENCE COMPLETED ===")
         
-        // アプリケーションに終了を許可
+        // Allow the application to terminate
         Logger.shared.log("Calling reply(toApplicationShouldTerminate: true)")
         NSApplication.shared.reply(toApplicationShouldTerminate: true)
         Logger.shared.log("reply(toApplicationShouldTerminate: true) called successfully")
@@ -235,13 +235,13 @@ final class MenuBarApp: NSObject, ObservableObject {
     private func forceTerminate() {
         Logger.shared.log("forceTerminate called - timeout occurred")
         
-        // タイムアウト時の強制終了
+        // Force termination when the timeout fires
         DispatchQueue.main.async { [weak self] in
             Logger.shared.log("forceTerminate on main thread")
             self?.clipboardService.stopMonitoring()
             // cleanup method was removed in Swift 6.2 migration
             
-            // アプリケーションに終了を許可
+            // Allow the application to terminate immediately
             Logger.shared.log("Calling reply(toApplicationShouldTerminate: true) from forceTerminate")
             NSApplication.shared.reply(toApplicationShouldTerminate: true)
             Logger.shared.log("forceTerminate completed")
@@ -547,6 +547,25 @@ extension MenuBarApp: NSMenuDelegate {
     }
 }
 
+#if DEBUG
+extension MenuBarApp {
+    @MainActor
+    func test_handleTextCaptureSettingsChange(
+        enabled: Bool,
+        keyCode: UInt16,
+        modifiers: NSEvent.ModifierFlags,
+        manager: TextCaptureHotkeyManager = TextCaptureHotkeyManager.shared
+    ) {
+        handleTextCaptureSettingsChange(
+            enabled: enabled,
+            keyCode: keyCode,
+            modifierFlagsRawValue: UInt(modifiers.rawValue),
+            manager: manager
+        )
+    }
+}
+#endif
+
 // MARK: - NSApplicationDelegate
 extension MenuBarApp: NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -555,29 +574,29 @@ extension MenuBarApp: NSApplicationDelegate {
         Logger.shared.log("Sender: \(sender)")
         Logger.shared.log("Current thread: \(Thread.current)")
         
-        // テスト環境では即座に終了を許可
+        // Allow immediate termination during tests
         if Self.isTestEnvironment {
             return .terminateNow
         }
         
-        // 既に終了処理中の場合
+        // If termination is already in progress
         if isTerminating {
             Logger.shared.log("WARNING: Already terminating, this should not happen!")
-            // 即座に終了を許可（前回の非同期処理が何らかの理由で完了していない）
+            // Permit immediate termination if previous async work is stuck
             return .terminateNow
         }
         
-        // 非同期終了処理を開始
+        // Begin the asynchronous termination flow
         isTerminating = true
         performAsyncTermination()
         
-        // 一旦終了をキャンセル（後で reply(toApplicationShouldTerminate:) を呼ぶ）
+        // Cancel termination for now (will reply later)
         return .terminateCancel
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         Logger.shared.log("=== applicationWillTerminate called ===")
-        // この時点ではすでに保存処理は完了しているはず
+        // The save work should be finished by this point
     }
 }
 
@@ -598,7 +617,7 @@ extension MenuBarApp {
 
     func performTermination() async {
         // Extract the async work from performAsyncTermination
-        // デバウンスされた保存を即座に実行
+        // Flush any debounced saves immediately
         Logger.shared.log("Flushing pending saves...")
         await clipboardService.flushPendingSaves()
 

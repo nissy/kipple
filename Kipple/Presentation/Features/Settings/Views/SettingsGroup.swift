@@ -48,7 +48,12 @@ struct SettingsGroup<Content: View>: View {
             }
             .padding(.leading, SettingsLayoutMetrics.groupContentIndent)
         }
-        .padding(.top, SettingsLayoutMetrics.groupTopPadding)
+        .padding(
+            .top,
+            includeTopDivider
+                ? SettingsLayoutMetrics.groupTopPaddingWithDivider
+                : SettingsLayoutMetrics.groupTopPaddingWithoutDivider
+        )
         .padding(.bottom, SettingsLayoutMetrics.groupBottomPadding)
     }
 }

@@ -1,25 +1,15 @@
 import XCTest
+import AppKit
 @testable import Kipple
 
-@MainActor
 final class MenuBarAppIntegrationTests: XCTestCase {
-    private var app: MenuBarApp!
-
-    override func setUp() {
-        super.setUp()
-        // MenuBarApp is initialized in test mode automatically
-        app = MenuBarApp()
-    }
-
-    override func tearDown() {
-        app = nil
-        super.tearDown()
-    }
-
     // MARK: - Service Provider Tests
 
+    @MainActor
     func testUsesClipboardService() {
-        // When: App initializes its clipboard service
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
+
         let serviceType = type(of: app.clipboardService)
 
         // Then: ModernClipboardServiceAdapter is used
@@ -29,8 +19,11 @@ final class MenuBarAppIntegrationTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testUsesHotkeyManager() {
-        // When: App initializes its hotkey manager
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
+
         let managerType = type(of: app.hotkeyManager)
 
         // Then: SimplifiedHotkeyManager is used
@@ -42,10 +35,11 @@ final class MenuBarAppIntegrationTests: XCTestCase {
 
     // MARK: - Service Lifecycle Tests
 
+    @MainActor
     func testStartsClipboardMonitoring() async throws {
-        // Given: App is initialized
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
 
-        // When: Services are started
         await app.startServicesAsync()
 
         // Then: Clipboard monitoring is active
@@ -53,8 +47,11 @@ final class MenuBarAppIntegrationTests: XCTestCase {
         XCTAssertTrue(isMonitoring, "Clipboard monitoring should be started")
     }
 
-    func testSavesDataOnTermination() async throws {
-        // Given: Services are running with some data
+    @MainActor
+   func testSavesDataOnTermination() async throws {
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
+
         await app.startServicesAsync()
 
         // Add test data
@@ -70,8 +67,10 @@ final class MenuBarAppIntegrationTests: XCTestCase {
 
     // MARK: - Window Management Tests
 
+    @MainActor
     func testWindowManagement() {
-        // Given: App is initialized
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
 
         // Then: Window manager is available
         // Note: We can't test actual window opening in unit tests as openMainWindow is private
@@ -82,7 +81,8 @@ final class MenuBarAppIntegrationTests: XCTestCase {
 
     @MainActor
     func testRegistersHotkeys() async {
-        // Given: App is initialized
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
 
         // When: Hotkeys are registered
         await app.registerHotkeys()
@@ -90,5 +90,75 @@ final class MenuBarAppIntegrationTests: XCTestCase {
         // Then: Main hotkey is registered
         let isRegistered = app.isHotkeyRegistered()
         XCTAssertTrue(isRegistered, "Main hotkey should be registered")
+    }
+
+    @MainActor
+    func testHandleTextCaptureSettingsChangeDisablesShortcut() {
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
+
+        let manager = TextCaptureHotkeyManager.shared
+        app.test_handleTextCaptureSettingsChange(
+            enabled: true,
+            keyCode: 17,
+            modifiers: [.command, .shift],
+            manager: manager
+        )
+        XCTAssertEqual(manager.currentHotkey?.keyCode, 17)
+        XCTAssertEqual(manager.currentHotkey?.modifiers, [.command, .shift])
+
+        app.test_handleTextCaptureSettingsChange(
+            enabled: false,
+            keyCode: 0,
+            modifiers: [],
+            manager: manager
+        )
+        XCTAssertNil(manager.currentHotkey)
+        XCTAssertEqual(
+            UserDefaults.standard.integer(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey),
+            0
+        )
+        XCTAssertEqual(
+            UserDefaults.standard.integer(forKey: TextCaptureHotkeyManager.modifierDefaultsKey),
+            0
+        )
+    }
+
+    @MainActor
+    func testHandleTextCaptureSettingsChangeRegistersShortcut() {
+        let app = makeMenuBarApp()
+        defer { resetTextCaptureHotkey() }
+
+        let manager = TextCaptureHotkeyManager.shared
+        XCTAssertNil(manager.currentHotkey)
+
+        app.test_handleTextCaptureSettingsChange(
+            enabled: true,
+            keyCode: 17,
+            modifiers: [.command, .shift],
+            manager: manager
+        )
+
+        let currentHotkey = manager.currentHotkey
+        XCTAssertNotNil(currentHotkey)
+        XCTAssertEqual(currentHotkey?.keyCode, 17)
+        XCTAssertEqual(currentHotkey?.modifiers, [.command, .shift])
+    }
+
+    // MARK: - Helpers
+
+    @MainActor
+    private func makeMenuBarApp() -> MenuBarApp {
+        resetTextCaptureHotkey()
+        return MenuBarApp()
+    }
+
+    @MainActor
+    private func resetTextCaptureHotkey() {
+        let manager = TextCaptureHotkeyManager.shared
+        _ = manager.applyHotKey(keyCode: 0, modifiers: [])
+        manager.onHotkeyTriggered = nil
+        UserDefaults.standard.removeObject(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: TextCaptureHotkeyManager.modifierDefaultsKey)
     }
 }
