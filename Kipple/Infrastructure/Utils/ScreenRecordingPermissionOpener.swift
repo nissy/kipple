@@ -9,8 +9,31 @@ import AppKit
 
 enum ScreenRecordingPermissionOpener {
     @MainActor
-    static func openSystemSettings() {
-        let majorVersion = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    struct Dependencies {
+        var openURL: (URL) -> Bool
+        var launchProcess: (_ launchPath: String, _ arguments: [String]) -> Void
+        var runAppleScript: (_ source: String) -> Void
+
+        static let live = Dependencies(
+            openURL: { NSWorkspace.shared.open($0) },
+            launchProcess: { path, args in
+                let process = Process()
+                process.launchPath = path
+                process.arguments = args
+                try? process.run()
+            },
+            runAppleScript: { source in
+                NSAppleScript(source: source)?.executeAndReturnError(nil)
+            }
+        )
+    }
+
+    @MainActor
+    static func openSystemSettings(
+        osVersion: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion,
+        dependencies: Dependencies = .live
+    ) {
+        let majorVersion = osVersion.majorVersion
         let candidates: [String]
 
         switch majorVersion {
@@ -36,15 +59,15 @@ enum ScreenRecordingPermissionOpener {
         }
 
         for candidate in candidates {
-            if let url = URL(string: candidate), NSWorkspace.shared.open(url) {
+            if let url = URL(string: candidate), dependencies.openURL(url) {
                 return
             }
         }
 
-        let process = Process()
-        process.launchPath = "/usr/bin/open"
-        process.arguments = ["-b", "com.apple.systempreferences", "/System/Library/PreferencePanes/Security.prefPane"]
-        try? process.run()
+        dependencies.launchProcess(
+            "/usr/bin/open",
+            ["-b", "com.apple.systempreferences", "/System/Library/PreferencePanes/Security.prefPane"]
+        )
 
         let screenRecordingAnchor = majorVersion >= 26 ? "Privacy_ScreenCapture" : "Privacy_ScreenRecording"
 
@@ -58,6 +81,6 @@ enum ScreenRecordingPermissionOpener {
             end try
         end tell
         """
-        NSAppleScript(source: appleScriptSource)?.executeAndReturnError(nil)
+        dependencies.runAppleScript(appleScriptSource)
     }
 }

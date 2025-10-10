@@ -20,6 +20,7 @@
 		100153BEEC3A79B3B25838FD /* DataSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7077BB0F24641D773661D25B /* DataSettingsView.swift */; };
 		10ADDAC5ECDD8378D779E14C /* ModernClipboardService+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FFDAC614C09BD018C9DA2DB /* ModernClipboardService+Testing.swift */; };
 		11302BAD946FB4767EB5DBE3 /* RecopyTimestampUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64EAD289700C9E14E9F9C37 /* RecopyTimestampUpdateTests.swift */; };
+		12577519362F3EED5B1C66E5 /* CategoryManagerWindowCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88389422983216967CC99430 /* CategoryManagerWindowCoordinatorTests.swift */; };
 		14B405D051834F8C2F1A5295 /* MainViewModelProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B1186DB01242EB63C34D9D /* MainViewModelProtocol.swift */; };
 		16CBF5A71696D878151E1A43 /* SwiftDataRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14D69BC2609666CEE0808F3C /* SwiftDataRepositoryTests.swift */; };
 		189258EE5ADC269652F28061 /* ModernClipboardServiceComprehensiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E23A39DCADF68DF5D7A47DCE /* ModernClipboardServiceComprehensiveTests.swift */; };
@@ -56,6 +57,7 @@
 		5336AC0750412C68D20C79AD /* AutoClearHistoryPreservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C047FD9A14ECD8829BF89827 /* AutoClearHistoryPreservationTests.swift */; };
 		5337AED8B1BAC762B9D43A1F /* TextCaptureHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFEE2E4DBEE84E717957C1A /* TextCaptureHotkeyManager.swift */; };
 		5481F0ECD6CAF9B1DBA71EFB /* UserCategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9ED909BCBE92C9FDBF3BCA1 /* UserCategoryStore.swift */; };
+		550B7D4010394BE49A940FFF /* ScreenRecordingPermissionOpenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C48D222E16E064E94C46795A /* ScreenRecordingPermissionOpenerTests.swift */; };
 		55E02AD98832C01335498467 /* AppInfoRecordingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A80E91253CCD851C6231CB /* AppInfoRecordingTests.swift */; };
 		5625744EC2A8F5A838BEE23B /* AutoClearBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AF4A7453157A2A730A8F9E /* AutoClearBehaviorTests.swift */; };
 		59A504619C472F5D87041F38 /* ResizableSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B538EF6166B8332429EF10E7 /* ResizableSplitView.swift */; };
@@ -246,6 +248,7 @@
 		866EF79DC1C4FABC144A5F04 /* LoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerTests.swift; sourceTree = "<group>"; };
 		867532273CB00F98FCD94839 /* HoverTrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoverTrackingView.swift; sourceTree = "<group>"; };
 		86EB3075FA086F96EAF118D1 /* HistoryItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryItemView.swift; sourceTree = "<group>"; };
+		88389422983216967CC99430 /* CategoryManagerWindowCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagerWindowCoordinatorTests.swift; sourceTree = "<group>"; };
 		88B10B53A06B353B8ABDB1C3 /* DeleteItemSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteItemSyncTests.swift; sourceTree = "<group>"; };
 		88CC5DBC53E0C2D680CCE42D /* SwiftDataPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataPersistenceTests.swift; sourceTree = "<group>"; };
 		897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonStyles.swift; sourceTree = "<group>"; };
@@ -286,6 +289,7 @@
 		BF59054401118E4A2F90AAB8 /* SettingsLayoutMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLayoutMetrics.swift; sourceTree = "<group>"; };
 		C047FD9A14ECD8829BF89827 /* AutoClearHistoryPreservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoClearHistoryPreservationTests.swift; sourceTree = "<group>"; };
 		C3F24D6851521E2B85EA282F /* InternalClearExternalCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalClearExternalCopyTests.swift; sourceTree = "<group>"; };
+		C48D222E16E064E94C46795A /* ScreenRecordingPermissionOpenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingPermissionOpenerTests.swift; sourceTree = "<group>"; };
 		C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewControlSection.swift; sourceTree = "<group>"; };
 		C64EAD289700C9E14E9F9C37 /* RecopyTimestampUpdateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecopyTimestampUpdateTests.swift; sourceTree = "<group>"; };
 		C8AF4A7453157A2A730A8F9E /* AutoClearBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoClearBehaviorTests.swift; sourceTree = "<group>"; };
@@ -805,6 +809,7 @@
 				36A80E91253CCD851C6231CB /* AppInfoRecordingTests.swift */,
 				C8AF4A7453157A2A730A8F9E /* AutoClearBehaviorTests.swift */,
 				C047FD9A14ECD8829BF89827 /* AutoClearHistoryPreservationTests.swift */,
+				88389422983216967CC99430 /* CategoryManagerWindowCoordinatorTests.swift */,
 				4B56AB0D9DA2210397B15B7A /* ClearAllHistoryBehaviorTests.swift */,
 				6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */,
 				A37EA352932E46C425A5EE57 /* ClearClipboardSyncTests.swift */,
@@ -843,6 +848,7 @@
 				163B51E969EDBC688D6AD83E /* RecopyHistoryUpdateTests.swift */,
 				AD42C8770D3C55052325301A /* RecopyRaceConditionTests.swift */,
 				C64EAD289700C9E14E9F9C37 /* RecopyTimestampUpdateTests.swift */,
+				C48D222E16E064E94C46795A /* ScreenRecordingPermissionOpenerTests.swift */,
 				34D3F54D8BF77BCDF6FAAEBD /* SimplifiedHotkeyManagerFullTests.swift */,
 				8EC6B91B179AA5EFABC7CD87 /* SimplifiedHotkeyManagerTests.swift */,
 				88CC5DBC53E0C2D680CCE42D /* SwiftDataPersistenceTests.swift */,
@@ -1067,6 +1073,7 @@
 				C73072F117ADCC9F52D92520 /* AppInfoTests.swift in Sources */,
 				5625744EC2A8F5A838BEE23B /* AutoClearBehaviorTests.swift in Sources */,
 				5336AC0750412C68D20C79AD /* AutoClearHistoryPreservationTests.swift in Sources */,
+				12577519362F3EED5B1C66E5 /* CategoryManagerWindowCoordinatorTests.swift in Sources */,
 				FF29198CDF33EB1A631FBABA /* ClearAllHistoryBehaviorTests.swift in Sources */,
 				FB9D3338A86658CEC827EFC0 /* ClearButtonRegressionTest.swift in Sources */,
 				05F13CD7EA892F84606EB84E /* ClearClipboardSyncTests.swift in Sources */,
@@ -1115,6 +1122,7 @@
 				99AACF46738A2255AEEADED7 /* RecopyHistoryUpdateTests.swift in Sources */,
 				94421D9C0403DBCDF0DB3DC5 /* RecopyRaceConditionTests.swift in Sources */,
 				11302BAD946FB4767EB5DBE3 /* RecopyTimestampUpdateTests.swift in Sources */,
+				550B7D4010394BE49A940FFF /* ScreenRecordingPermissionOpenerTests.swift in Sources */,
 				76F04D59D6CF00DA20D0E32D /* SearchAndFilterTests.swift in Sources */,
 				FE559C2AA720A6221F37680D /* SettingsBackupTests.swift in Sources */,
 				2BFF305F6C7562391A4F2518 /* SettingsRestorationExampleTests.swift in Sources */,

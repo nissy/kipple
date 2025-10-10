@@ -116,3 +116,11 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         window.setFrameOrigin(targetOrigin)
     }
 }
+
+#if DEBUG
+extension CategoryManagerWindowCoordinator {
+    func test_position(window: NSWindow, near anchorWindow: NSWindow?) {
+        position(window: window, near: anchorWindow)
+    }
+}
+#endif
