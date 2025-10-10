@@ -420,11 +420,12 @@ extension MenuBarApp {
         title: String,
         combination: (UInt16, NSEvent.ModifierFlags)?
     ) {
+        menuItem.toolTip = nil
+
         guard let (keyCode, modifiers) = combination else {
             menuItem.title = title
             menuItem.keyEquivalent = ""
             menuItem.keyEquivalentModifierMask = []
-            menuItem.toolTip = nil
             return
         }
 
@@ -435,17 +436,14 @@ extension MenuBarApp {
             menuItem.title = title
             menuItem.keyEquivalent = keyEquivalent
             menuItem.keyEquivalentModifierMask = modifiers
-            menuItem.toolTip = displayString.isEmpty ? nil : displayString
         } else if !displayString.isEmpty {
             menuItem.title = "\(title) (\(displayString))"
             menuItem.keyEquivalent = ""
             menuItem.keyEquivalentModifierMask = []
-            menuItem.toolTip = displayString
         } else {
             menuItem.title = title
             menuItem.keyEquivalent = ""
             menuItem.keyEquivalentModifierMask = []
-            menuItem.toolTip = nil
         }
     }
 
