@@ -32,7 +32,7 @@ struct DataSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 ClipboardFontSettingsView()
 
                 // Action Click
@@ -210,8 +210,8 @@ struct DataSettingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
+            .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .task {
             updateAutoClearConfiguration()

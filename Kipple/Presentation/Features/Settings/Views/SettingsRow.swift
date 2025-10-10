@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct SettingsRow<Content: View>: View {
-    private let labelColumnWidth: CGFloat = 160
     let label: String
     let description: String?
     let content: () -> Content
@@ -34,20 +33,20 @@ struct SettingsRow<Content: View>: View {
     var body: some View {
         Group {
             if layout == .inlineControl {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SettingsLayoutMetrics.rowVerticalSpacing) {
                     content()
                     if let description = description {
                         Text(description)
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.leading, 4)
+                            .padding(.leading, SettingsLayoutMetrics.inlineDescriptionLeadingPadding)
                     }
                 }
             } else {
-                HStack(alignment: .top, spacing: 16) {
+                HStack(alignment: .top, spacing: SettingsLayoutMetrics.rowHorizontalSpacing) {
                     labelView
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: SettingsLayoutMetrics.rowVerticalSpacing) {
                         content()
                         if let description = description {
                             Text(description)
@@ -59,14 +58,14 @@ struct SettingsRow<Content: View>: View {
                 }
             }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, SettingsLayoutMetrics.rowVerticalPadding)
     }
 
     private var labelView: some View {
         Text(label)
             .font(.system(size: 13))
             .foregroundColor(.primary)
-            .frame(width: labelColumnWidth, alignment: .leading)
+            .frame(width: SettingsLayoutMetrics.rowLabelWidth, alignment: .leading)
             .lineLimit(1)
     }
 }

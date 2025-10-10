@@ -29,7 +29,7 @@ struct GeneralSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 // Startup
                 SettingsGroup("Startup", includeTopDivider: false) {
                     SettingsRow(
@@ -131,8 +131,8 @@ struct GeneralSettingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
+            .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
+            .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
             tempKeyCode = UInt16(hotkeyKeyCode)

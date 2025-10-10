@@ -26,13 +26,13 @@ struct SettingsGroup<Content: View>: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: SettingsLayoutMetrics.groupContainerSpacing) {
             if includeTopDivider {
                 Divider()
-                    .padding(.bottom, 6)
+                    .padding(.bottom, SettingsLayoutMetrics.groupDividerBottomPadding)
             }
 
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: SettingsLayoutMetrics.groupHeaderSpacing) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.primary)
@@ -43,12 +43,12 @@ struct SettingsGroup<Content: View>: View {
                 Spacer(minLength: 0)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: SettingsLayoutMetrics.groupContentSpacing) {
                 content()
             }
-            .padding(.leading, 14)
+            .padding(.leading, SettingsLayoutMetrics.groupContentIndent)
         }
-        .padding(.top, includeTopDivider ? 10 : 2)
-        .padding(.bottom, 10)
+        .padding(.top, SettingsLayoutMetrics.groupTopPadding)
+        .padding(.bottom, SettingsLayoutMetrics.groupBottomPadding)
     }
 }

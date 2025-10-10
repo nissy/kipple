@@ -18,7 +18,7 @@ struct EditorSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 // Font Settings
                 SimpleFontSettingsView()
                 // Editor Position
@@ -68,8 +68,8 @@ struct EditorSettingsView: View {
                 
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
+            .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
             tempCopyKeyCode = UInt16(appSettings.editorCopyHotkeyKeyCode)

@@ -31,9 +31,9 @@ struct SettingsView: View {
                 activeTab = newTab
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(minWidth: 480, alignment: .topLeading)
+        .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
+        .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
+        .frame(minWidth: 440, alignment: .topLeading)
         .background(glassBackground)
         .sheet(isPresented: $viewModel.showingAddFallbackSheet) {
             AddFallbackFontSheet(

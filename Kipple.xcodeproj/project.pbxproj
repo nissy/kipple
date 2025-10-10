@@ -134,6 +134,7 @@
 		D756FBE1A9DB7DC26355B941 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22A89DBDDE13B95E612B1BE7 /* GeneralSettingsView.swift */; };
 		D84EAF4152289114721887B5 /* ModernSwiftUIIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE63429F4E8A11653AD5676 /* ModernSwiftUIIntegrationTests.swift */; };
 		D8951BA3E254756423C4A6C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 313C2DE548F71294936CF09C /* Assets.xcassets */; };
+		D9869FAE029BB597ABA3F6C3 /* SettingsLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF59054401118E4A2F90AAB8 /* SettingsLayoutMetrics.swift */; };
 		DF8A5EC8443873C9568465A9 /* SimplifiedHotkeyManagerFullTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34D3F54D8BF77BCDF6FAAEBD /* SimplifiedHotkeyManagerFullTests.swift */; };
 		E35B55A93E5023845EE31DA6 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F53824EF6E3465F75E9B79 /* SettingsViewModel.swift */; };
 		E4A937A59BBA7585438E98DD /* SimpleLineNumberRulerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E8F672B5F8DCE4239D1494 /* SimpleLineNumberRulerView.swift */; };
@@ -282,6 +283,7 @@
 		B91A4B3A793032BFDCF571FD /* IntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationTests.swift; sourceTree = "<group>"; };
 		BC48D2F668FB9434E6169962 /* ModernClipboardHashCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardHashCleanupTests.swift; sourceTree = "<group>"; };
 		BDF0A9EA04C6D3DCB72F6EA5 /* HotkeyRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRecorderView.swift; sourceTree = "<group>"; };
+		BF59054401118E4A2F90AAB8 /* SettingsLayoutMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLayoutMetrics.swift; sourceTree = "<group>"; };
 		C047FD9A14ECD8829BF89827 /* AutoClearHistoryPreservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoClearHistoryPreservationTests.swift; sourceTree = "<group>"; };
 		C3F24D6851521E2B85EA282F /* InternalClearExternalCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalClearExternalCopyTests.swift; sourceTree = "<group>"; };
 		C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewControlSection.swift; sourceTree = "<group>"; };
@@ -539,6 +541,7 @@
 				381FF9CEF8F860091FE91A61 /* ManageCategoriesButton.swift */,
 				10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */,
 				D36EF972EACF9279EE76CFE9 /* SettingsGroup.swift */,
+				BF59054401118E4A2F90AAB8 /* SettingsLayoutMetrics.swift */,
 				E5778807D1EE8AD4AF29AB95 /* SettingsRow.swift */,
 				B5B70F6D565F5E4D7DBB160D /* SettingsSidebarItem.swift */,
 				FAB7B799720062D0F0A7B124 /* SettingsView.swift */,
@@ -1027,6 +1030,7 @@
 				71ED0C92C9F135E30E122457 /* ScreenSelectionOverlayController.swift in Sources */,
 				FC6F95815A0E3BDD680FDA59 /* SearchableFontPicker.swift in Sources */,
 				A3DE9ECB686BA72A32C2CDDA /* SettingsGroup.swift in Sources */,
+				D9869FAE029BB597ABA3F6C3 /* SettingsLayoutMetrics.swift in Sources */,
 				50CBF859C12B26AAEFF93906 /* SettingsRow.swift in Sources */,
 				EB49D860628367B9F51E6F0D /* SettingsSidebarItem.swift in Sources */,
 				3F055E4767378CD68AA83E39 /* SettingsView.swift in Sources */,
