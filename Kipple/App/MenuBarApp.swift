@@ -262,10 +262,7 @@ extension MenuBarApp {
     }
 
     private func setupTextCaptureHotkey() {
-        if let observer = textCaptureHotkeyObserver {
-            NotificationCenter.default.removeObserver(observer)
-            textCaptureHotkeyObserver = nil
-        }
+        removeTextCaptureHotkeyObserver()
 
         let manager = TextCaptureHotkeyManager.shared
         textCaptureHotkeyManager = manager
@@ -274,33 +271,59 @@ extension MenuBarApp {
             self.captureTextFromScreen()
         }
 
-        textCaptureHotkeyObserver = NotificationCenter.default.addObserver(
+        textCaptureHotkeyObserver = registerTextCaptureSettingsObserver(for: manager)
+
+        updateScreenTextCaptureMenuItemShortcut()
+    }
+
+    private func removeTextCaptureHotkeyObserver() {
+        if let observer = textCaptureHotkeyObserver {
+            NotificationCenter.default.removeObserver(observer)
+            textCaptureHotkeyObserver = nil
+        }
+    }
+
+    private func registerTextCaptureSettingsObserver(
+        for manager: TextCaptureHotkeyManager
+    ) -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
             forName: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self, let manager = self.textCaptureHotkeyManager else { return }
             guard
+                let self,
                 let userInfo = notification.userInfo,
                 let keyCode = userInfo["keyCode"] as? Int,
                 let modifierFlags = userInfo["modifierFlags"] as? Int
             else { return }
 
             let enabled = userInfo["enabled"] as? Bool ?? true
-            let resolvedModifiers = NSEvent.ModifierFlags(rawValue: UInt(modifierFlags)).intersection([.command, .control, .option, .shift])
-            let resolvedKeyCode = UInt16(keyCode)
+            self.handleTextCaptureSettingsChange(
+                enabled: enabled,
+                keyCode: UInt16(keyCode),
+                modifierFlagsRawValue: UInt(modifierFlags),
+                manager: manager
+            )
+        }
+    }
 
-            if enabled, resolvedKeyCode != 0, !resolvedModifiers.isEmpty {
-                if manager.applyHotKey(keyCode: resolvedKeyCode, modifiers: resolvedModifiers) {
-                    self.updateScreenTextCaptureMenuItemShortcut(with: resolvedKeyCode, modifiers: resolvedModifiers)
-                }
-            } else {
-                if manager.applyHotKey(keyCode: 0, modifiers: []) {
-                    self.updateScreenTextCaptureMenuItemShortcut()
-                }
-            }
+    private func handleTextCaptureSettingsChange(
+        enabled: Bool,
+        keyCode: UInt16,
+        modifierFlagsRawValue: UInt,
+        manager: TextCaptureHotkeyManager
+    ) {
+        let allModifiers = NSEvent.ModifierFlags(rawValue: modifierFlagsRawValue)
+        let resolvedModifiers = allModifiers.intersection([.command, .control, .option, .shift])
+
+        if enabled, keyCode != 0, !resolvedModifiers.isEmpty {
+            guard manager.applyHotKey(keyCode: keyCode, modifiers: resolvedModifiers) else { return }
+            updateScreenTextCaptureMenuItemShortcut(with: keyCode, modifiers: resolvedModifiers)
+            return
         }
 
+        guard manager.applyHotKey(keyCode: 0, modifiers: []) else { return }
         updateScreenTextCaptureMenuItemShortcut()
     }
 }
@@ -426,67 +449,67 @@ extension MenuBarApp {
         }
     }
 
-    private func shortcutMapping(for keyCode: UInt16) -> (display: String, keyEquivalent: String?)? {
-        let map: [UInt16: (String, String?)] = [
-            1: ("S", "s"),
-            2: ("D", "d"),
-            3: ("F", "f"),
-            4: ("H", "h"),
-            5: ("G", "g"),
-            6: ("Z", "z"),
-            7: ("X", "x"),
-            8: ("C", "c"),
-            9: ("V", "v"),
-            11: ("B", "b"),
-            12: ("Q", "q"),
-            13: ("W", "w"),
-            14: ("E", "e"),
-            15: ("R", "r"),
-            16: ("Y", "y"),
-            17: ("T", "t"),
-            18: ("1", "1"),
-            19: ("2", "2"),
-            20: ("3", "3"),
-            21: ("4", "4"),
-            22: ("6", "6"),
-            23: ("5", "5"),
-            24: ("=", "="),
-            25: ("9", "9"),
-            26: ("7", "7"),
-            27: ("-", "-"),
-            28: ("8", "8"),
-            29: ("0", "0"),
-            30: ("]", "]"),
-            31: ("O", "o"),
-            32: ("U", "u"),
-            33: ("[", "["),
-            34: ("I", "i"),
-            35: ("P", "p"),
-            36: ("↩︎", "\r"),
-            37: ("L", "l"),
-            38: ("J", "j"),
-            39: ("'", "'"),
-            40: ("K", "k"),
-            41: (";", ";"),
-            42: ("\\", "\\"),
-            43: (",", ","),
-            44: ("/", "/"),
-            45: ("N", "n"),
-            46: ("M", "m"),
-            47: (".", "."),
-            48: ("⇥", "\t"),
-            49: ("Space", " "),
-            50: ("`", "`"),
-            51: ("⌫", "\u{8}"),
-            53: ("⎋", "\u{1b}"),
-            117: ("⌦", "\u{7f}"),
-            123: ("←", nil),
-            124: ("→", nil),
-            125: ("↓", nil),
-            126: ("↑", nil)
-        ]
+    private static let shortcutMap: [UInt16: (display: String, keyEquivalent: String?)] = [
+        1: (display: "S", keyEquivalent: "s"),
+        2: (display: "D", keyEquivalent: "d"),
+        3: (display: "F", keyEquivalent: "f"),
+        4: (display: "H", keyEquivalent: "h"),
+        5: (display: "G", keyEquivalent: "g"),
+        6: (display: "Z", keyEquivalent: "z"),
+        7: (display: "X", keyEquivalent: "x"),
+        8: (display: "C", keyEquivalent: "c"),
+        9: (display: "V", keyEquivalent: "v"),
+        11: (display: "B", keyEquivalent: "b"),
+        12: (display: "Q", keyEquivalent: "q"),
+        13: (display: "W", keyEquivalent: "w"),
+        14: (display: "E", keyEquivalent: "e"),
+        15: (display: "R", keyEquivalent: "r"),
+        16: (display: "Y", keyEquivalent: "y"),
+        17: (display: "T", keyEquivalent: "t"),
+        18: (display: "1", keyEquivalent: "1"),
+        19: (display: "2", keyEquivalent: "2"),
+        20: (display: "3", keyEquivalent: "3"),
+        21: (display: "4", keyEquivalent: "4"),
+        22: (display: "6", keyEquivalent: "6"),
+        23: (display: "5", keyEquivalent: "5"),
+        24: (display: "=", keyEquivalent: "="),
+        25: (display: "9", keyEquivalent: "9"),
+        26: (display: "7", keyEquivalent: "7"),
+        27: (display: "-", keyEquivalent: "-"),
+        28: (display: "8", keyEquivalent: "8"),
+        29: (display: "0", keyEquivalent: "0"),
+        30: (display: "]", keyEquivalent: "]"),
+        31: (display: "O", keyEquivalent: "o"),
+        32: (display: "U", keyEquivalent: "u"),
+        33: (display: "[", keyEquivalent: "["),
+        34: (display: "I", keyEquivalent: "i"),
+        35: (display: "P", keyEquivalent: "p"),
+        36: (display: "↩︎", keyEquivalent: "\r"),
+        37: (display: "L", keyEquivalent: "l"),
+        38: (display: "J", keyEquivalent: "j"),
+        39: (display: "'", keyEquivalent: "'"),
+        40: (display: "K", keyEquivalent: "k"),
+        41: (display: ";", keyEquivalent: ";"),
+        42: (display: "\\", keyEquivalent: "\\"),
+        43: (display: ",", keyEquivalent: ","),
+        44: (display: "/", keyEquivalent: "/"),
+        45: (display: "N", keyEquivalent: "n"),
+        46: (display: "M", keyEquivalent: "m"),
+        47: (display: ".", keyEquivalent: "."),
+        48: (display: "⇥", keyEquivalent: "\t"),
+        49: (display: "Space", keyEquivalent: " "),
+        50: (display: "`", keyEquivalent: "`"),
+        51: (display: "⌫", keyEquivalent: "\u{8}"),
+        53: (display: "⎋", keyEquivalent: "\u{1b}"),
+        117: (display: "⌦", keyEquivalent: "\u{7f}"),
+        123: (display: "←", keyEquivalent: nil),
+        124: (display: "→", keyEquivalent: nil),
+        125: (display: "↓", keyEquivalent: nil),
+        126: (display: "↑", keyEquivalent: nil)
+    ]
 
-        return map[keyCode]
+    private func shortcutMapping(for keyCode: UInt16) -> (display: String, keyEquivalent: String?)? {
+        Self.shortcutMap[keyCode]
     }
 
     private func screenCaptureMenuItem() -> NSMenuItem {
