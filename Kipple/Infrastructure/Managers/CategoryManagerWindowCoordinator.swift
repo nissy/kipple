@@ -39,7 +39,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
 
         let window = NSWindow(contentViewController: controller)
         window.title = "Manage Categories"
-        window.styleMask = [.titled, .closable, .resizable]
+        window.styleMask = [.titled, .closable]
 
         applyContentSize(controller, to: window)
         window.center()

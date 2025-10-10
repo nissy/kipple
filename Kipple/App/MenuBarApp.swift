@@ -3,8 +3,6 @@
 //  Kipple
 //
 //  Created by Kipple on 2025/06/28.
-//
-
 import SwiftUI
 import Cocoa
 
@@ -125,13 +123,13 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     private func createMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.delegate = self
+        let menu = NSMenu(); menu.delegate = self
         
         menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(openKippleMenuEntry())
         menu.addItem(screenTextCaptureMenuEntry())
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(screenCaptureMenuItem())
         menu.addItem(NSMenuItem.separator())
 
@@ -146,7 +144,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         updateScreenTextCaptureMenuItemShortcut()
         return menu
     }
-    
+
     private func startServices() {
         // Perform data migration if needed
         Task {
