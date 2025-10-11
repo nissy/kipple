@@ -35,8 +35,13 @@ final class ScreenSelectionOverlayController: NSObject {
             return window
         }
 
-        // 最初のウィンドウをキーにしてキーボードイベントを受け付ける
-        overlayWindows.first?.makeKeyAndOrderFront(nil)
+        // マウス位置と同じ画面のウィンドウをキーにして即時にカーソルを切り替える
+        let mouseLocation = NSEvent.mouseLocation
+        let activeWindow = overlayWindows.first { window in
+            guard let frame = window.screen?.frame else { return false }
+            return frame.contains(mouseLocation)
+        } ?? overlayWindows.first
+        activeWindow?.makeKeyAndOrderFront(nil)
 
         if !cursorPushed {
             NSCursor.crosshair.push()
