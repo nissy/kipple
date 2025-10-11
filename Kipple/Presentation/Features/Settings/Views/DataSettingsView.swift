@@ -156,13 +156,11 @@ struct DataSettingsView: View {
                 
                 // Data Management Section
                 SettingsGroup("Data Management") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Remove all clipboard history items (pinned items stay)")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .padding(.bottom, 4)
-
-                        HStack {
+                    SettingsRow(
+                        label: "Clear history",
+                        description: "Remove all clipboard history items (pinned items stay)"
+                    ) {
+                        HStack(spacing: 10) {
                             Button(action: {
                                 showClearHistoryAlert = true
                             }, label: {
@@ -173,8 +171,8 @@ struct DataSettingsView: View {
                                         .font(.system(size: 12, weight: .medium))
                                 }
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
                                 .background(
                                     LinearGradient(
                                         colors: [Color.red, Color.red.opacity(0.8)],
@@ -183,18 +181,17 @@ struct DataSettingsView: View {
                                     )
                                 )
                                 .cornerRadius(6)
-                                .shadow(color: Color.red.opacity(0.3), radius: 2, y: 1)
+                                .shadow(color: Color.red.opacity(0.25), radius: 1, y: 1)
                             })
                             .buttonStyle(PlainButtonStyle())
                             .disabled(clipboardService.history.isEmpty)
-                            
-                            Spacer()
-                            
-                            // アイテム数の表示
+
+                            Spacer(minLength: 12)
+
                             VStack(alignment: .trailing, spacing: 2) {
                                 let unpinnedCount = clipboardService.history.filter { !$0.isPinned }.count
                                 let pinnedCount = clipboardService.history.filter { $0.isPinned }.count
-                                
+
                                 if unpinnedCount > 0 {
                                     Text("\(unpinnedCount) items in history")
                                         .font(.system(size: 11))

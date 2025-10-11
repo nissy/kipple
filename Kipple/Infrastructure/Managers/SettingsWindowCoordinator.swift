@@ -21,11 +21,11 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     private let viewModel: SettingsViewModel
     private weak var window: NSWindow?
     private var cancellables = Set<AnyCancellable>()
-    private let minimumContentSize = NSSize(width: 480, height: 340)
+    private let minimumContentSize = NSSize(width: 430, height: 300)
     private lazy var toolbar: NSToolbar = {
         let toolbar = NSToolbar(identifier: Self.toolbarIdentifier)
         toolbar.delegate = self
-        toolbar.displayMode = .iconAndLabel
+        toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         toolbar.allowsExtensionItems = false
         return toolbar
@@ -42,6 +42,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     func attach(to window: NSWindow) {
         self.window = window
         window.toolbar = toolbar
+        toolbar.isVisible = false
         toolbar.selectedItemIdentifier = viewModel.selectedTab.toolbarIdentifier
         window.contentMinSize = minimumContentSize
         if #available(macOS 11.0, *) {

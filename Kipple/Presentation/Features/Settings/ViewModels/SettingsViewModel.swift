@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import AppKit
 
 @MainActor
 class SettingsViewModel: ObservableObject {
@@ -74,11 +75,7 @@ class SettingsViewModel: ObservableObject {
         }
 
         var accentColor: Color {
-            switch self {
-            case .general: return .blue
-            case .editor: return .green
-            case .clipboard: return .orange
-            }
+            Color(nsColor: NSColor.controlAccentColor)
         }
     }
 }

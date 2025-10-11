@@ -21,20 +21,22 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            toolbar
+            Divider()
             tabContent
                 .id(activeTab)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .frame(minWidth: 420, idealWidth: 480, maxWidth: 560, alignment: .topLeading)
+        .background(glassBackground)
         .animation(nil, value: activeTab)
         .onReceive(viewModel.$selectedTab) { newTab in
             if activeTab != newTab {
-                activeTab = newTab
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    activeTab = newTab
+                }
             }
         }
-        .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
-        .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
-        .frame(minWidth: 440, alignment: .topLeading)
-        .background(glassBackground)
         .sheet(isPresented: $viewModel.showingAddFallbackSheet) {
             AddFallbackFontSheet(
                 selectedFont: $viewModel.selectedFallbackFont,
@@ -69,8 +71,93 @@ struct SettingsView: View {
         }
     }
 
+    private var toolbar: some View {
+        HStack(alignment: .center, spacing: 8) {
+            ForEach(SettingsViewModel.Tab.allCases, id: \.self) { tab in
+                SettingsToolbarButton(
+                    tab: tab,
+                    isSelected: tab == activeTab,
+                    controlActiveState: controlActiveState
+                ) {
+                    guard activeTab != tab else { return }
+                    viewModel.selectedTab = tab
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(NSColor.windowBackgroundColor).opacity(0.95),
+                    Color(NSColor.windowBackgroundColor).opacity(0.86)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+
     private var glassBackground: some View {
         Color(NSColor.windowBackgroundColor)
+    }
+}
+
+private struct SettingsToolbarButton: View {
+    let tab: SettingsViewModel.Tab
+    let isSelected: Bool
+    let controlActiveState: ControlActiveState
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(borderColor, lineWidth: isSelected ? 1 : 0)
+                    )
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Image(systemName: tab.symbolName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(iconColor)
+                    )
+
+                Text(tab.title)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(labelColor)
+            }
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel(tab.title)
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return tab.accentColor.opacity(controlActiveState == .inactive ? 0.12 : 0.16)
+        } else {
+            return Color.secondary.opacity(controlActiveState == .inactive ? 0.06 : 0.1)
+        }
+    }
+
+    private var borderColor: Color {
+        guard isSelected else { return Color.clear }
+        return tab.accentColor.opacity(controlActiveState == .inactive ? 0.2 : 0.35)
+    }
+
+    private var iconColor: Color {
+        isSelected ? tab.accentColor : Color.secondary
+    }
+
+    private var labelColor: Color {
+        isSelected ? .primary : .secondary
     }
 }
 

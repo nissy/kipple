@@ -401,7 +401,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let window = NSWindow(contentViewController: hostingController)
             window.title = "Kipple Settings"
             window.styleMask = [.titled, .closable]
-            window.setContentSize(NSSize(width: 520, height: 480))
+            window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
             window.isReleasedWhenClosed = false
             window.titleVisibility = .visible
