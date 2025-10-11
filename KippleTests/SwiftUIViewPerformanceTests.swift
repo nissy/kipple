@@ -92,7 +92,6 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     item: ClipItem(content: "Test", isPinned: false),
                     isSelected: false,
                     isCurrentClipboardItem: false,
-                    isScrolling: false,
                     onTap: {},
                     onTogglePin: {},
                     onDelete: {},

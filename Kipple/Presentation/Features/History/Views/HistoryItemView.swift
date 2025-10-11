@@ -12,7 +12,6 @@ struct HistoryItemView: View {
     let item: ClipItem
     let isSelected: Bool
     let isCurrentClipboardItem: Bool
-    let isScrolling: Bool
     let onTap: () -> Void
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
@@ -22,12 +21,13 @@ struct HistoryItemView: View {
     let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
 
-    @ObservedObject private var actionKeyObserver = ActionKeyObserver.shared
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
+    @State private var isScrolling = false
     @State private var currentAnchorView: NSView?
     @State private var isActionKeyActive = false
+    @State private var flagsMonitor: Any?
 
     var body: some View {
         HoverTrackingView(content: rowContent) { hovering, anchor in
@@ -53,21 +53,30 @@ struct HistoryItemView: View {
                 HistoryPopoverManager.shared.scheduleHide()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
+            isScrolling = true
+            HistoryPopoverManager.shared.scheduleHide()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification)) { _ in
+            isScrolling = false
+            if isHovered, let anchor = currentAnchorView {
+                schedulePopoverPresentation(anchor: anchor)
+            }
+        }
         .onDisappear {
             HistoryPopoverManager.shared.hide()
+            if let monitor = flagsMonitor {
+                NSEvent.removeMonitor(monitor)
+                flagsMonitor = nil
+            }
         }
         .onAppear {
-            updateActionKeyActive(with: actionKeyObserver.currentModifiers())
-        }
-        .onChange(of: actionKeyObserver.modifiers) { newValue in
-            updateActionKeyActive(with: newValue)
-        }
-        .onChange(of: isScrolling) { scrolling in
-            if scrolling {
-                cancelPopoverTask()
-                HistoryPopoverManager.shared.scheduleHide()
-            } else if isHovered, let anchor = currentAnchorView {
-                schedulePopoverPresentation(anchor: anchor)
+            updateActionKeyActive()
+            if flagsMonitor == nil {
+                flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                    updateActionKeyActive(with: event.modifierFlags)
+                    return event
+                }
             }
         }
     }

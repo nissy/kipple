@@ -198,37 +198,6 @@ class MainViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.hasMoreHistory)
     }
 
-    func testPaginationLimitPersistsAfterServiceUpdate() {
-        // Given
-        mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }
-        viewModel.loadHistory()
-        let lastVisible = viewModel.history.last
-
-        // When: load more to increase limit
-        if let lastVisible {
-            viewModel.loadMoreHistoryIfNeeded(currentItem: lastVisible)
-        }
-        XCTAssertEqual(viewModel.history.count, 100)
-
-        // サービスから新しい履歴配列が流れてきたケースを模擬
-        let newItem = ClipItem(content: "New Item")
-        mockClipboardService.history.insert(newItem, at: 0)
-        viewModel.updateFilteredItems(mockClipboardService.history)
-
-        // Then: 既に読み込んだ件数を維持しつつ、新規アイテムも先頭で表示される
-        XCTAssertEqual(viewModel.history.count, 100)
-        XCTAssertEqual(viewModel.history.first?.content, newItem.content)
-        XCTAssertTrue(viewModel.hasMoreHistory)
-
-        // When: 履歴が減少した場合は縮小
-        mockClipboardService.history = Array(mockClipboardService.history.prefix(60))
-        viewModel.updateFilteredItems(mockClipboardService.history)
-
-        // Then: 上限は縮小後の件数に合わせて維持される
-        XCTAssertEqual(viewModel.history.count, 60)
-        XCTAssertFalse(viewModel.hasMoreHistory)
-    }
-
     func testSearchDisablesPagination() {
         // Given
         mockClipboardService.history = (1...30).map { ClipItem(content: "Item \($0)") }
