@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
@@ -13,6 +14,7 @@ struct DataSettingsView: View {
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
     @AppStorage("enableAutoClear") private var enableAutoClear = true
     @AppStorage("autoClearInterval") private var autoClearInterval = 10
+    @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
@@ -30,8 +32,19 @@ struct DataSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 ClipboardFontSettingsView()
+
+                // Action Click
+                SettingsGroup("Open URI") {
+                    SettingsRow(
+                        label: "Modified click",
+                        description: "Use modifier + click"
+                    ) {
+                        ModifierKeyPicker(selection: $actionClickModifiers)
+                            .frame(width: 120)
+                    }
+                }
 
                 // Categories management entry (moved from Settings to Manager)
                 SettingsGroup("Categories") {
@@ -41,8 +54,8 @@ struct DataSettingsView: View {
                 }
                 
                 // Auto-Clear Settings Section
-                SettingsGroup("Auto-Clear") {
-                    SettingsRow(label: "Enable Auto-Clear", isOn: $enableAutoClear)
+                SettingsGroup("Auto Clipboard Clear") {
+                    SettingsRow(label: "Enable Auto Clipboard Clear", isOn: $enableAutoClear)
                         .onChange(of: enableAutoClear) { _ in
                             updateAutoClearConfiguration()
                         }
@@ -197,8 +210,8 @@ struct DataSettingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
+            .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .task {
             updateAutoClearConfiguration()

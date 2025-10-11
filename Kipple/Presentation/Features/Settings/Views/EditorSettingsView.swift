@@ -6,9 +6,11 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct EditorSettingsView: View {
     @ObservedObject private var appSettings = AppSettings.shared
+    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
     @State private var tempCopyKeyCode: UInt16 = 6  // Z key
     @State private var tempCopyModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var tempClearKeyCode: UInt16 = 7  // X key
@@ -16,7 +18,7 @@ struct EditorSettingsView: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 // Font Settings
                 SimpleFontSettingsView()
                 // Editor Position
@@ -31,8 +33,8 @@ struct EditorSettingsView: View {
                     }
                 }
                 // Editor Copy Hotkey
-                SettingsGroup("Editor Copy Hotkey") {
-                    SettingsRow(label: "Copy editor content") {
+                SettingsGroup("Editor Copy") {
+                    SettingsRow(label: "Hotkey") {
                         HotkeyRecorderField(
                             keyCode: $tempCopyKeyCode,
                             modifierFlags: $tempCopyModifierFlags
@@ -42,8 +44,8 @@ struct EditorSettingsView: View {
                     }
                 }
                 // Editor Clear Hotkey
-                SettingsGroup("Editor Clear Hotkey") {
-                    SettingsRow(label: "Clear editor content") {
+                SettingsGroup("Editor Clear") {
+                    SettingsRow(label: "Hotkey") {
                         HotkeyRecorderField(
                             keyCode: $tempClearKeyCode,
                             modifierFlags: $tempClearModifierFlags
@@ -52,11 +54,22 @@ struct EditorSettingsView: View {
                         .onChange(of: tempClearModifierFlags) { _ in updateClearHotkey() }
                     }
                 }
+
+                // Editor Insert
+                SettingsGroup("Editor History Insert") {
+                    SettingsRow(
+                        label: "Modified click",
+                        description: "Use modifier + click"
+                    ) {
+                        ModifierKeyPicker(selection: $editorInsertModifiers)
+                            .frame(width: 120)
+                    }
+                }
                 
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
+            .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
             tempCopyKeyCode = UInt16(appSettings.editorCopyHotkeyKeyCode)

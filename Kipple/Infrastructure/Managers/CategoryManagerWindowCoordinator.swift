@@ -39,7 +39,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
 
         let window = NSWindow(contentViewController: controller)
         window.title = "Manage Categories"
-        window.styleMask = [.titled, .closable, .resizable]
+        window.styleMask = [.titled, .closable]
 
         applyContentSize(controller, to: window)
         window.center()
@@ -116,3 +116,11 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         window.setFrameOrigin(targetOrigin)
     }
 }
+
+#if DEBUG
+extension CategoryManagerWindowCoordinator {
+    func test_position(window: NSWindow, near anchorWindow: NSWindow?) {
+        position(window: window, near: anchorWindow)
+    }
+}
+#endif
