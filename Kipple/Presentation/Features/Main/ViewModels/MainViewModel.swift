@@ -217,8 +217,12 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         filteredHistory = filtered
 
         let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
-        if shouldPaginate {
-            currentHistoryLimit = min(pageSize, filtered.count)
+
+        if filtered.isEmpty {
+            currentHistoryLimit = 0
+        } else if shouldPaginate {
+            let baseline = currentHistoryLimit == 0 ? pageSize : max(currentHistoryLimit, pageSize)
+            currentHistoryLimit = min(baseline, filtered.count)
         } else {
             currentHistoryLimit = filtered.count
         }

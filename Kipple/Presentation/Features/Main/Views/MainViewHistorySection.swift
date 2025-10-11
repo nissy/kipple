@@ -27,6 +27,7 @@ struct MainViewHistorySection: View {
 
     @State private var searchText: String
     @State private var searchCancellable: AnyCancellable?
+    @State private var isScrolling = false
 
     init(
         history: [ClipItem],
@@ -113,6 +114,7 @@ struct MainViewHistorySection: View {
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
                                 isCurrentClipboardItem: item.content == currentClipboardContent,
+                                isScrolling: isScrolling,
                                 onTap: {
                                     withAnimation(.spring(response: 0.3)) {
                                         onSelectItem(item)
@@ -153,6 +155,20 @@ struct MainViewHistorySection: View {
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.3)
                 )
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: NSScrollView.willStartLiveScrollNotification
+                    )
+                ) { _ in
+                    isScrolling = true
+                }
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: NSScrollView.didEndLiveScrollNotification
+                    )
+                ) { _ in
+                    isScrolling = false
+                }
         }
         .onChange(of: searchText) { newValue in
             // 検索テキストの変更をデバウンス（パフォーマンス最適化）
