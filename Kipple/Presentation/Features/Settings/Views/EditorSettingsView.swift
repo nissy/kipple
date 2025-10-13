@@ -65,8 +65,6 @@ struct EditorSettingsView: View {
                             .frame(width: 120)
                     }
                 }
-                
-                Spacer()
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)

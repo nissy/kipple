@@ -26,6 +26,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var settingsCoordinator: SettingsToolbarController?
+    private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
     private var isAlwaysOnTop = false {
         didSet {
@@ -392,7 +393,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     // MARK: - Settings Window
     
-    func openSettings() {
+    func openSettings(tab: SettingsViewModel.Tab = .general) {
         if settingsWindow == nil {
             let viewModel = SettingsViewModel()
             let settingsView = SettingsView(viewModel: viewModel)
@@ -401,7 +402,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let window = NSWindow(contentViewController: hostingController)
             window.title = "Kipple Settings"
             window.styleMask = [.titled, .closable]
-            window.setContentSize(NSSize(width: 520, height: 480))
+            window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
             window.isReleasedWhenClosed = false
             window.titleVisibility = .visible
@@ -415,12 +416,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let coordinator = SettingsToolbarController(viewModel: viewModel)
             coordinator.attach(to: window)
             settingsCoordinator = coordinator
+            settingsViewModel = viewModel
 
             settingsWindow = window
         }
 
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+        settingsViewModel?.selectedTab = tab
 
         if let observer = settingsObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -437,6 +440,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 self?.settingsObserver = nil
             }
             self?.settingsCoordinator = nil
+            self?.settingsViewModel = nil
             self?.settingsWindow = nil
         }
     }

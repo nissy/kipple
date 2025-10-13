@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import AppKit
 
 @MainActor
 class SettingsViewModel: ObservableObject {
@@ -56,12 +57,14 @@ class SettingsViewModel: ObservableObject {
         case general
         case editor
         case clipboard
+        case permission
 
         var title: String {
             switch self {
             case .general: return "General"
             case .editor: return "Editor"
             case .clipboard: return "Clipboard"
+            case .permission: return "Permission"
             }
         }
 
@@ -70,15 +73,12 @@ class SettingsViewModel: ObservableObject {
             case .general: return "gear"
             case .editor: return "pencil"
             case .clipboard: return "doc.on.clipboard"
+            case .permission: return "lock.shield"
             }
         }
 
         var accentColor: Color {
-            switch self {
-            case .general: return .blue
-            case .editor: return .green
-            case .clipboard: return .orange
-            }
+            Color(nsColor: NSColor.controlAccentColor)
         }
     }
 }
