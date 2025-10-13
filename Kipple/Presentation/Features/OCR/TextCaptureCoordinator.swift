@@ -10,48 +10,129 @@ import CoreGraphics
 
 @MainActor
 final class TextCaptureCoordinator {
+    typealias OverlaySelectionHandler = (_ rect: CGRect, _ screen: NSScreen) -> Void
+    typealias OverlayCancelHandler = () -> Void
+    typealias ScreenSelectionOverlayFactory = (
+        _ onSelection: @escaping OverlaySelectionHandler,
+        _ onCancel: @escaping OverlayCancelHandler
+    ) -> ScreenSelectionOverlayControlling
+
     private let clipboardService: any ClipboardServiceProtocol
     private let textRecognitionService: any TextRecognitionServiceProtocol
     private let windowManager: WindowManaging
-    private var overlayController: ScreenSelectionOverlayController?
+    private let screenCapturePermission: ScreenCapturePermissionDependencies
+    private let overlayFactory: ScreenSelectionOverlayFactory
+
+    private var overlayController: (any ScreenSelectionOverlayControlling)?
+    private var permissionMonitoringTask: Task<Void, Never>?
+    private var isAwaitingPermission = false
+    private var shouldResumeCaptureAfterPermission = false
 
     init(
         clipboardService: any ClipboardServiceProtocol,
         textRecognitionService: any TextRecognitionServiceProtocol,
-        windowManager: WindowManaging
+        windowManager: WindowManaging,
+        screenCapturePermission: ScreenCapturePermissionDependencies = .live,
+        overlayFactory: @escaping ScreenSelectionOverlayFactory = { onSelection, onCancel in
+            ScreenSelectionOverlayController(onSelection: onSelection, onCancel: onCancel)
+        }
     ) {
         self.clipboardService = clipboardService
         self.textRecognitionService = textRecognitionService
         self.windowManager = windowManager
+        self.screenCapturePermission = screenCapturePermission
+        self.overlayFactory = overlayFactory
+    }
+
+    deinit {
+        permissionMonitoringTask?.cancel()
     }
 
     func startCaptureFlow() {
         Logger.shared.info("Starting OCR capture flow.")
 
-        guard ensureScreenCapturePermission() else {
-            presentPermissionAlert()
+        guard screenCapturePermission.preflight() else {
+            shouldResumeCaptureAfterPermission = true
+            beginPermissionAcquisitionFlow()
             return
         }
 
-        if overlayController != nil {
-            // 既存セッションを強制的にキャンセルしてから再開
-            overlayController?.cancel()
-            overlayController = nil
-        }
+        shouldResumeCaptureAfterPermission = false
+        presentSelectionOverlay()
+    }
 
-        let controller = ScreenSelectionOverlayController(
-            onSelection: { [weak self] rect, screen in
+    func showPermissionSettings() {
+        screenCapturePermission.openPermissionTab()
+    }
+
+    private func presentSelectionOverlay() {
+        overlayController?.cancel()
+        overlayController = nil
+
+        let controller = overlayFactory(
+            { [weak self] rect, screen in
                 Task { @MainActor [weak self] in
                     self?.handleSelection(rect: rect, screen: screen)
                 }
             },
-            onCancel: { [weak self] in
+            { [weak self] in
                 self?.overlayController = nil
             }
         )
 
         overlayController = controller
         controller.present()
+    }
+
+    private func beginPermissionAcquisitionFlow() {
+        guard !isAwaitingPermission else { return }
+
+        isAwaitingPermission = true
+        permissionMonitoringTask?.cancel()
+        permissionMonitoringTask = Task { [weak self] in
+            await self?.monitorPermissionFlow()
+        }
+    }
+
+    @MainActor
+    private func monitorPermissionFlow() async {
+        let grantedImmediately = screenCapturePermission.request()
+
+        if grantedImmediately || screenCapturePermission.preflight() {
+            permissionGranted()
+            return
+        }
+
+        screenCapturePermission.openPermissionTab()
+        screenCapturePermission.openSystemSettings()
+
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(nanoseconds: screenCapturePermission.pollingIntervalNanoseconds)
+            } catch {
+                break
+            }
+
+            if screenCapturePermission.preflight() {
+                permissionGranted()
+                return
+            }
+        }
+    }
+
+    @MainActor
+    private func permissionGranted() {
+        guard isAwaitingPermission else { return }
+
+        isAwaitingPermission = false
+        permissionMonitoringTask?.cancel()
+        permissionMonitoringTask = nil
+
+        let resumeCapture = shouldResumeCaptureAfterPermission
+        shouldResumeCaptureAfterPermission = false
+
+        guard resumeCapture else { return }
+        presentSelectionOverlay()
     }
 
     private func handleSelection(rect: CGRect, screen: NSScreen) {
@@ -96,14 +177,6 @@ final class TextCaptureCoordinator {
         windowManager.showCopiedNotification()
     }
 
-    private func ensureScreenCapturePermission() -> Bool {
-        if CGPreflightScreenCaptureAccess() {
-            return true
-        }
-        Logger.shared.warning("Screen capture access not granted. Requesting permission.")
-        return CGRequestScreenCaptureAccess() && CGPreflightScreenCaptureAccess()
-    }
-
     private func captureImage(from rect: CGRect, on screen: NSScreen) -> CGImage? {
         guard
             let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
@@ -146,18 +219,6 @@ final class TextCaptureCoordinator {
         localRect.origin.y = invertedY
 
         return fullImage.cropping(to: localRect)
-    }
-
-    private func presentPermissionAlert() {
-        let alert = NSAlert()
-        alert.alertStyle = .critical
-        alert.messageText = "Screen Recording Permission Required"
-        alert.informativeText = """
-        Enable Kipple in System Settings > Privacy & Security > Screen Recording.
-        Restart the app after granting access.
-        """
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 
     private func presentErrorAlert(message: String) {
@@ -211,10 +272,46 @@ final class TextCaptureCoordinator {
     }
 }
 
+// MARK: - Dependencies
+
+@MainActor
+extension TextCaptureCoordinator {
+    struct ScreenCapturePermissionDependencies {
+        var preflight: () -> Bool
+        var request: () -> Bool
+        var openPermissionTab: () -> Void
+        var openSystemSettings: () -> Void
+        var pollingIntervalNanoseconds: UInt64
+
+        @MainActor
+        static var live: ScreenCapturePermissionDependencies {
+            ScreenCapturePermissionDependencies(
+                preflight: { CGPreflightScreenCaptureAccess() },
+                request: { CGRequestScreenCaptureAccess() },
+                openPermissionTab: {
+                    NotificationCenter.default.post(
+                        name: .screenRecordingPermissionRequested,
+                        object: nil,
+                        userInfo: nil
+                    )
+                },
+                openSystemSettings: {
+                    ScreenRecordingPermissionOpener.openSystemSettings()
+                },
+                pollingIntervalNanoseconds: 1_000_000_000
+            )
+        }
+    }
+}
+
 #if DEBUG
 extension TextCaptureCoordinator {
     func test_handleRecognizedText(_ text: String) {
         handleRecognizedText(text)
+    }
+
+    func test_isAwaitingPermission() -> Bool {
+        isAwaitingPermission
     }
 }
 #endif

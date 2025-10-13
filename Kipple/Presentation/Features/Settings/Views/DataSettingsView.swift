@@ -169,6 +169,8 @@ struct DataSettingsView: View {
                                         .font(.system(size: 12))
                                     Text("Clear All History")
                                         .font(.system(size: 12, weight: .medium))
+                                        .lineLimit(1)
+                                        .fixedSize()
                                 }
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 14)

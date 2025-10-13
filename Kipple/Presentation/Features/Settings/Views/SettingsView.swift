@@ -68,6 +68,8 @@ struct SettingsView: View {
             EditorSettingsView()
         case .clipboard:
             DataSettingsView()
+        case .permission:
+            PermissionsSettingsView()
         }
     }
 
@@ -133,6 +135,7 @@ private struct SettingsToolbarButton: View {
             }
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
+            .frame(width: SettingsLayoutMetrics.toolbarButtonWidth)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())

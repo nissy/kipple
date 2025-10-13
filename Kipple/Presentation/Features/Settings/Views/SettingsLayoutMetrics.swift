@@ -19,6 +19,7 @@ enum SettingsLayoutMetrics {
     static let groupTopPaddingWithDivider: CGFloat = 6
     static let groupTopPaddingWithoutDivider: CGFloat = 3
     static let groupBottomPadding: CGFloat = 6
+    static let toolbarButtonWidth: CGFloat = 78
     static let rowLabelWidth: CGFloat = 150
     static let rowHorizontalSpacing: CGFloat = 10
     static let rowVerticalSpacing: CGFloat = 2

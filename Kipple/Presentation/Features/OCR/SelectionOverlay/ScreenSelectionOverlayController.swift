@@ -8,7 +8,13 @@
 import AppKit
 
 @MainActor
-final class ScreenSelectionOverlayController: NSObject {
+protocol ScreenSelectionOverlayControlling: AnyObject {
+    func present()
+    func cancel()
+}
+
+@MainActor
+final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayControlling {
     typealias SelectionHandler = (_ rect: CGRect, _ screen: NSScreen) -> Void
     typealias CancelHandler = () -> Void
 
