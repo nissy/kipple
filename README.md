@@ -8,6 +8,12 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 
 <img width="784" height="849" src="https://github.com/user-attachments/assets/75173e80-61de-46b9-84ff-0e894a3a0525" />
 
+## Installation
+1. Download the latest release from the [Releases](https://github.com/nissy/kipple/releases)
+2. Move Kipple.app to Applications folder
+3. Launch Kipple from Applications or Spotlight
+4. Follow the first-run guide to configure hotkeys and history size
+
 ### 🔖 Use Cases
 - **Reading List**: Pin articles and URLs to read later
 - **Code Snippet Manager**: Store and organize frequently used code
@@ -36,12 +42,6 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 
 ## Requirements
 - macOS 13.0 or later
-
-## Installation
-1. Download the latest release from the [Releases](https://github.com/nissy/kipple/releases)
-2. Move Kipple.app to Applications folder
-3. Launch Kipple from Applications or Spotlight
-4. Follow the first-run guide to configure hotkeys and history size
 
 ## Privacy
 - All data stays on your Mac
