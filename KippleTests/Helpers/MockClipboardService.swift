@@ -9,7 +9,7 @@ import Foundation
 @testable import Kipple
 
 @MainActor
-class MockClipboardService: ClipboardServiceProtocol {
+class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling {
     var history: [ClipItem] = [] {
         didSet {
             pinnedItems = history.filter { $0.isPinned }
@@ -33,6 +33,9 @@ class MockClipboardService: ClipboardServiceProtocol {
     var lastDeletedItem: ClipItem?
     var clearAllHistoryCalled = false
     var autoClearRemainingTime: TimeInterval?
+    var pauseAutoClearCalled = false
+    var resumeAutoClearCalled = false
+    private(set) var isAutoClearPaused = false
 
     func startMonitoring() {
         isMonitoringActive = true
@@ -127,6 +130,16 @@ class MockClipboardService: ClipboardServiceProtocol {
         // No-op for mock
     }
 
+    func pauseAutoClearForQueue() {
+        pauseAutoClearCalled = true
+        isAutoClearPaused = true
+    }
+
+    func resumeAutoClearAfterQueue() {
+        resumeAutoClearCalled = true
+        isAutoClearPaused = false
+    }
+
     // Helper methods for testing
     func addTestItem(_ content: String, isPinned: Bool = false, sourceApp: String? = nil) {
         var item = ClipItem(content: content, sourceApp: sourceApp)
@@ -153,5 +166,8 @@ class MockClipboardService: ClipboardServiceProtocol {
         lastDeletedItem = nil
         clearAllHistoryCalled = false
         autoClearRemainingTime = nil
+        pauseAutoClearCalled = false
+        resumeAutoClearCalled = false
+        isAutoClearPaused = false
     }
 }

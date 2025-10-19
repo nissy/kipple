@@ -54,7 +54,8 @@ extension MainView {
     
     private func handleItemSelection(_ item: ClipItem) {
         let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if modifiers.contains(.command), viewModel.canUsePasteQueue {
+        if viewModel.canUsePasteQueue,
+           viewModel.isQueueModeActive {
             viewModel.handleQueueSelection(for: item, modifiers: modifiers)
             return
         }
@@ -214,10 +215,7 @@ extension MainView {
             )
             MainViewControlSection(
                 onCopy: confirmAction,
-                onClear: clearAction,
-                onTogglePasteMode: { viewModel.togglePasteMode() },
-                pasteMode: viewModel.pasteMode,
-                queueEnabled: viewModel.canUsePasteQueue
+                onClear: clearAction
             )
         }
         .id(editorRefreshID)
@@ -402,6 +400,10 @@ extension MainView {
                     viewModel.loadMoreHistoryIfNeeded(currentItem: item)
                 },
                 hasMoreItems: viewModel.hasMoreHistory,
+                queueEnabled: viewModel.canUsePasteQueue,
+                pasteMode: viewModel.pasteMode,
+                onToggleQueueMode: { viewModel.toggleQueueMode() },
+                onToggleQueueRepetition: { viewModel.toggleQueueRepetition() },
                 queueBadgeProvider: viewModel.queueBadge(for:),
                 queueSelectionPreview: viewModel.queueSelectionPreview
             )

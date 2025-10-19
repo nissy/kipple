@@ -5,7 +5,7 @@ import AppKit
 
 /// Adapter to bridge ModernClipboardService (Actor) with existing ClipboardServiceProtocol
 @MainActor
-final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServiceProtocol {
+final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServiceProtocol, QueueAutoClearControlling {
     // MARK: - Published Properties
 
     @Published var history: [ClipItem] = []
@@ -18,6 +18,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private var refreshTask: Task<Void, Never>?
     private nonisolated(unsafe) var autoClearTimer: Timer?
     private var pendingClipboardContent: String?
+    private var autoClearPausedByQueue = false
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -284,6 +285,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         currentClipboardContent = nil
         autoClearRemainingTime = nil
         pendingClipboardContent = nil
+        autoClearPausedByQueue = false
 
         // Ensure we are in sync with the service after it resets.
         await refreshHistory()
@@ -322,10 +324,27 @@ extension ModernClipboardServiceAdapter {
         await modernService.setMaxHistoryItems(max)
         await refreshHistory()
     }
+
+    func pauseAutoClearForQueue() {
+        guard !autoClearPausedByQueue else { return }
+        guard AppSettings.shared.enableAutoClear else { return }
+        autoClearPausedByQueue = true
+        stopAutoClearTimer(resetRemaining: false)
+    }
+
+    func resumeAutoClearAfterQueue() {
+        guard autoClearPausedByQueue else { return }
+        autoClearPausedByQueue = false
+        restartAutoClearTimerIfNeeded()
+    }
 }
 
 private extension ModernClipboardServiceAdapter {
     func restartAutoClearTimerIfNeeded() {
+        if autoClearPausedByQueue {
+            stopAutoClearTimer(resetRemaining: false)
+            return
+        }
         let settings = AppSettings.shared
         guard settings.enableAutoClear else {
             stopAutoClearTimer()

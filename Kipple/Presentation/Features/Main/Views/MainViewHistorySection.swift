@@ -23,6 +23,10 @@ struct MainViewHistorySection: View {
     let onSearchTextChanged: (String) -> Void
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
+    let queueEnabled: Bool
+    let pasteMode: MainViewModel.PasteMode
+    let onToggleQueueMode: () -> Void
+    let onToggleQueueRepetition: () -> Void
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
     @ObservedObject private var fontManager = FontManager.shared
@@ -45,6 +49,10 @@ struct MainViewHistorySection: View {
         onSearchTextChanged: @escaping (String) -> Void,
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
+        queueEnabled: Bool,
+        pasteMode: MainViewModel.PasteMode,
+        onToggleQueueMode: @escaping () -> Void,
+        onToggleQueueRepetition: @escaping () -> Void,
         queueBadgeProvider: @escaping (ClipItem) -> Int?,
         queueSelectionPreview: Set<UUID>
     ) {
@@ -61,6 +69,10 @@ struct MainViewHistorySection: View {
         self.onSearchTextChanged = onSearchTextChanged
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
+        self.queueEnabled = queueEnabled
+        self.pasteMode = pasteMode
+        self.onToggleQueueMode = onToggleQueueMode
+        self.onToggleQueueRepetition = onToggleQueueRepetition
         self.queueBadgeProvider = queueBadgeProvider
         self.queueSelectionPreview = queueSelectionPreview
         _searchText = State(initialValue: initialSearchText)
@@ -70,6 +82,7 @@ struct MainViewHistorySection: View {
         return VStack(spacing: 0) {
             // 検索バー（常に表示）
             HStack(spacing: 10) {
+                queueControls
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color(NSColor.textBackgroundColor))
@@ -174,5 +187,83 @@ struct MainViewHistorySection: View {
         .onAppear {
             onSearchTextChanged(searchText)
         }
+    }
+
+    @ViewBuilder
+    private var queueControls: some View {
+        HStack(spacing: 4) {
+            queueModeButton
+            if pasteMode != .clipboard {
+                queueLoopButton
+            }
+        }
+    }
+
+    private var queueModeButton: some View {
+        let isActive = pasteMode != .clipboard
+        return Button {
+            guard queueEnabled else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                onToggleQueueMode()
+            }
+        } label: {
+            VStack(spacing: 1) {
+                ZStack {
+                    Circle()
+                        .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
+                        .frame(width: 24, height: 24)
+                        .shadow(color: isActive ? Color.accentColor.opacity(0.3) : .clear,
+                                radius: 3,
+                                y: 2)
+
+                    Image(systemName: "list.number")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(isActive ? .white : .secondary)
+                }
+
+                Text("Queue")
+                    .font(.system(size: 7.5))
+                    .foregroundColor(isActive ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 34)
+            .opacity(queueEnabled ? 1.0 : 0.4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!queueEnabled)
+    }
+
+    private var queueLoopButton: some View {
+        let isLooping = pasteMode == .queueToggle
+        return Button {
+            guard queueEnabled else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                onToggleQueueRepetition()
+            }
+        } label: {
+            VStack(spacing: 1) {
+                ZStack {
+                    Circle()
+                        .fill(isLooping ? Color.accentColor : Color.secondary.opacity(0.1))
+                        .frame(width: 24, height: 24)
+                        .shadow(color: isLooping ? Color.accentColor.opacity(0.3) : .clear,
+                                radius: 3,
+                                y: 2)
+
+                    Image(systemName: isLooping ? "repeat.circle.fill" : "repeat")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(isLooping ? .white : .secondary)
+                }
+
+                Text("Loop")
+                    .font(.system(size: 7.5))
+                    .foregroundColor(isLooping ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 34)
+            .opacity(queueEnabled ? 1.0 : 0.4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!queueEnabled)
     }
 }

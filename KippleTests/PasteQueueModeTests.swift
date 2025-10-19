@@ -39,6 +39,7 @@ final class PasteQueueModeTests: XCTestCase {
     func testEnqueueAddsItemsInOrder() {
         let items = Array(mockService.history.prefix(2))
 
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
 
         XCTAssertEqual(viewModel.pasteMode, .queueOnce)
@@ -49,6 +50,7 @@ final class PasteQueueModeTests: XCTestCase {
 
     func testEnqueueIgnoresDuplicatesAndAppends() {
         let items = Array(mockService.history.prefix(3))
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: [items[0], items[1]], anchor: items[1])
         viewModel.queueSelection(items: [items[1], items[2]], anchor: items[2])
 
@@ -60,28 +62,30 @@ final class PasteQueueModeTests: XCTestCase {
     func testHandleQueueSelectionWithShiftSelectsRange() {
         let items = Array(mockService.history.prefix(4))
 
-        viewModel.handleQueueSelection(for: items[1], modifiers: [.command])
-        viewModel.handleQueueSelection(for: items[3], modifiers: [.command, .shift])
+        viewModel.toggleQueueMode()
+
+        viewModel.handleQueueSelection(for: items[1], modifiers: [])
+        viewModel.handleQueueSelection(for: items[3], modifiers: [.shift])
         let expectedPreview = Set([items[1], items[0], items[2], items[3]].map(\.id))
         XCTAssertEqual(viewModel.queueSelectionPreview, expectedPreview)
         XCTAssertEqual(viewModel.pasteQueue, [items[1].id])
 
-        viewModel.handleModifierFlagsChanged([.command])
+        viewModel.handleModifierFlagsChanged([])
 
         XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
         XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[2].id, items[3].id])
-        XCTAssertFalse(viewModel.pasteQueue.contains(items[1].id))
     }
 
     func testShiftSelectionTogglesExistingRange() {
         let items = Array(mockService.history.prefix(3))
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.first)
 
-        viewModel.handleQueueSelection(for: items[0], modifiers: [.command, .shift])
-        viewModel.handleQueueSelection(for: items[2], modifiers: [.command, .shift])
+        viewModel.handleQueueSelection(for: items[0], modifiers: [.shift])
+        viewModel.handleQueueSelection(for: items[2], modifiers: [.shift])
         XCTAssertEqual(viewModel.queueSelectionPreview, Set(items.map(\.id)))
 
-        viewModel.handleModifierFlagsChanged([.command])
+        viewModel.handleModifierFlagsChanged([])
 
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
@@ -91,78 +95,162 @@ final class PasteQueueModeTests: XCTestCase {
     func testShiftSelectionAddsAndRemovesMixedItems() {
         let items = Array(mockService.history.prefix(4))
 
-        viewModel.handleQueueSelection(for: items[0], modifiers: [.command])
-        viewModel.handleQueueSelection(for: items[3], modifiers: [.command, .shift])
+        viewModel.toggleQueueMode()
+
+        viewModel.handleQueueSelection(for: items[0], modifiers: [])
+        viewModel.handleQueueSelection(for: items[3], modifiers: [.shift])
 
         XCTAssertEqual(viewModel.queueSelectionPreview, Set(items[0...3].map(\.id)))
 
-        viewModel.handleModifierFlagsChanged([.command])
+        viewModel.handleModifierFlagsChanged([])
 
-        XCTAssertEqual(Set(viewModel.pasteQueue), Set([items[1].id, items[2].id, items[3].id]))
-        XCTAssertFalse(viewModel.pasteQueue.contains(items[0].id))
+        XCTAssertEqual(viewModel.pasteQueue, [items[1].id, items[2].id, items[3].id])
         XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
     }
 
-    func testShiftSelectionIgnoresItemsAboveAnchor() {
+    func testShiftSelectionAddsRangeAboveAnchorAnchorsFirst() {
+        let items = Array(mockService.history.prefix(4))
+        let baseline = [items[0], items[1], items[2], items[3]]
+
+        let selection = viewModel.makeShiftSelectionRange(
+            baselineItems: baseline,
+            anchorIndex: 3,
+            currentIndex: 1
+        )
+
+        XCTAssertEqual(selection.map(\.id), [items[3].id, items[2].id, items[1].id])
+    }
+
+    func testShiftSelectionFirstShiftClickShowsPreview() {
+        let items = Array(mockService.history.prefix(3))
+
+        viewModel.toggleQueueMode()
+
+        viewModel.handleQueueSelection(for: items[1], modifiers: [.shift])
+
+        XCTAssertEqual(viewModel.queueSelectionPreview, Set([items[1].id]))
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+    }
+
+    func testShiftSelectionStartingWithShiftProducesRange() {
         let items = Array(mockService.history.prefix(4))
 
-        viewModel.handleQueueSelection(for: items[0], modifiers: [.command])
-        viewModel.handleQueueSelection(for: items[1], modifiers: [.command])
-        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+        viewModel.toggleQueueMode()
 
-        viewModel.handleQueueSelection(for: items[0], modifiers: [.command, .shift])
+        viewModel.handleQueueSelection(for: items[3], modifiers: [.shift])
+        XCTAssertEqual(viewModel.queueSelectionPreview, Set([items[3].id]))
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
 
-        XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
-        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+        viewModel.handleQueueSelection(for: items[1], modifiers: [.shift])
+        let expectedPreview = Set([items[3], items[2], items[1]].map(\.id))
+        XCTAssertEqual(viewModel.queueSelectionPreview, expectedPreview)
 
-        viewModel.handleModifierFlagsChanged([.command])
+        viewModel.handleModifierFlagsChanged([])
 
-        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+        XCTAssertEqual(viewModel.pasteQueue, [items[3].id, items[2].id, items[1].id])
         XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
     }
 
-    func testShiftSelectionRecoversAfterIgnoringUpwardSelection() {
-        let items = Array(mockService.history.prefix(5))
+    func testQueueBadgeReflectsShiftSelectionPreview() {
+        let items = Array(mockService.history.prefix(3))
 
-        viewModel.handleQueueSelection(for: items[0], modifiers: [.command])
-        viewModel.handleQueueSelection(for: items[1], modifiers: [.command])
-        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+        viewModel.toggleQueueMode()
 
-        viewModel.handleQueueSelection(for: items[0], modifiers: [.command, .shift])
+        viewModel.handleQueueSelection(for: items[0], modifiers: [])
+        XCTAssertEqual(viewModel.queueBadge(for: items[0]), 1)
 
-        XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
-        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+        viewModel.handleQueueSelection(for: items[2], modifiers: [.shift])
 
-        viewModel.handleQueueSelection(for: items[4], modifiers: [.command, .shift])
-        let expectedPreview = Set([items[1], items[2], items[3], items[4]].map(\.id))
+        XCTAssertNil(viewModel.queueBadge(for: items[0]))
+        XCTAssertEqual(viewModel.queueBadge(for: items[1]), 1)
+        XCTAssertEqual(viewModel.queueBadge(for: items[2]), 2)
+
+        viewModel.handleModifierFlagsChanged([])
+
+        XCTAssertNil(viewModel.queueBadge(for: items[0]))
+        XCTAssertEqual(viewModel.queueBadge(for: items[1]), 1)
+        XCTAssertEqual(viewModel.queueBadge(for: items[2]), 2)
+        XCTAssertEqual(viewModel.pasteQueue, [items[1].id, items[2].id])
+    }
+
+    func testShiftSelectionUpwardOverExistingRangeRemovesIt() {
+        let items = Array(mockService.history.prefix(4))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items[3])
+
+        viewModel.handleQueueSelection(for: items[1], modifiers: [.shift])
+
+        let expectedPreview = Set([items[3], items[2], items[1]].map(\.id))
         XCTAssertEqual(viewModel.queueSelectionPreview, expectedPreview)
 
-        viewModel.handleModifierFlagsChanged([.command])
+        viewModel.handleModifierFlagsChanged([])
 
-        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[2].id, items[3].id, items[4].id])
+        XCTAssertEqual(viewModel.pasteQueue, [items[0].id])
+        XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
+    }
+
+    func testQueueBadgeKeepsExistingOrderDuringPreview() {
+        let items = Array(mockService.history.prefix(3))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.last)
+
+        XCTAssertEqual(viewModel.queueBadge(for: items[0]), 1)
+        XCTAssertEqual(viewModel.queueBadge(for: items[1]), 2)
+        XCTAssertEqual(viewModel.queueBadge(for: items[2]), 3)
+
+        viewModel.handleQueueSelection(for: items[0], modifiers: [.shift])
+
+        XCTAssertNil(viewModel.queueBadge(for: items[0]))
+        XCTAssertNil(viewModel.queueBadge(for: items[1]))
+        XCTAssertNil(viewModel.queueBadge(for: items[2]))
+    }
+
+    func testShiftSelectionUpwardFromAnchorReordersQueue() {
+        let items = Array(mockService.history.prefix(4))
+
+        viewModel.toggleQueueMode()
+
+        viewModel.handleQueueSelection(for: items[0], modifiers: [])
+        viewModel.handleQueueSelection(for: items[1], modifiers: [])
+        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+
+        viewModel.handleQueueSelection(for: items[0], modifiers: [.shift])
+
+        let expectedPreview = Set([items[1], items[0]].map(\.id))
+        XCTAssertEqual(viewModel.queueSelectionPreview, expectedPreview)
+        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+
+        viewModel.handleModifierFlagsChanged([])
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
         XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
     }
 
     func testShiftSelectionWithQueuedAnchorUsesDisplayOrderRange() {
         let items = Array(mockService.history.prefix(5))
 
-        viewModel.handleQueueSelection(for: items[3], modifiers: [.command])
+        viewModel.toggleQueueMode()
+
+        viewModel.handleQueueSelection(for: items[3], modifiers: [])
         XCTAssertEqual(viewModel.pasteQueue, [items[3].id])
 
-        viewModel.handleQueueSelection(for: items[4], modifiers: [.command, .shift])
+        viewModel.handleQueueSelection(for: items[4], modifiers: [.shift])
 
         let expectedPreview = Set([items[3], items[0], items[1], items[2], items[4]].map(\.id))
         XCTAssertEqual(viewModel.queueSelectionPreview, expectedPreview)
 
-        viewModel.handleModifierFlagsChanged([.command])
+        viewModel.handleModifierFlagsChanged([])
 
-        XCTAssertFalse(viewModel.pasteQueue.contains(items[3].id))
         XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id, items[2].id, items[4].id])
         XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
     }
     func testQueueSelectionStartsMonitoringAndCopiesFirstItem() {
         let items = Array(mockService.history.prefix(2))
 
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
 
         XCTAssertTrue(pasteMonitor.isMonitoring)
@@ -173,6 +261,7 @@ final class PasteQueueModeTests: XCTestCase {
         pasteMonitor.hasAccessibilityPermission = false
         let items = Array(mockService.history.prefix(2))
 
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
 
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
@@ -180,8 +269,41 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertFalse(pasteMonitor.isMonitoring)
     }
 
+    func testQueueSelectionIgnoredWhenQueueModeDisabled() {
+        let target = mockService.history[0]
+
+        viewModel.handleQueueSelection(for: target, modifiers: [])
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+    }
+
+    func testToggleQueueModePausesAndResumesAutoClear() {
+        viewModel.toggleQueueMode()
+
+        XCTAssertTrue(mockService.pauseAutoClearCalled)
+
+        viewModel.toggleQueueMode()
+
+        XCTAssertTrue(mockService.resumeAutoClearCalled)
+    }
+
+    func testExternalCopyWhileQueueModeActiveResetsQueue() {
+        let items = Array(mockService.history.prefix(2))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.last)
+
+        mockService.copyToClipboard("External Copy", fromEditor: false)
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+        XCTAssertTrue(mockService.resumeAutoClearCalled)
+    }
+
     func testPasteCommandAdvancesQueueInQueueMode() async {
         let items = Array(mockService.history.prefix(2))
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
 
         pasteMonitor.simulatePasteCommand()
@@ -194,8 +316,9 @@ final class PasteQueueModeTests: XCTestCase {
 
     func testPasteCommandCyclesQueueInToggleMode() async {
         let items = Array(mockService.history.prefix(2))
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
-        viewModel.togglePasteMode()
+        viewModel.toggleQueueRepetition()
 
         pasteMonitor.simulatePasteCommand()
 
@@ -207,6 +330,7 @@ final class PasteQueueModeTests: XCTestCase {
 
     func testResetPasteQueueClearsStateAndStopsMonitoring() {
         let items = Array(mockService.history.prefix(2))
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
 
         viewModel.resetPasteQueue()
@@ -214,10 +338,12 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertFalse(pasteMonitor.isMonitoring)
+        XCTAssertTrue(mockService.resumeAutoClearCalled)
     }
 
     func testPasteCommandUntilQueueEmptiesStopsMonitoring() async {
         let items = Array(mockService.history.prefix(2))
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: items, anchor: items.last)
 
         pasteMonitor.simulatePasteCommand()
@@ -232,10 +358,59 @@ final class PasteQueueModeTests: XCTestCase {
 
     func testUpdateFilteredItemsRespectsQueueOrdering() {
         let items = mockService.history
+        viewModel.toggleQueueMode()
         viewModel.queueSelection(items: [items[2], items[0]], anchor: items[0])
         viewModel.loadHistory()
 
         XCTAssertEqual(viewModel.history.prefix(2).map(\.id), [items[2].id, items[0].id])
+    }
+
+    func testQueueOnceCompletionClearsClipboardAndResumesAutoClear() async {
+        let items = Array(mockService.history.prefix(2))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.last)
+
+        pasteMonitor.simulatePasteCommand()
+        await Task.yield()
+        pasteMonitor.simulatePasteCommand()
+        await Task.yield()
+        await Task.yield()
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+        XCTAssertNil(mockService.currentClipboardContent)
+        XCTAssertTrue(mockService.resumeAutoClearCalled)
+    }
+
+    func testManualCopyClearsQueueAndReturnsToClipboardMode() {
+        let items = Array(mockService.history.prefix(2))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: [items[0]], anchor: items[0])
+
+        viewModel.selectHistoryItem(items[1])
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+        XCTAssertTrue(mockService.resumeAutoClearCalled)
+    }
+    func testShiftSelectionMixedQueueAndNewItemsRemovesQueuedOnes() {
+        let items = Array(mockService.history.prefix(4))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: Array(items[0...1]), anchor: items[1])
+
+        viewModel.handleQueueSelection(for: items[3], modifiers: [.shift])
+
+        XCTAssertEqual(viewModel.queueBadge(for: items[0]), 1)
+        XCTAssertNil(viewModel.queueBadge(for: items[1]))
+        XCTAssertEqual(viewModel.queueBadge(for: items[2]), 2)
+        XCTAssertEqual(viewModel.queueBadge(for: items[3]), 3)
+
+        viewModel.handleModifierFlagsChanged([])
+
+        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[2].id, items[3].id])
     }
 }
 

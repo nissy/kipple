@@ -10,27 +10,10 @@ import SwiftUI
 struct MainViewControlSection: View {
     let onCopy: () -> Void
     let onClear: () -> Void
-    let onTogglePasteMode: () -> Void
-    let pasteMode: MainViewModel.PasteMode
-    let queueEnabled: Bool
     @ObservedObject private var appSettings = AppSettings.shared
-    
+
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: onTogglePasteMode) {
-                Label(modeButtonTitle(), systemImage: modeButtonIcon())
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color(NSColor.controlBackgroundColor).opacity(0.8))
-                    )
-            }
-            .buttonStyle(.plain)
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .disabled(!queueEnabled)
-            
             Button(action: onCopy) {
                 HStack(spacing: 4) {
                     Label("Copy", systemImage: "doc.on.doc")
@@ -99,28 +82,6 @@ struct MainViewControlSection: View {
         return parts.joined()
     }
 
-    private func modeButtonTitle() -> String {
-        switch pasteMode {
-        case .clipboard:
-            return "Clipboard"
-        case .queueOnce:
-            return "Paste Queue"
-        case .queueToggle:
-            return "Queue Toggle"
-        }
-    }
-
-    private func modeButtonIcon() -> String {
-        switch pasteMode {
-        case .clipboard:
-            return "doc.on.clipboard"
-        case .queueOnce:
-            return "list.number"
-        case .queueToggle:
-            return "repeat"
-        }
-    }
-    
     private func keyCodeToString(_ keyCode: UInt16) -> String? {
         // 一般的なキーコードのマッピング
         let keyMap: [UInt16: String] = [
