@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import CoreGraphics
+import ApplicationServices
 
 struct PermissionsSettingsView: View {
     @AppStorage("textCaptureHotkeyKeyCode") private var textCaptureHotkeyKeyCode: Int = 0
@@ -16,6 +17,7 @@ struct PermissionsSettingsView: View {
     @State private var tempCaptureKeyCode: UInt16 = 17
     @State private var tempCaptureModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var hasScreenCapturePermission = CGPreflightScreenCaptureAccess()
+    @State private var hasAccessibilityPermission = AXIsProcessTrusted()
     @State private var captureHotkeyError: String?
     @State private var permissionPollingTimer: Timer?
 
@@ -26,6 +28,7 @@ struct PermissionsSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 screenRecordingSection
+                accessibilitySection
                 screenTextCaptureSection
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
@@ -33,13 +36,13 @@ struct PermissionsSettingsView: View {
         }
         .onAppear {
             loadCaptureHotkeyState()
-            refreshScreenCapturePermission()
+            refreshPermissions()
         }
         .onDisappear {
             stopPermissionPolling()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            refreshScreenCapturePermission()
+            refreshPermissions()
         }
     }
 
@@ -75,6 +78,44 @@ struct PermissionsSettingsView: View {
             SettingsRow(label: "Request Access", layout: .inlineControl) {
                 Button("Request Permission Again") {
                     requestPermissionAgain()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundColor(Color.accentColor)
+            }
+        }
+    }
+
+    private var accessibilitySection: some View {
+        SettingsGroup(
+            "Accessibility Permission",
+            headerAccessory: AnyView(
+                PermissionStatusBadge(isGranted: hasAccessibilityPermission)
+            )
+        ) {
+            SettingsRow(label: "Overview") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("1. Open System Settings → Privacy & Security → Accessibility.")
+                    Text("2. Turn on the toggle next to “Kipple”.")
+                    Text("3. Return to Kipple; this screen updates automatically.")
+                    Text("Tip: This allows Kipple to observe Command+V while running in the background.")
+                }
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+            }
+
+            SettingsRow(label: "System Settings", layout: .inlineControl) {
+                Button("Open Accessibility Preferences") {
+                    openAccessibilityPreferences()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundColor(Color.accentColor)
+            }
+
+            SettingsRow(label: "Request Access", layout: .inlineControl) {
+                Button("Request Permission Again") {
+                    requestAccessibilityPermission()
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 12))
@@ -180,6 +221,7 @@ struct PermissionsSettingsView: View {
         )
     }
 
+    @MainActor
     private func refreshScreenCapturePermission() {
         let granted = CGPreflightScreenCaptureAccess()
         if granted != hasScreenCapturePermission {
@@ -194,6 +236,20 @@ struct PermissionsSettingsView: View {
         }
     }
 
+    @MainActor
+    private func refreshAccessibilityPermission() {
+        let granted = AXIsProcessTrusted()
+        if granted != hasAccessibilityPermission {
+            hasAccessibilityPermission = granted
+        }
+    }
+
+    @MainActor
+    private func refreshPermissions() {
+        refreshScreenCapturePermission()
+        refreshAccessibilityPermission()
+    }
+
     private func openSystemSettings() {
         startPermissionPolling()
         ScreenRecordingPermissionOpener.openSystemSettings()
@@ -202,6 +258,21 @@ struct PermissionsSettingsView: View {
     private func requestPermissionAgain() {
         startPermissionPolling()
         _ = CGRequestScreenCaptureAccess()
+    }
+
+    @MainActor
+    private func openAccessibilityPreferences() {
+        startPermissionPolling()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @MainActor
+    private func requestAccessibilityPermission() {
+        startPermissionPolling()
+        let options: [CFString: Bool] = ["AXTrustedCheckOptionPrompt" as CFString: true]
+        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
     private func openPermissionTab() {
@@ -216,12 +287,12 @@ struct PermissionsSettingsView: View {
     private func startPermissionPolling() {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            refreshScreenCapturePermission()
+            refreshPermissions()
         }
         if let timer = permissionPollingTimer {
             RunLoop.main.add(timer, forMode: .common)
         }
-        refreshScreenCapturePermission()
+        refreshPermissions()
     }
 
     private func stopPermissionPolling() {

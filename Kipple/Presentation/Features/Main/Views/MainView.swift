@@ -26,6 +26,7 @@ struct MainView: View {
     @State private var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
+    @State private var modifierMonitor: Any?
     // Copied通知の遅延非表示を管理（多重スケジュール防止）
     @State private var copiedHideWorkItem: DispatchWorkItem?
     
@@ -52,6 +53,12 @@ struct MainView: View {
 extension MainView {
     
     private func handleItemSelection(_ item: ClipItem) {
+        let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if modifiers.contains(.command), viewModel.canUsePasteQueue {
+            viewModel.handleQueueSelection(for: item, modifiers: modifiers)
+            return
+        }
+
         if viewModel.shouldInsertToEditor() {
             viewModel.insertToEditor(content: item.content)
             // エディタ挿入の場合はウィンドウを閉じない
@@ -164,11 +171,27 @@ extension MainView {
                 // Cmd+O 実行は不要（削除）
                 return event
             }
+
+            if let monitor = modifierMonitor {
+                NSEvent.removeMonitor(monitor)
+                modifierMonitor = nil
+            }
+            modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                let normalized = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                viewModel.handleModifierFlagsChanged(normalized)
+                return event
+            }
+            let currentFlags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            viewModel.handleModifierFlagsChanged(currentFlags)
         }
         .onDisappear {
             if let monitor = keyDownMonitor {
                 NSEvent.removeMonitor(monitor)
                 keyDownMonitor = nil
+            }
+            if let monitor = modifierMonitor {
+                NSEvent.removeMonitor(monitor)
+                modifierMonitor = nil
             }
             // Cancel any scheduled hide for copied notification to avoid retaining self after window closes
             copiedHideWorkItem?.cancel()
@@ -191,7 +214,10 @@ extension MainView {
             )
             MainViewControlSection(
                 onCopy: confirmAction,
-                onClear: clearAction
+                onClear: clearAction,
+                onTogglePasteMode: { viewModel.togglePasteMode() },
+                pasteMode: viewModel.pasteMode,
+                queueEnabled: viewModel.canUsePasteQueue
             )
         }
         .id(editorRefreshID)
@@ -375,7 +401,9 @@ extension MainView {
                 onLoadMore: { item in
                     viewModel.loadMoreHistoryIfNeeded(currentItem: item)
                 },
-                hasMoreItems: viewModel.hasMoreHistory
+                hasMoreItems: viewModel.hasMoreHistory,
+                queueBadgeProvider: viewModel.queueBadge(for:),
+                queueSelectionPreview: viewModel.queueSelectionPreview
             )
             .id(historyRefreshID)
         }
@@ -508,7 +536,7 @@ extension MainView {
             .background(.ultraThinMaterial)
         )
     }
-    
+
     // MARK: - Actions
     private func confirmAction() {
         viewModel.copyEditor()
@@ -545,7 +573,7 @@ extension MainView {
         copiedHideWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
     }
-    
+
     private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
         switch category {
         case .all:
@@ -553,31 +581,5 @@ extension MainView {
         case .url:
             return appSettings.filterCategoryURL
         }
-    }
-    
-    private func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
-        let seconds = Int(timeInterval) % 60
-        
-        if minutes > 0 {
-            return String(format: "%02d:%02d", minutes, seconds)
-        } else {
-            return String(format: "00:%02d", seconds)
-        }
-    }
-
-    private func clearSystemClipboard() {
-        Task {
-            await viewModel.clipboardService.clearSystemClipboard()
-        }
-    }
-
-    private func presentCategoryManager() {
-        let anchor = NSApp.keyWindow
-        CategoryManagerWindowCoordinator.shared.open(
-            relativeTo: anchor,
-            onOpen: { onSetPreventAutoClose?(true) },
-            onClose: { onSetPreventAutoClose?(false) }
-        )
     }
 }

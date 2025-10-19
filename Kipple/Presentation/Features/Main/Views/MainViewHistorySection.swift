@@ -23,6 +23,8 @@ struct MainViewHistorySection: View {
     let onSearchTextChanged: (String) -> Void
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
+    let queueBadgeProvider: (ClipItem) -> Int?
+    let queueSelectionPreview: Set<UUID>
     @ObservedObject private var fontManager = FontManager.shared
 
     @State private var searchText: String
@@ -42,7 +44,9 @@ struct MainViewHistorySection: View {
         initialSearchText: String,
         onSearchTextChanged: @escaping (String) -> Void,
         onLoadMore: @escaping (ClipItem) -> Void,
-        hasMoreItems: Bool
+        hasMoreItems: Bool,
+        queueBadgeProvider: @escaping (ClipItem) -> Int?,
+        queueSelectionPreview: Set<UUID>
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
@@ -57,6 +61,8 @@ struct MainViewHistorySection: View {
         self.onSearchTextChanged = onSearchTextChanged
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
+        self.queueBadgeProvider = queueBadgeProvider
+        self.queueSelectionPreview = queueSelectionPreview
         _searchText = State(initialValue: initialSearchText)
     }
 
@@ -113,6 +119,8 @@ struct MainViewHistorySection: View {
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
                                 isCurrentClipboardItem: item.content == currentClipboardContent,
+                                queueBadge: queueBadgeProvider(item),
+                                isQueuePreviewed: queueSelectionPreview.contains(item.id),
                                 onTap: {
                                     withAnimation(.spring(response: 0.3)) {
                                         onSelectItem(item)

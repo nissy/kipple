@@ -12,6 +12,8 @@ struct HistoryItemView: View {
     let item: ClipItem
     let isSelected: Bool
     let isCurrentClipboardItem: Bool
+    let queueBadge: Int?
+    let isQueuePreviewed: Bool
     let onTap: () -> Void
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
@@ -88,6 +90,7 @@ struct HistoryItemView: View {
                 .onTapGesture { handleTap() }
 
             HStack(spacing: 8) {
+                queueBadgeView
                 pinButton
                 categoryMenu
                 historyText
@@ -99,20 +102,47 @@ struct HistoryItemView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    @ViewBuilder
+    private var queueBadgeView: some View {
+        if let queueBadge {
+            Text("\(queueBadge)")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(Color.accentColor)
+                )
+                .contentShape(Circle())
+                .help("Queue position \(queueBadge)")
+        }
+    }
+
     private var backgroundView: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(
-                isSelected ? AnyShapeStyle(LinearGradient(
-                    colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )) : AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
-            )
-            .overlay(
-                isHovered && !isSelected ?
+        let baseFill: AnyShapeStyle
+        if isSelected {
+            baseFill = AnyShapeStyle(LinearGradient(
+                colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+        } else if isQueuePreviewed {
+            baseFill = AnyShapeStyle(Color.accentColor.opacity(0.25))
+        } else {
+            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
+        }
+
+        return RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(baseFill)
+            .overlay {
+                if isHovered && !isSelected {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1) : nil
-            )
+                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                } else if isQueuePreviewed && !isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
+                }
+            }
             .shadow(
                 color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
                 radius: isSelected ? 8 : 0,

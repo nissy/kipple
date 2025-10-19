@@ -9,8 +9,15 @@ import Foundation
 import SwiftUI
 import Combine
 
+// swiftlint:disable type_body_length file_length
 @MainActor
 class MainViewModel: ObservableObject, MainViewModelProtocol {
+    enum PasteMode {
+        case clipboard
+        case queueOnce
+        case queueToggle
+    }
+
     @Published var editorText: String {
         didSet {
             // パフォーマンス最適化：デバウンスを使用して保存処理を遅延
@@ -21,6 +28,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     private let saveDebouncer = PassthroughSubject<String, Never>()
     
     let clipboardService: any ClipboardServiceProtocol
+    private let pasteMonitor: any PasteCommandMonitoring
     private var cancellables = Set<AnyCancellable>()
     private var serviceCancellables = Set<AnyCancellable>()
     
@@ -42,6 +50,9 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var selectedCategory: ClipItemCategory?
     @Published var selectedUserCategoryId: UUID?
     @Published var isPinnedFilterActive: Bool = false
+    @Published private(set) var pasteMode: PasteMode = .clipboard
+    @Published private(set) var pasteQueue: [UUID] = []
+    @Published private(set) var queueSelectionPreview: Set<UUID> = []
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String?
@@ -54,8 +65,18 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     private let pageSize: Int
     private var currentHistoryLimit: Int = 0
     private var isLoadingMore = false
+    private var lastQueueAnchorID: UUID?
+    private var filteredOrderingSnapshot: [ClipItem] = []
+    private var isPasteMonitorActive = false
+    private var isShiftSelecting = false
+    private var pendingShiftSelection: [ClipItem] = []
+    private var shiftSelectionInitialQueue: [UUID] = []
 
-    init(clipboardService: (any ClipboardServiceProtocol)? = nil, pageSize: Int = 50) {
+    init(
+        clipboardService: (any ClipboardServiceProtocol)? = nil,
+        pageSize: Int = 50,
+        pasteMonitor: any PasteCommandMonitoring = PasteCommandMonitor()
+    ) {
         self.pageSize = max(1, pageSize)
         // 保存されたエディタテキストを読み込む（なければ空文字）
         self.editorText = UserDefaults.standard.string(forKey: "lastEditorText") ?? ""
@@ -66,6 +87,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             // Fallback to default service
             self.clipboardService = ClipboardServiceProvider.resolve()
         }
+        self.pasteMonitor = pasteMonitor
 
         // デバウンスされた保存処理を設定
         saveDebouncer
@@ -196,6 +218,9 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         if showOnlyPinned || isPinnedFilterActive {
             filtered = filtered.filter { $0.isPinned }
         }
+
+        filtered = applyQueueOrdering(to: filtered)
+        filteredOrderingSnapshot = filtered
 
         updatePagination(with: filtered)
     }
@@ -342,4 +367,298 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         isPinnedFilterActive = false
         updateFilteredItems(clipboardService.history)
     }
+
+    // MARK: - Paste Queue Management
+
+    func queueSelection(items: [ClipItem], anchor: ClipItem?) {
+        guard canUsePasteQueue else { return }
+        guard !items.isEmpty else { return }
+
+        if pasteMode == .clipboard {
+            pasteMode = .queueOnce
+        }
+
+        let wasQueueEmpty = pasteQueue.isEmpty
+        var updatedQueue = pasteQueue
+        for item in items {
+            if let existingIndex = updatedQueue.firstIndex(of: item.id) {
+                updatedQueue.remove(at: existingIndex)
+            }
+            updatedQueue.append(item.id)
+        }
+        pasteQueue = updatedQueue
+
+        if let anchor = anchor {
+            lastQueueAnchorID = anchor.id
+        }
+
+        updateFilteredItems(clipboardService.history)
+
+        if !pasteQueue.isEmpty {
+            if wasQueueEmpty {
+                prepareNextQueueClipboard()
+            }
+            startPasteMonitoringIfNeeded()
+        }
+    }
+
+    func handleQueueSelection(for item: ClipItem, modifiers: NSEvent.ModifierFlags) {
+        guard canUsePasteQueue else { return }
+        let normalized = modifiers.intersection(.deviceIndependentFlagsMask)
+        isShiftSelecting = normalized.contains(.shift)
+
+        let baselineItems = filteredOrderingSnapshot.isEmpty ? filteredHistory : filteredOrderingSnapshot
+
+        guard let currentIndex = baselineItems.firstIndex(where: { $0.id == item.id }) else {
+            queueSelection(items: [item], anchor: item)
+            queueSelectionPreview = isShiftSelecting ? [item.id] : []
+            pendingShiftSelection = isShiftSelecting ? [item] : []
+            return
+        }
+
+        if isShiftSelecting {
+            if pendingShiftSelection.isEmpty {
+                shiftSelectionInitialQueue = pasteQueue
+                if lastQueueAnchorID == nil || !baselineItems.contains(where: { $0.id == lastQueueAnchorID }) {
+                    lastQueueAnchorID = item.id
+                }
+            }
+            guard let anchorID = lastQueueAnchorID,
+                  let anchorIndex = baselineItems.firstIndex(where: { $0.id == anchorID }) else {
+                pendingShiftSelection = []
+                queueSelectionPreview = []
+                return
+            }
+
+            if currentIndex < anchorIndex {
+                pendingShiftSelection = []
+                queueSelectionPreview = []
+                return
+            }
+
+            let lowerBound = min(anchorIndex, currentIndex)
+            let upperBound = max(anchorIndex, currentIndex)
+            let selection = Array(baselineItems[lowerBound...upperBound])
+
+            pendingShiftSelection = selection
+            queueSelectionPreview = Set(selection.map(\.id))
+            return
+        } else {
+            pendingShiftSelection = []
+            queueSelectionPreview = []
+            toggleSingleItemSelection(item)
+        }
+    }
+
+    func queueBadge(for item: ClipItem) -> Int? {
+        guard let index = pasteQueue.firstIndex(of: item.id) else { return nil }
+        return index + 1
+    }
+
+    func nextQueuedItem() -> ClipItem? {
+        guard let firstID = pasteQueue.first else { return nil }
+        return clipboardService.history.first { $0.id == firstID }
+    }
+
+    func togglePasteMode() {
+        guard canUsePasteQueue else {
+            resetPasteQueue()
+            return
+        }
+        switch pasteMode {
+        case .clipboard:
+            guard !pasteQueue.isEmpty else { return }
+            pasteMode = .queueOnce
+        case .queueOnce:
+            pasteMode = .queueToggle
+        case .queueToggle:
+            resetPasteQueue()
+        }
+    }
+
+    func resetPasteQueue() {
+        pasteQueue = []
+        pasteMode = .clipboard
+        lastQueueAnchorID = nil
+        stopPasteMonitoring()
+        pendingShiftSelection = []
+        queueSelectionPreview = []
+        updateFilteredItems(clipboardService.history)
+    }
+
+    private func applyQueueOrdering(to items: [ClipItem]) -> [ClipItem] {
+        guard !pasteQueue.isEmpty else { return items }
+
+        var queueItems: [ClipItem] = []
+        var seen = Set<UUID>()
+
+        for id in pasteQueue {
+            guard !seen.contains(id),
+                  let match = items.first(where: { $0.id == id }) else {
+                continue
+            }
+            queueItems.append(match)
+            seen.insert(id)
+        }
+
+        guard !queueItems.isEmpty else { return items }
+
+        let remaining = items.filter { !seen.contains($0.id) }
+        return queueItems + remaining
+    }
+
+    private func startPasteMonitoringIfNeeded() {
+        guard canUsePasteQueue else { return }
+        guard !isPasteMonitorActive else { return }
+        let started = pasteMonitor.start { [weak self] in
+            Task { @MainActor in
+                self?.handlePasteCommandDetected()
+            }
+        }
+        if started {
+            isPasteMonitorActive = true
+        }
+    }
+
+    private func stopPasteMonitoring() {
+        guard isPasteMonitorActive else { return }
+        pasteMonitor.stop()
+        isPasteMonitorActive = false
+    }
+
+    private func handlePasteCommandDetected() {
+        guard !pasteQueue.isEmpty else {
+            stopPasteMonitoring()
+            return
+        }
+
+        let completedID = pasteQueue.removeFirst()
+
+        if pasteMode == .queueToggle {
+            pasteQueue.append(completedID)
+        } else if pasteQueue.isEmpty {
+            pasteMode = .clipboard
+            lastQueueAnchorID = nil
+        }
+
+        updateFilteredItems(clipboardService.history)
+
+        if pasteQueue.isEmpty {
+            stopPasteMonitoring()
+        } else {
+            prepareNextQueueClipboard()
+        }
+    }
+
+    private func prepareNextQueueClipboard() {
+        guard canUsePasteQueue else {
+            resetPasteQueue()
+            return
+        }
+        guard let nextID = pasteQueue.first else {
+            return
+        }
+
+        guard let nextItem = clipboardService.history.first(where: { $0.id == nextID }) else {
+            pasteQueue.removeFirst()
+            if pasteQueue.isEmpty {
+                pasteMode = .clipboard
+                stopPasteMonitoring()
+                updateFilteredItems(clipboardService.history)
+            } else {
+                prepareNextQueueClipboard()
+            }
+            return
+        }
+
+        clipboardService.recopyFromHistory(nextItem)
+    }
 }
+
+extension MainViewModel {
+    var canUsePasteQueue: Bool {
+        pasteMonitor.hasAccessibilityPermission
+    }
+
+    func handleModifierFlagsChanged(_ flags: NSEvent.ModifierFlags) {
+        let normalized = flags.intersection(.deviceIndependentFlagsMask)
+        let shiftDown = normalized.contains(.shift)
+        isShiftSelecting = shiftDown
+        if !shiftDown {
+            if canUsePasteQueue,
+               !pendingShiftSelection.isEmpty {
+                commitPendingShiftSelection()
+            }
+            pendingShiftSelection = []
+            queueSelectionPreview = []
+            if !normalized.contains(.command) {
+                lastQueueAnchorID = nil
+            }
+        }
+    }
+
+    private func commitPendingShiftSelection() {
+        let selection = pendingShiftSelection
+        guard !selection.isEmpty else { return }
+
+        let initialSet = Set(shiftSelectionInitialQueue)
+        var updatedQueue = pasteQueue
+        for item in selection {
+            if initialSet.contains(item.id) {
+                updatedQueue.removeAll { $0 == item.id }
+            } else {
+                updatedQueue.removeAll { $0 == item.id }
+                updatedQueue.append(item.id)
+            }
+        }
+
+        pasteQueue = updatedQueue
+        shiftSelectionInitialQueue = updatedQueue
+
+        if pasteQueue.isEmpty {
+            updateFilteredItems(clipboardService.history)
+            pasteMode = .clipboard
+            lastQueueAnchorID = nil
+            stopPasteMonitoring()
+        } else {
+            if pasteMode == .clipboard {
+                pasteMode = .queueOnce
+            }
+            updateFilteredItems(clipboardService.history)
+            prepareNextQueueClipboard()
+            startPasteMonitoringIfNeeded()
+            if let last = selection.last, pasteQueue.contains(last.id) {
+                lastQueueAnchorID = last.id
+            }
+        }
+    }
+
+    private func toggleSingleItemSelection(_ item: ClipItem) {
+        var updatedQueue = pasteQueue
+        if let index = updatedQueue.firstIndex(of: item.id) {
+            updatedQueue.remove(at: index)
+        } else {
+            updatedQueue.removeAll { $0 == item.id }
+            updatedQueue.append(item.id)
+        }
+        pasteQueue = updatedQueue
+
+        if pasteQueue.isEmpty {
+            updateFilteredItems(clipboardService.history)
+            pasteMode = .clipboard
+            lastQueueAnchorID = nil
+            stopPasteMonitoring()
+        } else {
+            if pasteMode == .clipboard {
+                pasteMode = .queueOnce
+            }
+            updateFilteredItems(clipboardService.history)
+            prepareNextQueueClipboard()
+            startPasteMonitoringIfNeeded()
+            if pasteQueue.contains(item.id) {
+                lastQueueAnchorID = item.id
+            }
+        }
+    }
+}
+// swiftlint:enable type_body_length file_length
