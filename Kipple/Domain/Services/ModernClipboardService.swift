@@ -499,26 +499,34 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private func shouldSkipChange(for changeCount: Int) async -> Bool {
         let expectedChangeCount = await state.getExpectedChangeCount()
-        if let expected = expectedChangeCount, changeCount == expected {
-            lastChangeCount = changeCount
-            await state.setExpectedChangeCount(nil)
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
-            return true
+        if let expected = expectedChangeCount {
+            if changeCount == expected {
+                lastChangeCount = changeCount
+                await state.setExpectedChangeCount(nil)
+                await state.setInternalCopy(false)
+                await state.setFromEditor(false)
+                return true
+            }
+
+            if changeCount < expected {
+                lastChangeCount = changeCount
+                return true
+            }
+
+            if changeCount > expected {
+                await state.setExpectedChangeCount(nil)
+                await state.setInternalCopy(false)
+                await state.setFromEditor(false)
+            }
         }
 
         let isInternalCopy = await state.getInternalCopy()
-        if isInternalCopy && expectedChangeCount == nil {
+        if isInternalCopy {
             lastChangeCount = changeCount
             await state.setInternalCopy(false)
             await state.setFromEditor(false)
-            return true
-        }
-
-        if let expected = expectedChangeCount, changeCount > expected {
             await state.setExpectedChangeCount(nil)
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
+            return true
         }
 
         return false

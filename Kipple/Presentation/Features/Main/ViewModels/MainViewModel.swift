@@ -413,7 +413,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func handleQueueSelection(for item: ClipItem, modifiers: NSEvent.ModifierFlags) {
         guard canUsePasteQueue else { return }
         guard isQueueModeActive else { return }

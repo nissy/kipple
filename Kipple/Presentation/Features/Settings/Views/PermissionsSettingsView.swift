@@ -29,7 +29,6 @@ struct PermissionsSettingsView: View {
             VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 screenRecordingSection
                 accessibilitySection
-                screenTextCaptureSection
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
@@ -61,6 +60,7 @@ struct PermissionsSettingsView: View {
                     Text("3. Return to Kipple; this screen updates automatically.")
                     Text("MDM Tip: Configure AllowStandardUserToSetSystemService for ScreenCapture.")
                     Text("This enables standard users to approve the permission.")
+                    Text("Once granted, configure the screen text capture shortcut in the section below.")
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
@@ -82,6 +82,32 @@ struct PermissionsSettingsView: View {
                 .buttonStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundColor(Color.accentColor)
+            }
+
+            SettingsRow(label: "Text Capture Shortcut") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HotkeyRecorderField(
+                        keyCode: $tempCaptureKeyCode,
+                        modifierFlags: $tempCaptureModifierFlags
+                    )
+                    .disabled(!hasScreenCapturePermission)
+                    .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
+                    .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
+
+                    if let captureHotkeyError {
+                        Text(captureHotkeyError)
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                    } else if hasScreenCapturePermission {
+                        Text("Shortcut is ready to use. Hold the selected modifiers and key to capture text.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Enable Screen Recording permission to configure the text capture shortcut.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
         }
     }
@@ -120,32 +146,6 @@ struct PermissionsSettingsView: View {
                 .buttonStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundColor(Color.accentColor)
-            }
-        }
-    }
-
-    private var screenTextCaptureSection: some View {
-        SettingsGroup("Screen Text Capture Settings") {
-            SettingsRow(label: "Global Hotkey") {
-                HotkeyRecorderField(
-                    keyCode: $tempCaptureKeyCode,
-                    modifierFlags: $tempCaptureModifierFlags
-                )
-                .disabled(!hasScreenCapturePermission)
-                .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
-                .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
-            }
-
-            if let captureHotkeyError {
-                Text(captureHotkeyError)
-                    .font(.system(size: 11))
-                    .foregroundColor(.red)
-                    .padding(.leading, 4)
-            } else if hasScreenCapturePermission {
-                Text("Shortcut is ready to use. Hold the selected modifiers and key to capture text.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 4)
             }
         }
     }
