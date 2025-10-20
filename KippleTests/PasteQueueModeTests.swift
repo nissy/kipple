@@ -121,6 +121,23 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(selection.map(\.id), [items[3].id, items[2].id, items[1].id])
     }
 
+    func testShiftSelectionResetsAnchorAfterModifierChange() {
+        let items = Array(mockService.history.prefix(3))
+
+        viewModel.toggleQueueMode()
+
+        viewModel.handleQueueSelection(for: items[0], modifiers: [])
+
+        viewModel.handleModifierFlagsChanged([.shift])
+        viewModel.handleQueueSelection(for: items[2], modifiers: [.shift])
+
+        XCTAssertEqual(viewModel.queueSelectionPreview, Set([items[2].id]))
+
+        viewModel.handleModifierFlagsChanged([])
+        XCTAssertEqual(viewModel.pasteQueue, [items[0].id])
+        XCTAssertTrue(viewModel.queueSelectionPreview.isEmpty)
+    }
+
     func testShiftSelectionFirstShiftClickShowsPreview() {
         let items = Array(mockService.history.prefix(3))
 

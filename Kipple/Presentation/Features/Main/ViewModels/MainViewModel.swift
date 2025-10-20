@@ -66,6 +66,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var currentHistoryLimit: Int = 0
     private var isLoadingMore = false
     private var lastQueueAnchorID: UUID?
+    private var shouldResetAnchorOnNextShiftSelection = false
     private var filteredOrderingSnapshot: [ClipItem] = []
     private var isPasteMonitorActive = false
     private var isShiftSelecting = false
@@ -399,6 +400,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         if let anchor = anchor {
             lastQueueAnchorID = anchor.id
+            shouldResetAnchorOnNextShiftSelection = false
         }
 
         updateFilteredItems(clipboardService.history)
@@ -430,8 +432,11 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         if isShiftSelecting {
             if pendingShiftSelection.isEmpty {
                 shiftSelectionInitialQueue = pasteQueue
-                if lastQueueAnchorID == nil || !baselineItems.contains(where: { $0.id == lastQueueAnchorID }) {
+                if shouldResetAnchorOnNextShiftSelection ||
+                    lastQueueAnchorID == nil ||
+                    !baselineItems.contains(where: { $0.id == lastQueueAnchorID }) {
                     lastQueueAnchorID = item.id
+                    shouldResetAnchorOnNextShiftSelection = false
                 }
             }
             guard let anchorID = lastQueueAnchorID,
@@ -536,6 +541,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         pasteQueue = []
         pasteMode = .clipboard
         lastQueueAnchorID = nil
+        shouldResetAnchorOnNextShiftSelection = false
         expectedQueueHeadID = nil
         stopPasteMonitoring()
         pendingShiftSelection = []
@@ -653,7 +659,12 @@ extension MainViewModel {
         let normalized = flags.intersection(.deviceIndependentFlagsMask)
         let shiftDown = normalized.contains(.shift)
         isShiftSelecting = shiftDown
-        if !shiftDown {
+        if shiftDown {
+            if canUsePasteQueue,
+               isQueueModeActive {
+                shouldResetAnchorOnNextShiftSelection = true
+            }
+        } else {
             if canUsePasteQueue,
                isQueueModeActive,
                !pendingShiftSelection.isEmpty {
@@ -662,6 +673,7 @@ extension MainViewModel {
             pendingShiftSelection = []
             queueSelectionPreview = []
             lastQueueAnchorID = nil
+            shouldResetAnchorOnNextShiftSelection = false
         }
     }
 
@@ -694,6 +706,7 @@ extension MainViewModel {
             startPasteMonitoringIfNeeded()
             if let last = selection.last, pasteQueue.contains(last.id) {
                 lastQueueAnchorID = last.id
+                shouldResetAnchorOnNextShiftSelection = false
             }
         }
     }
