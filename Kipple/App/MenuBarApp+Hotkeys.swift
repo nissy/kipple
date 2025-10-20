@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 // MARK: - Hotkey Handling
 
@@ -122,14 +123,13 @@ extension MenuBarApp {
         modifiers: NSEvent.ModifierFlags? = nil
     ) {
         let baseTitle = screenTextCaptureMenuTitle
-        let permissionGranted = CGPreflightScreenCaptureAccess()
-
-        screenTextCaptureMenuItem.isEnabled = permissionGranted
-        screenTextCaptureMenuItem.toolTip = permissionGranted
+        let screenPermissionGranted = CGPreflightScreenCaptureAccess()
+        screenTextCaptureMenuItem.isEnabled = screenPermissionGranted
+        screenTextCaptureMenuItem.toolTip = screenPermissionGranted
             ? nil
-            : "Grant Screen Recording access in System Settings to enable Screen Text Capture."
+            : "Grant Screen Recording permission in System Settings to enable Screen Text Capture."
 
-        guard permissionGranted else {
+        guard screenPermissionGranted else {
             applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
             return
         }
@@ -219,18 +219,54 @@ extension MenuBarApp {
     }
 
     func updateScreenCaptureMenuItem() {
-        let granted = CGPreflightScreenCaptureAccess()
-        screenCaptureStatusItem.title = granted ? "System Permissions Ready" : "Grant Screen Recording Access…"
-        screenCaptureStatusItem.state = granted ? .on : .off
-        screenCaptureStatusItem.isEnabled = !granted
-        screenCaptureStatusItem.target = granted ? nil : self
-        screenCaptureStatusItem.action = granted ? nil : #selector(openScreenRecordingSettingsFromMenu)
+        let screenPermissionGranted = CGPreflightScreenCaptureAccess()
+        screenCaptureStatusItem.title = screenPermissionGranted
+            ? "Screen Recording Permission Ready"
+            : "Grant Screen Recording Permission…"
+        screenCaptureStatusItem.state = screenPermissionGranted ? .on : .off
+        screenCaptureStatusItem.isEnabled = !screenPermissionGranted
+        screenCaptureStatusItem.target = screenPermissionGranted ? nil : self
+        screenCaptureStatusItem.action = screenPermissionGranted ? nil : #selector(openScreenRecordingSettingsFromMenu)
+    }
+
+    func accessibilityMenuItem() -> NSMenuItem {
+        accessibilityStatusItem.target = self
+        accessibilityStatusItem.action = #selector(openAccessibilitySettingsFromMenu)
+        accessibilityStatusItem.keyEquivalent = ""
+        return accessibilityStatusItem
+    }
+
+    func updateAccessibilityMenuItem() {
+        let accessibilityPermissionGranted = AXIsProcessTrusted()
+        accessibilityStatusItem.title = accessibilityPermissionGranted
+            ? "Accessibility Permission Ready"
+            : "Grant Accessibility Permission…"
+        accessibilityStatusItem.state = accessibilityPermissionGranted ? .on : .off
+        accessibilityStatusItem.isEnabled = !accessibilityPermissionGranted
+        accessibilityStatusItem.target = accessibilityPermissionGranted ? nil : self
+        accessibilityStatusItem.action = accessibilityPermissionGranted ? nil : #selector(openAccessibilitySettingsFromMenu)
     }
 
     @objc func openScreenRecordingSettingsFromMenu() {
         Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.windowManager.openSettings(tab: .permission)
+
+            // Only open System Settings when the inline request action is unavailable (permission already granted)
+            if CGPreflightScreenCaptureAccess() {
+                ScreenRecordingPermissionOpener.openSystemSettings()
+            }
+        }
+    }
+
+    @objc func openAccessibilitySettingsFromMenu() {
+        Task { @MainActor [weak self] in
             self?.windowManager.openSettings(tab: .permission)
-            ScreenRecordingPermissionOpener.openSystemSettings()
+            if let url = URL(
+                string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            ) {
+                NSWorkspace.shared.open(url)
+            }
         }
     }
 
@@ -238,10 +274,16 @@ extension MenuBarApp {
         Task { @MainActor [weak self] in
             guard let self else { return }
 
-            guard CGPreflightScreenCaptureAccess() else {
+            let screenPermissionGranted = CGPreflightScreenCaptureAccess()
+
+            guard screenPermissionGranted else {
                 Logger.shared.warning("Screen Text Capture blocked: screen recording permission not granted.")
                 updateScreenTextCaptureMenuItemShortcut()
                 windowManager.openSettings(tab: .permission)
+
+                if CGPreflightScreenCaptureAccess() {
+                    ScreenRecordingPermissionOpener.openSystemSettings()
+                }
                 return
             }
 

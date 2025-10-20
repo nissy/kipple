@@ -53,6 +53,18 @@ struct PermissionsSettingsView: View {
                 PermissionStatusBadge(isGranted: hasScreenCapturePermission)
             )
         ) {
+            SettingsRow(label: "Request Access") {
+                HStack {
+                    Button("Request Permission Again") {
+                        requestPermissionAgain()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(Color.accentColor)
+                    .disabled(hasScreenCapturePermission)
+                }
+            }
+
             SettingsRow(label: "Overview") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("1. Open System Settings → Privacy & Security → Screen & System Audio Recording.")
@@ -64,24 +76,6 @@ struct PermissionsSettingsView: View {
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
-            }
-
-            SettingsRow(label: "System Settings", layout: .inlineControl) {
-                Button("Open Screen Recording Preferences") {
-                    openSystemSettings()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(Color.accentColor)
-            }
-
-            SettingsRow(label: "Request Access", layout: .inlineControl) {
-                Button("Request Permission Again") {
-                    requestPermissionAgain()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(Color.accentColor)
             }
 
             SettingsRow(label: "Text Capture Shortcut") {
@@ -119,6 +113,18 @@ struct PermissionsSettingsView: View {
                 PermissionStatusBadge(isGranted: hasAccessibilityPermission)
             )
         ) {
+            SettingsRow(label: "Request Access") {
+                HStack {
+                    Button("Request Permission Again") {
+                        requestAccessibilityPermission()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(Color.accentColor)
+                    .disabled(hasAccessibilityPermission)
+                }
+            }
+
             SettingsRow(label: "Overview") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("1. Open System Settings → Privacy & Security → Accessibility.")
@@ -128,24 +134,6 @@ struct PermissionsSettingsView: View {
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
-            }
-
-            SettingsRow(label: "System Settings", layout: .inlineControl) {
-                Button("Open Accessibility Preferences") {
-                    openAccessibilityPreferences()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(Color.accentColor)
-            }
-
-            SettingsRow(label: "Request Access", layout: .inlineControl) {
-                Button("Request Permission Again") {
-                    requestAccessibilityPermission()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(Color.accentColor)
             }
         }
     }
@@ -256,8 +244,16 @@ struct PermissionsSettingsView: View {
     }
 
     private func requestPermissionAgain() {
+        if hasScreenCapturePermission {
+            openSystemSettings()
+            return
+        }
+
         startPermissionPolling()
-        _ = CGRequestScreenCaptureAccess()
+        let didPrompt = CGRequestScreenCaptureAccess()
+        if !didPrompt {
+            openSystemSettings()
+        }
     }
 
     @MainActor
@@ -270,9 +266,17 @@ struct PermissionsSettingsView: View {
 
     @MainActor
     private func requestAccessibilityPermission() {
+        if hasAccessibilityPermission {
+            openAccessibilityPreferences()
+            return
+        }
+
         startPermissionPolling()
         let options: [CFString: Bool] = ["AXTrustedCheckOptionPrompt" as CFString: true]
-        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        let didPrompt = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        if !didPrompt {
+            openAccessibilityPreferences()
+        }
     }
 
     private func openPermissionTab() {

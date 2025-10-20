@@ -25,6 +25,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         keyEquivalent: ""
     )
     let screenCaptureStatusItem = NSMenuItem()
+    let accessibilityStatusItem = NSMenuItem()
     private lazy var textRecognitionService: any TextRecognitionServiceProtocol =
         TextRecognitionServiceProvider.resolve()
     lazy var textCaptureCoordinator: TextCaptureCoordinator = {
@@ -142,6 +143,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         menu.addItem(screenTextCaptureMenuEntry())
         menu.addItem(NSMenuItem.separator())
         menu.addItem(screenCaptureMenuItem())
+        menu.addItem(accessibilityMenuItem())
         menu.addItem(NSMenuItem.separator())
 
         menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openPreferences), keyEquivalent: ","))
@@ -151,6 +153,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         menu.items.forEach { $0.target = self }
 
         updateScreenCaptureMenuItem()
+        updateAccessibilityMenuItem()
         updateOpenKippleMenuItemShortcut()
         updateScreenTextCaptureMenuItemShortcut()
         return menu
@@ -266,6 +269,7 @@ final class MenuBarApp: NSObject, ObservableObject {
 extension MenuBarApp: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         updateScreenCaptureMenuItem()
+        updateAccessibilityMenuItem()
         updateOpenKippleMenuItemShortcut()
         updateScreenTextCaptureMenuItemShortcut()
     }
