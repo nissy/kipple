@@ -11,31 +11,29 @@ import AppKit
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
     @State private var selectedHistoryItem: ClipItem?
-    @State private var isShowingCopiedNotification = false
-    @State private var currentNotificationType: CopiedNotificationView.NotificationType = .copied
-    @State private var isAlwaysOnTop = false
+    @State var isShowingCopiedNotification = false
+    @State var currentNotificationType: CopiedNotificationView.NotificationType = .copied
+    @State var isAlwaysOnTop = false
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
-    @ObservedObject private var appSettings = AppSettings.shared
-    @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject var appSettings = AppSettings.shared
+    @ObservedObject var fontManager = FontManager.shared
     @ObservedObject private var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
     @State private var historyRefreshID = UUID()
-    @State private var hoveredClearButton = false
+    @State var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
     @State private var modifierMonitor: Any?
     // Copied通知の遅延非表示を管理（多重スケジュール防止）
-    @State private var copiedHideWorkItem: DispatchWorkItem?
+    @State var copiedHideWorkItem: DispatchWorkItem?
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
     let onSetPreventAutoClose: ((Bool) -> Void)?
-    
-    // 設定値を読み込み
     
     init(
         onClose: (() -> Void)? = nil,
@@ -51,7 +49,6 @@ struct MainView: View {
 }
 
 extension MainView {
-    
     private func handleItemSelection(_ item: ClipItem) {
         let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if viewModel.canUsePasteQueue,
@@ -76,29 +73,34 @@ extension MainView {
             }
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // メインコンテンツ（分割ビュー）
-            ResizableSplitView(
-                topHeight: $editorSectionHeight,
-                minTopHeight: 150,
-                minBottomHeight: 150,
-                topContent: {
-                    if appSettings.editorPosition == "top" {
-                        editorSection
-                    } else {
-                        historyAndPinnedContent
+            if appSettings.editorPosition == "disabled" {
+                historyAndPinnedContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // メインコンテンツ（分割ビュー）
+                ResizableSplitView(
+                    topHeight: $editorSectionHeight,
+                    minTopHeight: 150,
+                    minBottomHeight: 150,
+                    topContent: {
+                        if appSettings.editorPosition == "top" {
+                            editorSection
+                        } else {
+                            historyAndPinnedContent
+                        }
+                    },
+                    bottomContent: {
+                        if appSettings.editorPosition == "bottom" {
+                            editorSection
+                        } else {
+                            historyAndPinnedContent
+                        }
                     }
-                },
-                bottomContent: {
-                    if appSettings.editorPosition == "bottom" {
-                        editorSection
-                    } else {
-                        historyAndPinnedContent
-                    }
-                }
-            )
+                )
+            }
         }
         .frame(minWidth: 300, maxWidth: .infinity)
         .background(
@@ -413,175 +415,5 @@ extension MainView {
 
     // 下部バー
     @ViewBuilder
-    private var bottomBar: some View {
-        HStack(alignment: .center, spacing: 12) {
-                // 現在のペースト内容を表示
-                if let currentContent = viewModel.currentClipboardContent {
-                    HStack(alignment: .center, spacing: 8) {
-                        // 自動消去タイマーの残り時間表示
-                        if AppSettings.shared.enableAutoClear,
-                           let remainingTime = viewModel.autoClearRemainingTime {
-                            HStack(spacing: 6) {
-                                Image(systemName: "timer")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                                
-                                Text(formatRemainingTime(remainingTime))
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Divider()
-                                .frame(height: 16)
-                                .padding(.horizontal, 4)
-                        }
-                        
-                        Image(systemName: "doc.on.clipboard")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                        
-                        Text(currentContent)
-                            .font(.custom(fontManager.historyFont.fontName, size: 11))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        
-                        // Clear button
-                        Button(action: {
-                            clearSystemClipboard()
-                        }, label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary.opacity(0.6))
-                                .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Clear clipboard")
-                        .onHover { hovering in
-                            hoveredClearButton = hovering
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.accentColor.opacity(0.1))
-                    )
-                }
-                
-                Spacer()
-                
-                // Settings button
-                Button(action: {
-                    onOpenSettings?()
-                }, label: {
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                colors: [
-                                    Color(NSColor.controlBackgroundColor),
-                                    Color(NSColor.controlBackgroundColor).opacity(0.8)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 28, height: 28)
-                            .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
-                        
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.secondary)
-                    }
-                })
-                .buttonStyle(PlainButtonStyle())
-                .scaleEffect(1.0)
-                .onHover { _ in
-                    withAnimation(.spring(response: 0.3)) {
-                        // Scale effect handled by button style
-                    }
-                }
-                .help("Settings")
-                
-                // Always on Top button
-                Button(action: {
-                    toggleAlwaysOnTop()
-                }, label: {
-                    ZStack {
-                        Circle()
-                            .fill(isAlwaysOnTop ? 
-                                Color.accentColor :
-                                Color(NSColor.controlBackgroundColor))
-                            .frame(width: 28, height: 28)
-                            .shadow(
-                                color: isAlwaysOnTop ? 
-                                    Color.accentColor.opacity(0.3) : 
-                                    Color.black.opacity(0.1),
-                                radius: 3,
-                                y: 2
-                            )
-                        
-                        Image(systemName: isAlwaysOnTop ? "pin.fill" : "pin")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(isAlwaysOnTop ? .white : .secondary)
-                            .rotationEffect(.degrees(isAlwaysOnTop ? 0 : -45))
-                    }
-                })
-                .buttonStyle(PlainButtonStyle())
-                .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
-                .animation(.spring(response: 0.3), value: isAlwaysOnTop)
-                .help(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            Color(NSColor.windowBackgroundColor).opacity(0.95)
-            .background(.ultraThinMaterial)
-        )
-    }
-
-    // MARK: - Actions
-    private func confirmAction() {
-        viewModel.copyEditor()
-        
-        // コピー時は常に通知を表示（ウィンドウは閉じない）
-        showCopiedNotification(.copied)
-    }
-    
-    private func clearAction() {
-        viewModel.clearEditor()
-    }
-    
-    private func toggleAlwaysOnTop() {
-        isAlwaysOnTop.toggle()
-        
-        // 状態の変更を通知（WindowManagerがウィンドウレベルを更新する）
-        onAlwaysOnTopChanged?(isAlwaysOnTop)
-    }
-    
-    private func showCopiedNotification(_ type: CopiedNotificationView.NotificationType) {
-        currentNotificationType = type
-        if !isShowingCopiedNotification {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                isShowingCopiedNotification = true
-            }
-        }
-        // 既存の非表示タスクをキャンセルして延長（多重スケジュール防止）
-        copiedHideWorkItem?.cancel()
-        let work = DispatchWorkItem {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                self.isShowingCopiedNotification = false
-            }
-        }
-        copiedHideWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
-    }
-
-    private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
-        switch category {
-        case .all:
-            return true // All is always enabled
-        case .url:
-            return appSettings.filterCategoryURL
-        }
-    }
+    private var bottomBar: some View { bottomBarContent }
 }

@@ -9,6 +9,52 @@ import SwiftUI
 import AppKit
 
 extension MainView {
+    // MARK: - Editor Helpers
+    var isEditorEnabled: Bool {
+        appSettings.editorPosition != "disabled"
+    }
+
+    func confirmAction() {
+        viewModel.copyEditor()
+        showCopiedNotification(.copied)
+    }
+
+    func clearAction() {
+        viewModel.clearEditor()
+    }
+
+    func toggleAlwaysOnTop() {
+        isAlwaysOnTop.toggle()
+        onAlwaysOnTopChanged?(isAlwaysOnTop)
+    }
+
+    func toggleEditorVisibility() {
+        if appSettings.editorPosition == "disabled" {
+            let restore = appSettings.editorPositionLastEnabled
+            appSettings.editorPosition = restore.isEmpty ? "bottom" : restore
+        } else {
+            appSettings.editorPosition = "disabled"
+        }
+    }
+
+    func showCopiedNotification(_ type: CopiedNotificationView.NotificationType) {
+        currentNotificationType = type
+        if !isShowingCopiedNotification {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                isShowingCopiedNotification = true
+            }
+        }
+
+        copiedHideWorkItem?.cancel()
+        let work = DispatchWorkItem {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                self.isShowingCopiedNotification = false
+            }
+        }
+        copiedHideWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
+    }
+
     func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
         let minutes = Int(timeInterval) / 60
         let seconds = Int(timeInterval) % 60

@@ -73,6 +73,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var pendingShiftSelection: [ClipItem] = []
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
+    private let appSettings = AppSettings.shared
 
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
@@ -309,6 +310,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 現在の修飾キーがエディタ挿入用かチェック
     func shouldInsertToEditor() -> Bool {
+        guard appSettings.editorPosition != "disabled" else { return false }
         let currentModifiers = NSEvent.modifierFlags
         let requiredModifiers = getEditorInsertModifiers()
         // None(=0) のときは無効

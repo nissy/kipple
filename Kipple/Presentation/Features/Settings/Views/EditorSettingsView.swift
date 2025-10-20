@@ -24,7 +24,21 @@ struct EditorSettingsView: View {
                 // Editor Position
                 SettingsGroup("Editor Position") {
                     SettingsRow(label: "Position") {
-                        Picker("", selection: $appSettings.editorPosition) {
+                        Picker(
+                            "",
+                            selection: Binding<String>(
+                                get: {
+                                    let current = appSettings.editorPosition
+                                    if current == "disabled" {
+                                        return appSettings.editorPositionLastEnabled
+                                    }
+                                    return current
+                                },
+                                set: { newValue in
+                                    appSettings.editorPosition = newValue
+                                }
+                            )
+                        ) {
                             Text("Top").tag("top")
                             Text("Bottom").tag("bottom")
                         }

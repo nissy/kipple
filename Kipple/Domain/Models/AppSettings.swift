@@ -21,8 +21,30 @@ final class AppSettings: ObservableObject {
     // Editor Settings
     @AppStorage("lastEditorText") var lastEditorText: String = ""
     @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
-    @AppStorage("editorPosition") var editorPosition: String = "bottom"  // "top" or "bottom"
     @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
+    @AppStorage("editorPosition") private var storedEditorPosition: String = "bottom"
+    @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
+
+    var editorPosition: String {
+        get { storedEditorPosition }
+        set {
+            guard newValue != storedEditorPosition else { return }
+            objectWillChange.send()
+            if newValue != "disabled" {
+                storedEditorPositionLastEnabled = newValue
+            } else if storedEditorPosition != "disabled" {
+                storedEditorPositionLastEnabled = storedEditorPosition
+            }
+            storedEditorPosition = newValue
+        }
+    }
+
+    var editorPositionLastEnabled: String {
+        if storedEditorPositionLastEnabled == "disabled" {
+            return "bottom"
+        }
+        return storedEditorPositionLastEnabled
+    }
     
     // History Settings
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
