@@ -111,7 +111,9 @@ struct PrivacyStatement: View {
 }
 
 #if !CI_BUILD
-#Preview {
-    AboutView()
+struct AboutView_Previews: PreviewProvider {
+    static var previews: some View {
+        AboutView()
+    }
 }
 #endif

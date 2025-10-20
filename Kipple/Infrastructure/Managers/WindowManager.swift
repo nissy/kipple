@@ -359,8 +359,13 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.contentView = nil
             window.contentViewController = nil
         }
+        if let viewModel = mainViewModel,
+           viewModel.isQueueModeActive,
+           viewModel.pasteQueue.isEmpty {
+            viewModel.resetPasteQueue()
+        }
         mainWindow = nil
-       isAlwaysOnTop = false
+        isAlwaysOnTop = false
         removeMainWindowObservers()
     }
     

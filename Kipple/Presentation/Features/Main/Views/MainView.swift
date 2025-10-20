@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
@@ -14,6 +15,9 @@ struct MainView: View {
     @State var isShowingCopiedNotification = false
     @State var currentNotificationType: CopiedNotificationView.NotificationType = .copied
     @State var isAlwaysOnTop = false
+    @State var isAlwaysOnTopForcedByQueue = false
+    @State var userPreferredAlwaysOnTop = false
+    @State var hasQueueForceOverride = false
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject var appSettings = AppSettings.shared
@@ -70,6 +74,30 @@ extension MainView {
             } else {
                 // Always on Topが無効の場合は即座にウィンドウを閉じる
                 onClose?()
+            }
+        }
+    }
+
+    func enforceQueueAlwaysOnTopIfNeeded(queueCount: Int, isQueueModeActive: Bool) {
+        let shouldForce = isQueueModeActive && queueCount > 0
+        if shouldForce {
+            if !isAlwaysOnTopForcedByQueue {
+                isAlwaysOnTopForcedByQueue = true
+                userPreferredAlwaysOnTop = isAlwaysOnTop
+            }
+            if !hasQueueForceOverride && !isAlwaysOnTop {
+                isAlwaysOnTop = true
+                onAlwaysOnTopChanged?(true)
+            }
+        } else {
+            if isAlwaysOnTopForcedByQueue {
+                isAlwaysOnTopForcedByQueue = false
+                hasQueueForceOverride = false
+                let target = userPreferredAlwaysOnTop
+                if isAlwaysOnTop != target {
+                    isAlwaysOnTop = target
+                    onAlwaysOnTopChanged?(target)
+                }
             }
         }
     }
@@ -131,6 +159,11 @@ extension MainView {
             historyRefreshID = UUID()
         }
         .onAppear {
+            userPreferredAlwaysOnTop = isAlwaysOnTop
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: viewModel.pasteQueue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
             // 既存のモニタがあれば解除
             if let monitor = keyDownMonitor {
                 NSEvent.removeMonitor(monitor)
@@ -203,6 +236,18 @@ extension MainView {
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
+        }
+        .onReceive(viewModel.$pasteQueue) { queue in
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: queue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
+        }
+        .onReceive(viewModel.$pasteMode) { _ in
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: viewModel.pasteQueue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
         }
     }
     

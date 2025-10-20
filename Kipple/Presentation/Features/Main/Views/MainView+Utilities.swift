@@ -25,6 +25,16 @@ extension MainView {
 
     func toggleAlwaysOnTop() {
         isAlwaysOnTop.toggle()
+        userPreferredAlwaysOnTop = isAlwaysOnTop
+        if isAlwaysOnTopForcedByQueue {
+            hasQueueForceOverride = !isAlwaysOnTop
+        }
+        if isAlwaysOnTopForcedByQueue {
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: viewModel.pasteQueue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
+        }
         onAlwaysOnTopChanged?(isAlwaysOnTop)
     }
 

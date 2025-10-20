@@ -154,7 +154,11 @@ extension MainView {
             .buttonStyle(PlainButtonStyle())
             .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
             .animation(.spring(response: 0.3), value: isAlwaysOnTop)
-            .help(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
+            .help(
+                isAlwaysOnTopForcedByQueue && !isAlwaysOnTop ?
+                    "Queueモード中ですが前面表示をオフにしています" :
+                    (isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
+            )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
