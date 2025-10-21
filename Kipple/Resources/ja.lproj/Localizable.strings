@@ -90,7 +90,7 @@
 "Launch at login" = "ログイン時に起動";
 "Global Hotkey" = "グローバルホットキー";
 "Pin limit reached" = "ピン留め数の上限に達しました";
-"Pinned" = "ピン留め";
+"Pinned" = "Pinned";
 "Privacy & Security" = "プライバシーとセキュリティ";
 "Hide editor panel" = "エディタパネルを非表示";
 "Show editor panel" = "エディタパネルを表示";
