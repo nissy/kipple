@@ -56,7 +56,7 @@
 "Filter by “%@”" = "「%@」でフィルタ";
 "General" = "一般";
 "Editor" = "エディタ";
-"Clipboard" = "クリップボード";
+"Clipboard" = "履歴";
 "Permission" = "権限";
 "Grant Accessibility Permission…" = "アクセシビリティの許可を付与…";
 "Grant Screen Recording Permission…" = "画面収録の許可を付与…";
@@ -69,7 +69,7 @@
 "Kipple - Clipboard Manager" = "Kipple - クリップボードマネージャ";
 "Japanese" = "日本語";
 "Launch at Login Error" = "ログイン時起動のエラー";
-"Loop" = "ループ";
+"Loop" = "Loop";
 "MDM Tip: Configure AllowStandardUserToSetSystemService for ScreenCapture." = "MDM ヒント: ScreenCapture 用に AllowStandardUserToSetSystemService を設定してください。";
 "Language" = "言語";
 "Failed to capture the screen. Check Screen Recording permissions in System Settings." = "画面のキャプチャに失敗しました。システム設定で画面収録の権限を確認してください。";
@@ -101,7 +101,7 @@
 "No data is sent to external servers" = "外部サーバーへデータを送信しません";
 "Protected by macOS security features" = "macOSのセキュリティ機能で保護されています";
 "Data can be cleared at any time" = "いつでもデータを削除できます";
-"Queue" = "キュー";
+"Queue" = "Queue";
 "Queue position %d" = "キューの位置 %d";
 "Quick Editor" = "クイックエディタ";
 "Quit Kipple" = "Kipple を終了";
