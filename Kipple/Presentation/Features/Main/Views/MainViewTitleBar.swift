@@ -66,7 +66,13 @@ struct MainViewTitleBar: View {
             .buttonStyle(PlainButtonStyle())
             .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
             .animation(.spring(response: 0.3), value: isAlwaysOnTop)
-            .help(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
+            .help(
+                Text(
+                    isAlwaysOnTop
+                        ? "Disable always on top"
+                        : "Enable always on top"
+                )
+            )
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

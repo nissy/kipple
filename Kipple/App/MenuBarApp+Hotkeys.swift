@@ -79,27 +79,29 @@ extension MenuBarApp {
 
 extension MenuBarApp {
     func openKippleMenuEntry() -> NSMenuItem {
-        openKippleMenuItem.title = openKippleMenuTitle
+        let title = localizedMenuString("Open Kipple")
+        openKippleMenuItem.title = title
         openKippleMenuItem.target = self
         openKippleMenuItem.action = #selector(openMainWindow)
         return openKippleMenuItem
     }
 
     func screenTextCaptureMenuEntry() -> NSMenuItem {
-        screenTextCaptureMenuItem.title = screenTextCaptureMenuTitle
+        screenTextCaptureMenuItem.title = localizedMenuString("Screen Text Capture")
         screenTextCaptureMenuItem.target = self
         screenTextCaptureMenuItem.action = #selector(captureTextFromScreen)
         return screenTextCaptureMenuItem
     }
 
     func updateOpenKippleMenuItemShortcut() {
+        let baseTitle = localizedMenuString("Open Kipple")
         guard let manager = hotkeyManager as? SimplifiedHotkeyManager else {
-            applyShortcut(to: openKippleMenuItem, title: openKippleMenuTitle, combination: nil)
+            applyShortcut(to: openKippleMenuItem, title: baseTitle, combination: nil)
             return
         }
 
         guard manager.getEnabled() else {
-            applyShortcut(to: openKippleMenuItem, title: openKippleMenuTitle, combination: nil)
+            applyShortcut(to: openKippleMenuItem, title: baseTitle, combination: nil)
             return
         }
 
@@ -107,13 +109,13 @@ extension MenuBarApp {
         let sanitizedModifiers = hotkey.modifiers.intersection([.command, .control, .option, .shift])
 
         if hotkey.keyCode == 0 || sanitizedModifiers.isEmpty {
-            applyShortcut(to: openKippleMenuItem, title: openKippleMenuTitle, combination: nil)
+            applyShortcut(to: openKippleMenuItem, title: baseTitle, combination: nil)
             return
         }
 
         applyShortcut(
             to: openKippleMenuItem,
-            title: openKippleMenuTitle,
+            title: baseTitle,
             combination: (hotkey.keyCode, sanitizedModifiers)
         )
     }
@@ -122,12 +124,12 @@ extension MenuBarApp {
         with keyCode: UInt16? = nil,
         modifiers: NSEvent.ModifierFlags? = nil
     ) {
-        let baseTitle = screenTextCaptureMenuTitle
+        let baseTitle = localizedMenuString("Screen Text Capture")
         let screenPermissionGranted = CGPreflightScreenCaptureAccess()
         screenTextCaptureMenuItem.isEnabled = screenPermissionGranted
         screenTextCaptureMenuItem.toolTip = screenPermissionGranted
             ? nil
-            : "Grant Screen Recording permission in System Settings to enable Screen Text Capture."
+            : localizedMenuString("Grant Screen Recording permission in System Settings to enable Screen Text Capture.")
 
         guard screenPermissionGranted else {
             applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
@@ -221,8 +223,8 @@ extension MenuBarApp {
     func updateScreenCaptureMenuItem() {
         let screenPermissionGranted = CGPreflightScreenCaptureAccess()
         screenCaptureStatusItem.title = screenPermissionGranted
-            ? "Screen Recording Permission Ready"
-            : "Grant Screen Recording Permission…"
+            ? localizedMenuString("Screen Recording Permission Ready")
+            : localizedMenuString("Grant Screen Recording Permission…")
         screenCaptureStatusItem.state = screenPermissionGranted ? .on : .off
         screenCaptureStatusItem.isEnabled = !screenPermissionGranted
         screenCaptureStatusItem.target = screenPermissionGranted ? nil : self
@@ -239,8 +241,8 @@ extension MenuBarApp {
     func updateAccessibilityMenuItem() {
         let accessibilityPermissionGranted = AXIsProcessTrusted()
         accessibilityStatusItem.title = accessibilityPermissionGranted
-            ? "Accessibility Permission Ready"
-            : "Grant Accessibility Permission…"
+            ? localizedMenuString("Accessibility Permission Ready")
+            : localizedMenuString("Grant Accessibility Permission…")
         accessibilityStatusItem.state = accessibilityPermissionGranted ? .on : .off
         accessibilityStatusItem.isEnabled = !accessibilityPermissionGranted
         accessibilityStatusItem.target = accessibilityPermissionGranted ? nil : self

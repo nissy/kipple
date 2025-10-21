@@ -155,9 +155,9 @@ extension MainView {
             .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
             .animation(.spring(response: 0.3), value: isAlwaysOnTop)
             .help(
-                isAlwaysOnTopForcedByQueue && !isAlwaysOnTop ?
-                    "Queueモード中ですが前面表示をオフにしています" :
-                    (isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
+                isAlwaysOnTopForcedByQueue && !isAlwaysOnTop
+                    ? Text("Queue mode is active but Always on Top is disabled")
+                    : Text(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
             )
         }
         .padding(.horizontal, 12)

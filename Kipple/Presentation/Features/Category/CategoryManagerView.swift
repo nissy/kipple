@@ -37,6 +37,11 @@ struct CategoryManagerView: View {
     @State private var symbol: String = UserCategoryStore.availableSymbols.first ?? "tag"
 
     var body: some View {
+        content
+            .environment(\.locale, appSettings.appLocale)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Manage Categories").font(.headline)
 
@@ -122,13 +127,13 @@ struct CategoryManagerView: View {
                                 }
                             )
                             .buttonStyle(.borderless)
-                            .help("Delete category")
+                            .help(Text("Delete category"))
                         } else {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(CategoryManagerAppearance.builtInColor)
                                 .frame(width: CategoryManagerLayout.deleteColumnWidth, height: 24)
-                                .help("Built-in categories cannot be deleted")
+                                .help(Text("Built-in categories cannot be deleted"))
                         }
                     }
                     .contextMenu {
@@ -207,7 +212,7 @@ private extension CategoryManagerView {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("アイコンを変更")
+            .help(Text("Change icon"))
         }
     }
 

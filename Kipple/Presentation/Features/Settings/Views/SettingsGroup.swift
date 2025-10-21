@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct SettingsGroup<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     let includeTopDivider: Bool
     let content: () -> Content
     let headerAccessory: AnyView?
     
     init(
-        _ title: String,
+        _ title: LocalizedStringKey,
         includeTopDivider: Bool = true,
         headerAccessory: AnyView? = nil,
         @ViewBuilder content: @escaping () -> Content

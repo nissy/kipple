@@ -177,7 +177,10 @@ struct PermissionsSettingsView: View {
         let modifiers = tempCaptureModifierFlags
 
         guard keyCode != 0, !modifiers.isEmpty else {
-            captureHotkeyError = "Select a key and modifier to enable the shortcut."
+            captureHotkeyError = NSLocalizedString(
+                "Select a key and modifier to enable the shortcut.",
+                comment: "Error message shown when no shortcut is selected"
+            )
             disableCaptureHotkey()
             return
         }
@@ -197,7 +200,10 @@ struct PermissionsSettingsView: View {
                 enabled: true
             )
         } else {
-            captureHotkeyError = "The selected shortcut is already taken. Try another combination."
+            captureHotkeyError = NSLocalizedString(
+                "The selected shortcut is already taken. Try another combination.",
+                comment: "Error message shown when shortcut conflicts"
+            )
         }
     }
 

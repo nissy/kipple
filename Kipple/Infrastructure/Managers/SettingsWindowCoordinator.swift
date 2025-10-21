@@ -21,6 +21,8 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     private let viewModel: SettingsViewModel
     private weak var window: NSWindow?
     private var cancellables = Set<AnyCancellable>()
+    private let appSettings = AppSettings.shared
+    private var localizationCancellable: AnyCancellable?
     private let minimumContentSize = NSSize(width: 430, height: 300)
     private lazy var toolbar: NSToolbar = {
         let toolbar = NSToolbar(identifier: Self.toolbarIdentifier)
@@ -37,6 +39,16 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         self.viewModel = viewModel
         super.init()
         bindToViewModel()
+        localizationCancellable = appSettings.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshLocalization()
+                self.updateWindowSize(animated: true)
+                DispatchQueue.main.async { [weak self] in
+                    self?.updateWindowSize(animated: true)
+                }
+            }
     }
 
     func attach(to window: NSWindow) {
@@ -45,9 +57,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         toolbar.isVisible = false
         toolbar.selectedItemIdentifier = viewModel.selectedTab.toolbarIdentifier
         window.contentMinSize = minimumContentSize
-        if #available(macOS 11.0, *) {
-            window.subtitle = viewModel.selectedTab.title
-        }
+        refreshLocalization()
         updateWindowSize(animated: false)
         DispatchQueue.main.async { [weak self] in
             self?.updateWindowSize(animated: false)
@@ -63,8 +73,9 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
                     self.toolbar.selectedItemIdentifier = tab.toolbarIdentifier
                 }
                 if #available(macOS 11.0, *) {
-                    self.window?.subtitle = tab.title
+                    self.window?.subtitle = self.appSettings.localizedString(tab.titleKey, comment: "Settings tab title")
                 }
+                self.refreshLocalization()
                 self.updateWindowSize(animated: true)
                 DispatchQueue.main.async { [weak self] in
                     self?.updateWindowSize(animated: true)
@@ -114,16 +125,34 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         }
 
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-        item.label = tab.title
-        item.paletteLabel = tab.title
-        item.toolTip = tab.title
-        if let image = NSImage(systemSymbolName: tab.symbolName, accessibilityDescription: tab.title) {
+        let localizedTitle = appSettings.localizedString(tab.titleKey, comment: "Settings tab title")
+        item.label = localizedTitle
+        item.paletteLabel = localizedTitle
+        item.toolTip = localizedTitle
+        if let image = NSImage(systemSymbolName: tab.symbolName, accessibilityDescription: localizedTitle) {
             item.image = image
         }
         item.target = self
         item.action = #selector(selectTab(_:))
         item.isBordered = true
         return item
+    }
+
+    func refreshLocalization() {
+        guard let window else { return }
+        toolbar.items.forEach { item in
+            guard let tab = SettingsViewModel.Tab(toolbarIdentifier: item.itemIdentifier) else { return }
+            let title = appSettings.localizedString(tab.titleKey, comment: "Settings tab title")
+            item.label = title
+            item.paletteLabel = title
+            item.toolTip = title
+            if let image = NSImage(systemSymbolName: tab.symbolName, accessibilityDescription: title) {
+                item.image = image
+            }
+        }
+        if #available(macOS 11.0, *) {
+            window.subtitle = appSettings.localizedString(viewModel.selectedTab.titleKey, comment: "Settings tab title")
+        }
     }
 
     private func updateWindowSize(animated: Bool) {

@@ -25,6 +25,9 @@ ARCHIVE_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).xcarchive
 EXPORT_PATH = $(PROD_BUILD_DIR)/export
 DMG_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).dmg
 
+# SwiftData plugin path (required for Swift macros)
+SWIFTDATA_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftDataMacros.dylib
+
 # Environment variables (from .envrc)
 DEVELOPMENT_TEAM ?= R7LKF73J2W
 PRODUCT_BUNDLE_IDENTIFIER ?= com.nissy.Kipple
@@ -204,6 +207,7 @@ test: generate ## Run all tests
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
 		-only-testing:KippleTests
 
 test-coverage: generate ## Run tests with coverage report
@@ -220,6 +224,7 @@ test-coverage: generate ## Run tests with coverage report
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
 		-only-testing:KippleTests
 
 test-specific: generate ## Run specific test (use TEST=ClassName)
@@ -237,6 +242,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
 		-only-testing:KippleTests/$(TEST)
 
 #===============================================================================

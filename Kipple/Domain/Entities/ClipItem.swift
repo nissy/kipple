@@ -19,6 +19,10 @@ enum ClipItemCategory: String, CaseIterable {
     case all = "All"
     case url = "URL"
 
+    var localizedName: String {
+        NSLocalizedString(rawValue, comment: "Clip item category name")
+    }
+
     var icon: String {
         switch self {
         case .all:
@@ -168,7 +172,13 @@ struct ClipItem: Identifiable, Codable, Equatable {
     // アクションタイトル
     var actionTitle: String? {
         if let scheme = resolveURISchemeURL()?.scheme?.uppercased() {
-            return "Open \(scheme)"
+            return String(
+                format: NSLocalizedString(
+                    "Open %@",
+                    comment: "Open action title with URI scheme"
+                ),
+                scheme
+            )
         }
         return nil
     }

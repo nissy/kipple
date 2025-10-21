@@ -17,19 +17,19 @@ struct ModifierKeyPicker: View {
 
     var body: some View {
         Menu {
-            Button("None") {
+            Button(noneLabel) {
                 selection = 0
             }
-            Button("⌘ Command") {
+            Button(commandLabel) {
                 selection = Int(NSEvent.ModifierFlags.command.rawValue)
             }
-            Button("⌥ Option") {
+            Button(optionLabel) {
                 selection = Int(NSEvent.ModifierFlags.option.rawValue)
             }
-            Button("⌃ Control") {
+            Button(controlLabel) {
                 selection = Int(NSEvent.ModifierFlags.control.rawValue)
             }
-            Button("⇧ Shift") {
+            Button(shiftLabel) {
                 selection = Int(NSEvent.ModifierFlags.shift.rawValue)
             }
         } label: {
@@ -50,11 +50,17 @@ struct ModifierKeyPicker: View {
 
     private var modifierKeyDisplayName: String {
         var parts: [String] = []
-        if modifierFlags.contains(.command) { parts.append("⌘ Command") }
-        if modifierFlags.contains(.option) { parts.append("⌥ Option") }
-        if modifierFlags.contains(.control) { parts.append("⌃ Control") }
-        if modifierFlags.contains(.shift) { parts.append("⇧ Shift") }
-        if parts.isEmpty { return "None" }
+        if modifierFlags.contains(.command) { parts.append(commandLabel) }
+        if modifierFlags.contains(.option) { parts.append(optionLabel) }
+        if modifierFlags.contains(.control) { parts.append(controlLabel) }
+        if modifierFlags.contains(.shift) { parts.append(shiftLabel) }
+        if parts.isEmpty { return noneLabel }
         return parts.joined(separator: " + ")
     }
+
+    private var noneLabel: String { String(localized: "None") }
+    private var commandLabel: String { String(localized: "⌘ Command") }
+    private var optionLabel: String { String(localized: "⌥ Option") }
+    private var controlLabel: String { String(localized: "⌃ Control") }
+    private var shiftLabel: String { String(localized: "⇧ Shift") }
 }

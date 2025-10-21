@@ -13,6 +13,7 @@ struct ClipboardItemPopover: View {
     @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
     @ObservedObject private var fontManager = FontManager.shared
     @ObservedObject private var categoryStore = UserCategoryStore.shared
+    @ObservedObject private var appSettings = AppSettings.shared
 
     init(item: ClipItem) {
         self.initialItem = item
@@ -24,6 +25,11 @@ struct ClipboardItemPopover: View {
     }
 
     var body: some View {
+        content
+            .environment(\.locale, appSettings.appLocale)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             headerSection
                 .padding(16)
@@ -71,7 +77,7 @@ struct ClipboardItemPopover: View {
                             Image(systemName: "app.badge.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(.accentColor)
-                            Text(appName)
+                            Text(localizedAppName(appName))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(.primary)
                         }
@@ -82,7 +88,7 @@ struct ClipboardItemPopover: View {
                             Image(systemName: "macwindow")
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
-                            Text(windowTitle)
+                            Text(localizedWindowTitle(windowTitle))
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
@@ -153,7 +159,11 @@ struct ClipboardItemPopover: View {
         // Fallback to automatic classification
         switch item.category {
         case .url:
-            return DisplayCategoryInfo(name: "URL", icon: "link", color: .blue)
+            return DisplayCategoryInfo(
+                name: String(localized: "URL"),
+                icon: "link",
+                color: .blue
+            )
         case .all:
             let none = categoryStore.noneCategory()
             return DisplayCategoryInfo(
@@ -162,5 +172,19 @@ struct ClipboardItemPopover: View {
                 color: .gray
             )
         }
+    }
+
+    private func localizedAppName(_ appName: String) -> String {
+        if appName == "External Source" {
+            return String(localized: "External Source")
+        }
+        return appName
+    }
+
+    private func localizedWindowTitle(_ title: String) -> String {
+        if title == "Quick Editor" {
+            return String(localized: "Quick Editor")
+        }
+        return title
     }
 }

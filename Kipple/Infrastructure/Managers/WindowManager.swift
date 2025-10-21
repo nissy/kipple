@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 @MainActor
 protocol WindowManaging: AnyObject {
@@ -21,6 +22,7 @@ extension Notification.Name {
 }
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class WindowManager: NSObject, NSWindowDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
@@ -28,6 +30,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsCoordinator: SettingsToolbarController?
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
+    private let appSettings = AppSettings.shared
+    private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
         didSet {
             if let window = mainWindow {
@@ -48,6 +52,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var appDidBecomeActiveObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        localizationCancellable = appSettings.objectWillChange
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateLocalization()
+            }
+    }
     
     // MARK: - Main Window
     
@@ -405,7 +418,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = SettingsHostingController(rootView: settingsView)
 
             let window = NSWindow(contentViewController: hostingController)
-            window.title = "Kipple Settings"
+            window.title = String(localized: "Settings")
             window.styleMask = [.titled, .closable]
             window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
@@ -424,6 +437,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             settingsViewModel = viewModel
 
             settingsWindow = window
+            updateLocalization()
         }
 
         NSApp.activate(ignoringOtherApps: true)
@@ -458,12 +472,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = NSHostingController(rootView: aboutView)
             
             aboutWindow = NSWindow(contentViewController: hostingController)
-            aboutWindow?.title = "About Kipple"
+            aboutWindow?.title = String(localized: "About Kipple")
             aboutWindow?.styleMask = [.titled, .closable]
             aboutWindow?.isMovableByWindowBackground = true
             aboutWindow?.setContentSize(NSSize(width: 400, height: 580))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
+        } else {
+            aboutWindow?.title = String(localized: "About Kipple")
         }
         
         NSApp.setActivationPolicy(.regular)
@@ -483,6 +499,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 NSApp.setActivationPolicy(.accessory)
             }
         }
+    }
+
+    private func updateLocalization() {
+        settingsWindow?.title = appSettings.localizedString("Settings", comment: "Settings window title")
+        settingsCoordinator?.refreshLocalization()
     }
     
     // MARK: - Focus Management

@@ -114,7 +114,17 @@ struct HistoryItemView: View {
                         .fill(Color.accentColor)
                 )
                 .contentShape(Circle())
-                .help("Queue position \(queueBadge)")
+                .help(
+                    Text(
+                        String(
+                            format: NSLocalizedString(
+                                "Queue position %d",
+                                comment: "Tooltip showing queue badge position"
+                            ),
+                            queueBadge
+                        )
+                    )
+                )
         }
     }
 
@@ -201,7 +211,17 @@ struct HistoryItemView: View {
                 closePopover()
                 onCategoryTap()
             }
-            .help("「\(item.category.rawValue)」でフィルタ")
+            .help(
+                Text(
+                    String(
+                        format: NSLocalizedString(
+                            "Filter by “%@”",
+                            comment: "Filter tooltip with category name"
+                        ),
+                        item.category.localizedName
+                    )
+                )
+            )
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
@@ -397,6 +417,14 @@ private extension HistoryItemView {
         case .shift: key = "⇧"
         default: key = "⌘"
         }
-        return "\(key)+Click to \(item.actionTitle ?? "Open")"
+        let actionTitle = item.actionTitle ?? NSLocalizedString("Open", comment: "Default action title")
+        return String(
+            format: NSLocalizedString(
+                "%@+Click to %@",
+                comment: "Modifier click instruction with action title"
+            ),
+            key,
+            actionTitle
+        )
     }
 }

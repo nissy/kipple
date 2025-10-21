@@ -103,6 +103,12 @@ extension MainView {
     }
 
     var body: some View {
+        mainContent
+            .environment(\.locale, appSettings.appLocale)
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
         VStack(spacing: 0) {
             if appSettings.editorPosition == "disabled" {
                 historyAndPinnedContent
@@ -351,7 +357,7 @@ extension MainView {
                                             .white : .secondary)
                                 }
                                 
-                                Text(category.rawValue)
+                                Text(category.localizedName)
                                     .font(.system(size: 9))
                                     .foregroundColor(viewModel.selectedCategory == category ? 
                                         .primary : .secondary)

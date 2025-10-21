@@ -18,6 +18,7 @@ struct DataSettingsView: View {
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
+    @ObservedObject private var appSettings = AppSettings.shared
     
     private let clipboardService: any ClipboardServiceProtocol
     
@@ -195,12 +196,12 @@ struct DataSettingsView: View {
                                 let pinnedCount = clipboardService.history.filter { $0.isPinned }.count
 
                                 if unpinnedCount > 0 {
-                                    Text("\(unpinnedCount) items in history")
+                                    Text(localizedHistoryCountMessage(unpinnedCount))
                                         .font(.system(size: 11))
                                         .foregroundColor(.secondary)
                                 }
                                 if pinnedCount > 0 {
-                                    Text("\(pinnedCount) pinned items")
+                                    Text(localizedPinnedCountMessage(pinnedCount))
                                         .font(.system(size: 11))
                                         .foregroundColor(.secondary)
                                 }
@@ -223,27 +224,12 @@ struct DataSettingsView: View {
         } message: {
             let unpinnedCount = clipboardService.history.filter { !$0.isPinned }.count
             let pinnedCount = clipboardService.history.filter { $0.isPinned }.count
-            
-            let message = if pinnedCount > 0 {
-                """
-                This will permanently delete \(unpinnedCount) history item\(unpinnedCount == 1 ? "" : "s"). \
-                Your \(pinnedCount) pinned item\(pinnedCount == 1 ? "" : "s") will be preserved. \
-                This action cannot be undone.
-                """
-            } else {
-                """
-                This will permanently delete \(unpinnedCount) history item\(unpinnedCount == 1 ? "" : "s"). \
-                This action cannot be undone.
-                """
-            }
-            
-            Text(message)
+            Text(clearHistoryConfirmationMessage(unpinnedCount: unpinnedCount, pinnedCount: pinnedCount))
         }
         .alert("History Cleared", isPresented: $showClearSuccessAlert) {
             Button("OK") { }
         } message: {
-            let itemText = "\(clearedItemCount) item\(clearedItemCount == 1 ? "" : "s")"
-            Text("\(itemText) successfully removed from clipboard history.")
+            Text(clearHistorySuccessMessage(count: clearedItemCount))
         }
     }
     
@@ -291,5 +277,58 @@ struct DataSettingsView: View {
                 }
             }
         }
+    }
+
+    private func localizedHistoryCountMessage(_ count: Int) -> String {
+        appSettings.localizedFormat(
+            "history.unpinnedCount",
+            comment: "Shows the number of items currently in history",
+            count
+        )
+    }
+
+    private func localizedPinnedCountMessage(_ count: Int) -> String {
+        appSettings.localizedFormat(
+            "history.pinnedCount",
+            comment: "Shows the number of pinned items",
+            count
+        )
+    }
+
+    private func clearHistoryConfirmationMessage(unpinnedCount: Int, pinnedCount: Int) -> String {
+        var components: [String] = [
+            appSettings.localizedFormat(
+                "history.clear.deleteCount",
+                comment: "Describes how many history items will be deleted",
+                unpinnedCount
+            )
+        ]
+
+        if pinnedCount > 0 {
+            components.append(
+                appSettings.localizedFormat(
+                    "history.clear.pinnedPreserved",
+                    comment: "Describes how many pinned items remain",
+                    pinnedCount
+                )
+            )
+        }
+
+        components.append(
+            appSettings.localizedString(
+                "history.clear.cannotUndo",
+                comment: "Warns that the action cannot be undone"
+            )
+        )
+
+        return components.joined(separator: " ")
+    }
+
+    private func clearHistorySuccessMessage(count: Int) -> String {
+        appSettings.localizedFormat(
+            "history.clear.success",
+            comment: "Summary after clearing history",
+            count
+        )
     }
 }

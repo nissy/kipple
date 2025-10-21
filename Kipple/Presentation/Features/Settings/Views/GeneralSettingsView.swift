@@ -13,13 +13,16 @@ struct GeneralSettingsView: View {
     @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 0
     @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
     @AppStorage("windowAnimation") private var windowAnimation: String = "none"
+    @ObservedObject private var appSettings = AppSettings.shared
 
     @State private var tempKeyCode: UInt16 = 0
     @State private var tempModifierFlags: NSEvent.ModifierFlags = []
+    @State private var selectedLanguage: AppSettings.LanguageOption = .system
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
+                languageSection
                 startupSection
                 openKippleSection
                 windowAnimationSection
@@ -30,11 +33,31 @@ struct GeneralSettingsView: View {
         .onAppear {
             tempKeyCode = UInt16(hotkeyKeyCode)
             tempModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(hotkeyModifierFlags))
+            selectedLanguage = appSettings.appLanguage
+        }
+        .onChange(of: selectedLanguage) { newValue in
+            appSettings.appLanguage = newValue
+        }
+    }
+
+    private var languageSection: some View {
+        SettingsGroup("Language", includeTopDivider: false) {
+            SettingsRow(label: "App Language") {
+                Picker("", selection: $selectedLanguage) {
+                    ForEach(AppSettings.LanguageOption.allCases) { option in
+                        Text(option.displayName)
+                            .tag(option)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+                .pickerStyle(MenuPickerStyle())
+            }
         }
     }
 
     private var startupSection: some View {
-        SettingsGroup("Startup", includeTopDivider: false) {
+        SettingsGroup("Startup") {
             SettingsRow(
                 label: "Launch at login",
                 isOn: $autoLaunchAtLogin
