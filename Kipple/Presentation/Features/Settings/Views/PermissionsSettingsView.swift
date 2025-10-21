@@ -48,13 +48,10 @@ struct PermissionsSettingsView: View {
     private var screenRecordingSection: some View {
         SettingsGroup(
             "Screen Recording Permission",
-            includeTopDivider: false,
-            headerAccessory: AnyView(
-                PermissionStatusBadge(isGranted: hasScreenCapturePermission)
-            )
+            includeTopDivider: false
         ) {
             SettingsRow(label: "Request Access") {
-                HStack {
+                HStack(spacing: 10) {
                     Button("Request Permission Again") {
                         requestPermissionAgain()
                     }
@@ -62,23 +59,26 @@ struct PermissionsSettingsView: View {
                     .controlSize(.small)
                     .tint(Color.accentColor)
                     .disabled(hasScreenCapturePermission)
+                    PermissionStatusBadge(isGranted: hasScreenCapturePermission)
                 }
             }
 
             SettingsRow(label: "Overview") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("1. Open System Settings → Privacy & Security → Screen & System Audio Recording.")
-                    Text("2. Turn on the toggle next to “Kipple”.")
-                    Text("3. Return to Kipple; this screen updates automatically.")
+                    Text("Why: Needed so Screen Text Capture can read on-screen text. No screen data leaves your Mac.")
+                    Text("1. Click “Request Permission Again” and follow the macOS prompt to System Settings.")
+                    Text("2. In System Settings → Privacy & Security → Screen Recording, enable “Kipple”.")
+                    Text("Note: On macOS 15+, the section label is Screen & System Audio Recording.")
+                    Text("3. Return to Kipple; the status badge switches to Granted automatically.")
                     Text("MDM Tip: Configure AllowStandardUserToSetSystemService for ScreenCapture.")
                     Text("This enables standard users to approve the permission.")
-                    Text("Once granted, configure the screen text capture shortcut in the section below.")
+                    Text("Once granted, configure the screen text capture shortcut below.")
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
             }
 
-            SettingsRow(label: "Text Capture Shortcut") {
+            SettingsRow(label: "Text Capture Hotkey") {
                 VStack(alignment: .leading, spacing: 8) {
                     HotkeyRecorderField(
                         keyCode: $tempCaptureKeyCode,
@@ -108,13 +108,10 @@ struct PermissionsSettingsView: View {
 
     private var accessibilitySection: some View {
         SettingsGroup(
-            "Accessibility Permission",
-            headerAccessory: AnyView(
-                PermissionStatusBadge(isGranted: hasAccessibilityPermission)
-            )
+            "Accessibility Permission"
         ) {
             SettingsRow(label: "Request Access") {
-                HStack {
+                HStack(spacing: 10) {
                     Button("Request Permission Again") {
                         requestAccessibilityPermission()
                     }
@@ -122,15 +119,17 @@ struct PermissionsSettingsView: View {
                     .controlSize(.small)
                     .tint(Color.accentColor)
                     .disabled(hasAccessibilityPermission)
+                    PermissionStatusBadge(isGranted: hasAccessibilityPermission)
                 }
             }
 
             SettingsRow(label: "Overview") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("1. Open System Settings → Privacy & Security → Accessibility.")
-                    Text("2. Turn on the toggle next to “Kipple”.")
-                    Text("3. Return to Kipple; this screen updates automatically.")
-                    Text("Tip: This allows Kipple to observe Command+V while running in the background.")
+                    Text("Why: Lets Quick Paste watch Command+V for clipboard automation. Input stays on device.")
+                    Text("1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings.")
+                    Text("2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”.")
+                    Text("3. Return to Kipple; the status badge switches to Granted automatically.")
+                    Text("Tip: Granting Accessibility lets Kipple observe Command+V while running in the background.")
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
@@ -145,7 +144,10 @@ struct PermissionsSettingsView: View {
             defaults.set(Int(defaultCaptureKeyCode), forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
         }
         if defaults.object(forKey: TextCaptureHotkeyManager.modifierDefaultsKey) == nil {
-            defaults.set(Int(defaultCaptureModifierFlags.rawValue), forKey: TextCaptureHotkeyManager.modifierDefaultsKey)
+            defaults.set(
+                Int(defaultCaptureModifierFlags.rawValue),
+                forKey: TextCaptureHotkeyManager.modifierDefaultsKey
+            )
         }
 
         textCaptureHotkeyKeyCode = defaults.integer(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
