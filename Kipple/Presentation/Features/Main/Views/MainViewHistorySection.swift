@@ -201,32 +201,52 @@ struct MainViewHistorySection: View {
 
     private var queueModeButton: some View {
         let isActive = pasteMode != .clipboard
+        let inactiveBase = Color(NSColor.controlBackgroundColor)
+        let background = isActive
+            ? LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.95),
+                    Color.accentColor.opacity(0.75)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            : LinearGradient(
+                colors: [
+                    inactiveBase,
+                    inactiveBase.opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        let strokeColor = isActive ? Color.accentColor.opacity(0.35) : Color.black.opacity(0.05)
+        let shadowColor = isActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
+
         return Button {
             guard queueEnabled else { return }
             withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                 onToggleQueueMode()
             }
         } label: {
-            VStack(spacing: 1) {
-                ZStack {
-                    Circle()
-                        .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
-                        .frame(width: 24, height: 24)
-                        .shadow(color: isActive ? Color.accentColor.opacity(0.3) : .clear,
-                                radius: 3,
-                                y: 2)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(background)
+                    .frame(width: 32, height: 32)
+                    .shadow(
+                        color: shadowColor,
+                        radius: 4,
+                        y: 2
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(strokeColor, lineWidth: 1)
+                    )
 
-                    Image(systemName: "list.number")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(isActive ? .white : .secondary)
-                }
-
-                Text("Queue")
-                    .font(.system(size: 7.5))
-                    .foregroundColor(isActive ? .primary : .secondary)
-                    .lineLimit(1)
+                Image(systemName: "list.number")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isActive ? .white : .secondary)
             }
-            .frame(width: 34)
+            .frame(width: 36, height: 36)
             .opacity(queueEnabled ? 1.0 : 0.4)
         }
         .buttonStyle(PlainButtonStyle())
@@ -235,32 +255,52 @@ struct MainViewHistorySection: View {
 
     private var queueLoopButton: some View {
         let isLooping = pasteMode == .queueToggle
+        let inactiveBase = Color(NSColor.controlBackgroundColor)
+        let background = isLooping
+            ? LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.95),
+                    Color.accentColor.opacity(0.75)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            : LinearGradient(
+                colors: [
+                    inactiveBase,
+                    inactiveBase.opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        let strokeColor = isLooping ? Color.accentColor.opacity(0.35) : Color.black.opacity(0.05)
+        let shadowColor = isLooping ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
+
         return Button {
             guard queueEnabled else { return }
             withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                 onToggleQueueRepetition()
             }
         } label: {
-            VStack(spacing: 1) {
-                ZStack {
-                    Circle()
-                        .fill(isLooping ? Color.accentColor : Color.secondary.opacity(0.1))
-                        .frame(width: 24, height: 24)
-                        .shadow(color: isLooping ? Color.accentColor.opacity(0.3) : .clear,
-                                radius: 3,
-                                y: 2)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(background)
+                    .frame(width: 32, height: 32)
+                    .shadow(
+                        color: shadowColor,
+                        radius: 4,
+                        y: 2
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(strokeColor, lineWidth: 1)
+                    )
 
-                    Image(systemName: isLooping ? "repeat.circle.fill" : "repeat")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(isLooping ? .white : .secondary)
-                }
-
-                Text("Loop")
-                    .font(.system(size: 7.5))
-                    .foregroundColor(isLooping ? .primary : .secondary)
-                    .lineLimit(1)
+                Image(systemName: isLooping ? "repeat.circle.fill" : "repeat")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isLooping ? .white : .secondary)
             }
-            .frame(width: 34)
+            .frame(width: 36, height: 36)
             .opacity(queueEnabled ? 1.0 : 0.4)
         }
         .buttonStyle(PlainButtonStyle())
