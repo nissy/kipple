@@ -128,11 +128,21 @@ struct MainViewHistorySection: View {
                 ScrollView {
                     LazyVStack(spacing: 2, pinnedViews: []) {
                         ForEach(history) { item in
+                            let queueBadgeValue: Int? = {
+                                if let badge = queueBadgeProvider(item) {
+                                    return badge
+                                }
+                                if pasteMode != .clipboard {
+                                    return 0
+                                }
+                                return nil
+                            }()
+
                             HistoryItemView(
                                 item: item,
                                 isSelected: selectedHistoryItem?.id == item.id,
                                 isCurrentClipboardItem: item.content == currentClipboardContent,
-                                queueBadge: queueBadgeProvider(item),
+                                queueBadge: queueBadgeValue,
                                 isQueuePreviewed: queueSelectionPreview.contains(item.id),
                                 onTap: {
                                     withAnimation(.spring(response: 0.3)) {

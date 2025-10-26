@@ -105,13 +105,18 @@ struct HistoryItemView: View {
     @ViewBuilder
     private var queueBadgeView: some View {
         if let queueBadge {
-            Text("\(queueBadge)")
+            let isActiveBadge = queueBadge > 0
+            let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
+            let badgeBackground = isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1)
+            let badgeForeground = isActiveBadge ? Color.white : Color.secondary
+
+            Text(badgeText)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(badgeForeground)
                 .frame(width: 22, height: 22)
                 .background(
                     Circle()
-                        .fill(Color.accentColor)
+                        .fill(badgeBackground)
                 )
                 .contentShape(Circle())
                 .help(
