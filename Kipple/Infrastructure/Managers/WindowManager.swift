@@ -52,6 +52,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var appDidBecomeActiveObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
+    var onTextCaptureRequested: (() -> Void)?
 
     override init() {
         super.init()
@@ -121,6 +122,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             },
             onSetPreventAutoClose: { [weak self] flag in
                 self?.setPreventAutoClose(flag)
+            },
+            onStartTextCapture: { [weak self] in
+                self?.onTextCaptureRequested?()
             }
         )
         .environmentObject(mainViewModel!)

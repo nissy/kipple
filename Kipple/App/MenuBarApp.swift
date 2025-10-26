@@ -80,6 +80,9 @@ final class MenuBarApp: NSObject, ObservableObject {
         self.hotkeyManager = HotkeyManagerProvider.resolveSync()
 
         super.init()
+        windowManager.onTextCaptureRequested = { [weak self] in
+            self?.captureTextFromScreen()
+        }
         observeLocalizationChanges()
 
         // Skip heavy initialization when running unit tests

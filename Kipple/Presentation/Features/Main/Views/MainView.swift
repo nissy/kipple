@@ -38,17 +38,20 @@ struct MainView: View {
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
     let onSetPreventAutoClose: ((Bool) -> Void)?
+    let onStartTextCapture: (() -> Void)?
     
     init(
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
-        onSetPreventAutoClose: ((Bool) -> Void)? = nil
+        onSetPreventAutoClose: ((Bool) -> Void)? = nil,
+        onStartTextCapture: (() -> Void)? = nil
     ) {
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
         self.onSetPreventAutoClose = onSetPreventAutoClose
+        self.onStartTextCapture = onStartTextCapture
     }
 }
 
@@ -293,6 +296,73 @@ extension MainView {
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
                 VStack(spacing: 6) {
+                    if let onStartTextCapture {
+                        Button(action: {
+                            onStartTextCapture()
+                        }, label: {
+                            VStack(spacing: 3) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.secondary.opacity(0.1))
+                                        .frame(width: 30, height: 30)
+
+                                    Image(systemName: "text.magnifyingglass")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Text(String(localized: "Capture"))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 52)
+                        })
+                        .buttonStyle(PlainButtonStyle())
+                        .help(Text(String(localized: "Screen Text Capture")))
+
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                toggleEditorVisibility()
+                            }
+                        }, label: {
+                            VStack(spacing: 3) {
+                                ZStack {
+                                    Circle()
+                                        .fill(isEditorEnabled ?
+                                              Color.accentColor :
+                                              Color.secondary.opacity(0.1))
+                                        .frame(width: 30, height: 30)
+                                        .shadow(
+                                            color: isEditorEnabled ?
+                                                Color.accentColor.opacity(0.3) :
+                                                .clear,
+                                            radius: 3,
+                                            y: 2
+                                        )
+
+                                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(isEditorEnabled ? .white : .secondary)
+                                }
+
+                                Text(String(localized: "Editor"))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(isEditorEnabled ? .primary : .secondary)
+                                    .lineLimit(1)
+                            }
+                            .frame(width: 52)
+                        })
+                        .buttonStyle(PlainButtonStyle())
+                        .scaleEffect(isEditorEnabled ? 1.05 : 1.0)
+                        .animation(.spring(response: 0.3), value: isEditorEnabled)
+                        .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
+
+                        Divider()
+                            .frame(width: 44)
+                            .padding(.vertical, 6)
+                    }
+
                     // ピン留めフィルター（一番上に配置）
                     Button(action: {
                         withAnimation(.spring(response: 0.3)) {

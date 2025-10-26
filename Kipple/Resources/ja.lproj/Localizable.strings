@@ -30,6 +30,7 @@
 "Close" = "閉じる";
 "Copied" = "コピー時刻";
 "Copy" = "コピー";
+"Capture" = "Capture";
 "Data Management" = "データ管理";
 "Modified click" = "修飾キー付きクリック";
 "Use modifier + click" = "修飾キーとクリックを使います";
@@ -55,7 +56,7 @@
 "Fade" = "フェード";
 "Filter by “%@”" = "「%@」でフィルタ";
 "General" = "一般";
-"Editor" = "エディタ";
+"Editor" = "Editor";
 "Clipboard" = "履歴";
 "Permission" = "権限";
 "Grant Accessibility Permission…" = "アクセシビリティの許可を付与…";

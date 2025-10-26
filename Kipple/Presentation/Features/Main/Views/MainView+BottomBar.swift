@@ -90,41 +90,6 @@ extension MainView {
             .help("Settings")
 
             Button(action: {
-                toggleEditorVisibility()
-            }, label: {
-                ZStack {
-                    Circle()
-                        .fill(isEditorEnabled ?
-                              activeButtonHighlight :
-                              LinearGradient(
-                                  colors: [
-                                      Color(NSColor.controlBackgroundColor),
-                                      Color(NSColor.controlBackgroundColor).opacity(0.8)
-                                  ],
-                                  startPoint: .topLeading,
-                                  endPoint: .bottomTrailing
-                              )
-                        )
-                        .frame(width: 28, height: 28)
-                        .shadow(
-                            color: isEditorEnabled ?
-                                Color.accentColor.opacity(0.3) :
-                                Color.black.opacity(0.08),
-                            radius: 3,
-                            y: 2
-                        )
-
-                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(isEditorEnabled ? .white : .secondary)
-                }
-            })
-            .buttonStyle(PlainButtonStyle())
-            .scaleEffect(isEditorEnabled ? 1.0 : 0.95)
-            .animation(.spring(response: 0.3), value: isEditorEnabled)
-            .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
-
-            Button(action: {
                 toggleAlwaysOnTop()
             }, label: {
                 ZStack {
