@@ -95,11 +95,7 @@ extension MainView {
                 ZStack {
                     Circle()
                         .fill(isEditorEnabled ?
-                              LinearGradient(
-                                  colors: [Color.accentColor.opacity(0.85), Color.accentColor.opacity(0.65)],
-                                  startPoint: .topLeading,
-                                  endPoint: .bottomTrailing
-                              ) :
+                              activeButtonHighlight :
                               LinearGradient(
                                   colors: [
                                       Color(NSColor.controlBackgroundColor),
@@ -112,7 +108,7 @@ extension MainView {
                         .frame(width: 28, height: 28)
                         .shadow(
                             color: isEditorEnabled ?
-                                Color.accentColor.opacity(0.25) :
+                                Color.accentColor.opacity(0.3) :
                                 Color.black.opacity(0.08),
                             radius: 3,
                             y: 2
@@ -134,8 +130,16 @@ extension MainView {
                 ZStack {
                     Circle()
                         .fill(isAlwaysOnTop ?
-                            Color.accentColor :
-                            Color(NSColor.controlBackgroundColor))
+                              activeButtonHighlight :
+                              LinearGradient(
+                                  colors: [
+                                      Color(NSColor.controlBackgroundColor),
+                                      Color(NSColor.controlBackgroundColor).opacity(0.8)
+                                  ],
+                                  startPoint: .topLeading,
+                                  endPoint: .bottomTrailing
+                              )
+                        )
                         .frame(width: 28, height: 28)
                         .shadow(
                             color: isAlwaysOnTop ?
@@ -165,6 +169,17 @@ extension MainView {
         .background(
             Color(NSColor.windowBackgroundColor).opacity(0.95)
                 .background(.ultraThinMaterial)
+        )
+    }
+
+    private var activeButtonHighlight: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.accentColor,
+                Color.accentColor
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
         )
     }
 }
