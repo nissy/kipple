@@ -23,10 +23,13 @@ struct MainViewHistorySection: View {
     let onSearchTextChanged: (String) -> Void
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
-    let queueEnabled: Bool
+    let isPinnedFilterActive: Bool
+    let onTogglePinnedFilter: () -> Void
+    let availableCategories: [ClipItemCategory]
+    let customCategories: [UserCategory]
+    let selectedUserCategoryId: UUID?
+    let onToggleUserCategoryFilter: (UUID) -> Void
     let pasteMode: MainViewModel.PasteMode
-    let onToggleQueueMode: () -> Void
-    let onToggleQueueRepetition: () -> Void
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
     @ObservedObject private var fontManager = FontManager.shared
@@ -49,10 +52,13 @@ struct MainViewHistorySection: View {
         onSearchTextChanged: @escaping (String) -> Void,
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
-        queueEnabled: Bool,
+        isPinnedFilterActive: Bool,
+        onTogglePinnedFilter: @escaping () -> Void,
+        availableCategories: [ClipItemCategory],
+        customCategories: [UserCategory],
+        selectedUserCategoryId: UUID?,
+        onToggleUserCategoryFilter: @escaping (UUID) -> Void,
         pasteMode: MainViewModel.PasteMode,
-        onToggleQueueMode: @escaping () -> Void,
-        onToggleQueueRepetition: @escaping () -> Void,
         queueBadgeProvider: @escaping (ClipItem) -> Int?,
         queueSelectionPreview: Set<UUID>
     ) {
@@ -69,10 +75,13 @@ struct MainViewHistorySection: View {
         self.onSearchTextChanged = onSearchTextChanged
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
-        self.queueEnabled = queueEnabled
+        self.isPinnedFilterActive = isPinnedFilterActive
+        self.onTogglePinnedFilter = onTogglePinnedFilter
+        self.availableCategories = availableCategories
+        self.customCategories = customCategories
+        self.selectedUserCategoryId = selectedUserCategoryId
+        self.onToggleUserCategoryFilter = onToggleUserCategoryFilter
         self.pasteMode = pasteMode
-        self.onToggleQueueMode = onToggleQueueMode
-        self.onToggleQueueRepetition = onToggleQueueRepetition
         self.queueBadgeProvider = queueBadgeProvider
         self.queueSelectionPreview = queueSelectionPreview
         _searchText = State(initialValue: initialSearchText)
@@ -81,8 +90,9 @@ struct MainViewHistorySection: View {
     var body: some View {
         return VStack(spacing: 0) {
             // 検索バー（常に表示）
-            HStack(spacing: 10) {
-                queueControls
+            HStack(spacing: 8) {
+                pinnedFilterButton
+                categoryFilterControl
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color(NSColor.textBackgroundColor))
@@ -115,6 +125,7 @@ struct MainViewHistorySection: View {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .frame(height: 32)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -199,121 +210,188 @@ struct MainViewHistorySection: View {
         }
     }
 
+    private var pinnedFilterButton: some View {
+        Button {
+            onTogglePinnedFilter()
+        } label: {
+            let background = isPinnedFilterActive
+                ? Color.accentColor.opacity(0.9)
+                : Color(NSColor.textBackgroundColor)
+            let borderColor = isPinnedFilterActive
+                ? Color.accentColor.opacity(0.65)
+                : Color(NSColor.separatorColor).opacity(0.35)
+            let iconColor: Color = isPinnedFilterActive ? .white : .secondary
+
+            Image(systemName: "pin.fill")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(iconColor)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(background)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(borderColor, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(
+            Text(
+                isPinnedFilterActive
+                ? String(localized: "Pinned only")
+                : String(localized: "Pins: All")
+            )
+        )
+    }
+
     @ViewBuilder
-    private var queueControls: some View {
-        HStack(spacing: 4) {
-            queueModeButton
-            if pasteMode != .clipboard {
-                queueLoopButton
+    private var categoryFilterControl: some View {
+        let isActive = selectedCategory != nil || selectedUserCategoryId != nil
+        if isActive {
+            let iconName: String = {
+                if let category = selectedCategory {
+                    return category.icon
+                }
+                if let selectedUserCategoryId,
+                   let custom = customCategories.first(where: { $0.id == selectedUserCategoryId }) {
+                    return custom.iconSystemName
+                }
+                return noneCategoryIconName
+            }()
+
+            Button {
+                if let category = selectedCategory {
+                    onCategoryFilter?(category)
+                } else if let userCategoryId = selectedUserCategoryId {
+                    onToggleUserCategoryFilter(userCategoryId)
+                } else {
+                    onCategoryFilter?(.all)
+                }
+            } label: {
+                filterControlIcon(
+                    systemName: iconName,
+                    isActive: true,
+                    showSecondaryFrame: iconName == noneCategoryIconName
+                )
             }
+            .buttonStyle(PlainButtonStyle())
+            .help(Text(currentCategoryFilterLabel))
+        } else {
+            Menu {
+                if let onCategoryFilter {
+                    ForEach(availableCategories, id: \.self) { category in
+                        Button {
+                            onCategoryFilter(category)
+                        } label: {
+                            filterMenuItemLabel(
+                                category.localizedName,
+                            selected: false,
+                            systemImage: category.icon
+                            )
+                        }
+                    }
+                }
+
+                if !customCategories.isEmpty {
+                    if onCategoryFilter != nil {
+                        Divider()
+                    }
+                    ForEach(customCategories) { category in
+                        Button {
+                            onToggleUserCategoryFilter(category.id)
+                        } label: {
+                            filterMenuItemLabel(
+                                category.name,
+                                selected: false,
+                                systemImage: category.iconSystemName
+                            )
+                        }
+                    }
+                }
+            } label: {
+                filterControlIcon(
+                    systemName: noneCategoryIconName,
+                    isActive: false,
+                    showSecondaryFrame: true
+                )
+            }
+            .menuStyle(BorderlessButtonMenuStyle())
+            .help(Text(noneCategoryDisplayName))
         }
     }
 
-    private var queueModeButton: some View {
-        let isActive = pasteMode != .clipboard
-        let inactiveBase = Color(NSColor.controlBackgroundColor)
+    private var currentCategoryFilterLabel: String {
+        if let category = selectedCategory {
+            return category.localizedName
+        }
+        if let selectedUserCategoryId,
+           let custom = customCategories.first(where: { $0.id == selectedUserCategoryId }) {
+            return custom.name
+        }
+        return noneCategoryDisplayName
+    }
+
+    private func filterControlIcon(systemName: String, isActive: Bool, showSecondaryFrame: Bool = false) -> some View {
         let background = isActive
-            ? LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.95),
-                    Color.accentColor.opacity(0.75)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            : LinearGradient(
-                colors: [
-                    inactiveBase,
-                    inactiveBase.opacity(0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        let strokeColor = isActive ? Color.accentColor.opacity(0.35) : Color.black.opacity(0.05)
-        let shadowColor = isActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
+            ? Color.accentColor.opacity(0.9)
+            : Color(NSColor.textBackgroundColor)
+        let borderColor = isActive
+            ? Color.accentColor.opacity(0.65)
+            : Color(NSColor.separatorColor).opacity(0.35)
+        let iconColor: Color = isActive ? .white : .secondary
 
-        return Button {
-            guard queueEnabled else { return }
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                onToggleQueueMode()
-            }
-        } label: {
-            ZStack {
+        return Image(systemName: systemName)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(iconColor)
+            .frame(width: 32, height: 32)
+            .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(background)
-                    .frame(width: 32, height: 32)
-                    .shadow(
-                        color: shadowColor,
-                        radius: 4,
-                        y: 2
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(strokeColor, lineWidth: 1)
-                    )
-
-                Image(systemName: "list.number")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isActive ? .white : .secondary)
-            }
-            .frame(width: 36, height: 36)
-            .opacity(queueEnabled ? 1.0 : 0.4)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!queueEnabled)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(borderColor, lineWidth: 1)
+            )
+            .overlay(
+                Group {
+                    if showSecondaryFrame {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+                            .padding(4)
+                    }
+                }
+            )
+            .contentShape(Rectangle())
     }
 
-    private var queueLoopButton: some View {
-        let isLooping = pasteMode == .queueToggle
-        let inactiveBase = Color(NSColor.controlBackgroundColor)
-        let background = isLooping
-            ? LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.95),
-                    Color.accentColor.opacity(0.75)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            : LinearGradient(
-                colors: [
-                    inactiveBase,
-                    inactiveBase.opacity(0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        let strokeColor = isLooping ? Color.accentColor.opacity(0.35) : Color.black.opacity(0.05)
-        let shadowColor = isLooping ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
-
-        return Button {
-            guard queueEnabled else { return }
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                onToggleQueueRepetition()
+    private func filterMenuItemLabel(
+        _ text: String,
+        selected: Bool,
+        systemImage: String? = nil
+    ) -> some View {
+        HStack(spacing: 8) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.secondary)
             }
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(background)
-                    .frame(width: 32, height: 32)
-                    .shadow(
-                        color: shadowColor,
-                        radius: 4,
-                        y: 2
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(strokeColor, lineWidth: 1)
-                    )
-
-                Image(systemName: isLooping ? "repeat.circle.fill" : "repeat")
+            Text(text)
+                .font(.system(size: 12))
+            Spacer()
+            if selected {
+                Image(systemName: "checkmark")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isLooping ? .white : .secondary)
             }
-            .frame(width: 36, height: 36)
-            .opacity(queueEnabled ? 1.0 : 0.4)
         }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!queueEnabled)
+        .padding(.vertical, 2)
+    }
+
+    private var noneCategoryIconName: String {
+        UserCategoryStore.shared.noneCategory().iconSystemName
+    }
+
+    private var noneCategoryDisplayName: String {
+        UserCategoryStore.shared.noneCategory().name
     }
 }

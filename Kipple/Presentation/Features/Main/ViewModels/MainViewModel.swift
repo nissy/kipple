@@ -340,8 +340,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             selectedCategory = nil
         } else {
             selectedCategory = category
-            // ピンフィルターをクリア
-            isPinnedFilterActive = false
             // ユーザカテゴリフィルタは排他
             selectedUserCategoryId = nil
         }
@@ -352,11 +350,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     /// ピンフィルタの切り替え
     func togglePinnedFilter() {
         isPinnedFilterActive.toggle()
-        // カテゴリフィルタをクリア
-        if isPinnedFilterActive {
-            selectedCategory = nil
-            selectedUserCategoryId = nil
-        }
         // フィルタを適用
         updateFilteredItems(clipboardService.history)
     }
@@ -368,7 +361,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         } else {
             selectedUserCategoryId = id
             selectedCategory = nil
-            isPinnedFilterActive = false
         }
         updateFilteredItems(clipboardService.history)
     }

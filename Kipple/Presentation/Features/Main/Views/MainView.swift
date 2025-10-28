@@ -361,131 +361,21 @@ extension MainView {
                         Divider()
                             .frame(width: 44)
                             .padding(.vertical, 6)
-                    }
 
-                    // ピン留めフィルター（一番上に配置）
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3)) {
-                            viewModel.togglePinnedFilter()
+                        queueModeFilterButton
+
+                        if viewModel.pasteMode != .clipboard {
+                            queueLoopFilterButton
                         }
-                    }, label: {
-                        VStack(spacing: 3) {
-                            ZStack {
-                                Circle()
-                                    .fill(viewModel.isPinnedFilterActive ? 
-                                        Color.accentColor : 
-                                        Color.secondary.opacity(0.1))
-                                    .frame(width: 30, height: 30)
-                                    .shadow(
-                                        color: viewModel.isPinnedFilterActive ? 
-                                            Color.accentColor.opacity(0.3) : .clear,
-                                        radius: 3,
-                                        y: 2
-                                    )
-                                
-                                Image(systemName: "pin.fill")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(viewModel.isPinnedFilterActive ? 
-                                        .white : .secondary)
-                            }
-                            
-                            Text("Pinned")
-                                .font(.system(size: 9))
-                                .foregroundColor(viewModel.isPinnedFilterActive ? 
-                                    .primary : .secondary)
-                                .lineLimit(1)
-                        }
-                        .frame(width: 52)
-                    })
-                    .buttonStyle(PlainButtonStyle())
-                    .scaleEffect(viewModel.isPinnedFilterActive ? 1.05 : 1.0)
-                    .animation(.spring(response: 0.3), value: viewModel.isPinnedFilterActive)
-                    
-                    ForEach(enabledCategories, id: \.self) { category in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3)) {
-                                viewModel.toggleCategoryFilter(category)
-                            }
-                        }, label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    Circle()
-                                        .fill(viewModel.selectedCategory == category ? 
-                                            Color.accentColor : 
-                                            Color.secondary.opacity(0.1))
-                                        .frame(width: 30, height: 30)
-                                        .shadow(
-                                            color: viewModel.selectedCategory == category ? 
-                                                Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 3,
-                                            y: 2
-                                        )
-                                    
-                                    Image(systemName: category.icon)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(viewModel.selectedCategory == category ? 
-                                            .white : .secondary)
-                                }
-                                
-                                Text(category.localizedName)
-                                    .font(.system(size: 9))
-                                    .foregroundColor(viewModel.selectedCategory == category ? 
-                                        .primary : .secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 52)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
                     }
-                    // ユーザ定義カテゴリのフィルタ
-                    ForEach(customCategories) { cat in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3)) {
-                                viewModel.toggleUserCategoryFilter(cat.id)
-                            }
-                        }, label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    Circle()
-                                        .fill(viewModel.selectedUserCategoryId == cat.id ?
-                                              Color.accentColor :
-                                              Color.secondary.opacity(0.1))
-                                        .frame(width: 30, height: 30)
-                                        .shadow(
-                                            color: viewModel.selectedUserCategoryId == cat.id ?
-                                                Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 3,
-                                            y: 2
-                                        )
 
-                                    Image(systemName: cat.iconSystemName)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
-                                                         .white : .secondary)
-                                }
-
-                                Text(cat.name)
-                                    .font(.system(size: 9))
-                                    .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
-                                                     .primary : .secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 52)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(viewModel.selectedUserCategoryId == cat.id ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.3), value: viewModel.selectedUserCategoryId)
-                    }
-                    
                     Spacer()
                 }
                 .padding(.vertical, 6)
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.5)
                 )
-            
+
             // メインコンテンツ（履歴セクションのみ）
             MainViewHistorySection(
                 history: viewModel.history,
@@ -523,15 +413,96 @@ extension MainView {
                     viewModel.loadMoreHistoryIfNeeded(currentItem: item)
                 },
                 hasMoreItems: viewModel.hasMoreHistory,
-                queueEnabled: viewModel.canUsePasteQueue,
+                isPinnedFilterActive: viewModel.isPinnedFilterActive,
+                onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
+                availableCategories: enabledCategories,
+                customCategories: customCategories,
+                selectedUserCategoryId: viewModel.selectedUserCategoryId,
+                onToggleUserCategoryFilter: { viewModel.toggleUserCategoryFilter($0) },
                 pasteMode: viewModel.pasteMode,
-                onToggleQueueMode: { viewModel.toggleQueueMode() },
-                onToggleQueueRepetition: { viewModel.toggleQueueRepetition() },
                 queueBadgeProvider: viewModel.queueBadge(for:),
                 queueSelectionPreview: viewModel.queueSelectionPreview
             )
             .id(historyRefreshID)
         }
+    }
+
+    private var queueModeFilterButton: some View {
+        let isActive = viewModel.pasteMode != .clipboard
+        let isEnabled = viewModel.canUsePasteQueue
+
+        return Button {
+            guard isEnabled else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.toggleQueueMode()
+            }
+        } label: {
+            VStack(spacing: 3) {
+                ZStack {
+                    Circle()
+                        .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
+                        .frame(width: 30, height: 30)
+                        .shadow(
+                            color: isActive ? Color.accentColor.opacity(0.3) : .clear,
+                            radius: 3,
+                            y: 2
+                        )
+
+                    Image(systemName: "list.number")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isActive ? .white : .secondary)
+                }
+
+                Text(String(localized: "Queue"))
+                    .font(.system(size: 9))
+                    .foregroundColor(isActive ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 52)
+            .opacity(isEnabled ? 1.0 : 0.4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .help(Text(String(localized: "Queue")))
+    }
+
+    private var queueLoopFilterButton: some View {
+        let isLooping = viewModel.pasteMode == .queueToggle
+        let isEnabled = viewModel.canUsePasteQueue
+
+        return Button {
+            guard isEnabled else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.toggleQueueRepetition()
+            }
+        } label: {
+            VStack(spacing: 3) {
+                ZStack {
+                    Circle()
+                        .fill(isLooping ? Color.accentColor : Color.secondary.opacity(0.1))
+                        .frame(width: 30, height: 30)
+                        .shadow(
+                            color: isLooping ? Color.accentColor.opacity(0.3) : .clear,
+                            radius: 3,
+                            y: 2
+                        )
+
+                    Image(systemName: isLooping ? "repeat.circle.fill" : "repeat")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isLooping ? .white : .secondary)
+                }
+
+                Text(String(localized: "Loop"))
+                    .font(.system(size: 9))
+                    .foregroundColor(isLooping ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 52)
+            .opacity(isEnabled ? 1.0 : 0.4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .help(Text(String(localized: "Loop")))
     }
 
     // 下部バー
