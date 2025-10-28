@@ -91,47 +91,14 @@ struct MainViewHistorySection: View {
         return VStack(spacing: 0) {
             // 検索バー（常に表示）
             HStack(spacing: 8) {
+                if pasteMode != .clipboard {
+                    queueColumnPlaceholder
+                }
                 pinnedFilterButton
                 categoryFilterControl
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(NSColor.textBackgroundColor))
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
-                    
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 8)
-                        
-                        TextField("Search", text: $searchText)
-                            .textFieldStyle(.plain)
-                            .font(Font(fontManager.historyFont))
-                            .foregroundColor(.primary)
-                        
-                        if !searchText.isEmpty {
-                            Button(action: { 
-                                withAnimation(.spring(response: 0.2)) {
-                                    searchText = ""
-                                }
-                            }, label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            })
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.trailing, 8)
-                            .transition(.scale.combined(with: .opacity))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 32)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
-                )
+                searchField
             }
+            .padding(.horizontal, 8)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             
@@ -214,26 +181,13 @@ struct MainViewHistorySection: View {
         Button {
             onTogglePinnedFilter()
         } label: {
-            let background = isPinnedFilterActive
-                ? Color.accentColor.opacity(0.9)
-                : Color(NSColor.textBackgroundColor)
-            let borderColor = isPinnedFilterActive
-                ? Color.accentColor.opacity(0.65)
-                : Color(NSColor.separatorColor).opacity(0.35)
-            let iconColor: Color = isPinnedFilterActive ? .white : .secondary
-
-            Image(systemName: "pin.fill")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(iconColor)
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(background)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(borderColor, lineWidth: 1)
-                )
+            circleFilterIcon(
+                background: isPinnedFilterActive ? Color.accentColor : Color.secondary.opacity(0.1),
+                iconName: isPinnedFilterActive ? "pin.fill" : "pin",
+                iconColor: isPinnedFilterActive ? .white : .secondary,
+                iconSize: 10,
+                rotation: isPinnedFilterActive ? 0 : -45
+            )
         }
         .buttonStyle(PlainButtonStyle())
         .help(
@@ -269,10 +223,11 @@ struct MainViewHistorySection: View {
                     onCategoryFilter?(.all)
                 }
             } label: {
-                filterControlIcon(
-                    systemName: iconName,
-                    isActive: true,
-                    showSecondaryFrame: iconName == noneCategoryIconName
+                circleFilterIcon(
+                    background: Color.accentColor,
+                    iconName: iconName,
+                    iconColor: .white,
+                    iconSize: 13
                 )
             }
             .buttonStyle(PlainButtonStyle())
@@ -310,10 +265,11 @@ struct MainViewHistorySection: View {
                     }
                 }
             } label: {
-                filterControlIcon(
-                    systemName: noneCategoryIconName,
-                    isActive: false,
-                    showSecondaryFrame: true
+                circleFilterIcon(
+                    background: Color.secondary.opacity(0.1),
+                    iconName: noneCategoryIconName,
+                    iconColor: .secondary,
+                    iconSize: 13
                 )
             }
             .menuStyle(BorderlessButtonMenuStyle())
@@ -330,39 +286,6 @@ struct MainViewHistorySection: View {
             return custom.name
         }
         return noneCategoryDisplayName
-    }
-
-    private func filterControlIcon(systemName: String, isActive: Bool, showSecondaryFrame: Bool = false) -> some View {
-        let background = isActive
-            ? Color.accentColor.opacity(0.9)
-            : Color(NSColor.textBackgroundColor)
-        let borderColor = isActive
-            ? Color.accentColor.opacity(0.65)
-            : Color(NSColor.separatorColor).opacity(0.35)
-        let iconColor: Color = isActive ? .white : .secondary
-
-        return Image(systemName: systemName)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundColor(iconColor)
-            .frame(width: 32, height: 32)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(background)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(borderColor, lineWidth: 1)
-            )
-            .overlay(
-                Group {
-                    if showSecondaryFrame {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
-                            .padding(4)
-                    }
-                }
-            )
-            .contentShape(Rectangle())
     }
 
     private func filterMenuItemLabel(
@@ -393,5 +316,72 @@ struct MainViewHistorySection: View {
 
     private var noneCategoryDisplayName: String {
         UserCategoryStore.shared.noneCategory().name
+    }
+
+    private var queueColumnPlaceholder: some View {
+        Color.clear
+            .frame(width: 22, height: 22)
+    }
+
+    private var searchField: some View {
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(NSColor.textBackgroundColor))
+                .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .padding(.leading, 8)
+
+                TextField("Search", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(Font(fontManager.historyFont))
+                    .foregroundColor(.primary)
+
+                if !searchText.isEmpty {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.2)) {
+                            searchText = ""
+                        }
+                    }, label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    })
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.trailing, 8)
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 32)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
+        )
+    }
+
+    private func circleFilterIcon(
+        background: Color,
+        iconName: String,
+        iconColor: Color,
+        iconSize: CGFloat = 12,
+        rotation: Double = 0
+    ) -> some View {
+        ZStack {
+            Circle()
+                .fill(background)
+                .frame(width: 22, height: 22)
+
+            Image(systemName: iconName)
+                .font(.system(size: iconSize, weight: .medium))
+                .foregroundColor(iconColor)
+                .rotationEffect(.degrees(rotation))
+        }
+        .frame(width: 22, height: 22)
+        .contentShape(Circle())
     }
 }
