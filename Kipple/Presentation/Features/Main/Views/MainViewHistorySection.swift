@@ -190,6 +190,7 @@ struct MainViewHistorySection: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .frame(width: 22, height: 22)
         .help(
             Text(
                 isPinnedFilterActive
@@ -231,6 +232,7 @@ struct MainViewHistorySection: View {
                 )
             }
             .buttonStyle(PlainButtonStyle())
+            .frame(width: 22, height: 22)
             .help(Text(currentCategoryFilterLabel))
         } else {
             Menu {
@@ -273,6 +275,8 @@ struct MainViewHistorySection: View {
                 )
             }
             .menuStyle(BorderlessButtonMenuStyle())
+            .menuIndicator(.hidden)
+            .frame(width: 22, height: 22)
             .help(Text(noneCategoryDisplayName))
         }
     }

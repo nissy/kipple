@@ -296,77 +296,20 @@ extension MainView {
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
                 VStack(spacing: 6) {
-                    if let onStartTextCapture {
-                        Button(action: {
-                            onStartTextCapture()
-                        }, label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.secondary.opacity(0.1))
-                                        .frame(width: 30, height: 30)
+                    editorToggleButton
 
-                                    Image(systemName: "text.magnifyingglass")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                }
+                    if onStartTextCapture != nil {
+                        sectionDivider
+                    }
 
-                                Text(String(localized: "Capture"))
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 52)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .help(Text(String(localized: "Screen Text Capture")))
+                    captureButton(onStartTextCapture: onStartTextCapture)
 
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3)) {
-                                toggleEditorVisibility()
-                            }
-                        }, label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    Circle()
-                                        .fill(isEditorEnabled ?
-                                              Color.accentColor :
-                                              Color.secondary.opacity(0.1))
-                                        .frame(width: 30, height: 30)
-                                        .shadow(
-                                            color: isEditorEnabled ?
-                                                Color.accentColor.opacity(0.3) :
-                                                .clear,
-                                            radius: 3,
-                                            y: 2
-                                        )
+                    sectionDivider
 
-                                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(isEditorEnabled ? .white : .secondary)
-                                }
+                    queueModeFilterButton
 
-                                Text(String(localized: "Editor"))
-                                    .font(.system(size: 9))
-                                    .foregroundColor(isEditorEnabled ? .primary : .secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 52)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(isEditorEnabled ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.3), value: isEditorEnabled)
-                        .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
-
-                        Divider()
-                            .frame(width: 44)
-                            .padding(.vertical, 6)
-
-                        queueModeFilterButton
-
-                        if viewModel.pasteMode != .clipboard {
-                            queueLoopFilterButton
-                        }
+                    if viewModel.pasteMode != .clipboard {
+                        queueLoopFilterButton
                     }
 
                     Spacer()
@@ -503,6 +446,85 @@ extension MainView {
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
         .help(Text(String(localized: "Loop")))
+    }
+
+    private var editorToggleButton: some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3)) {
+                toggleEditorVisibility()
+            }
+        }, label: {
+            VStack(spacing: 3) {
+                ZStack {
+                    Circle()
+                        .fill(isEditorEnabled ?
+                              Color.accentColor :
+                              Color.secondary.opacity(0.1))
+                        .frame(width: 30, height: 30)
+                        .shadow(
+                            color: isEditorEnabled ?
+                                Color.accentColor.opacity(0.3) :
+                                .clear,
+                            radius: 3,
+                            y: 2
+                        )
+
+                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isEditorEnabled ? .white : .secondary)
+                }
+
+                Text(String(localized: "Editor"))
+                    .font(.system(size: 9))
+                    .foregroundColor(isEditorEnabled ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 52)
+        })
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isEditorEnabled ? 1.05 : 1.0)
+        .animation(.spring(response: 0.3), value: isEditorEnabled)
+        .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
+    }
+
+    @ViewBuilder
+    private func captureButton(onStartTextCapture: (() -> Void)?) -> some View {
+        if let onStartTextCapture {
+            let captureEnabled = viewModel.canUseScreenTextCapture
+
+            Button(action: {
+                onStartTextCapture()
+            }, label: {
+                VStack(spacing: 3) {
+                    ZStack {
+                        Circle()
+                            .fill(captureEnabled ?
+                                  Color.secondary.opacity(0.1) :
+                                  Color.secondary.opacity(0.05))
+                            .frame(width: 30, height: 30)
+
+                        Image(systemName: "text.magnifyingglass")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(captureEnabled ? .secondary : .gray)
+                    }
+
+                    Text(String(localized: "Capture"))
+                        .font(.system(size: 9))
+                        .foregroundColor(captureEnabled ? .secondary : .gray.opacity(0.7))
+                        .lineLimit(1)
+                }
+                .frame(width: 52)
+            })
+            .buttonStyle(PlainButtonStyle())
+            .disabled(!captureEnabled)
+            .help(Text(String(localized: "Screen Text Capture")))
+        }
+    }
+
+    private var sectionDivider: some View {
+        Divider()
+            .frame(width: 44)
+            .padding(.vertical, 6)
     }
 
     // 下部バー

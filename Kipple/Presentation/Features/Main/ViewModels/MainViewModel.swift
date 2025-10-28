@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import CoreGraphics
 import Combine
 
 // swiftlint:disable type_body_length file_length
@@ -29,6 +30,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     let clipboardService: any ClipboardServiceProtocol
     private let pasteMonitor: any PasteCommandMonitoring
+    private let screenCapturePermissionCheck: () -> Bool
     private var cancellables = Set<AnyCancellable>()
     private var serviceCancellables = Set<AnyCancellable>()
     
@@ -78,7 +80,8 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
         pageSize: Int = 50,
-        pasteMonitor: any PasteCommandMonitoring = PasteCommandMonitor()
+        pasteMonitor: any PasteCommandMonitoring = PasteCommandMonitor(),
+        screenCapturePermissionCheck: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }
     ) {
         self.pageSize = max(1, pageSize)
         // 保存されたエディタテキストを読み込む（なければ空文字）
@@ -91,6 +94,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             self.clipboardService = ClipboardServiceProvider.resolve()
         }
         self.pasteMonitor = pasteMonitor
+        self.screenCapturePermissionCheck = screenCapturePermissionCheck
 
         // デバウンスされた保存処理を設定
         saveDebouncer
@@ -642,6 +646,10 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 extension MainViewModel {
     var canUsePasteQueue: Bool {
         pasteMonitor.hasAccessibilityPermission
+    }
+
+    var canUseScreenTextCapture: Bool {
+        screenCapturePermissionCheck()
     }
 
     var isQueueModeActive: Bool {
