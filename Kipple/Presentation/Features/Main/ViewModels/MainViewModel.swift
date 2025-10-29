@@ -196,17 +196,12 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func applyFilters() {
-        updateFilteredItems(clipboardService.history)
+        updateFilteredItems(clipboardService.history, animated: true)
     }
 
-    func updateFilteredItems(_ items: [ClipItem]) {
-        // Separate pinned items
-        pinnedHistory = items.filter { $0.isPinned }
-
-        // Apply filters
+    func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
         var filtered = items
 
-        // Apply search filter
         if !searchText.isEmpty {
             filtered = filtered.filter { item in
                 item.content.localizedCaseInsensitiveContains(searchText) ||
@@ -214,7 +209,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
         }
 
-        // Apply category filter (built-in) or user-defined (exclusive)
         if let userCatId = selectedUserCategoryId {
             let noneId = UserCategoryStore.shared.noneCategoryId()
             if userCatId == noneId {
@@ -226,20 +220,39 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             filtered = filtered.filter { $0.category == category }
         }
 
-        // URL filter
         if showOnlyURLs {
             filtered = filtered.filter { $0.category == .url }
         }
 
-        // Apply pinned filter
         if showOnlyPinned || isPinnedFilterActive {
             filtered = filtered.filter { $0.isPinned }
         }
 
-        filtered = applyQueueOrdering(to: filtered)
-        filteredOrderingSnapshot = filtered
+        let queueOrdered = applyQueueOrdering(to: filtered)
+        let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
+        let newCurrentHistoryLimit = shouldPaginate ? min(pageSize, queueOrdered.count) : queueOrdered.count
+        let newHistory = Array(queueOrdered.prefix(newCurrentHistoryLimit))
+        let newHasMoreHistory = newHistory.count < queueOrdered.count
+        let newPinnedItems = isPinnedFilterActive ? queueOrdered : []
+        let newPinnedHistory = items.filter { $0.isPinned }
 
-        updatePagination(with: filtered)
+        let applyState = { [self] in
+            pinnedHistory = newPinnedHistory
+            filteredOrderingSnapshot = queueOrdered
+            filteredHistory = queueOrdered
+            currentHistoryLimit = newCurrentHistoryLimit
+            history = newHistory
+            hasMoreHistory = newHasMoreHistory
+            pinnedItems = newPinnedItems
+        }
+
+        if animated {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                applyState()
+            }
+        } else {
+            applyState()
+        }
     }
 
     func loadMoreHistoryIfNeeded(currentItem: ClipItem) {
@@ -255,25 +268,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         isLoadingMore = false
     }
 
-    private func updatePagination(with filtered: [ClipItem]) {
-        filteredHistory = filtered
-
-        let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
-        if shouldPaginate {
-            currentHistoryLimit = min(pageSize, filtered.count)
-        } else {
-            currentHistoryLimit = filtered.count
-        }
-
-        history = Array(filtered.prefix(currentHistoryLimit))
-        hasMoreHistory = history.count < filtered.count
-
-        if isPinnedFilterActive {
-            pinnedItems = filtered
-        } else {
-            pinnedItems = []
-        }
-    }
     
     func copyEditor() {
         if !editorText.isEmpty {
@@ -347,15 +341,13 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             // ユーザカテゴリフィルタは排他
             selectedUserCategoryId = nil
         }
-        // フィルタを適用
-        updateFilteredItems(clipboardService.history)
+        updateFilteredItems(clipboardService.history, animated: true)
     }
     
     /// ピンフィルタの切り替え
     func togglePinnedFilter() {
         isPinnedFilterActive.toggle()
-        // フィルタを適用
-        updateFilteredItems(clipboardService.history)
+        updateFilteredItems(clipboardService.history, animated: true)
     }
 
     /// ユーザカテゴリフィルタの切り替え（内製カテゴリとは排他）
@@ -366,7 +358,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             selectedUserCategoryId = id
             selectedCategory = nil
         }
-        updateFilteredItems(clipboardService.history)
+        updateFilteredItems(clipboardService.history, animated: true)
     }
 
     private func resetFiltersAfterCopy() {
@@ -376,7 +368,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         selectedCategory = nil
         selectedUserCategoryId = nil
         isPinnedFilterActive = false
-        updateFilteredItems(clipboardService.history)
+        updateFilteredItems(clipboardService.history, animated: true)
     }
 
     // MARK: - Paste Queue Management

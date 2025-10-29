@@ -326,7 +326,9 @@ extension MainView {
                 selectedHistoryItem: $selectedHistoryItem,
                 onSelectItem: handleItemSelection,
                 onTogglePin: { item in
-                    if !viewModel.togglePinSync(for: item) {
+                    let wasPinned = item.isPinned
+                    let newState = viewModel.togglePinSync(for: item)
+                    if !wasPinned && !newState {
                         // ピン留め失敗（最大数に達している）
                         showCopiedNotification(.pinLimitReached)
                     }
@@ -380,28 +382,11 @@ extension MainView {
                 viewModel.toggleQueueMode()
             }
         } label: {
-            VStack(spacing: 3) {
-                ZStack {
-                    Circle()
-                        .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
-                        .frame(width: 30, height: 30)
-                        .shadow(
-                            color: isActive ? Color.accentColor.opacity(0.3) : .clear,
-                            radius: 3,
-                            y: 2
-                        )
-
-                    Image(systemName: "list.number")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isActive ? .white : .secondary)
-                }
-
-                Text(String(localized: "Queue"))
-                    .font(.system(size: 9))
-                    .foregroundColor(isActive ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 52)
+            sidebarButtonContent(
+                isActive: isActive,
+                iconName: "list.number",
+                label: "Queue"
+            )
             .opacity(isEnabled ? 1.0 : 0.4)
         }
         .buttonStyle(PlainButtonStyle())
@@ -419,28 +404,12 @@ extension MainView {
                 viewModel.toggleQueueRepetition()
             }
         } label: {
-            VStack(spacing: 3) {
-                ZStack {
-                    Circle()
-                        .fill(isLooping ? Color.accentColor : Color.secondary.opacity(0.1))
-                        .frame(width: 30, height: 30)
-                        .shadow(
-                            color: isLooping ? Color.accentColor.opacity(0.3) : .clear,
-                            radius: 3,
-                            y: 2
-                        )
-
-                    Image(systemName: isLooping ? "repeat.circle.fill" : "repeat")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isLooping ? .white : .secondary)
-                }
-
-                Text(String(localized: "Loop"))
-                    .font(.system(size: 9))
-                    .foregroundColor(isLooping ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 52)
+            sidebarButtonContent(
+                isActive: isLooping,
+                iconName: "repeat",
+                activeIconName: "repeat.circle.fill",
+                label: "Loop"
+            )
             .opacity(isEnabled ? 1.0 : 0.4)
         }
         .buttonStyle(PlainButtonStyle())
@@ -495,25 +464,12 @@ extension MainView {
             Button(action: {
                 onStartTextCapture()
             }, label: {
-                VStack(spacing: 3) {
-                    ZStack {
-                        Circle()
-                            .fill(captureEnabled ?
-                                  Color.secondary.opacity(0.1) :
-                                  Color.secondary.opacity(0.05))
-                            .frame(width: 30, height: 30)
-
-                        Image(systemName: "text.magnifyingglass")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(captureEnabled ? .secondary : .gray)
-                    }
-
-                    Text(String(localized: "Capture"))
-                        .font(.system(size: 9))
-                        .foregroundColor(captureEnabled ? .secondary : .gray.opacity(0.7))
-                        .lineLimit(1)
-                }
-                .frame(width: 52)
+                sidebarButtonContent(
+                    isActive: false,
+                    iconName: "text.magnifyingglass",
+                    label: "Capture"
+                )
+                .opacity(captureEnabled ? 1.0 : 0.4)
             })
             .buttonStyle(PlainButtonStyle())
             .disabled(!captureEnabled)
@@ -530,4 +486,38 @@ extension MainView {
     // 下部バー
     @ViewBuilder
     private var bottomBar: some View { bottomBarContent }
+}
+
+// MARK: - Sidebar Button Styling
+
+private extension MainView {
+    func sidebarButtonContent(
+        isActive: Bool,
+        iconName: String,
+        activeIconName: String? = nil,
+        label: LocalizedStringKey
+    ) -> some View {
+        VStack(spacing: 3) {
+            ZStack {
+                Circle()
+                    .fill(isActive ? Color.secondary.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .frame(width: 30, height: 30)
+                    .shadow(
+                        color: isActive ? Color.secondary.opacity(0.2) : .clear,
+                        radius: 3,
+                        y: 2
+                    )
+
+                Image(systemName: isActive ? (activeIconName ?? iconName) : iconName)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isActive ? .primary : .secondary)
+            }
+
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .frame(width: 52)
+    }
 }
