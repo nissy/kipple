@@ -7,51 +7,63 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
     @State private var selectedHistoryItem: ClipItem?
-    @State private var isShowingCopiedNotification = false
-    @State private var currentNotificationType: CopiedNotificationView.NotificationType = .copied
-    @State private var isAlwaysOnTop = false
+    @State var isShowingCopiedNotification = false
+    @State var currentNotificationType: CopiedNotificationView.NotificationType = .copied
+    @State var isAlwaysOnTop = false
+    @State var isAlwaysOnTopForcedByQueue = false
+    @State var userPreferredAlwaysOnTop = false
+    @State var hasQueueForceOverride = false
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
-    @ObservedObject private var appSettings = AppSettings.shared
-    @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject var appSettings = AppSettings.shared
+    @ObservedObject var fontManager = FontManager.shared
     @ObservedObject private var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
     @State private var historyRefreshID = UUID()
-    @State private var hoveredClearButton = false
+    @State var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
+    @State private var modifierMonitor: Any?
     // Copied通知の遅延非表示を管理（多重スケジュール防止）
-    @State private var copiedHideWorkItem: DispatchWorkItem?
+    @State var copiedHideWorkItem: DispatchWorkItem?
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
     let onSetPreventAutoClose: ((Bool) -> Void)?
-    
-    // 設定値を読み込み
+    let onStartTextCapture: (() -> Void)?
     
     init(
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
-        onSetPreventAutoClose: ((Bool) -> Void)? = nil
+        onSetPreventAutoClose: ((Bool) -> Void)? = nil,
+        onStartTextCapture: (() -> Void)? = nil
     ) {
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
         self.onSetPreventAutoClose = onSetPreventAutoClose
+        self.onStartTextCapture = onStartTextCapture
     }
 }
 
 extension MainView {
-    
     private func handleItemSelection(_ item: ClipItem) {
+        let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if viewModel.canUsePasteQueue,
+           viewModel.isQueueModeActive {
+            viewModel.handleQueueSelection(for: item, modifiers: modifiers)
+            return
+        }
+
         if viewModel.shouldInsertToEditor() {
             viewModel.insertToEditor(content: item.content)
             // エディタ挿入の場合はウィンドウを閉じない
@@ -68,29 +80,64 @@ extension MainView {
             }
         }
     }
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // メインコンテンツ（分割ビュー）
-            ResizableSplitView(
-                topHeight: $editorSectionHeight,
-                minTopHeight: 150,
-                minBottomHeight: 150,
-                topContent: {
-                    if appSettings.editorPosition == "top" {
-                        editorSection
-                    } else {
-                        historyAndPinnedContent
-                    }
-                },
-                bottomContent: {
-                    if appSettings.editorPosition == "bottom" {
-                        editorSection
-                    } else {
-                        historyAndPinnedContent
-                    }
+
+    func enforceQueueAlwaysOnTopIfNeeded(queueCount: Int, isQueueModeActive: Bool) {
+        let shouldForce = isQueueModeActive && queueCount > 0
+        if shouldForce {
+            if !isAlwaysOnTopForcedByQueue {
+                isAlwaysOnTopForcedByQueue = true
+                userPreferredAlwaysOnTop = isAlwaysOnTop
+            }
+            if !hasQueueForceOverride && !isAlwaysOnTop {
+                isAlwaysOnTop = true
+                onAlwaysOnTopChanged?(true)
+            }
+        } else {
+            if isAlwaysOnTopForcedByQueue {
+                isAlwaysOnTopForcedByQueue = false
+                hasQueueForceOverride = false
+                let target = userPreferredAlwaysOnTop
+                if isAlwaysOnTop != target {
+                    isAlwaysOnTop = target
+                    onAlwaysOnTopChanged?(target)
                 }
-            )
+            }
+        }
+    }
+
+    var body: some View {
+        mainContent
+            .environment(\.locale, appSettings.appLocale)
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            if appSettings.editorPosition == "disabled" {
+                historyAndPinnedContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // メインコンテンツ（分割ビュー）
+                ResizableSplitView(
+                    topHeight: $editorSectionHeight,
+                    minTopHeight: 150,
+                    minBottomHeight: 150,
+                    topContent: {
+                        if appSettings.editorPosition == "top" {
+                            editorSection
+                        } else {
+                            historyAndPinnedContent
+                        }
+                    },
+                    bottomContent: {
+                        if appSettings.editorPosition == "bottom" {
+                            editorSection
+                        } else {
+                            historyAndPinnedContent
+                        }
+                    }
+                )
+            }
         }
         .frame(minWidth: 300, maxWidth: .infinity)
         .background(
@@ -121,6 +168,11 @@ extension MainView {
             historyRefreshID = UUID()
         }
         .onAppear {
+            userPreferredAlwaysOnTop = isAlwaysOnTop
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: viewModel.pasteQueue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
             // 既存のモニタがあれば解除
             if let monitor = keyDownMonitor {
                 NSEvent.removeMonitor(monitor)
@@ -164,11 +216,27 @@ extension MainView {
                 // Cmd+O 実行は不要（削除）
                 return event
             }
+
+            if let monitor = modifierMonitor {
+                NSEvent.removeMonitor(monitor)
+                modifierMonitor = nil
+            }
+            modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                let normalized = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                viewModel.handleModifierFlagsChanged(normalized)
+                return event
+            }
+            let currentFlags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            viewModel.handleModifierFlagsChanged(currentFlags)
         }
         .onDisappear {
             if let monitor = keyDownMonitor {
                 NSEvent.removeMonitor(monitor)
                 keyDownMonitor = nil
+            }
+            if let monitor = modifierMonitor {
+                NSEvent.removeMonitor(monitor)
+                modifierMonitor = nil
             }
             // Cancel any scheduled hide for copied notification to avoid retaining self after window closes
             copiedHideWorkItem?.cancel()
@@ -177,6 +245,18 @@ extension MainView {
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
+        }
+        .onReceive(viewModel.$pasteQueue) { queue in
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: queue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
+        }
+        .onReceive(viewModel.$pasteMode) { _ in
+            enforceQueueAlwaysOnTopIfNeeded(
+                queueCount: viewModel.pasteQueue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
         }
     }
     
@@ -209,136 +289,40 @@ extension MainView {
             let customCategories: [UserCategory] = {
                 var list = userCategoryStore.userDefinedFilters()
                 if appSettings.filterCategoryNone {
-                    list.insert(userCategoryStore.noneCategory(), at: 0)
+                    var noneCategory = userCategoryStore.noneCategory()
+                    if noneCategory.name != "None" {
+                        noneCategory.name = "None"
+                    }
+                    list.insert(noneCategory, at: 0)
                 }
                 return list
             }()
             
             // フィルターパネルを常に表示（ピンフィルターがあるため）
                 VStack(spacing: 6) {
-                    // ピン留めフィルター（一番上に配置）
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3)) {
-                            viewModel.togglePinnedFilter()
-                        }
-                    }, label: {
-                        VStack(spacing: 3) {
-                            ZStack {
-                                Circle()
-                                    .fill(viewModel.isPinnedFilterActive ? 
-                                        Color.accentColor : 
-                                        Color.secondary.opacity(0.1))
-                                    .frame(width: 30, height: 30)
-                                    .shadow(
-                                        color: viewModel.isPinnedFilterActive ? 
-                                            Color.accentColor.opacity(0.3) : .clear,
-                                        radius: 3,
-                                        y: 2
-                                    )
-                                
-                                Image(systemName: "pin.fill")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(viewModel.isPinnedFilterActive ? 
-                                        .white : .secondary)
-                            }
-                            
-                            Text("Pinned")
-                                .font(.system(size: 9))
-                                .foregroundColor(viewModel.isPinnedFilterActive ? 
-                                    .primary : .secondary)
-                                .lineLimit(1)
-                        }
-                        .frame(width: 52)
-                    })
-                    .buttonStyle(PlainButtonStyle())
-                    .scaleEffect(viewModel.isPinnedFilterActive ? 1.05 : 1.0)
-                    .animation(.spring(response: 0.3), value: viewModel.isPinnedFilterActive)
-                    
-                    ForEach(enabledCategories, id: \.self) { category in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3)) {
-                                viewModel.toggleCategoryFilter(category)
-                            }
-                        }, label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    Circle()
-                                        .fill(viewModel.selectedCategory == category ? 
-                                            Color.accentColor : 
-                                            Color.secondary.opacity(0.1))
-                                        .frame(width: 30, height: 30)
-                                        .shadow(
-                                            color: viewModel.selectedCategory == category ? 
-                                                Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 3,
-                                            y: 2
-                                        )
-                                    
-                                    Image(systemName: category.icon)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(viewModel.selectedCategory == category ? 
-                                            .white : .secondary)
-                                }
-                                
-                                Text(category.rawValue)
-                                    .font(.system(size: 9))
-                                    .foregroundColor(viewModel.selectedCategory == category ? 
-                                        .primary : .secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 52)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(viewModel.selectedCategory == category ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.3), value: viewModel.selectedCategory)
-                    }
-                    // ユーザ定義カテゴリのフィルタ
-                    ForEach(customCategories) { cat in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3)) {
-                                viewModel.toggleUserCategoryFilter(cat.id)
-                            }
-                        }, label: {
-                            VStack(spacing: 3) {
-                                ZStack {
-                                    Circle()
-                                        .fill(viewModel.selectedUserCategoryId == cat.id ?
-                                              Color.accentColor :
-                                              Color.secondary.opacity(0.1))
-                                        .frame(width: 30, height: 30)
-                                        .shadow(
-                                            color: viewModel.selectedUserCategoryId == cat.id ?
-                                                Color.accentColor.opacity(0.3) : .clear,
-                                            radius: 3,
-                                            y: 2
-                                        )
+                    editorToggleButton
 
-                                    Image(systemName: cat.iconSystemName)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
-                                                         .white : .secondary)
-                                }
-
-                                Text(cat.name)
-                                    .font(.system(size: 9))
-                                    .foregroundColor(viewModel.selectedUserCategoryId == cat.id ?
-                                                     .primary : .secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 52)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .scaleEffect(viewModel.selectedUserCategoryId == cat.id ? 1.05 : 1.0)
-                        .animation(.spring(response: 0.3), value: viewModel.selectedUserCategoryId)
+                    if onStartTextCapture != nil {
+                        sectionDivider
                     }
-                    
+
+                    captureButton(onStartTextCapture: onStartTextCapture)
+
+                    sectionDivider
+
+                    queueModeFilterButton
+
+                    if viewModel.pasteMode != .clipboard {
+                        queueLoopFilterButton
+                    }
+
                     Spacer()
                 }
                 .padding(.vertical, 6)
                 .background(
                     Color(NSColor.controlBackgroundColor).opacity(0.5)
                 )
-            
+
             // メインコンテンツ（履歴セクションのみ）
             MainViewHistorySection(
                 history: viewModel.history,
@@ -346,7 +330,9 @@ extension MainView {
                 selectedHistoryItem: $selectedHistoryItem,
                 onSelectItem: handleItemSelection,
                 onTogglePin: { item in
-                    if !viewModel.togglePinSync(for: item) {
+                    let wasPinned = item.isPinned
+                    let newState = viewModel.togglePinSync(for: item)
+                    if !wasPinned && !newState {
                         // ピン留め失敗（最大数に達している）
                         showCopiedNotification(.pinLimitReached)
                     }
@@ -375,209 +361,167 @@ extension MainView {
                 onLoadMore: { item in
                     viewModel.loadMoreHistoryIfNeeded(currentItem: item)
                 },
-                hasMoreItems: viewModel.hasMoreHistory
+                hasMoreItems: viewModel.hasMoreHistory,
+                isPinnedFilterActive: viewModel.isPinnedFilterActive,
+                onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
+                availableCategories: enabledCategories,
+                customCategories: customCategories,
+                selectedUserCategoryId: viewModel.selectedUserCategoryId,
+                onToggleUserCategoryFilter: { viewModel.toggleUserCategoryFilter($0) },
+                pasteMode: viewModel.pasteMode,
+                queueBadgeProvider: viewModel.queueBadge(for:),
+                queueSelectionPreview: viewModel.queueSelectionPreview
             )
             .id(historyRefreshID)
         }
     }
 
+    private var queueModeFilterButton: some View {
+        let isActive = viewModel.pasteMode != .clipboard
+        let isEnabled = viewModel.canUsePasteQueue
+
+        return Button {
+            guard isEnabled else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.toggleQueueMode()
+            }
+        } label: {
+            sidebarButtonContent(
+                isActive: isActive,
+                iconName: "list.number",
+                label: "Queue"
+            )
+            .opacity(isEnabled ? 1.0 : 0.4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .help(Text(verbatim: "Queue"))
+    }
+
+    private var queueLoopFilterButton: some View {
+        let isLooping = viewModel.pasteMode == .queueToggle
+        let isEnabled = viewModel.canUsePasteQueue
+
+        return Button {
+            guard isEnabled else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.toggleQueueRepetition()
+            }
+        } label: {
+            sidebarButtonContent(
+                isActive: isLooping,
+                iconName: "repeat",
+                activeIconName: "repeat.circle.fill",
+                label: "Loop"
+            )
+            .opacity(isEnabled ? 1.0 : 0.4)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .help(Text(verbatim: "Loop"))
+    }
+
+    private var editorToggleButton: some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.3)) {
+                toggleEditorVisibility()
+            }
+        }, label: {
+            VStack(spacing: 3) {
+                ZStack {
+                    Circle()
+                        .fill(isEditorEnabled ?
+                              Color.accentColor :
+                              Color.secondary.opacity(0.1))
+                        .frame(width: 30, height: 30)
+                        .shadow(
+                            color: isEditorEnabled ?
+                                Color.accentColor.opacity(0.3) :
+                                .clear,
+                            radius: 3,
+                            y: 2
+                        )
+
+                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isEditorEnabled ? .white : .secondary)
+                }
+
+                Text(verbatim: "Editor")
+                    .font(.system(size: 9))
+                    .foregroundColor(isEditorEnabled ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 52)
+        })
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isEditorEnabled ? 1.05 : 1.0)
+        .animation(.spring(response: 0.3), value: isEditorEnabled)
+        .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
+    }
+
+    @ViewBuilder
+    private func captureButton(onStartTextCapture: (() -> Void)?) -> some View {
+        if let onStartTextCapture {
+            let captureEnabled = viewModel.canUseScreenTextCapture
+
+            Button(action: {
+                onStartTextCapture()
+            }, label: {
+                sidebarButtonContent(
+                    isActive: false,
+                    iconName: "text.magnifyingglass",
+                    label: "Capture"
+                )
+                .opacity(captureEnabled ? 1.0 : 0.4)
+            })
+            .buttonStyle(PlainButtonStyle())
+            .disabled(!captureEnabled)
+            .help(Text(verbatim: "Screen Text Capture"))
+        }
+    }
+
+    private var sectionDivider: some View {
+        Divider()
+            .frame(width: 44)
+            .padding(.vertical, 6)
+    }
+
     // 下部バー
     @ViewBuilder
-    private var bottomBar: some View {
-        HStack(alignment: .center, spacing: 12) {
-                // 現在のペースト内容を表示
-                if let currentContent = viewModel.currentClipboardContent {
-                    HStack(alignment: .center, spacing: 8) {
-                        // 自動消去タイマーの残り時間表示
-                        if AppSettings.shared.enableAutoClear,
-                           let remainingTime = viewModel.autoClearRemainingTime {
-                            HStack(spacing: 6) {
-                                Image(systemName: "timer")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                                
-                                Text(formatRemainingTime(remainingTime))
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Divider()
-                                .frame(height: 16)
-                                .padding(.horizontal, 4)
-                        }
-                        
-                        Image(systemName: "doc.on.clipboard")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                        
-                        Text(currentContent)
-                            .font(.custom(fontManager.historyFont.fontName, size: 11))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        
-                        // Clear button
-                        Button(action: {
-                            clearSystemClipboard()
-                        }, label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary.opacity(0.6))
-                                .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
-                        })
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Clear clipboard")
-                        .onHover { hovering in
-                            hoveredClearButton = hovering
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.accentColor.opacity(0.1))
+    private var bottomBar: some View { bottomBarContent }
+}
+
+// MARK: - Sidebar Button Styling
+
+private extension MainView {
+    func sidebarButtonContent(
+        isActive: Bool,
+        iconName: String,
+        activeIconName: String? = nil,
+        label: LocalizedStringKey
+    ) -> some View {
+        VStack(spacing: 3) {
+            ZStack {
+                Circle()
+                    .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
+                    .frame(width: 30, height: 30)
+                    .shadow(
+                        color: isActive ? Color.accentColor.opacity(0.3) : .clear,
+                        radius: 3,
+                        y: 2
                     )
-                }
-                
-                Spacer()
-                
-                // Settings button
-                Button(action: {
-                    onOpenSettings?()
-                }, label: {
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                colors: [
-                                    Color(NSColor.controlBackgroundColor),
-                                    Color(NSColor.controlBackgroundColor).opacity(0.8)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 28, height: 28)
-                            .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
-                        
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.secondary)
-                    }
-                })
-                .buttonStyle(PlainButtonStyle())
-                .scaleEffect(1.0)
-                .onHover { _ in
-                    withAnimation(.spring(response: 0.3)) {
-                        // Scale effect handled by button style
-                    }
-                }
-                .help("Settings")
-                
-                // Always on Top button
-                Button(action: {
-                    toggleAlwaysOnTop()
-                }, label: {
-                    ZStack {
-                        Circle()
-                            .fill(isAlwaysOnTop ? 
-                                Color.accentColor :
-                                Color(NSColor.controlBackgroundColor))
-                            .frame(width: 28, height: 28)
-                            .shadow(
-                                color: isAlwaysOnTop ? 
-                                    Color.accentColor.opacity(0.3) : 
-                                    Color.black.opacity(0.1),
-                                radius: 3,
-                                y: 2
-                            )
-                        
-                        Image(systemName: isAlwaysOnTop ? "pin.fill" : "pin")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(isAlwaysOnTop ? .white : .secondary)
-                            .rotationEffect(.degrees(isAlwaysOnTop ? 0 : -45))
-                    }
-                })
-                .buttonStyle(PlainButtonStyle())
-                .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
-                .animation(.spring(response: 0.3), value: isAlwaysOnTop)
-                .help(isAlwaysOnTop ? "Disable always on top" : "Enable always on top")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            Color(NSColor.windowBackgroundColor).opacity(0.95)
-            .background(.ultraThinMaterial)
-        )
-    }
-    
-    // MARK: - Actions
-    private func confirmAction() {
-        viewModel.copyEditor()
-        
-        // コピー時は常に通知を表示（ウィンドウは閉じない）
-        showCopiedNotification(.copied)
-    }
-    
-    private func clearAction() {
-        viewModel.clearEditor()
-    }
-    
-    private func toggleAlwaysOnTop() {
-        isAlwaysOnTop.toggle()
-        
-        // 状態の変更を通知（WindowManagerがウィンドウレベルを更新する）
-        onAlwaysOnTopChanged?(isAlwaysOnTop)
-    }
-    
-    private func showCopiedNotification(_ type: CopiedNotificationView.NotificationType) {
-        currentNotificationType = type
-        if !isShowingCopiedNotification {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                isShowingCopiedNotification = true
-            }
-        }
-        // 既存の非表示タスクをキャンセルして延長（多重スケジュール防止）
-        copiedHideWorkItem?.cancel()
-        let work = DispatchWorkItem {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                self.isShowingCopiedNotification = false
-            }
-        }
-        copiedHideWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
-    }
-    
-    private func isCategoryFilterEnabled(_ category: ClipItemCategory) -> Bool {
-        switch category {
-        case .all:
-            return true // All is always enabled
-        case .url:
-            return appSettings.filterCategoryURL
-        }
-    }
-    
-    private func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
-        let seconds = Int(timeInterval) % 60
-        
-        if minutes > 0 {
-            return String(format: "%02d:%02d", minutes, seconds)
-        } else {
-            return String(format: "00:%02d", seconds)
-        }
-    }
 
-    private func clearSystemClipboard() {
-        Task {
-            await viewModel.clipboardService.clearSystemClipboard()
-        }
-    }
+                Image(systemName: isActive ? (activeIconName ?? iconName) : iconName)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isActive ? .white : .secondary)
+            }
 
-    private func presentCategoryManager() {
-        let anchor = NSApp.keyWindow
-        CategoryManagerWindowCoordinator.shared.open(
-            relativeTo: anchor,
-            onOpen: { onSetPreventAutoClose?(true) },
-            onClose: { onSetPreventAutoClose?(false) }
-        )
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundColor(isActive ? .primary : .secondary)
+                .lineLimit(1)
+        }
+        .frame(width: 52)
     }
 }

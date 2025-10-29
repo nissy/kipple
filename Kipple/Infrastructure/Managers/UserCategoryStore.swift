@@ -66,27 +66,33 @@ final class UserCategoryStore: ObservableObject {
     }()
 
     // ビルトインカテゴリ（削除不可）
-    private static let builtInNone = UserCategory(
-        id: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!,
-        name: "None",
-        iconSystemName: "tag",
-        isFilterEnabled: false
-    )
-    private static let builtInURL = UserCategory(
-        id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
-        name: "URL",
-        iconSystemName: "link",
-        isFilterEnabled: true
-    )
+    private static let builtInNoneID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+    private static let builtInURLID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+    private static var builtInNone: UserCategory {
+        UserCategory(
+            id: builtInNoneID,
+            name: "None",
+            iconSystemName: "tag",
+            isFilterEnabled: false
+        )
+    }
+    private static var builtInURL: UserCategory {
+        UserCategory(
+            id: builtInURLID,
+            name: "URL",
+            iconSystemName: "link",
+            isFilterEnabled: true
+        )
+    }
     private static var builtIns: [UserCategory] { [builtInNone, builtInURL] }
 
     func noneCategory() -> UserCategory { Self.builtInNone }
-    func noneCategoryId() -> UUID { Self.builtInNone.id }
+    func noneCategoryId() -> UUID { Self.builtInNoneID }
 
     enum BuiltInKind { case none, url }
     func builtInKind(for id: UUID) -> BuiltInKind? {
-        if id == Self.builtInNone.id { return .none }
-        if id == Self.builtInURL.id { return .url }
+        if id == Self.builtInNoneID { return .none }
+        if id == Self.builtInURLID { return .url }
         return nil
     }
 

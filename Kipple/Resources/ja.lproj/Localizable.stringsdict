@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>history.clear.deleteCount</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@items@</string>
+        <key>items</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+            <key>one</key>
+            <string>%d 件の履歴項目を完全に削除します。</string>
+            <key>other</key>
+            <string>%d 件の履歴項目を完全に削除します。</string>
+        </dict>
+    </dict>
+    <key>history.clear.pinnedPreserved</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@items@</string>
+        <key>items</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+            <key>one</key>
+            <string>ピン留めされた %d 件の項目は保持されます。</string>
+            <key>other</key>
+            <string>ピン留めされた %d 件の項目は保持されます。</string>
+        </dict>
+    </dict>
+    <key>history.clear.success</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@items@</string>
+        <key>items</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+            <key>one</key>
+            <string>クリップボード履歴から %d 件の項目を削除しました。</string>
+            <key>other</key>
+            <string>クリップボード履歴から %d 件の項目を削除しました。</string>
+        </dict>
+    </dict>
+    <key>history.pinnedCount</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@items@</string>
+        <key>items</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+            <key>one</key>
+            <string>ピン留め %d 件</string>
+            <key>other</key>
+            <string>ピン留め %d 件</string>
+        </dict>
+    </dict>
+    <key>history.unpinnedCount</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%#@items@</string>
+        <key>items</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>d</string>
+            <key>one</key>
+            <string>履歴 %d 件</string>
+            <key>other</key>
+            <string>履歴 %d 件</string>
+        </dict>
+    </dict>
+</dict>
+</plist>

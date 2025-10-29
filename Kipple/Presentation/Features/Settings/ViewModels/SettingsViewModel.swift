@@ -53,19 +53,23 @@ class SettingsViewModel: ObservableObject {
         FontManager.shared.editorSettings.fallbackFontNames.remove(at: index)
     }
 
+    @MainActor
     enum Tab: Int, CaseIterable {
         case general
         case editor
         case clipboard
         case permission
 
-        var title: String {
+        var titleKey: String {
             switch self {
             case .general: return "General"
             case .editor: return "Editor"
             case .clipboard: return "Clipboard"
             case .permission: return "Permission"
             }
+        }
+        var localizedTitle: String {
+            AppSettings.shared.localizedString(titleKey, comment: "Settings tab title")
         }
 
         var symbolName: String {
@@ -75,6 +79,10 @@ class SettingsViewModel: ObservableObject {
             case .clipboard: return "doc.on.clipboard"
             case .permission: return "lock.shield"
             }
+        }
+
+        var localizedTitleKey: LocalizedStringKey {
+            LocalizedStringKey(titleKey)
         }
 
         var accentColor: Color {

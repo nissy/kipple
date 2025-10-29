@@ -21,8 +21,30 @@ final class AppSettings: ObservableObject {
     // Editor Settings
     @AppStorage("lastEditorText") var lastEditorText: String = ""
     @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
-    @AppStorage("editorPosition") var editorPosition: String = "bottom"  // "top" or "bottom"
     @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
+    @AppStorage("editorPosition") private var storedEditorPosition: String = "bottom"
+    @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
+
+    var editorPosition: String {
+        get { storedEditorPosition }
+        set {
+            guard newValue != storedEditorPosition else { return }
+            objectWillChange.send()
+            if newValue != "disabled" {
+                storedEditorPositionLastEnabled = newValue
+            } else if storedEditorPosition != "disabled" {
+                storedEditorPositionLastEnabled = storedEditorPosition
+            }
+            storedEditorPosition = newValue
+        }
+    }
+
+    var editorPositionLastEnabled: String {
+        if storedEditorPositionLastEnabled == "disabled" {
+            return "bottom"
+        }
+        return storedEditorPositionLastEnabled
+    }
     
     // History Settings
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
@@ -75,6 +97,47 @@ final class AppSettings: ObservableObject {
     // Action Click Settings (modifier required to trigger item action by click)
     @AppStorage("actionClickModifiers") var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     
+    // Localization
+    @AppStorage("appLanguage") private var storedAppLanguage = LanguageOption.system.rawValue
+
+    var appLanguage: LanguageOption {
+        get { LanguageOption(rawValue: storedAppLanguage) ?? .system }
+        set {
+            guard storedAppLanguage != newValue.rawValue else { return }
+            objectWillChange.send()
+            storedAppLanguage = newValue.rawValue
+        }
+    }
+    
+    var appLocale: Locale {
+        switch appLanguage {
+        case .system:
+            return Locale.autoupdatingCurrent
+        case .english:
+            return Locale(identifier: "en")
+        case .japanese:
+            return Locale(identifier: "ja")
+        }
+    }
+    
+    var appLanguageIdentifier: String? {
+        appLanguage.localeIdentifier
+    }
+
+    func localizedString(_ key: String, comment: String = "") -> String {
+        if let identifier = appLanguageIdentifier,
+           let path = Bundle.main.path(forResource: identifier, ofType: "lproj"),
+           let bundle = Bundle(path: path) {
+            return bundle.localizedString(forKey: key, value: nil, table: nil)
+        }
+        return Bundle.main.localizedString(forKey: key, value: nil, table: nil)
+    }
+
+    func localizedFormat(_ key: String, comment: String = "", _ args: CVarArg...) -> String {
+        let format = localizedString(key, comment: comment)
+        return String(format: format, locale: appLocale, arguments: args)
+    }
+
     private init() {
         if storedFilterCategoryNone {
             storedFilterCategoryNone = false
@@ -106,5 +169,36 @@ final class AppSettings: ObservableObject {
         static let launchAtLogin = "launchAtLogin"
         static let filterCategoryURL = "filterCategoryURL"
         static let filterCategoryNone = "filterCategoryNone"
+        static let appLanguage = "appLanguage"
+    }
+    
+    enum LanguageOption: String, CaseIterable, Identifiable {
+        case system
+        case english
+        case japanese
+        
+        var id: String { rawValue }
+        
+        var displayName: LocalizedStringKey {
+            switch self {
+            case .system:
+                return LocalizedStringKey("System Default")
+            case .english:
+                return LocalizedStringKey("English")
+            case .japanese:
+                return LocalizedStringKey("Japanese")
+            }
+        }
+        
+        var localeIdentifier: String? {
+            switch self {
+            case .system:
+                return nil
+            case .english:
+                return "en"
+            case .japanese:
+                return "ja"
+            }
+        }
     }
 }

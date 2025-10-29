@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import CoreGraphics
+import ApplicationServices
 
 struct PermissionsSettingsView: View {
     @AppStorage("textCaptureHotkeyKeyCode") private var textCaptureHotkeyKeyCode: Int = 0
@@ -16,6 +17,7 @@ struct PermissionsSettingsView: View {
     @State private var tempCaptureKeyCode: UInt16 = 17
     @State private var tempCaptureModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var hasScreenCapturePermission = CGPreflightScreenCaptureAccess()
+    @State private var hasAccessibilityPermission = AXIsProcessTrusted()
     @State private var captureHotkeyError: String?
     @State private var permissionPollingTimer: Timer?
 
@@ -26,85 +28,111 @@ struct PermissionsSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 screenRecordingSection
-                screenTextCaptureSection
+                accessibilitySection
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
             loadCaptureHotkeyState()
-            refreshScreenCapturePermission()
+            refreshPermissions()
         }
         .onDisappear {
             stopPermissionPolling()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            refreshScreenCapturePermission()
+            refreshPermissions()
         }
     }
 
     private var screenRecordingSection: some View {
         SettingsGroup(
             "Screen Recording Permission",
-            includeTopDivider: false,
-            headerAccessory: AnyView(
-                PermissionStatusBadge(isGranted: hasScreenCapturePermission)
-            )
+            includeTopDivider: false
         ) {
+            SettingsRow(label: "Request Access") {
+                HStack(spacing: 10) {
+                    Button("Request Permission Again") {
+                        requestPermissionAgain()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(Color.accentColor)
+                    .disabled(hasScreenCapturePermission)
+                    PermissionStatusBadge(isGranted: hasScreenCapturePermission)
+                }
+            }
+
             SettingsRow(label: "Overview") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("1. Open System Settings → Privacy & Security → Screen & System Audio Recording.")
-                    Text("2. Turn on the toggle next to “Kipple”.")
-                    Text("3. Return to Kipple; this screen updates automatically.")
+                    Text("Why: Needed so Screen Text Capture can read on-screen text. No screen data leaves your Mac.")
+                    Text("1. Click “Request Permission Again” and follow the macOS prompt to System Settings.")
+                    Text("2. In System Settings → Privacy & Security → Screen Recording, enable “Kipple”.")
+                    Text("Note: On macOS 15+, the section label is Screen & System Audio Recording.")
+                    Text("3. Return to Kipple; the status badge switches to Granted automatically.")
                     Text("MDM Tip: Configure AllowStandardUserToSetSystemService for ScreenCapture.")
                     Text("This enables standard users to approve the permission.")
+                    Text("Once granted, configure the screen text capture shortcut below.")
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
             }
 
-            SettingsRow(label: "System Settings", layout: .inlineControl) {
-                Button("Open Screen Recording Preferences") {
-                    openSystemSettings()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(Color.accentColor)
-            }
+            SettingsRow(label: "Text Capture Hotkey") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HotkeyRecorderField(
+                        keyCode: $tempCaptureKeyCode,
+                        modifierFlags: $tempCaptureModifierFlags
+                    )
+                    .disabled(!hasScreenCapturePermission)
+                    .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
+                    .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
 
-            SettingsRow(label: "Request Access", layout: .inlineControl) {
-                Button("Request Permission Again") {
-                    requestPermissionAgain()
+                    if let captureHotkeyError {
+                        Text(captureHotkeyError)
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                    } else if hasScreenCapturePermission {
+                        Text("Shortcut is ready to use. Hold the selected modifiers and key to capture text.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Enable Screen Recording permission to configure the text capture shortcut.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(Color.accentColor)
             }
         }
     }
 
-    private var screenTextCaptureSection: some View {
-        SettingsGroup("Screen Text Capture Settings") {
-            SettingsRow(label: "Global Hotkey") {
-                HotkeyRecorderField(
-                    keyCode: $tempCaptureKeyCode,
-                    modifierFlags: $tempCaptureModifierFlags
-                )
-                .disabled(!hasScreenCapturePermission)
-                .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
-                .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
+    private var accessibilitySection: some View {
+        SettingsGroup(
+            "Accessibility Permission"
+        ) {
+            SettingsRow(label: "Request Access") {
+                HStack(spacing: 10) {
+                    Button("Request Permission Again") {
+                        requestAccessibilityPermission()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(Color.accentColor)
+                    .disabled(hasAccessibilityPermission)
+                    PermissionStatusBadge(isGranted: hasAccessibilityPermission)
+                }
             }
 
-            if let captureHotkeyError {
-                Text(captureHotkeyError)
-                    .font(.system(size: 11))
-                    .foregroundColor(.red)
-                    .padding(.leading, 4)
-            } else if hasScreenCapturePermission {
-                Text("Shortcut is ready to use. Hold the selected modifiers and key to capture text.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 4)
+            SettingsRow(label: "Overview") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Why: Lets Quick Paste watch Command+V for clipboard automation. Input stays on device.")
+                    Text("1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings.")
+                    Text("2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”.")
+                    Text("3. Return to Kipple; the status badge switches to Granted automatically.")
+                    Text("Tip: Granting Accessibility lets Kipple observe Command+V while running in the background.")
+                }
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
             }
         }
     }
@@ -116,7 +144,10 @@ struct PermissionsSettingsView: View {
             defaults.set(Int(defaultCaptureKeyCode), forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
         }
         if defaults.object(forKey: TextCaptureHotkeyManager.modifierDefaultsKey) == nil {
-            defaults.set(Int(defaultCaptureModifierFlags.rawValue), forKey: TextCaptureHotkeyManager.modifierDefaultsKey)
+            defaults.set(
+                Int(defaultCaptureModifierFlags.rawValue),
+                forKey: TextCaptureHotkeyManager.modifierDefaultsKey
+            )
         }
 
         textCaptureHotkeyKeyCode = defaults.integer(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
@@ -146,7 +177,10 @@ struct PermissionsSettingsView: View {
         let modifiers = tempCaptureModifierFlags
 
         guard keyCode != 0, !modifiers.isEmpty else {
-            captureHotkeyError = "Select a key and modifier to enable the shortcut."
+            captureHotkeyError = NSLocalizedString(
+                "Select a key and modifier to enable the shortcut.",
+                comment: "Error message shown when no shortcut is selected"
+            )
             disableCaptureHotkey()
             return
         }
@@ -166,7 +200,10 @@ struct PermissionsSettingsView: View {
                 enabled: true
             )
         } else {
-            captureHotkeyError = "The selected shortcut is already taken. Try another combination."
+            captureHotkeyError = NSLocalizedString(
+                "The selected shortcut is already taken. Try another combination.",
+                comment: "Error message shown when shortcut conflicts"
+            )
         }
     }
 
@@ -180,6 +217,7 @@ struct PermissionsSettingsView: View {
         )
     }
 
+    @MainActor
     private func refreshScreenCapturePermission() {
         let granted = CGPreflightScreenCaptureAccess()
         if granted != hasScreenCapturePermission {
@@ -194,14 +232,59 @@ struct PermissionsSettingsView: View {
         }
     }
 
+    @MainActor
+    private func refreshAccessibilityPermission() {
+        let granted = AXIsProcessTrusted()
+        if granted != hasAccessibilityPermission {
+            hasAccessibilityPermission = granted
+        }
+    }
+
+    @MainActor
+    private func refreshPermissions() {
+        refreshScreenCapturePermission()
+        refreshAccessibilityPermission()
+    }
+
     private func openSystemSettings() {
         startPermissionPolling()
         ScreenRecordingPermissionOpener.openSystemSettings()
     }
 
     private func requestPermissionAgain() {
+        if hasScreenCapturePermission {
+            openSystemSettings()
+            return
+        }
+
         startPermissionPolling()
-        _ = CGRequestScreenCaptureAccess()
+        let didPrompt = CGRequestScreenCaptureAccess()
+        if !didPrompt {
+            openSystemSettings()
+        }
+    }
+
+    @MainActor
+    private func openAccessibilityPreferences() {
+        startPermissionPolling()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @MainActor
+    private func requestAccessibilityPermission() {
+        if hasAccessibilityPermission {
+            openAccessibilityPreferences()
+            return
+        }
+
+        startPermissionPolling()
+        let options: [CFString: Bool] = ["AXTrustedCheckOptionPrompt" as CFString: true]
+        let didPrompt = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        if !didPrompt {
+            openAccessibilityPreferences()
+        }
     }
 
     private func openPermissionTab() {
@@ -216,12 +299,12 @@ struct PermissionsSettingsView: View {
     private func startPermissionPolling() {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            refreshScreenCapturePermission()
+            refreshPermissions()
         }
         if let timer = permissionPollingTimer {
             RunLoop.main.add(timer, forMode: .common)
         }
-        refreshScreenCapturePermission()
+        refreshPermissions()
     }
 
     private func stopPermissionPolling() {

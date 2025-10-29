@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct SettingsRow<Content: View>: View {
-    let label: String
-    let description: String?
+    let label: LocalizedStringKey
+    let description: LocalizedStringKey?
     let content: () -> Content
     let layout: Layout
     
@@ -19,8 +19,8 @@ struct SettingsRow<Content: View>: View {
     }
     
     init(
-        label: String,
-        description: String? = nil,
+        label: LocalizedStringKey,
+        description: LocalizedStringKey? = nil,
         layout: Layout = .trailingContent,
         @ViewBuilder content: @escaping () -> Content
     ) {
@@ -35,7 +35,7 @@ struct SettingsRow<Content: View>: View {
             if layout == .inlineControl {
                 VStack(alignment: .leading, spacing: SettingsLayoutMetrics.rowVerticalSpacing) {
                     content()
-                    if let description = description {
+                    if let description {
                         Text(description)
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
@@ -48,7 +48,7 @@ struct SettingsRow<Content: View>: View {
                     labelView
                     VStack(alignment: .leading, spacing: SettingsLayoutMetrics.rowVerticalSpacing) {
                         content()
-                        if let description = description {
+                        if let description {
                             Text(description)
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
@@ -73,7 +73,7 @@ struct SettingsRow<Content: View>: View {
 // MARK: - Convenience initializers for common controls
 
 extension SettingsRow where Content == AnyView {
-    init(label: String, description: String? = nil, isOn: Binding<Bool>) {
+    init(label: LocalizedStringKey, description: LocalizedStringKey? = nil, isOn: Binding<Bool>) {
         self.init(label: label, description: description, layout: .inlineControl) {
             AnyView(
                 Toggle(label, isOn: isOn)
@@ -82,7 +82,7 @@ extension SettingsRow where Content == AnyView {
         }
     }
     
-    init(label: String, description: String? = nil, value: String) {
+    init(label: LocalizedStringKey, description: LocalizedStringKey? = nil, value: String) {
         self.init(label: label, description: description) {
             AnyView(
                 Text(value)

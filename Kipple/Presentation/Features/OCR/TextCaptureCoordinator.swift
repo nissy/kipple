@@ -141,7 +141,12 @@ final class TextCaptureCoordinator {
 
         guard let image = captureImage(from: rect, on: screen) else {
             Logger.shared.error("Failed to capture image from selection.")
-            presentErrorAlert(message: "Failed to capture the screen. Check Screen Recording permissions in System Settings.")
+            presentErrorAlert(
+                message: NSLocalizedString(
+                    "Failed to capture the screen. Check Screen Recording permissions in System Settings.",
+                    comment: "Error shown when screen recording permission prevents OCR capture"
+                )
+            )
             return
         }
 
@@ -157,7 +162,12 @@ final class TextCaptureCoordinator {
             } catch {
                 Logger.shared.error("OCR failed with error: \(error.localizedDescription)")
                 await MainActor.run { [weak self] in
-                    self?.presentErrorAlert(message: "Could not extract text.\nPlease try again.")
+                    self?.presentErrorAlert(
+                        message: NSLocalizedString(
+                            "Could not extract text.\nPlease try again.",
+                            comment: "Error shown when OCR fails to extract text"
+                        )
+                    )
                 }
             }
         }
@@ -168,7 +178,12 @@ final class TextCaptureCoordinator {
 
         guard !trimmed.isEmpty else {
             Logger.shared.warning("No text recognized from selection.")
-            presentErrorAlert(message: "Text could not be detected. Please try another area.")
+            presentErrorAlert(
+                message: NSLocalizedString(
+                    "Text could not be detected. Please try another area.",
+                    comment: "Error shown when no text is detected during OCR capture"
+                )
+            )
             return
         }
 
@@ -224,9 +239,9 @@ final class TextCaptureCoordinator {
     private func presentErrorAlert(message: String) {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "OCR Error"
+        alert.messageText = NSLocalizedString("OCR Error", comment: "Alert title for OCR failures")
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button title"))
         alert.runModal()
     }
 

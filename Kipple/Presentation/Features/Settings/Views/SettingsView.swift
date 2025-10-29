@@ -11,6 +11,7 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var appSettings = AppSettings.shared
     @Environment(\.controlActiveState) private var controlActiveState
     @State private var activeTab: SettingsViewModel.Tab
 
@@ -20,6 +21,11 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        content
+            .environment(\.locale, appSettings.appLocale)
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             toolbar
             Divider()
@@ -129,7 +135,7 @@ private struct SettingsToolbarButton: View {
                             .foregroundColor(iconColor)
                     )
 
-                Text(tab.title)
+                Text(tab.localizedTitleKey)
                     .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
                     .foregroundColor(labelColor)
             }
@@ -139,7 +145,7 @@ private struct SettingsToolbarButton: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .accessibilityLabel(tab.title)
+        .accessibilityLabel(Text(tab.localizedTitleKey))
     }
 
     private var backgroundColor: Color {

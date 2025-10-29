@@ -25,6 +25,9 @@ ARCHIVE_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).xcarchive
 EXPORT_PATH = $(PROD_BUILD_DIR)/export
 DMG_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).dmg
 
+# SwiftData plugin path (required for Swift macros)
+SWIFTDATA_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftDataMacros.dylib
+
 # Environment variables (from .envrc)
 DEVELOPMENT_TEAM ?= R7LKF73J2W
 PRODUCT_BUNDLE_IDENTIFIER ?= com.nissy.Kipple
@@ -204,6 +207,7 @@ test: generate ## Run all tests
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
 		-only-testing:KippleTests
 
 test-coverage: generate ## Run tests with coverage report
@@ -220,6 +224,7 @@ test-coverage: generate ## Run tests with coverage report
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
 		-only-testing:KippleTests
 
 test-specific: generate ## Run specific test (use TEST=ClassName)
@@ -237,6 +242,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
 		-only-testing:KippleTests/$(TEST)
 
 #===============================================================================
@@ -484,10 +490,10 @@ show-version: ## Show version from xcconfig files
 	@echo "Marketing Version: $$(grep '^MARKETING_VERSION' Config/Version.xcconfig | cut -d'=' -f2 | xargs)"
 	@echo "Build Number: $$(grep '^CURRENT_PROJECT_VERSION' Config/Version.xcconfig | cut -d'=' -f2 | xargs)"
 
-bump-version: ## Update version (usage: make bump-version VERSION=2.0.3)
+bump-version: ## Update version (usage: make bump-version VERSION=2.0.4)
 	@if [ -z "$(VERSION)" ]; then \
 		echo "$(RED)Error: VERSION not specified$(NC)"; \
-		echo "Usage: make bump-version VERSION=2.0.3"; \
+		echo "Usage: make bump-version VERSION=2.0.4"; \
 		exit 1; \
 	fi
 	@./Scripts/update_version.sh $(VERSION)

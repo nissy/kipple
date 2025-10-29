@@ -2,42 +2,41 @@ import SwiftUI
 import Combine
 
 @available(macOS 14.0, iOS 17.0, *)
-@Observable
 @MainActor
-final class ObservableMainViewModel: MainViewModelProtocol {
+final class ObservableMainViewModel: ObservableObject, MainViewModelProtocol {
     // MARK: - Published Properties
-    var filteredHistory: [ClipItem] = []
-    var pinnedHistory: [ClipItem] = []
-    var filteredItems: [ClipItem] = [] // Keep for backward compatibility
-    var searchText = "" {
+    @Published var filteredHistory: [ClipItem] = []
+    @Published var pinnedHistory: [ClipItem] = []
+    @Published var filteredItems: [ClipItem] = [] // Keep for backward compatibility
+    @Published var searchText = "" {
         didSet {
             applyFilters()
         }
     }
-    var editorText = ""
-    var selectedCategory: ClipItemCategory? {
+    @Published var editorText = ""
+    @Published var selectedCategory: ClipItemCategory? {
         didSet {
             applyFilters()
         }
     }
-    var isPinnedFilterActive = false {
+    @Published var isPinnedFilterActive = false {
         didSet {
             applyFilters()
         }
     }
-    var showOnlyPinned = false {
+    @Published var showOnlyPinned = false {
         didSet {
             applyFilters()
         }
     }
-    var showOnlyURLs = false {
+    @Published var showOnlyURLs = false {
         didSet {
             applyFilters()
         }
     }
-    var showingCopiedNotification = false
-    var currentClipboardContent: String?
-    var autoClearRemainingTime: TimeInterval?
+    @Published var showingCopiedNotification = false
+    @Published var currentClipboardContent: String?
+    @Published var autoClearRemainingTime: TimeInterval?
 
     // MARK: - Private Properties
     private let clipboardService: any ClipboardServiceProtocol

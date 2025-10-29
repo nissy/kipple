@@ -12,6 +12,8 @@ struct HistoryItemView: View {
     let item: ClipItem
     let isSelected: Bool
     let isCurrentClipboardItem: Bool
+    let queueBadge: Int?
+    let isQueuePreviewed: Bool
     let onTap: () -> Void
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
@@ -88,6 +90,7 @@ struct HistoryItemView: View {
                 .onTapGesture { handleTap() }
 
             HStack(spacing: 8) {
+                queueBadgeView
                 pinButton
                 categoryMenu
                 historyText
@@ -99,20 +102,62 @@ struct HistoryItemView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    @ViewBuilder
+    private var queueBadgeView: some View {
+        if let queueBadge {
+            let isActiveBadge = queueBadge > 0
+            let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
+            let badgeBackground = isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1)
+            let badgeForeground = isActiveBadge ? Color.white : Color.secondary
+
+            Text(badgeText)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(badgeForeground)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(badgeBackground)
+                )
+                .contentShape(Circle())
+                .help(
+                    Text(
+                        String(
+                            format: NSLocalizedString(
+                                "Queue position %d",
+                                comment: "Tooltip showing queue badge position"
+                            ),
+                            queueBadge
+                        )
+                    )
+                )
+        }
+    }
+
     private var backgroundView: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(
-                isSelected ? AnyShapeStyle(LinearGradient(
-                    colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )) : AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
-            )
-            .overlay(
-                isHovered && !isSelected ?
+        let baseFill: AnyShapeStyle
+        if isSelected {
+            baseFill = AnyShapeStyle(LinearGradient(
+                colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ))
+        } else if isQueuePreviewed {
+            baseFill = AnyShapeStyle(Color.accentColor.opacity(0.25))
+        } else {
+            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
+        }
+
+        return RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(baseFill)
+            .overlay {
+                if isHovered && !isSelected {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1) : nil
-            )
+                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                } else if isQueuePreviewed && !isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
+                }
+            }
             .shadow(
                 color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
                 radius: isSelected ? 8 : 0,
@@ -171,7 +216,17 @@ struct HistoryItemView: View {
                 closePopover()
                 onCategoryTap()
             }
-            .help("「\(item.category.rawValue)」でフィルタ")
+            .help(
+                Text(
+                    String(
+                        format: NSLocalizedString(
+                            "Filter by “%@”",
+                            comment: "Filter tooltip with category name"
+                        ),
+                        item.category.localizedName
+                    )
+                )
+            )
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
@@ -288,7 +343,11 @@ private extension HistoryItemView {
                     onChangeCategory?(noneId)
                 },
                 label: {
-                    Label("None", systemImage: "tag")
+                    Label {
+                        Text(verbatim: "None")
+                    } icon: {
+                        Image(systemName: "tag")
+                    }
                 }
             )
             Divider()
@@ -296,7 +355,11 @@ private extension HistoryItemView {
                 Button {
                     onChangeCategory?(cat.id)
                 } label: {
-                    Label(cat.name, systemImage: UserCategoryStore.shared.iconName(for: cat))
+                    Label {
+                        Text(verbatim: cat.name)
+                    } icon: {
+                        Image(systemName: UserCategoryStore.shared.iconName(for: cat))
+                    }
                 }
             }
             Divider()
@@ -367,6 +430,14 @@ private extension HistoryItemView {
         case .shift: key = "⇧"
         default: key = "⌘"
         }
-        return "\(key)+Click to \(item.actionTitle ?? "Open")"
+        let actionTitle = item.actionTitle ?? NSLocalizedString("Open", comment: "Default action title")
+        return String(
+            format: NSLocalizedString(
+                "%@+Click to %@",
+                comment: "Modifier click instruction with action title"
+            ),
+            key,
+            actionTitle
+        )
     }
 }

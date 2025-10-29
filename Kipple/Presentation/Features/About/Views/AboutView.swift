@@ -8,14 +8,27 @@
 import SwiftUI
 
 struct AboutView: View {
-    private let privacyItems: [(icon: String, text: String)] = [
-        ("lock.shield.fill", "All data is stored locally on your Mac"),
-        ("network.slash", "No data is sent to external servers"),
-        ("hand.raised.fill", "Protected by macOS security features"),
-        ("trash.fill", "Data can be cleared at any time")
+    private struct PrivacyItem: Identifiable {
+        let id: String
+        let icon: String
+        let text: LocalizedStringKey
+    }
+    
+    @ObservedObject private var appSettings = AppSettings.shared
+
+    private let privacyItems: [PrivacyItem] = [
+        .init(id: "local", icon: "lock.shield.fill", text: "All data is stored locally on your Mac"),
+        .init(id: "network", icon: "network.slash", text: "No data is sent to external servers"),
+        .init(id: "security", icon: "hand.raised.fill", text: "Protected by macOS security features"),
+        .init(id: "deletion", icon: "trash.fill", text: "Data can be cleared at any time")
     ]
     
     var body: some View {
+        content
+            .environment(\.locale, appSettings.appLocale)
+    }
+    
+    private var content: some View {
         VStack(alignment: .center, spacing: 24) {
             VStack(spacing: 12) {
                 if let appIcon = NSApp.applicationIconImage {
@@ -30,7 +43,12 @@ struct AboutView: View {
                     .foregroundColor(.primary)
                 
                 if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-                    Text("Version \(version)")
+                    Text(
+                        String(
+                            format: NSLocalizedString("Version %@", comment: "App version label"),
+                            version
+                        )
+                    )
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
@@ -48,7 +66,7 @@ struct AboutView: View {
                     .foregroundColor(.primary)
                 
                 VStack(alignment: .leading, spacing: 10) {
-                    ForEach(privacyItems, id: \.text) { item in
+                    ForEach(privacyItems) { item in
                         PrivacyStatement(icon: item.icon, text: item.text)
                     }
                 }
@@ -90,7 +108,7 @@ struct AboutView: View {
 
 struct PrivacyStatement: View {
     let icon: String
-    let text: String
+    let text: LocalizedStringKey
     
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -111,7 +129,9 @@ struct PrivacyStatement: View {
 }
 
 #if !CI_BUILD
-#Preview {
-    AboutView()
+struct AboutView_Previews: PreviewProvider {
+    static var previews: some View {
+        AboutView()
+    }
 }
 #endif

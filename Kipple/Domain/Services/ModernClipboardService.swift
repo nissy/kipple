@@ -230,7 +230,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             isPinned: false,
             kind: determineKind(for: content, isFromEditor: fromEditor),
             sourceApp: fromEditor ? "Kipple" : metadata.appName,
-            windowTitle: fromEditor ? "Quick Editor" : metadata.windowTitle,
+            windowTitle: fromEditor
+                ? "Quick Editor"
+                : metadata.windowTitle,
             bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
             isFromEditor: fromEditor
@@ -499,26 +501,34 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private func shouldSkipChange(for changeCount: Int) async -> Bool {
         let expectedChangeCount = await state.getExpectedChangeCount()
-        if let expected = expectedChangeCount, changeCount == expected {
-            lastChangeCount = changeCount
-            await state.setExpectedChangeCount(nil)
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
-            return true
+        if let expected = expectedChangeCount {
+            if changeCount == expected {
+                lastChangeCount = changeCount
+                await state.setExpectedChangeCount(nil)
+                await state.setInternalCopy(false)
+                await state.setFromEditor(false)
+                return true
+            }
+
+            if changeCount < expected {
+                lastChangeCount = changeCount
+                return true
+            }
+
+            if changeCount > expected {
+                await state.setExpectedChangeCount(nil)
+                await state.setInternalCopy(false)
+                await state.setFromEditor(false)
+            }
         }
 
         let isInternalCopy = await state.getInternalCopy()
-        if isInternalCopy && expectedChangeCount == nil {
+        if isInternalCopy {
             lastChangeCount = changeCount
             await state.setInternalCopy(false)
             await state.setFromEditor(false)
-            return true
-        }
-
-        if let expected = expectedChangeCount, changeCount > expected {
             await state.setExpectedChangeCount(nil)
-            await state.setInternalCopy(false)
-            await state.setFromEditor(false)
+            return true
         }
 
         return false
@@ -550,7 +560,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             content: content,
             kind: determineKind(for: content, isFromEditor: isFromEditor),
             sourceApp: isFromEditor ? "Kipple" : metadata.appName,
-            windowTitle: isFromEditor ? "Quick Editor" : metadata.windowTitle,
+            windowTitle: isFromEditor
+                ? "Quick Editor"
+                : metadata.windowTitle,
             bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
             isFromEditor: isFromEditor
@@ -610,7 +622,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         let syntheticPid = info.pid == 0 ? -1 : info.pid
         return ActiveAppInfo(
-            appName: info.appName == "Kipple" ? "External Source" : info.appName,
+            appName: info.appName == "Kipple"
+                ? "External Source"
+                : info.appName,
             windowTitle: info.windowTitle,
             bundleId: info.bundleId == bundleIdentifier ? "external.app" : info.bundleId,
             pid: syntheticPid

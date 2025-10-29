@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct SettingsGroup<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     let includeTopDivider: Bool
     let content: () -> Content
     let headerAccessory: AnyView?
     
     init(
-        _ title: String,
+        _ title: LocalizedStringKey,
         includeTopDivider: Bool = true,
         headerAccessory: AnyView? = nil,
         @ViewBuilder content: @escaping () -> Content
@@ -37,10 +37,10 @@ struct SettingsGroup<Content: View>: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.primary)
                     .padding(.leading, 1)
+                Spacer(minLength: 0)
                 if let headerAccessory {
                     headerAccessory
                 }
-                Spacer(minLength: 0)
             }
 
             VStack(alignment: .leading, spacing: SettingsLayoutMetrics.groupContentSpacing) {

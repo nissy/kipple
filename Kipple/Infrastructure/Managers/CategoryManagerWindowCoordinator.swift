@@ -28,6 +28,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         if let onClose { onCloseHandlers.append(onClose) }
 
         if let window {
+            window.title = String(localized: "Manage Categories")
             position(window: window, near: anchorWindow)
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -38,7 +39,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         controller.sizingOptions = []
 
         let window = NSWindow(contentViewController: controller)
-        window.title = "Manage Categories"
+        window.title = String(localized: "Manage Categories")
         window.styleMask = [.titled, .closable]
 
         applyContentSize(controller, to: window)

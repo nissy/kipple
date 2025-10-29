@@ -26,3 +26,9 @@ protocol ClipboardServiceProtocol: AnyObject {
     func deleteItem(_ item: ClipItem) async
     func flushPendingSaves() async
 }
+
+@MainActor
+protocol QueueAutoClearControlling: AnyObject {
+    func pauseAutoClearForQueue()
+    func resumeAutoClearAfterQueue()
+}

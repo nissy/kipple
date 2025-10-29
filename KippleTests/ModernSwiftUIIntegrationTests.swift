@@ -47,16 +47,16 @@ final class ModernSwiftUIIntegrationTests: XCTestCase {
 
         // Create a test view that uses the environment
         struct TestView: View {
-            @Environment(ObservableMainViewModel.self) var viewModel
+            @EnvironmentObject var viewModel: ObservableMainViewModel
 
             var body: some View {
                 Text(viewModel.searchText)
             }
         }
 
-        // When: View is created with environment
+        // When: View is created with environment object
         let view = TestView()
-            .environment(viewModel)
+            .environmentObject(viewModel)
 
         // Then: View can access environment
         XCTAssertNotNil(view)

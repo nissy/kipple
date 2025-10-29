@@ -14,7 +14,7 @@ struct HotkeyRecorderView: NSViewRepresentable {
     
     func makeNSView(context: Context) -> NSTextField {
         let textField = NSTextField()
-        textField.placeholderString = "None"
+        textField.placeholderString = String(localized: "None")
         textField.alignment = .center
         textField.isEditable = false
         textField.isSelectable = false
@@ -35,7 +35,7 @@ struct HotkeyRecorderView: NSViewRepresentable {
         
         if keyCode == 0 && modifierFlagsValue.isEmpty {
             textField.stringValue = ""
-            textField.placeholderString = "None"
+            textField.placeholderString = String(localized: "None")
             return
         }
         

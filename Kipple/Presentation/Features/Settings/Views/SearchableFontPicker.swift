@@ -13,6 +13,7 @@ struct SearchableFontPicker: View {
     @State private var searchText = ""
     @State private var isShowingPopover = false
     @Environment(\.colorScheme) var colorScheme
+    @ObservedObject private var appSettings = AppSettings.shared
     let includeNone: Bool
     
     init(selectedFont: Binding<String>, includeNone: Bool = false) {
@@ -67,17 +68,17 @@ struct SearchableFontPicker: View {
     private func fontDisplayName(for fontName: String) -> String {
         // SimpleFontSettingsViewと同じ実装
         if fontName.isEmpty {
-            return "None"
+            return appSettings.localizedString("None", comment: "Represents absence of a font")
         } else if fontName == "System" {
-            return "System"
+            return appSettings.localizedString("System", comment: "Represents the system font")
         } else if fontName.hasPrefix("SFMono-") {
             return "SF Mono"
         } else if fontName.hasPrefix("Menlo-") {
             return "Menlo"
         } else if fontName.hasPrefix("HiraginoSans-") {
-            return "ヒラギノ角ゴシック"
+            return NSLocalizedString("Hiragino Sans", comment: "Display name for Hiragino Sans font family")
         } else if fontName.hasPrefix("YuGothic-") {
-            return "游ゴシック"
+            return NSLocalizedString("Yu Gothic", comment: "Display name for Yu Gothic font family")
         }
         // 他のフォント名処理…
         return fontName.replacingOccurrences(of: "-Regular", with: "")
@@ -90,6 +91,7 @@ struct FontSelectionView: View {
     let allFonts: [String]
     let includeNone: Bool
     let onSelect: (String) -> Void
+    @ObservedObject private var appSettings = AppSettings.shared
     
     private var fontCategories: [(name: String, fonts: [String])] {
         var allFontsWithNone = allFonts
@@ -99,13 +101,14 @@ struct FontSelectionView: View {
         
         let filtered = searchText.isEmpty ? allFontsWithNone : allFontsWithNone.filter { font in
             if font.isEmpty {
-                return "None".localizedCaseInsensitiveContains(searchText)
+                return appSettings.localizedString("None", comment: "Represents absence of a font")
+                    .localizedCaseInsensitiveContains(searchText)
             }
             return fontDisplayName(for: font).localizedCaseInsensitiveContains(searchText)
         }
-        
+
         if !searchText.isEmpty {
-            return [("検索結果", filtered)]
+            return [(appSettings.localizedString("Search Results", comment: "Search results section title"), filtered)]
         }
         
         // カテゴリー分け
@@ -132,16 +135,32 @@ struct FontSelectionView: View {
         var categories: [(String, [String])] = []
         
         if !recentlyUsed.isEmpty {
-            categories.append(("最近使用したフォント", recentlyUsed))
+            let title = appSettings.localizedString(
+                "Recently Used Fonts",
+                comment: "Recently used fonts section title"
+            )
+            categories.append((title, recentlyUsed))
         }
         if !japanese.isEmpty {
-            categories.append(("日本語フォント", japanese))
+            let title = appSettings.localizedString(
+                "Japanese Fonts",
+                comment: "Japanese fonts section title"
+            )
+            categories.append((title, japanese))
         }
         if !monospaced.isEmpty {
-            categories.append(("等幅フォント", monospaced))
+            let title = appSettings.localizedString(
+                "Monospaced Fonts",
+                comment: "Monospaced fonts section title"
+            )
+            categories.append((title, monospaced))
         }
         if !others.isEmpty {
-            categories.append(("その他のフォント", others))
+            let title = appSettings.localizedString(
+                "Other Fonts",
+                comment: "Other fonts section title"
+            )
+            categories.append((title, others))
         }
         
         return categories
@@ -153,7 +172,16 @@ struct FontSelectionView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("フォントを検索…", text: $searchText)
+                TextField(
+                    "",
+                    text: $searchText,
+                    prompt: Text(
+                        appSettings.localizedString(
+                            "Search fonts…",
+                            comment: "Search fonts placeholder"
+                        )
+                    )
+                )
                     .textFieldStyle(PlainTextFieldStyle())
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }, label: {
@@ -199,7 +227,7 @@ struct FontSelectionView: View {
     
     private func fontDisplayName(for fontName: String) -> String {
         // 実装は上記と同じ
-        if fontName == "System" { return "System" }
+        if fontName == "System" { return appSettings.localizedString("System", comment: "Represents the system font") }
         if fontName.hasPrefix("SFMono-") { return "SF Mono" }
         if fontName.hasPrefix("Menlo-") { return "Menlo" }
         // … 他のフォント名処理
@@ -229,15 +257,16 @@ struct FontItemView: View {
     let font: String
     let isSelected: Bool
     let onSelect: (String) -> Void
-    
+
     @State private var isHovered = false
+    @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
         Button(action: { onSelect(font) }, label: {
             HStack {
                 // フォントプレビュー
                 if font.isEmpty {
-                    Text("None")
+                    Text(appSettings.localizedString("None", comment: "Represents absence of a font"))
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                         .frame(width: 120, alignment: .leading)
@@ -279,9 +308,15 @@ struct FontItemView: View {
     
     private func fontDisplayName(for fontName: String) -> String {
         // 実装は上記と同じ
-        if fontName.isEmpty { return "None" }
+        if fontName.isEmpty { return appSettings.localizedString("None", comment: "Represents absence of a font") }
         if fontName.hasPrefix("SFMono-") { return "SF Mono" }
         if fontName.hasPrefix("Menlo-") { return "Menlo" }
+        if fontName.hasPrefix("HiraginoSans-") {
+            return appSettings.localizedString("Hiragino Sans", comment: "Display name for Hiragino Sans font family")
+        }
+        if fontName.hasPrefix("YuGothic-") {
+            return appSettings.localizedString("Yu Gothic", comment: "Display name for Yu Gothic font family")
+        }
         return fontName.replacingOccurrences(of: "-Regular", with: "")
     }
 }
