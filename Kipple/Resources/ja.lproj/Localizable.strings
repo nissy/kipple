@@ -133,6 +133,7 @@
 "The selected shortcut is already taken. Try another combination." = "選択したショートカットは既に使用されています。別の組み合わせを試してください。";
 "This enables standard users to approve the permission." = "これにより一般ユーザーでも権限を承認できます。";
 "Tip: Granting Accessibility lets Kipple observe Command+V while running in the background." = "ヒント: アクセシビリティを許可すると、Kipple はバックグラウンドで Command+V を監視できます。";
+"Automation Prompt Tip" = "macOS で「自動操作」の確認が表示された場合は、Kipple にシステム設定の操作を許可するとショートカットから対象のペインを開けます。";
 "Top" = "上";
 "URL" = "URL";
 "Version %@" = "バージョン %@";

@@ -133,6 +133,7 @@
 "The selected shortcut is already taken. Try another combination." = "The selected shortcut is already taken. Try another combination.";
 "This enables standard users to approve the permission." = "This enables standard users to approve the permission.";
 "Tip: Granting Accessibility lets Kipple observe Command+V while running in the background." = "Tip: Granting Accessibility lets Kipple observe Command+V while running in the background.";
+"Automation Prompt Tip" = "If macOS shows an “Automation” prompt, allow Kipple to control System Settings so the shortcut can open the correct pane.";
 "Top" = "Top";
 "URL" = "URL";
 "Version %@" = "Version %@";
