@@ -141,7 +141,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.styleMask = [.titled, .closable, .fullSizeContentView, .resizable]
-        window.level = .floating
+        window.level = isAlwaysOnTop ? .floating : .normal
         // M2 Mac対応: hidesOnDeactivateを動的に設定
         window.hidesOnDeactivate = !isAlwaysOnTop
         
