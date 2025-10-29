@@ -190,5 +190,4 @@ final class UserCategoryStore: ObservableObject {
         }
         return "tag"
     }
-
 }

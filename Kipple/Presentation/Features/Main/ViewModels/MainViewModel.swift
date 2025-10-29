@@ -268,7 +268,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         isLoadingMore = false
     }
 
-    
     func copyEditor() {
         if !editorText.isEmpty {
             clipboardService.copyToClipboard(editorText, fromEditor: true)
