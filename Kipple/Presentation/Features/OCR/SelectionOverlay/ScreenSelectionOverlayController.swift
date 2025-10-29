@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import QuartzCore
 
 @MainActor
 protocol ScreenSelectionOverlayControlling: AnyObject {
@@ -46,8 +47,14 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
         let activeWindow = overlayWindows.first { window in
             guard let frame = window.screen?.frame else { return false }
             return frame.contains(mouseLocation)
-        } ?? overlayWindows.first
-        activeWindow?.makeKeyAndOrderFront(nil)
+        }
+
+        if let activeWindow {
+            activeWindow.makeKeyAndOrderFront(nil)
+            activeWindow.flashCursorHighlight(at: mouseLocation)
+        } else if let firstWindow = overlayWindows.first {
+            firstWindow.makeKeyAndOrderFront(nil)
+        }
 
         if !cursorPushed {
             NSCursor.crosshair.push()
@@ -150,6 +157,13 @@ private final class SelectionOverlayWindow: NSWindow {
         makeFirstResponder(overlayView)
     }
 
+    func flashCursorHighlight(at screenPoint: NSPoint) {
+        let screenRect = NSRect(origin: screenPoint, size: .zero)
+        let windowRect = convertFromScreen(screenRect)
+        let localPoint = overlayView.convert(windowRect.origin, from: nil)
+        overlayView.flashCursorHighlight(at: localPoint)
+    }
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
@@ -181,8 +195,73 @@ private final class SelectionOverlayView: NSView {
     private let dimensionBackground = NSColor.systemBlue.withAlphaComponent(0.9)
     private let dimensionTextColor = NSColor.white
 
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureLayer()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureLayer()
+    }
+
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
+
+    func flashCursorHighlight(at point: NSPoint) {
+        guard let layer else { return }
+
+        let radius: CGFloat = 36
+        let clampedPoint = NSPoint(
+            x: max(radius, min(bounds.width - radius, point.x)),
+            y: max(radius, min(bounds.height - radius, point.y))
+        )
+
+        let highlightLayer = CAShapeLayer()
+        highlightLayer.frame = CGRect(
+            x: clampedPoint.x - radius,
+            y: clampedPoint.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        )
+        highlightLayer.path = CGPath(
+            ellipseIn: CGRect(origin: .zero, size: CGSize(width: radius * 2, height: radius * 2)),
+            transform: nil
+        )
+        highlightLayer.fillColor = borderColor.withAlphaComponent(0.25).cgColor
+        highlightLayer.strokeColor = borderColor.cgColor
+        highlightLayer.lineWidth = 2
+        highlightLayer.opacity = 0
+        highlightLayer.contentsScale = layer.contentsScale
+
+        layer.addSublayer(highlightLayer)
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock {
+            highlightLayer.removeFromSuperlayer()
+        }
+
+        let fade = CAKeyframeAnimation(keyPath: "opacity")
+        fade.values = [0.0, 0.85, 0.0]
+        fade.keyTimes = [0.0, 0.4, 1.0]
+        fade.duration = 0.8
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 0.6
+        scale.toValue = 1.35
+        scale.duration = 0.8
+
+        let group = CAAnimationGroup()
+        group.animations = [fade, scale]
+        group.duration = 0.8
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        group.fillMode = .forwards
+        group.isRemovedOnCompletion = false
+
+        highlightLayer.add(group, forKey: "cursorHighlight")
+
+        CATransaction.commit()
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -294,5 +373,10 @@ private final class SelectionOverlayView: NSView {
             width: abs(end.x - start.x),
             height: abs(end.y - start.y)
         )
+    }
+
+    private func configureLayer() {
+        wantsLayer = true
+        layer?.masksToBounds = false
     }
 }

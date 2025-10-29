@@ -500,22 +500,22 @@ private extension MainView {
         VStack(spacing: 3) {
             ZStack {
                 Circle()
-                    .fill(isActive ? Color.secondary.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
                     .frame(width: 30, height: 30)
                     .shadow(
-                        color: isActive ? Color.secondary.opacity(0.2) : .clear,
+                        color: isActive ? Color.accentColor.opacity(0.3) : .clear,
                         radius: 3,
                         y: 2
                     )
 
                 Image(systemName: isActive ? (activeIconName ?? iconName) : iconName)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isActive ? .primary : .secondary)
+                    .foregroundColor(isActive ? .white : .secondary)
             }
 
             Text(label)
                 .font(.system(size: 9))
-                .foregroundColor(.secondary)
+                .foregroundColor(isActive ? .primary : .secondary)
                 .lineLimit(1)
         }
         .frame(width: 52)
