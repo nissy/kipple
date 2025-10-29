@@ -233,7 +233,7 @@ struct MainViewHistorySection: View {
             }
             .buttonStyle(PlainButtonStyle())
             .frame(width: 22, height: 22)
-            .help(Text(currentCategoryFilterLabel))
+            .help(Text(verbatim: currentCategoryFilterLabel))
         } else {
             Menu {
                 if let onCategoryFilter {
@@ -277,7 +277,7 @@ struct MainViewHistorySection: View {
             .menuStyle(BorderlessButtonMenuStyle())
             .menuIndicator(.hidden)
             .frame(width: 22, height: 22)
-            .help(Text(noneCategoryDisplayName))
+            .help(Text(verbatim: noneCategoryDisplayName))
         }
     }
 
@@ -303,7 +303,7 @@ struct MainViewHistorySection: View {
                     .font(.system(size: 12, weight: .regular))
                     .foregroundColor(.secondary)
             }
-            Text(text)
+            Text(verbatim: text)
                 .font(.system(size: 12))
             Spacer()
             if selected {
@@ -319,7 +319,7 @@ struct MainViewHistorySection: View {
     }
 
     private var noneCategoryDisplayName: String {
-        UserCategoryStore.shared.noneCategory().name
+        "None"
     }
 
     private var queueColumnPlaceholder: some View {

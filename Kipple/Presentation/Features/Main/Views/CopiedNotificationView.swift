@@ -27,9 +27,9 @@ struct CopiedNotificationView: View {
         var text: String {
             switch self {
             case .copied:
-                return String(localized: "Copied")
+                return "Copied"
             case .pinLimitReached:
-                return String(localized: "Pin limit reached")
+                return "Pin limit reached"
             }
         }
         

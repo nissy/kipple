@@ -60,7 +60,7 @@ struct ClipboardItemPopover: View {
             HStack(spacing: 6) {
                 Image(systemName: displayCategory.icon)
                     .font(.system(size: 12))
-                Text(displayCategory.name)
+                Text(verbatim: displayCategory.name)
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.white)

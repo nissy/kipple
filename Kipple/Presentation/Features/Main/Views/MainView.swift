@@ -289,7 +289,11 @@ extension MainView {
             let customCategories: [UserCategory] = {
                 var list = userCategoryStore.userDefinedFilters()
                 if appSettings.filterCategoryNone {
-                    list.insert(userCategoryStore.noneCategory(), at: 0)
+                    var noneCategory = userCategoryStore.noneCategory()
+                    if noneCategory.name != "None" {
+                        noneCategory.name = "None"
+                    }
+                    list.insert(noneCategory, at: 0)
                 }
                 return list
             }()
@@ -391,7 +395,7 @@ extension MainView {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
-        .help(Text(String(localized: "Queue")))
+        .help(Text(verbatim: "Queue"))
     }
 
     private var queueLoopFilterButton: some View {
@@ -414,7 +418,7 @@ extension MainView {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
-        .help(Text(String(localized: "Loop")))
+        .help(Text(verbatim: "Loop"))
     }
 
     private var editorToggleButton: some View {
@@ -443,7 +447,7 @@ extension MainView {
                         .foregroundColor(isEditorEnabled ? .white : .secondary)
                 }
 
-                Text(String(localized: "Editor"))
+                Text(verbatim: "Editor")
                     .font(.system(size: 9))
                     .foregroundColor(isEditorEnabled ? .primary : .secondary)
                     .lineLimit(1)
@@ -473,7 +477,7 @@ extension MainView {
             })
             .buttonStyle(PlainButtonStyle())
             .disabled(!captureEnabled)
-            .help(Text(String(localized: "Screen Text Capture")))
+            .help(Text(verbatim: "Screen Text Capture"))
         }
     }
 

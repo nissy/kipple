@@ -71,7 +71,7 @@ final class UserCategoryStore: ObservableObject {
     private static var builtInNone: UserCategory {
         UserCategory(
             id: builtInNoneID,
-            name: localized("None", comment: "Category label representing uncategorized items"),
+            name: "None",
             iconSystemName: "tag",
             isFilterEnabled: false
         )
@@ -79,7 +79,7 @@ final class UserCategoryStore: ObservableObject {
     private static var builtInURL: UserCategory {
         UserCategory(
             id: builtInURLID,
-            name: localized("URL", comment: "Category label representing URL items"),
+            name: "URL",
             iconSystemName: "link",
             isFilterEnabled: true
         )
@@ -191,7 +191,4 @@ final class UserCategoryStore: ObservableObject {
         return "tag"
     }
 
-    private static func localized(_ key: String, comment: String) -> String {
-        NSLocalizedString(key, comment: comment)
-    }
 }

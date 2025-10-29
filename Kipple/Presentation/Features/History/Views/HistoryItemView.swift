@@ -343,7 +343,11 @@ private extension HistoryItemView {
                     onChangeCategory?(noneId)
                 },
                 label: {
-                    Label("None", systemImage: "tag")
+                    Label {
+                        Text(verbatim: "None")
+                    } icon: {
+                        Image(systemName: "tag")
+                    }
                 }
             )
             Divider()
@@ -351,7 +355,11 @@ private extension HistoryItemView {
                 Button {
                     onChangeCategory?(cat.id)
                 } label: {
-                    Label(cat.name, systemImage: UserCategoryStore.shared.iconName(for: cat))
+                    Label {
+                        Text(verbatim: cat.name)
+                    } icon: {
+                        Image(systemName: UserCategoryStore.shared.iconName(for: cat))
+                    }
                 }
             }
             Divider()

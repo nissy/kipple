@@ -16,7 +16,11 @@ struct MainViewControlSection: View {
         HStack(spacing: 12) {
             Button(action: onCopy) {
                 HStack(spacing: 4) {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label {
+                        Text(verbatim: "Copy")
+                    } icon: {
+                        Image(systemName: "doc.on.doc")
+                    }
                     
                     // ショートカットキー表示（設定なし=非表示）
                     let shortcut = getShortcutKeyDisplay()
@@ -38,7 +42,11 @@ struct MainViewControlSection: View {
             
             Button(action: onClear) {
                 HStack(spacing: 4) {
-                    Label("Clear", systemImage: "trash")
+                    Label {
+                        Text(verbatim: "Clear")
+                    } icon: {
+                        Image(systemName: "trash")
+                    }
                     
                     // ショートカットキー表示（設定なし=非表示）
                     let shortcut = getClearShortcutKeyDisplay()
