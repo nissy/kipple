@@ -213,7 +213,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func stopAutoClearTimer(resetRemaining: Bool = true) {
         autoClearTimer?.invalidate()
         autoClearTimer = nil
-        if resetRemaining {
+        if resetRemaining || autoClearPausedByQueue {
             autoClearRemainingTime = nil
         }
     }
