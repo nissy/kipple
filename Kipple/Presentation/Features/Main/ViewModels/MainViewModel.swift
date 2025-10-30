@@ -70,6 +70,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var lastQueueAnchorID: UUID?
     private var shouldResetAnchorOnNextShiftSelection = false
     private var filteredOrderingSnapshot: [ClipItem] = []
+    private var isFilterMutating = false
     private var isPasteMonitorActive = false
     private var isShiftSelecting = false
     private var pendingShiftSelection: [ClipItem] = []
@@ -196,6 +197,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func applyFilters() {
+        guard !isFilterMutating else { return }
         updateFilteredItems(clipboardService.history, animated: true)
     }
 
@@ -361,13 +363,36 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func resetFiltersAfterCopy() {
-        searchText = ""
-        showOnlyURLs = false
-        showOnlyPinned = false
-        selectedCategory = nil
-        selectedUserCategoryId = nil
-        isPinnedFilterActive = false
-        updateFilteredItems(clipboardService.history, animated: true)
+        isFilterMutating = true
+        var didMutate = false
+
+        if !searchText.isEmpty {
+            searchText = ""
+            didMutate = true
+        }
+        if showOnlyURLs {
+            showOnlyURLs = false
+            didMutate = true
+        }
+        if showOnlyPinned {
+            showOnlyPinned = false
+            didMutate = true
+        }
+        if selectedCategory != nil {
+            selectedCategory = nil
+            didMutate = true
+        }
+        if selectedUserCategoryId != nil {
+            selectedUserCategoryId = nil
+            didMutate = true
+        }
+        if isPinnedFilterActive {
+            isPinnedFilterActive = false
+            didMutate = true
+        }
+
+        isFilterMutating = false
+        updateFilteredItems(clipboardService.history, animated: didMutate)
     }
 
     // MARK: - Paste Queue Management
@@ -526,6 +551,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func resetPasteQueue() {
+        guard !pasteQueue.isEmpty || pasteMode != .clipboard else { return }
         pasteQueue = []
         pasteMode = .clipboard
         lastQueueAnchorID = nil

@@ -32,6 +32,7 @@
 		1C47AD62906E6AEA7116C89E /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF0A9EA04C6D3DCB72F6EA5 /* HotkeyRecorderView.swift */; };
 		1DF7E8C1106493040EB3A0AD /* SwiftDataRepositoryComprehensiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB0F2C9F3E7E841B7C707C6 /* SwiftDataRepositoryComprehensiveTests.swift */; };
 		20C367DB3064914202E02EFC /* UserCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704FBF789F27F0E1F5DA71F8 /* UserCategory.swift */; };
+		20F3BAF3289C6FFB5F9BB8C2 /* RecopyPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */; };
 		21E8ABF485231AE29F2B3456 /* SimpleLineNumberRulerView+LineNumbers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC27626F1475139B9F815EB /* SimpleLineNumberRulerView+LineNumbers.swift */; };
 		224A0B5AE732714A9A33A1FE /* LastActiveAppTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67BF4F2A209B66F653AED625 /* LastActiveAppTracker.swift */; };
 		23B087B3644717001E41959E /* ScreenRecordingPermissionOpener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B01ED0E79A9494F70A575FB /* ScreenRecordingPermissionOpener.swift */; };
@@ -195,6 +196,7 @@
 		167B79F14132ADCEE67F5C5E /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = en; path = en.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		184889D405CAF3B49E5A64B2 /* TextCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCaptureCoordinator.swift; sourceTree = "<group>"; };
 		1B01ED0E79A9494F70A575FB /* ScreenRecordingPermissionOpener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingPermissionOpener.swift; sourceTree = "<group>"; };
+		1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecopyPerformanceTests.swift; sourceTree = "<group>"; };
 		202AE76511A06BF28D5FB2FE /* ClipboardServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardServiceProtocol.swift; sourceTree = "<group>"; };
 		21ABB32E7A1B8EC0C5626699 /* SimpleLineNumberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberView.swift; sourceTree = "<group>"; };
 		22A89DBDDE13B95E612B1BE7 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
@@ -675,6 +677,7 @@
 			isa = PBXGroup;
 			children = (
 				AEAB0897562E07633C08A4F1 /* DebouncingTests.swift */,
+				1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */,
 			);
 			path = Performance;
 			sourceTree = "<group>";
@@ -1166,6 +1169,7 @@
 				D1753E89CB41984167AB36AA /* PasteQueueModeTests.swift in Sources */,
 				C17A8F50F8EF6738C84200D9 /* PerformanceMetricsTests.swift in Sources */,
 				99AACF46738A2255AEEADED7 /* RecopyHistoryUpdateTests.swift in Sources */,
+				20F3BAF3289C6FFB5F9BB8C2 /* RecopyPerformanceTests.swift in Sources */,
 				94421D9C0403DBCDF0DB3DC5 /* RecopyRaceConditionTests.swift in Sources */,
 				11302BAD946FB4767EB5DBE3 /* RecopyTimestampUpdateTests.swift in Sources */,
 				550B7D4010394BE49A940FFF /* ScreenRecordingPermissionOpenerTests.swift in Sources */,
