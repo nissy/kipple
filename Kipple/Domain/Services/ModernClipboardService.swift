@@ -88,7 +88,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             history = pinnedItems
 
             if !pinnedItems.isEmpty {
-                Logger.shared.log("Loaded \(pinnedItems.count) pinned items from repository")
                 notifyHistoryObservers()
             }
 
@@ -118,12 +117,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             history = combinedItems
             let wasTrimmed = trimHistory()
-
-            if wasTrimmed {
-                Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
-            } else {
-                Logger.shared.log("Loaded \(history.count) items from repository (max: \(maxHistoryItems))")
-            }
 
             snapshotNeedsPriming = true
             saveSubject.send(history)

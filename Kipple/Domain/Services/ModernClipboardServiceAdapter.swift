@@ -224,11 +224,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     internal func performAutoClear() async {
         // Check if current clipboard content is text
         guard NSPasteboard.general.string(forType: .string) != nil else {
-            Logger.shared.log("Skipping auto-clear: current clipboard content is not text")
             return
         }
-
-        Logger.shared.log("Performing auto-clear of system clipboard (Modern pathway)")
 
         await clearSystemClipboard()
     }
