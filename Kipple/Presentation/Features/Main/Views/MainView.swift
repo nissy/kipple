@@ -4,6 +4,7 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
+// swiftlint:disable file_length
 
 import SwiftUI
 import AppKit
@@ -33,6 +34,9 @@ struct MainView: View {
     @State private var modifierMonitor: Any?
     // Copied通知の遅延非表示を管理（多重スケジュール防止）
     @State var copiedHideWorkItem: DispatchWorkItem?
+    @State var editorHeightResetID: UUID?
+    @State private var lastKnownEditorPosition: String = AppSettings.shared.editorPosition
+    private let minimumSectionHeight: Double = 150
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
@@ -119,9 +123,11 @@ extension MainView {
             } else {
                 // メインコンテンツ（分割ビュー）
                 ResizableSplitView(
-                    topHeight: $editorSectionHeight,
-                    minTopHeight: 150,
-                    minBottomHeight: 150,
+                    topHeight: splitTopSectionHeight,
+                    minTopHeight: minimumSectionHeight,
+                    minBottomHeight: minimumSectionHeight,
+                    reset: splitResetConfiguration,
+                    onHeightsChanged: updateSectionHeights(topHeight:bottomHeight:),
                     topContent: {
                         if appSettings.editorPosition == "top" {
                             editorSection
@@ -167,8 +173,18 @@ extension MainView {
             // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
         }
+        .onChange(of: appSettings.editorPosition) { newValue in
+            if lastKnownEditorPosition == "disabled", newValue != "disabled" {
+                editorHeightResetID = UUID()
+            }
+            if newValue == "disabled" {
+                editorHeightResetID = nil
+            }
+            lastKnownEditorPosition = newValue
+        }
         .onAppear {
             userPreferredAlwaysOnTop = isAlwaysOnTop
+            lastKnownEditorPosition = appSettings.editorPosition
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
@@ -257,6 +273,40 @@ extension MainView {
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
+        }
+    }
+
+    private var splitTopSectionHeight: Binding<Double> {
+        Binding(
+            get: {
+                if appSettings.editorPosition == "top" {
+                    return editorSectionHeight
+                }
+                return historySectionHeight
+            },
+            set: { newValue in
+                if appSettings.editorPosition == "top" {
+                    editorSectionHeight = newValue
+                } else {
+                    historySectionHeight = newValue
+                }
+            }
+        )
+    }
+
+    private func updateSectionHeights(topHeight: Double, bottomHeight: Double) {
+        switch appSettings.editorPosition {
+        case "top":
+            editorSectionHeight = topHeight
+            historySectionHeight = bottomHeight
+        case "bottom":
+            historySectionHeight = topHeight
+            editorSectionHeight = bottomHeight
+        default:
+            break
+        }
+        if editorHeightResetID != nil {
+            editorHeightResetID = nil
         }
     }
     
@@ -492,6 +542,28 @@ extension MainView {
     private var bottomBar: some View { bottomBarContent }
 }
 
+private extension MainView {
+    var splitResetConfiguration: SplitViewResetConfiguration? {
+        guard let id = editorHeightResetID else { return nil }
+        switch appSettings.editorPosition {
+        case "top":
+            return SplitViewResetConfiguration(
+                id: id,
+                preferredTopHeight: minimumSectionHeight,
+                preferredBottomHeight: nil
+            )
+        case "bottom":
+            return SplitViewResetConfiguration(
+                id: id,
+                preferredTopHeight: nil,
+                preferredBottomHeight: minimumSectionHeight
+            )
+        default:
+            return nil
+        }
+    }
+}
+
 // MARK: - Sidebar Button Styling
 
 private extension MainView {
@@ -525,3 +597,5 @@ private extension MainView {
         .frame(width: 52)
     }
 }
+
+// swiftlint:enable file_length

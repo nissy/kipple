@@ -42,8 +42,10 @@ extension MainView {
         if appSettings.editorPosition == "disabled" {
             let restore = appSettings.editorPositionLastEnabled
             appSettings.editorPosition = restore.isEmpty ? "bottom" : restore
+            editorHeightResetID = UUID()
         } else {
             appSettings.editorPosition = "disabled"
+            editorHeightResetID = nil
         }
     }
 
