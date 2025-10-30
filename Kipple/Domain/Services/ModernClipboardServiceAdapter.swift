@@ -249,7 +249,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
         // Only update if history actually changed (comparing IDs and pinned states)
-        let historyChanged = history != newHistory
+        let historyChanged = historiesDiffer(lhs: history, rhs: newHistory)
 
         if historyChanged {
             history = newHistory
@@ -297,6 +297,14 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         Task { [weak self] in
             guard let self else { return }
             await self.refreshHistory()
+        }
+    }
+    private func historiesDiffer(lhs: [ClipItem], rhs: [ClipItem]) -> Bool {
+        guard lhs.count == rhs.count else { return true }
+        return zip(lhs, rhs).contains { left, right in
+            left.id != right.id ||
+            left.isPinned != right.isPinned ||
+            left.timestamp != right.timestamp
         }
     }
 }

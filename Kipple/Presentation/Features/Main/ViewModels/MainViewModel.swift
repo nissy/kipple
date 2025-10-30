@@ -568,13 +568,12 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         guard !pasteQueue.isEmpty else { return items }
 
         var queueItems: [ClipItem] = []
+        queueItems.reserveCapacity(pasteQueue.count)
+        let lookup = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         var seen = Set<UUID>()
 
         for id in pasteQueue {
-            guard !seen.contains(id),
-                  let match = items.first(where: { $0.id == id }) else {
-                continue
-            }
+            guard !seen.contains(id), let match = lookup[id] else { continue }
             queueItems.append(match)
             seen.insert(id)
         }
