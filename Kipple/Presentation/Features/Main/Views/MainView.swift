@@ -127,6 +127,7 @@ extension MainView {
                     minTopHeight: minimumSectionHeight,
                     minBottomHeight: minimumSectionHeight,
                     reset: splitResetConfiguration,
+                    preferredHeights: splitPreferredHeightsProvider,
                     onHeightsChanged: updateSectionHeights(topHeight:bottomHeight:),
                     topContent: {
                         if appSettings.editorPosition == "top" {
@@ -543,6 +544,17 @@ extension MainView {
 }
 
 private extension MainView {
+    var splitPreferredHeightsProvider: (() -> (top: Double?, bottom: Double?))? {
+        switch appSettings.editorPosition {
+        case "top":
+            return { (top: editorSectionHeight, bottom: nil) }
+        case "bottom":
+            return { (top: nil, bottom: editorSectionHeight) }
+        default:
+            return nil
+        }
+    }
+
     var splitResetConfiguration: SplitViewResetConfiguration? {
         guard let id = editorHeightResetID else { return nil }
         switch appSettings.editorPosition {
