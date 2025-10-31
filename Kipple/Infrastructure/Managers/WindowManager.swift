@@ -32,7 +32,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
     private let titleBarState = MainWindowTitleBarState()
-    private var titleBarHostingView: NSHostingView<MainViewTitleBarAccessory>?
+    private var titleBarLeftHostingView: NSHostingView<MainViewTitleBarAccessory>?
+    private var titleBarPinHostingView: NSHostingView<MainViewTitleBarPinButton>?
     private let appSettings = AppSettings.shared
     private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
@@ -186,31 +187,49 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func attachAlwaysOnTopButton(to window: NSWindow) {
-        titleBarHostingView?.removeFromSuperview()
+        titleBarLeftHostingView?.removeFromSuperview()
+        titleBarPinHostingView?.removeFromSuperview()
         
         guard let titlebarContainer = window.standardWindowButton(.closeButton)?.superview?.superview else {
             Logger.shared.log("Failed to locate titlebar container for pin button")
             return
         }
         
-        let hostingView = NSHostingView(rootView: MainViewTitleBarAccessory(state: titleBarState))
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        hostingView.wantsLayer = true
-        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-        hostingView.layer?.zPosition = 1
-        hostingView.setContentHuggingPriority(.required, for: .horizontal)
-        hostingView.setContentCompressionResistancePriority(.required, for: .horizontal)
-        hostingView.isHidden = false
-        
-        titlebarContainer.addSubview(hostingView, positioned: .above, relativeTo: nil)
+        let leftView = NSHostingView(rootView: MainViewTitleBarAccessory(state: titleBarState))
+        leftView.translatesAutoresizingMaskIntoConstraints = false
+        leftView.wantsLayer = true
+        leftView.layer?.backgroundColor = NSColor.clear.cgColor
+        leftView.layer?.zPosition = 1
+        leftView.setContentHuggingPriority(.required, for: .horizontal)
+        leftView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        leftView.isHidden = false
+
+        titlebarContainer.addSubview(leftView, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
-            hostingView.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor, constant: -6),
-            hostingView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
-            hostingView.heightAnchor.constraint(equalToConstant: 34),
-            hostingView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34)
+            leftView.leadingAnchor.constraint(equalTo: titlebarContainer.leadingAnchor, constant: 6),
+            leftView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
+            leftView.heightAnchor.constraint(equalToConstant: 34)
         ])
-        
-        titleBarHostingView = hostingView
+
+        let pinView = NSHostingView(rootView: MainViewTitleBarPinButton(state: titleBarState))
+        pinView.translatesAutoresizingMaskIntoConstraints = false
+        pinView.wantsLayer = true
+        pinView.layer?.backgroundColor = NSColor.clear.cgColor
+        pinView.layer?.zPosition = 1
+        pinView.setContentHuggingPriority(.required, for: .horizontal)
+        pinView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        pinView.isHidden = false
+
+        titlebarContainer.addSubview(pinView, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            pinView.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor, constant: -6),
+            pinView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
+            pinView.heightAnchor.constraint(equalToConstant: 34),
+            pinView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34)
+        ])
+
+        titleBarLeftHostingView = leftView
+        titleBarPinHostingView = pinView
     }
     
     private func positionWindowAtCursor(_ window: NSWindow) {

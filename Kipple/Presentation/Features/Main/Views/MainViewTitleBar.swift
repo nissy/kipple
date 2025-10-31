@@ -53,6 +53,8 @@ struct MainViewTitleBarAccessory: View {
     
     var body: some View {
         HStack(spacing: 8) {
+            editorButton
+            
             if state.showsCaptureButton {
                 captureButton
             }
@@ -62,8 +64,6 @@ struct MainViewTitleBarAccessory: View {
             if state.showsQueueLoopButton {
                 queueLoopButton
             }
-            editorButton
-            pinButton
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
@@ -76,22 +76,22 @@ private extension MainViewTitleBarAccessory {
         Button(action: state.requestStartCapture) {
             ZStack {
                 Circle()
-                    .fill(state.isCaptureEnabled ? activeGradient : inactiveGradient)
+                    .fill(inactiveGradient)
                     .frame(width: 30, height: 30)
                     .shadow(
-                        color: state.isCaptureEnabled ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08),
-                        radius: state.isCaptureEnabled ? 4 : 2,
+                        color: Color.black.opacity(state.isCaptureEnabled ? 0.12 : 0.08),
+                        radius: state.isCaptureEnabled ? 3 : 2,
                         y: 2
                     )
                 
                 Image(systemName: "text.magnifyingglass")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(state.isCaptureEnabled ? .white : .secondary)
+                    .foregroundColor(state.isCaptureEnabled ? .secondary : .secondary.opacity(0.6))
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isCaptureEnabled ? 1.0 : 0.9)
-        .animation(.spring(response: 0.3), value: state.isCaptureEnabled)
+        .scaleEffect(1.0)
+        .opacity(state.isCaptureEnabled ? 1.0 : 0.45)
         .disabled(!state.isCaptureEnabled)
         .help(Text("Screen Text Capture"))
     }
@@ -167,11 +167,38 @@ private extension MainViewTitleBarAccessory {
         .help(state.isEditorEnabled ? Text("Hide editor panel") : Text("Show editor panel"))
     }
     
-    var pinButton: some View {
+    var editorButtonBackground: LinearGradient {
+        state.isEditorEnabled ? activeGradient : inactiveGradient
+    }
+
+    var activeGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
+    var inactiveGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(NSColor.controlBackgroundColor),
+                Color(NSColor.controlBackgroundColor).opacity(0.85)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
+struct MainViewTitleBarPinButton: View {
+    @ObservedObject var state: MainWindowTitleBarState
+    
+    var body: some View {
         Button(action: state.requestToggleAlwaysOnTop) {
             ZStack {
                 Circle()
-                    .fill(pinButtonBackground)
+                    .fill(state.isAlwaysOnTop ? activeGradient : inactiveGradient)
                     .frame(width: 30, height: 30)
                     .shadow(
                         color: state.isAlwaysOnTop ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.1),
@@ -199,23 +226,15 @@ private extension MainViewTitleBarAccessory {
         )
     }
     
-    var editorButtonBackground: LinearGradient {
-        state.isEditorEnabled ? activeGradient : inactiveGradient
-    }
-    
-    var pinButtonBackground: LinearGradient {
-        state.isAlwaysOnTop ? activeGradient : inactiveGradient
-    }
-    
-    var activeGradient: LinearGradient {
+    private var activeGradient: LinearGradient {
         LinearGradient(
-            colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
+            colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
     }
     
-    var inactiveGradient: LinearGradient {
+    private var inactiveGradient: LinearGradient {
         LinearGradient(
             colors: [
                 Color(NSColor.controlBackgroundColor),
