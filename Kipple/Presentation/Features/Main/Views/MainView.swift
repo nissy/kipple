@@ -4,8 +4,6 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
-// swiftlint:disable file_length
-
 import SwiftUI
 import AppKit
 import Combine
@@ -189,10 +187,23 @@ extension MainView {
                 editorHeightResetID = nil
             }
             lastKnownEditorPosition = newValue
+            syncTitleBarState()
         }
         .onAppear {
-            titleBarState.toggleHandler = {
+            titleBarState.toggleAlwaysOnTopHandler = {
                 toggleAlwaysOnTop()
+            }
+            titleBarState.toggleEditorHandler = {
+                toggleEditorVisibility(animated: true)
+            }
+            titleBarState.startCaptureHandler = {
+                startCaptureFromTitleBar()
+            }
+            titleBarState.toggleQueueHandler = {
+                toggleQueueModeFromTitleBar()
+            }
+            titleBarState.toggleQueueLoopHandler = {
+                toggleQueueLoopFromTitleBar()
             }
             syncTitleBarState()
             userPreferredAlwaysOnTop = isAlwaysOnTop
@@ -270,7 +281,11 @@ extension MainView {
             copiedHideWorkItem?.cancel()
             copiedHideWorkItem = nil
             isShowingCopiedNotification = false
-            titleBarState.toggleHandler = nil
+            titleBarState.toggleAlwaysOnTopHandler = nil
+            titleBarState.toggleEditorHandler = nil
+            titleBarState.startCaptureHandler = nil
+            titleBarState.toggleQueueHandler = nil
+            titleBarState.toggleQueueLoopHandler = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
@@ -343,51 +358,24 @@ extension MainView {
     // 履歴とピン留めセクションのコンテンツ
     @ViewBuilder
     private var historyAndPinnedContent: some View {
-        HStack(spacing: 0) {
-            // 有効なフィルターを取得
-            let enabledCategories = [
-                ClipItemCategory.url
-            ]
-                .filter { isCategoryFilterEnabled($0) }
-            let customCategories: [UserCategory] = {
-                var list = userCategoryStore.userDefinedFilters()
-                if appSettings.filterCategoryNone {
-                    var noneCategory = userCategoryStore.noneCategory()
-                    if noneCategory.name != "None" {
-                        noneCategory.name = "None"
-                    }
-                    list.insert(noneCategory, at: 0)
+        // 有効なフィルターを取得
+        let enabledCategories = [
+            ClipItemCategory.url
+        ]
+            .filter { isCategoryFilterEnabled($0) }
+        let customCategories: [UserCategory] = {
+            var list = userCategoryStore.userDefinedFilters()
+            if appSettings.filterCategoryNone {
+                var noneCategory = userCategoryStore.noneCategory()
+                if noneCategory.name != "None" {
+                    noneCategory.name = "None"
                 }
-                return list
-            }()
-            
-            // フィルターパネルを常に表示（ピンフィルターがあるため）
-                VStack(spacing: 6) {
-                    editorToggleButton
+                list.insert(noneCategory, at: 0)
+            }
+            return list
+        }()
 
-                    if onStartTextCapture != nil {
-                        sectionDivider
-                    }
-
-                    captureButton(onStartTextCapture: onStartTextCapture)
-
-                    sectionDivider
-
-                    queueModeFilterButton
-
-                    if viewModel.pasteMode != .clipboard {
-                        queueLoopFilterButton
-                    }
-
-                    Spacer()
-                }
-                .padding(.vertical, 6)
-                .background(
-                    Color(NSColor.controlBackgroundColor).opacity(0.5)
-                )
-
-            // メインコンテンツ（履歴セクションのみ）
-            MainViewHistorySection(
+        return MainViewHistorySection(
                 history: viewModel.history,
                 currentClipboardContent: viewModel.currentClipboardContent,
                 selectedHistoryItem: $selectedHistoryItem,
@@ -436,118 +424,6 @@ extension MainView {
                 queueSelectionPreview: viewModel.queueSelectionPreview
             )
             .id(historyRefreshID)
-        }
-    }
-
-    private var queueModeFilterButton: some View {
-        let isActive = viewModel.pasteMode != .clipboard
-        let isEnabled = viewModel.canUsePasteQueue
-
-        return Button {
-            guard isEnabled else { return }
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueMode()
-            }
-        } label: {
-            sidebarButtonContent(
-                isActive: isActive,
-                iconName: "list.number",
-                label: "Queue"
-            )
-            .opacity(isEnabled ? 1.0 : 0.4)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isEnabled)
-        .help(Text(verbatim: "Queue"))
-    }
-
-    private var queueLoopFilterButton: some View {
-        let isLooping = viewModel.pasteMode == .queueToggle
-        let isEnabled = viewModel.canUsePasteQueue
-
-        return Button {
-            guard isEnabled else { return }
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueRepetition()
-            }
-        } label: {
-            sidebarButtonContent(
-                isActive: isLooping,
-                iconName: "repeat",
-                activeIconName: "repeat.circle.fill",
-                label: "Loop"
-            )
-            .opacity(isEnabled ? 1.0 : 0.4)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isEnabled)
-        .help(Text(verbatim: "Loop"))
-    }
-
-    private var editorToggleButton: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3)) {
-                toggleEditorVisibility()
-            }
-        }, label: {
-            VStack(spacing: 3) {
-                ZStack {
-                    Circle()
-                        .fill(isEditorEnabled ?
-                              Color.accentColor :
-                              Color.secondary.opacity(0.1))
-                        .frame(width: 30, height: 30)
-                        .shadow(
-                            color: isEditorEnabled ?
-                                Color.accentColor.opacity(0.3) :
-                                .clear,
-                            radius: 3,
-                            y: 2
-                        )
-
-                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isEditorEnabled ? .white : .secondary)
-                }
-
-                Text(verbatim: "Editor")
-                    .font(.system(size: 9))
-                    .foregroundColor(isEditorEnabled ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 52)
-        })
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isEditorEnabled ? 1.05 : 1.0)
-        .animation(.spring(response: 0.3), value: isEditorEnabled)
-        .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
-    }
-
-    @ViewBuilder
-    private func captureButton(onStartTextCapture: (() -> Void)?) -> some View {
-        if let onStartTextCapture {
-            let captureEnabled = viewModel.canUseScreenTextCapture
-
-            Button(action: {
-                onStartTextCapture()
-            }, label: {
-                sidebarButtonContent(
-                    isActive: false,
-                    iconName: "text.magnifyingglass",
-                    label: "Capture"
-                )
-                .opacity(captureEnabled ? 1.0 : 0.4)
-            })
-            .buttonStyle(PlainButtonStyle())
-            .disabled(!captureEnabled)
-            .help(Text(verbatim: "Screen Text Capture"))
-        }
-    }
-
-    private var sectionDivider: some View {
-        Divider()
-            .frame(width: 44)
-            .padding(.vertical, 6)
     }
 
     // 下部バー
@@ -587,39 +463,3 @@ private extension MainView {
         }
     }
 }
-
-// MARK: - Sidebar Button Styling
-
-private extension MainView {
-    func sidebarButtonContent(
-        isActive: Bool,
-        iconName: String,
-        activeIconName: String? = nil,
-        label: LocalizedStringKey
-    ) -> some View {
-        VStack(spacing: 3) {
-            ZStack {
-                Circle()
-                    .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
-                    .frame(width: 30, height: 30)
-                    .shadow(
-                        color: isActive ? Color.accentColor.opacity(0.3) : .clear,
-                        radius: 3,
-                        y: 2
-                    )
-
-                Image(systemName: isActive ? (activeIconName ?? iconName) : iconName)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isActive ? .white : .secondary)
-            }
-
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundColor(isActive ? .primary : .secondary)
-                .lineLimit(1)
-        }
-        .frame(width: 52)
-    }
-}
-
-// swiftlint:enable file_length

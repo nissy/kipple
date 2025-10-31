@@ -32,7 +32,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
     private let titleBarState = MainWindowTitleBarState()
-    private var titleBarHostingView: NSHostingView<MainViewAlwaysOnTopAccessory>?
+    private var titleBarHostingView: NSHostingView<MainViewTitleBarAccessory>?
     private let appSettings = AppSettings.shared
     private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
@@ -153,6 +153,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // ツールバーボタンを無効化（×ボタン以外を非表示）
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.standardWindowButton(.closeButton)?.isHidden = true
         
         // デリゲートを設定
         window.delegate = self
@@ -192,13 +193,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             return
         }
         
-        let hostingView = NSHostingView(
-            rootView: MainViewAlwaysOnTopAccessory(
-                state: titleBarState
-            ) { [weak self] in
-                self?.titleBarState.requestToggle()
-            }
-        )
+        let hostingView = NSHostingView(rootView: MainViewTitleBarAccessory(state: titleBarState))
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor

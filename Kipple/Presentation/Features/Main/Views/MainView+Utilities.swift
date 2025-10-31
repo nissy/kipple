@@ -39,15 +39,27 @@ extension MainView {
         onAlwaysOnTopChanged?(isAlwaysOnTop)
     }
 
-    func toggleEditorVisibility() {
-        if appSettings.editorPosition == "disabled" {
-            let restore = appSettings.editorPositionLastEnabled
-            appSettings.editorPosition = restore.isEmpty ? "bottom" : restore
-            editorHeightResetID = UUID()
-        } else {
-            appSettings.editorPosition = "disabled"
-            editorHeightResetID = nil
+    func toggleEditorVisibility(animated: Bool = false) {
+        let action = {
+            if appSettings.editorPosition == "disabled" {
+                let restore = appSettings.editorPositionLastEnabled
+                appSettings.editorPosition = restore.isEmpty ? "bottom" : restore
+                editorHeightResetID = UUID()
+            } else {
+                appSettings.editorPosition = "disabled"
+                editorHeightResetID = nil
+            }
         }
+
+        if animated {
+            withAnimation(.spring(response: 0.3)) {
+                action()
+            }
+        } else {
+            action()
+        }
+
+        syncTitleBarState()
     }
 
     func showCopiedNotification(_ type: CopiedNotificationView.NotificationType) {
@@ -97,5 +109,37 @@ extension MainView {
     func syncTitleBarState() {
         titleBarState.isAlwaysOnTop = isAlwaysOnTop
         titleBarState.isAlwaysOnTopForcedByQueue = isAlwaysOnTopForcedByQueue
+        titleBarState.isEditorEnabled = isEditorEnabled
+        titleBarState.showsCaptureButton = onStartTextCapture != nil
+        titleBarState.isCaptureEnabled = (onStartTextCapture != nil) && viewModel.canUseScreenTextCapture
+        let canUseQueue = viewModel.canUsePasteQueue
+        let queueActive = viewModel.pasteMode != .clipboard
+        titleBarState.showsQueueButton = canUseQueue
+        titleBarState.isQueueEnabled = canUseQueue
+        titleBarState.isQueueActive = queueActive
+        titleBarState.showsQueueLoopButton = canUseQueue && queueActive
+        titleBarState.isQueueLoopEnabled = canUseQueue
+        titleBarState.isQueueLoopActive = viewModel.pasteMode == .queueToggle
+    }
+
+    func toggleQueueModeFromTitleBar() {
+        guard viewModel.canUsePasteQueue else { return }
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+            viewModel.toggleQueueMode()
+        }
+        syncTitleBarState()
+    }
+
+    func toggleQueueLoopFromTitleBar() {
+        guard viewModel.canUsePasteQueue else { return }
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+            viewModel.toggleQueueRepetition()
+        }
+        syncTitleBarState()
+    }
+
+    func startCaptureFromTitleBar() {
+        guard let onStartTextCapture else { return }
+        onStartTextCapture()
     }
 }
