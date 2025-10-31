@@ -89,22 +89,23 @@ private extension MainViewTitleBarAccessory {
         Button(action: state.requestToggleQueue) {
             ZStack {
                 Circle()
-                    .fill(state.isQueueActive ? activeGradient : inactiveGradient)
+                    .fill(queueButtonBackground)
                     .frame(width: 30, height: 30)
                     .shadow(
-                        color: state.isQueueActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08),
-                        radius: state.isQueueActive ? 4 : 2,
+                        color: queueShadowColor,
+                        radius: state.isQueueEnabled ? (state.isQueueActive ? 4 : 2) : 2,
                         y: 2
                     )
                 
                 Image(systemName: "list.number")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(state.isQueueActive ? .white : .secondary)
+                    .foregroundColor(queueIconColor)
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isQueueActive ? 1.0 : 0.9)
+        .scaleEffect(state.isQueueEnabled ? (state.isQueueActive ? 1.0 : 0.9) : 1.0)
         .animation(.spring(response: 0.3), value: state.isQueueActive)
+        .opacity(state.isQueueEnabled ? 1.0 : 0.45)
         .disabled(!state.isQueueEnabled)
         .help(Text("Queue"))
     }
@@ -153,6 +154,34 @@ private extension MainViewTitleBarAccessory {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    private var queueButtonBackground: LinearGradient {
+        if !state.isQueueEnabled {
+            return LinearGradient(
+                colors: [
+                    Color(NSColor.controlBackgroundColor),
+                    Color(NSColor.controlBackgroundColor).opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        return state.isQueueActive ? activeGradient : inactiveGradient
+    }
+
+    private var queueIconColor: Color {
+        if !state.isQueueEnabled {
+            return .secondary.opacity(0.6)
+        }
+        return state.isQueueActive ? .white : .secondary
+    }
+
+    private var queueShadowColor: Color {
+        if !state.isQueueEnabled {
+            return Color.black.opacity(0.08)
+        }
+        return state.isQueueActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
     }
 }
 

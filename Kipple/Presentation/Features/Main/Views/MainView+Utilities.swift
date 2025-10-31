@@ -114,7 +114,7 @@ extension MainView {
         titleBarState.isCaptureEnabled = (onStartTextCapture != nil) && viewModel.canUseScreenTextCapture
         let canUseQueue = viewModel.canUsePasteQueue
         let queueActive = viewModel.pasteMode != .clipboard
-        titleBarState.showsQueueButton = canUseQueue
+        titleBarState.showsQueueButton = true
         titleBarState.isQueueEnabled = canUseQueue
         titleBarState.isQueueActive = queueActive
     }
