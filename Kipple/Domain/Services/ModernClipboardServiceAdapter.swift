@@ -301,7 +301,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         return zip(lhs, rhs).contains { left, right in
             left.id != right.id ||
             left.isPinned != right.isPinned ||
-            left.timestamp != right.timestamp
+            left.timestamp != right.timestamp ||
+            left.userCategoryId != right.userCategoryId
         }
     }
 }
