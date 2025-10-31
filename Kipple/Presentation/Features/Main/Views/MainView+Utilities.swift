@@ -117,23 +117,12 @@ extension MainView {
         titleBarState.showsQueueButton = canUseQueue
         titleBarState.isQueueEnabled = canUseQueue
         titleBarState.isQueueActive = queueActive
-        titleBarState.showsQueueLoopButton = canUseQueue && queueActive
-        titleBarState.isQueueLoopEnabled = canUseQueue
-        titleBarState.isQueueLoopActive = viewModel.pasteMode == .queueToggle
     }
 
     func toggleQueueModeFromTitleBar() {
         guard viewModel.canUsePasteQueue else { return }
         withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
             viewModel.toggleQueueMode()
-        }
-        syncTitleBarState()
-    }
-
-    func toggleQueueLoopFromTitleBar() {
-        guard viewModel.canUsePasteQueue else { return }
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-            viewModel.toggleQueueRepetition()
         }
         syncTitleBarState()
     }

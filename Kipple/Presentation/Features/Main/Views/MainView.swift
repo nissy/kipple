@@ -202,9 +202,6 @@ extension MainView {
             titleBarState.toggleQueueHandler = {
                 toggleQueueModeFromTitleBar()
             }
-            titleBarState.toggleQueueLoopHandler = {
-                toggleQueueLoopFromTitleBar()
-            }
             syncTitleBarState()
             userPreferredAlwaysOnTop = isAlwaysOnTop
             lastKnownEditorPosition = appSettings.editorPosition
@@ -285,7 +282,6 @@ extension MainView {
             titleBarState.toggleEditorHandler = nil
             titleBarState.startCaptureHandler = nil
             titleBarState.toggleQueueHandler = nil
-            titleBarState.toggleQueueLoopHandler = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
@@ -375,6 +371,13 @@ extension MainView {
             return list
         }()
 
+        let queueLoopToggleHandler: () -> Void = {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.toggleQueueRepetition()
+            }
+            syncTitleBarState()
+        }
+
         return MainViewHistorySection(
                 history: viewModel.history,
                 currentClipboardContent: viewModel.currentClipboardContent,
@@ -421,7 +424,10 @@ extension MainView {
                 onToggleUserCategoryFilter: { viewModel.toggleUserCategoryFilter($0) },
                 pasteMode: viewModel.pasteMode,
                 queueBadgeProvider: viewModel.queueBadge(for:),
-                queueSelectionPreview: viewModel.queueSelectionPreview
+                queueSelectionPreview: viewModel.queueSelectionPreview,
+                isQueueLoopActive: viewModel.pasteMode == .queueToggle,
+                canToggleQueueLoop: viewModel.canUsePasteQueue,
+                onToggleQueueLoop: queueLoopToggleHandler
             )
             .id(historyRefreshID)
     }

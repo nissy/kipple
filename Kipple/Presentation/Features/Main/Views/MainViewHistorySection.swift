@@ -32,6 +32,9 @@ struct MainViewHistorySection: View {
     let pasteMode: MainViewModel.PasteMode
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
+    let isQueueLoopActive: Bool
+    let canToggleQueueLoop: Bool
+    let onToggleQueueLoop: () -> Void
     @ObservedObject private var fontManager = FontManager.shared
 
     @State private var searchText: String
@@ -60,7 +63,10 @@ struct MainViewHistorySection: View {
         onToggleUserCategoryFilter: @escaping (UUID) -> Void,
         pasteMode: MainViewModel.PasteMode,
         queueBadgeProvider: @escaping (ClipItem) -> Int?,
-        queueSelectionPreview: Set<UUID>
+        queueSelectionPreview: Set<UUID>,
+        isQueueLoopActive: Bool,
+        canToggleQueueLoop: Bool,
+        onToggleQueueLoop: @escaping () -> Void
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
@@ -84,6 +90,9 @@ struct MainViewHistorySection: View {
         self.pasteMode = pasteMode
         self.queueBadgeProvider = queueBadgeProvider
         self.queueSelectionPreview = queueSelectionPreview
+        self.isQueueLoopActive = isQueueLoopActive
+        self.canToggleQueueLoop = canToggleQueueLoop
+        self.onToggleQueueLoop = onToggleQueueLoop
         _searchText = State(initialValue: initialSearchText)
     }
 
@@ -92,7 +101,7 @@ struct MainViewHistorySection: View {
             // 検索バー（常に表示）
             HStack(spacing: 8) {
                 if pasteMode != .clipboard {
-                    queueColumnPlaceholder
+                    queueLoopControl
                 }
                 pinnedFilterButton
                 categoryFilterControl
@@ -322,9 +331,22 @@ struct MainViewHistorySection: View {
         "None"
     }
 
-    private var queueColumnPlaceholder: some View {
-        Color.clear
-            .frame(width: 22, height: 22)
+    private var queueLoopControl: some View {
+        Button {
+            onToggleQueueLoop()
+        } label: {
+            circleFilterIcon(
+                background: isQueueLoopActive ? Color.accentColor : Color.secondary.opacity(0.1),
+                iconName: "repeat",
+                iconColor: isQueueLoopActive ? .white : .secondary,
+                iconSize: 12
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .frame(width: 22, height: 22)
+        .disabled(!canToggleQueueLoop)
+        .opacity(canToggleQueueLoop ? 1.0 : 0.4)
+        .help(Text(String(localized: "Queue loop")))
     }
 
     private var searchField: some View {

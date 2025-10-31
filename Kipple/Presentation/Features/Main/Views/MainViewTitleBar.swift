@@ -17,15 +17,11 @@ final class MainWindowTitleBarState: ObservableObject {
     @Published var showsQueueButton: Bool = false
     @Published var isQueueEnabled: Bool = false
     @Published var isQueueActive: Bool = false
-    @Published var showsQueueLoopButton: Bool = false
-    @Published var isQueueLoopEnabled: Bool = false
-    @Published var isQueueLoopActive: Bool = false
     
     var toggleAlwaysOnTopHandler: (() -> Void)?
     var toggleEditorHandler: (() -> Void)?
     var startCaptureHandler: (() -> Void)?
     var toggleQueueHandler: (() -> Void)?
-    var toggleQueueLoopHandler: (() -> Void)?
     
     func requestToggleAlwaysOnTop() {
         toggleAlwaysOnTopHandler?()
@@ -42,10 +38,6 @@ final class MainWindowTitleBarState: ObservableObject {
     func requestToggleQueue() {
         toggleQueueHandler?()
     }
-    
-    func requestToggleQueueLoop() {
-        toggleQueueLoopHandler?()
-    }
 }
 
 struct MainViewTitleBarAccessory: View {
@@ -60,9 +52,6 @@ struct MainViewTitleBarAccessory: View {
             }
             if state.showsQueueButton {
                 queueButton
-            }
-            if state.showsQueueLoopButton {
-                queueLoopButton
             }
         }
         .padding(.horizontal, 6)
@@ -118,30 +107,6 @@ private extension MainViewTitleBarAccessory {
         .animation(.spring(response: 0.3), value: state.isQueueActive)
         .disabled(!state.isQueueEnabled)
         .help(Text("Queue"))
-    }
-    
-    var queueLoopButton: some View {
-        Button(action: state.requestToggleQueueLoop) {
-            ZStack {
-                Circle()
-                    .fill(state.isQueueLoopActive ? activeGradient : inactiveGradient)
-                    .frame(width: 30, height: 30)
-                    .shadow(
-                        color: state.isQueueLoopActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08),
-                        radius: state.isQueueLoopActive ? 4 : 2,
-                        y: 2
-                    )
-                
-                Image(systemName: state.isQueueLoopActive ? "repeat.circle.fill" : "repeat")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(state.isQueueLoopActive ? .white : .secondary)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isQueueLoopActive ? 1.0 : 0.9)
-        .animation(.spring(response: 0.3), value: state.isQueueLoopActive)
-        .disabled(!state.isQueueLoopEnabled)
-        .help(Text("Loop"))
     }
     
     var editorButton: some View {
