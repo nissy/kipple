@@ -201,6 +201,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         updateFilteredItems(clipboardService.history, animated: true)
     }
 
+    // swiftlint:disable:next function_body_length
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
         var filtered = items
 
@@ -219,11 +220,18 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
                 filtered = filtered.filter { $0.userCategoryId == userCatId }
             }
         } else if let category = selectedCategory, category != .all {
-            filtered = filtered.filter { $0.category == category }
+            filtered = filtered.filter { item in
+                switch category {
+                case .url:
+                    return isItemInURLCategory(item)
+                case .all:
+                    return true
+                }
+            }
         }
 
         if showOnlyURLs {
-            filtered = filtered.filter { $0.category == .url }
+            filtered = filtered.filter { isItemInURLCategory($0) }
         }
 
         if showOnlyPinned || isPinnedFilterActive {
@@ -562,6 +570,15 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         queueSelectionPreview = []
         resumeAutoClearIfNeeded()
         updateFilteredItems(clipboardService.history)
+    }
+
+    private func isItemInURLCategory(_ item: ClipItem) -> Bool {
+        let store = UserCategoryStore.shared
+        let urlCategoryId = store.urlCategoryId()
+        if let userCategoryId = item.userCategoryId {
+            return userCategoryId == urlCategoryId
+        }
+        return item.category == .url
     }
 
     private func applyQueueOrdering(to items: [ClipItem]) -> [ClipItem] {

@@ -45,14 +45,14 @@ struct MainViewTitleBarAccessory: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            editorButton
-            
-            if state.showsCaptureButton {
-                captureButton
-            }
             if state.showsQueueButton {
                 queueButton
             }
+            if state.showsCaptureButton {
+                captureButton
+            }
+            
+            editorButton
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)

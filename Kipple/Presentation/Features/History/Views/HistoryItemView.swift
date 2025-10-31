@@ -336,35 +336,60 @@ private extension HistoryItemView {
     @ViewBuilder
     var categoryMenu: some View {
         Menu(content: {
-            Button(
-                role: .none,
-                action: {
-                    let noneId = UserCategoryStore.shared.noneCategoryId()
-                    onChangeCategory?(noneId)
-                },
-                label: {
-                    Label {
-                        Text(verbatim: "None")
-                    } icon: {
-                        Image(systemName: "tag")
-                    }
-                }
-            )
-            Divider()
-            ForEach(UserCategoryStore.shared.userDefined()) { cat in
-                Button {
-                    onChangeCategory?(cat.id)
-                } label: {
-                    Label {
-                        Text(verbatim: cat.name)
-                    } icon: {
-                        Image(systemName: UserCategoryStore.shared.iconName(for: cat))
+            let store = UserCategoryStore.shared
+
+            let currentUserCategoryId = item.userCategoryId
+            let noneCategory = store.noneCategory()
+            let noneId = store.noneCategoryId()
+            let isNoneSelected =
+                (currentUserCategoryId == nil && item.category != .url) ||
+                currentUserCategoryId == noneId
+            Button {
+                onChangeCategory?(noneId)
+            } label: {
+                categoryMenuRow(
+                    name: noneCategory.name,
+                    systemImage: store.iconName(for: noneCategory),
+                    selected: isNoneSelected
+                )
+            }
+
+            let urlCategory = store.urlCategory()
+            let urlId = store.urlCategoryId()
+            let isURLSelected =
+                (currentUserCategoryId == nil && item.category == .url) ||
+                currentUserCategoryId == urlId
+            Button {
+                onChangeCategory?(urlId)
+            } label: {
+                categoryMenuRow(
+                    name: urlCategory.name,
+                    systemImage: store.iconName(for: urlCategory),
+                    selected: isURLSelected
+                )
+            }
+
+            let userDefinedCategories = store.userDefined()
+            if !userDefinedCategories.isEmpty {
+                Divider()
+                ForEach(userDefinedCategories) { cat in
+                    Button {
+                        onChangeCategory?(cat.id)
+                    } label: {
+                        categoryMenuRow(
+                            name: cat.name,
+                            systemImage: store.iconName(for: cat),
+                            selected: item.userCategoryId == cat.id
+                        )
                     }
                 }
             }
-            Divider()
-            Button("Manage Categories…") {
-                onOpenCategoryManager?()
+
+            if onOpenCategoryManager != nil {
+                Divider()
+                Button("Manage Categories…") {
+                    onOpenCategoryManager?()
+                }
             }
         }, label: {
             let current = UserCategoryStore.shared.category(id: item.userCategoryId)
@@ -439,5 +464,21 @@ private extension HistoryItemView {
             key,
             actionTitle
         )
+    }
+
+    private func categoryMenuRow(name: String, systemImage: String, selected: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundColor(.secondary)
+            Text(verbatim: name)
+                .font(.system(size: 12))
+            Spacer()
+            if selected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
