@@ -19,6 +19,7 @@ struct MainView: View {
     @State var isAlwaysOnTopForcedByQueue = false
     @State var userPreferredAlwaysOnTop = false
     @State var hasQueueForceOverride = false
+    let titleBarState: MainWindowTitleBarState
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject var appSettings = AppSettings.shared
@@ -37,6 +38,7 @@ struct MainView: View {
     @State var editorHeightResetID: UUID?
     @State private var lastKnownEditorPosition: String = AppSettings.shared.editorPosition
     private let minimumSectionHeight: Double = 150
+    private let titleBarHeight: CGFloat = 8
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
@@ -45,12 +47,14 @@ struct MainView: View {
     let onStartTextCapture: (() -> Void)?
     
     init(
+        titleBarState: MainWindowTitleBarState = MainWindowTitleBarState(),
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
         onSetPreventAutoClose: ((Bool) -> Void)? = nil,
         onStartTextCapture: (() -> Void)? = nil
     ) {
+        self.titleBarState = titleBarState
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
@@ -86,6 +90,7 @@ extension MainView {
     }
 
     func enforceQueueAlwaysOnTopIfNeeded(queueCount: Int, isQueueModeActive: Bool) {
+        defer { syncTitleBarState() }
         let shouldForce = isQueueModeActive && queueCount > 0
         if shouldForce {
             if !isAlwaysOnTopForcedByQueue {
@@ -146,10 +151,12 @@ extension MainView {
                 )
             }
         }
-        .frame(minWidth: 300, maxWidth: .infinity)
         .background(
             Color(NSColor.windowBackgroundColor)
         )
+
+        .padding(.top, titleBarHeight)
+        .frame(minWidth: 300, maxWidth: .infinity)
         .overlay(
             CopiedNotificationView(
                 showNotification: $isShowingCopiedNotification,
@@ -184,6 +191,10 @@ extension MainView {
             lastKnownEditorPosition = newValue
         }
         .onAppear {
+            titleBarState.toggleHandler = {
+                toggleAlwaysOnTop()
+            }
+            syncTitleBarState()
             userPreferredAlwaysOnTop = isAlwaysOnTop
             lastKnownEditorPosition = appSettings.editorPosition
             enforceQueueAlwaysOnTopIfNeeded(
@@ -259,6 +270,7 @@ extension MainView {
             copiedHideWorkItem?.cancel()
             copiedHideWorkItem = nil
             isShowingCopiedNotification = false
+            titleBarState.toggleHandler = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)

@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 import Combine
 
+// swiftlint:disable file_length
 @MainActor
 protocol WindowManaging: AnyObject {
     func openMainWindow()
@@ -30,6 +31,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsCoordinator: SettingsToolbarController?
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
+    private let titleBarState = MainWindowTitleBarState()
+    private var titleBarHostingView: NSHostingView<MainViewAlwaysOnTopAccessory>?
     private let appSettings = AppSettings.shared
     private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
@@ -40,6 +43,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.hidesOnDeactivate = !isAlwaysOnTop
                 Logger.shared.log("isAlwaysOnTop changed to: \(isAlwaysOnTop), hidesOnDeactivate: \(!isAlwaysOnTop)")
             }
+            titleBarState.isAlwaysOnTop = isAlwaysOnTop
         }
     }
     private var preventAutoClose = false
@@ -111,6 +115,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         
         let contentView = MainView(
+            titleBarState: titleBarState,
             onClose: { [weak self] in
                 self?.mainWindow?.close()
             },
@@ -156,6 +161,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         configureWindowSize(window)
         
         // カーソル位置にウィンドウを配置
+        attachAlwaysOnTopButton(to: window)
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let window else { return }
+            self?.attachAlwaysOnTopButton(to: window)
+        }
         positionWindowAtCursor(window)
     }
     
@@ -172,6 +182,40 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.setContentSize(NSSize(width: initialWidth, height: initialHeight))
         window.minSize = NSSize(width: 300, height: 300)
         window.maxSize = NSSize(width: 800, height: 1200)
+    }
+    
+    private func attachAlwaysOnTopButton(to window: NSWindow) {
+        titleBarHostingView?.removeFromSuperview()
+        
+        guard let titlebarContainer = window.standardWindowButton(.closeButton)?.superview?.superview else {
+            Logger.shared.log("Failed to locate titlebar container for pin button")
+            return
+        }
+        
+        let hostingView = NSHostingView(
+            rootView: MainViewAlwaysOnTopAccessory(
+                state: titleBarState
+            ) { [weak self] in
+                self?.titleBarState.requestToggle()
+            }
+        )
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.layer?.zPosition = 1
+        hostingView.setContentHuggingPriority(.required, for: .horizontal)
+        hostingView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        hostingView.isHidden = false
+        
+        titlebarContainer.addSubview(hostingView, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            hostingView.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor, constant: -6),
+            hostingView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
+            hostingView.heightAnchor.constraint(equalToConstant: 34),
+            hostingView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34)
+        ])
+        
+        titleBarHostingView = hostingView
     }
     
     private func positionWindowAtCursor(_ window: NSWindow) {
@@ -598,3 +642,5 @@ extension WindowManager {
 }
 
 extension WindowManager: WindowManaging {}
+
+// swiftlint:enable file_length

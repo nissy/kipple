@@ -35,6 +35,7 @@ extension MainView {
                 isQueueModeActive: viewModel.isQueueModeActive
             )
         }
+        syncTitleBarState()
         onAlwaysOnTopChanged?(isAlwaysOnTop)
     }
 
@@ -91,5 +92,10 @@ extension MainView {
             onOpen: { onSetPreventAutoClose?(true) },
             onClose: { onSetPreventAutoClose?(false) }
         )
+    }
+
+    func syncTitleBarState() {
+        titleBarState.isAlwaysOnTop = isAlwaysOnTop
+        titleBarState.isAlwaysOnTopForcedByQueue = isAlwaysOnTopForcedByQueue
     }
 }

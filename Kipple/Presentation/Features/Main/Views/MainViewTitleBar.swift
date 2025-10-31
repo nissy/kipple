@@ -6,90 +6,68 @@
 //
 
 import SwiftUI
+import Combine
 
-struct MainViewTitleBar: View {
-    @Binding var isAlwaysOnTop: Bool
+final class MainWindowTitleBarState: ObservableObject {
+    @Published var isAlwaysOnTop: Bool = false
+    @Published var isAlwaysOnTopForcedByQueue: Bool = false
+    var toggleHandler: (() -> Void)?
+    
+    func requestToggle() {
+        toggleHandler?()
+    }
+}
+
+struct MainViewAlwaysOnTopAccessory: View {
+    @ObservedObject var state: MainWindowTitleBarState
     let onToggleAlwaysOnTop: () -> Void
     
     var body: some View {
-        HStack {
-            HStack(spacing: 8) {
-                // App icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(LinearGradient(
-                            colors: [Color.accentColor, Color.purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 24, height: 24)
-                    
-                    Image(systemName: "scissors")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                }
+        Button(action: onToggleAlwaysOnTop) {
+            ZStack {
+                Circle()
+                    .fill(state.isAlwaysOnTop ?
+                          LinearGradient(
+                              colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
+                              startPoint: .topLeading,
+                              endPoint: .bottomTrailing
+                          ) :
+                          LinearGradient(
+                              colors: [
+                                  Color(NSColor.controlBackgroundColor),
+                                  Color(NSColor.controlBackgroundColor).opacity(0.85)
+                              ],
+                              startPoint: .topLeading,
+                              endPoint: .bottomTrailing
+                          )
+                    )
+                    .frame(width: 30, height: 30)
+                    .shadow(
+                        color: state.isAlwaysOnTop ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.1),
+                        radius: state.isAlwaysOnTop ? 4 : 2,
+                        y: 2
+                    )
                 
-                Text("Kipple")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.primary)
+                Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(state.isAlwaysOnTop ? .white : .secondary)
+                    .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
             }
-            
-            Spacer()
-            
-            Button(action: onToggleAlwaysOnTop) {
-                ZStack {
-                    Circle()
-                        .fill(isAlwaysOnTop ? 
-                            LinearGradient(
-                                colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
-                            LinearGradient(
-                                colors: [Color(NSColor.controlBackgroundColor), Color(NSColor.controlBackgroundColor)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                        .frame(width: 32, height: 32)
-                        .shadow(
-                            color: isAlwaysOnTop ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.1),
-                            radius: isAlwaysOnTop ? 4 : 2,
-                            y: 2
-                        )
-                    
-                    Image(systemName: isAlwaysOnTop ? "pin.fill" : "pin")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(isAlwaysOnTop ? .white : .secondary)
-                        .rotationEffect(.degrees(isAlwaysOnTop ? 0 : -45))
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            .scaleEffect(isAlwaysOnTop ? 1.0 : 0.9)
-            .animation(.spring(response: 0.3), value: isAlwaysOnTop)
-            .help(
-                Text(
-                    isAlwaysOnTop
+        }
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(state.isAlwaysOnTop ? 1.0 : 0.9)
+        .animation(.spring(response: 0.3), value: state.isAlwaysOnTop)
+        .help(
+            state.isAlwaysOnTopForcedByQueue && !state.isAlwaysOnTop
+                ? Text("Queue mode is active but Always on Top is disabled")
+                : Text(
+                    state.isAlwaysOnTop
                         ? "Disable always on top"
                         : "Enable always on top"
                 )
-            )
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            ZStack {
-                // Blur background
-                Color(NSColor.windowBackgroundColor)
-                    .opacity(0.8)
-                
-                // Top highlight
-                LinearGradient(
-                    colors: [Color.white.opacity(0.1), Color.clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .background(.ultraThinMaterial)
         )
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(Color.clear)
     }
 }
