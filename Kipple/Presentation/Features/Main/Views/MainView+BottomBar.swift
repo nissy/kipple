@@ -66,19 +66,19 @@ extension MainView {
 
             HStack(alignment: .center, spacing: 10) {
                 bottomBarActionButton(
-                    systemName: "info.circle.fill",
+                    systemName: "info.circle",
                     help: String(localized: "About"),
                     action: onOpenAbout
                 )
 
                 bottomBarActionButton(
-                    systemName: "power.circle.fill",
+                    systemName: "power.circle",
                     help: String(localized: "Quit Kipple"),
                     action: showQuitConfirmationAlert
                 )
 
                 bottomBarActionButton(
-                    systemName: "gearshape.fill",
+                    systemName: "gearshape",
                     help: String(localized: "Settings"),
                     action: onOpenSettings
                 )
@@ -117,16 +117,16 @@ private extension MainView {
                     .fill(LinearGradient(
                         colors: [
                             Color(NSColor.controlBackgroundColor),
-                            Color(NSColor.controlBackgroundColor).opacity(0.8)
+                            Color(NSColor.controlBackgroundColor).opacity(0.85)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ))
-                    .frame(width: 28, height: 28)
-                    .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
+                    .frame(width: 30, height: 30)
+                    .shadow(color: Color.black.opacity(0.08), radius: 2, y: 2)
 
                 Image(systemName: systemName)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
             }
         })
