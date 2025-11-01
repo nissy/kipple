@@ -106,6 +106,10 @@
 "Queue position %d" = "Queue position %d";
 "Quick Editor" = "Quick Editor";
 "Quit Kipple" = "Quit Kipple";
+"quit.alert.title" = "Quit Kipple";
+"quit.alert.message" = "Are you sure you want to quit Kipple?";
+"quit.alert.cancel" = "Cancel";
+"quit.alert.confirm" = "Quit Kipple";
 "Request Permission Again" = "Request Permission Again";
 "Scale" = "Scale";
 "Screen Recording Permission" = "Screen Recording Permission";

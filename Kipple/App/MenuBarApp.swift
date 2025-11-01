@@ -15,39 +15,6 @@ final class MenuBarApp: NSObject, ObservableObject {
     internal let clipboardService: any ClipboardServiceProtocol
     internal let windowManager = WindowManager()
     internal var hotkeyManager: Any
-    lazy var openKippleMenuItem: NSMenuItem = {
-        NSMenuItem(
-            title: localizedMenuString("Open Kipple"),
-            action: #selector(openMainWindow),
-            keyEquivalent: ""
-        )
-    }()
-    lazy var screenTextCaptureMenuItem: NSMenuItem = {
-        NSMenuItem(
-            title: localizedMenuString("Screen Text Capture"),
-            action: #selector(captureTextFromScreen),
-            keyEquivalent: ""
-        )
-    }()
-    private lazy var aboutMenuItem: NSMenuItem = {
-        let item = NSMenuItem(title: "", action: #selector(showAbout), keyEquivalent: "")
-        item.target = self
-        return item
-    }()
-    private lazy var settingsMenuItem: NSMenuItem = {
-        let item = NSMenuItem(title: "", action: #selector(openPreferences), keyEquivalent: ",")
-        item.target = self
-        item.keyEquivalentModifierMask = [.command]
-        return item
-    }()
-    private lazy var quitMenuItem: NSMenuItem = {
-        let item = NSMenuItem(title: "", action: #selector(quit), keyEquivalent: "q")
-        item.target = self
-        item.keyEquivalentModifierMask = [.command]
-        return item
-    }()
-    let screenCaptureStatusItem = NSMenuItem()
-    let accessibilityStatusItem = NSMenuItem()
     private lazy var textRecognitionService: any TextRecognitionServiceProtocol =
         TextRecognitionServiceProvider.resolve()
     lazy var textCaptureCoordinator: TextCaptureCoordinator = {
@@ -59,7 +26,6 @@ final class MenuBarApp: NSObject, ObservableObject {
     }()
     var textCaptureHotkeyManager: TextCaptureHotkeyManager?
     var textCaptureHotkeyObserver: NSObjectProtocol?
-    private var openKippleHotkeyObserver: NSObjectProtocol?
     private var screenRecordingPermissionObserver: NSObjectProtocol?
     
     // Properties for asynchronous termination handling
@@ -151,17 +117,11 @@ final class MenuBarApp: NSObject, ObservableObject {
                 button.imagePosition = .imageOnly
             }
         }
-
-        updateStaticMenuTitles()
-        updateOpenKippleMenuItemShortcut()
-        updateScreenTextCaptureMenuItemShortcut()
-        updateScreenCaptureMenuItem()
-        updateAccessibilityMenuItem()
     }
     
     private func setupMenuBar() {
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
+
         if let button = statusBarItem?.button {
             button.title = "📋"
             
@@ -174,71 +134,15 @@ final class MenuBarApp: NSObject, ObservableObject {
                 button.image = image
                 button.imagePosition = .imageOnly
             }
-            
+
             button.toolTip = localizedMenuString("Kipple - Clipboard Manager")
+            button.target = self
+            button.action = #selector(openMainWindow)
+            button.sendAction(on: [.leftMouseUp])
         }
-        
-        let menu = createMenu()
-        statusBarItem?.menu = menu
+
+        statusBarItem?.menu = nil
         statusBarItem?.isVisible = true
-
-        observeOpenKippleHotkeyChanges()
-    }
-
-    private func observeOpenKippleHotkeyChanges() {
-        if let observer = openKippleHotkeyObserver {
-            NotificationCenter.default.removeObserver(observer)
-            openKippleHotkeyObserver = nil
-        }
-
-        openKippleHotkeyObserver = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("HotkeySettingsChanged"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.updateOpenKippleMenuItemShortcut()
-        }
-    }
-    
-    private func createMenu() -> NSMenu {
-        let menu = NSMenu(); menu.delegate = self
-
-        updateStaticMenuTitles()
-        
-        menu.addItem(aboutMenuItem)
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(openKippleMenuEntry())
-        menu.addItem(screenTextCaptureMenuEntry())
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(screenCaptureMenuItem())
-        menu.addItem(accessibilityMenuItem())
-        menu.addItem(NSMenuItem.separator())
-
-        menu.addItem(settingsMenuItem)
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(quitMenuItem)
-
-        menu.items.forEach { $0.target = self }
-
-        updateScreenCaptureMenuItem()
-        updateAccessibilityMenuItem()
-        updateOpenKippleMenuItemShortcut()
-        updateScreenTextCaptureMenuItemShortcut()
-        return menu
-    }
-
-    private func updateStaticMenuTitles() {
-        let aboutTitle = localizedMenuString("About")
-        aboutMenuItem.title = aboutTitle
-
-        let settingsTitle = localizedMenuString("Settings…")
-        settingsMenuItem.title = settingsTitle
-
-        let quitTitle = localizedMenuString("Quit Kipple")
-        quitMenuItem.title = quitTitle
-
-        openKippleMenuItem.title = localizedMenuString("Open Kipple")
-        screenTextCaptureMenuItem.title = localizedMenuString("Screen Text Capture")
     }
 
     func startServices() {
@@ -347,15 +251,6 @@ final class MenuBarApp: NSObject, ObservableObject {
 // HotkeyManagerDelegate removed - using SimplifiedHotkeyManager notifications instead
 
 // MARK: - Hotkey Handling
-
-extension MenuBarApp: NSMenuDelegate {
-    func menuWillOpen(_ menu: NSMenu) {
-        updateScreenCaptureMenuItem()
-        updateAccessibilityMenuItem()
-        updateOpenKippleMenuItemShortcut()
-        updateScreenTextCaptureMenuItemShortcut()
-    }
-}
 
 #if DEBUG
 extension MenuBarApp {

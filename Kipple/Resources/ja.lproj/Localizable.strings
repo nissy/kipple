@@ -106,6 +106,10 @@
 "Queue position %d" = "キューの位置 %d";
 "Quick Editor" = "クイックエディタ";
 "Quit Kipple" = "Kipple を終了";
+"quit.alert.title" = "Kipple を終了";
+"quit.alert.message" = "Kipple を終了してもよろしいですか？";
+"quit.alert.cancel" = "キャンセル";
+"quit.alert.confirm" = "Kipple を終了";
 "Request Permission Again" = "再度許可をリクエスト";
 "Scale" = "スケール";
 "Screen Recording Permission" = "画面収録の権限";

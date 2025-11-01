@@ -66,7 +66,6 @@
 		5625744EC2A8F5A838BEE23B /* AutoClearBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AF4A7453157A2A730A8F9E /* AutoClearBehaviorTests.swift */; };
 		59A504619C472F5D87041F38 /* ResizableSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B538EF6166B8332429EF10E7 /* ResizableSplitView.swift */; };
 		5A08917C3CDE5860FB29C64E /* HotkeyManagerProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */; };
-		5D3E04E775B43501E48EC548 /* MenuBarShortcutMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76DD5804F8F7408A8D9512A5 /* MenuBarShortcutMapping.swift */; };
 		5DA5FD30710060D9FF7158BF /* ModernClipboardServicePinUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643A0D867F7B8BE9E0C6DDB3 /* ModernClipboardServicePinUpdateTests.swift */; };
 		5EF8C1590662867113127642 /* ButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */; };
 		62F009B02F724594C0A15CCF /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297CBB8448A107E022CAC728 /* WindowManager.swift */; };
@@ -256,7 +255,6 @@
 		7077BB0F24641D773661D25B /* DataSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSettingsView.swift; sourceTree = "<group>"; };
 		744EFD983380BA9F4014C37E /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		74ED56E8888BBC7EF54BB602 /* ClipboardFontSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardFontSettingsView.swift; sourceTree = "<group>"; };
-		76DD5804F8F7408A8D9512A5 /* MenuBarShortcutMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarShortcutMapping.swift; sourceTree = "<group>"; };
 		76F433A1E4092D8E995AB41D /* SwiftDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataModels.swift; sourceTree = "<group>"; };
 		7955B9273FADD78F8B637D13 /* TextCaptureHotkeyManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCaptureHotkeyManagerTests.swift; sourceTree = "<group>"; };
 		7C6A2394EEFF7F2A077E9F62 /* PasteQueueModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteQueueModeTests.swift; sourceTree = "<group>"; };
@@ -620,7 +618,6 @@
 				E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */,
 				AA000B813F456AB52D33BDED /* MenuBarApp+Hotkeys.swift */,
 				A1EF33FDC2171B34E560EF64 /* MenuBarApp+Testing.swift */,
-				76DD5804F8F7408A8D9512A5 /* MenuBarShortcutMapping.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -1073,7 +1070,6 @@
 				B43B42A3184473A6FB450617 /* MenuBarApp+Hotkeys.swift in Sources */,
 				65F919646D1213477062A2C4 /* MenuBarApp+Testing.swift in Sources */,
 				427F1FD66D8D46E661D2F049 /* MenuBarApp.swift in Sources */,
-				5D3E04E775B43501E48EC548 /* MenuBarShortcutMapping.swift in Sources */,
 				D20AD791A7E8A3E458D74969 /* ModernClipboardService.swift in Sources */,
 				48D29A126052E1EBBB3A7229 /* ModernClipboardServiceAdapter.swift in Sources */,
 				F3C9555AFCA3FCDC61FC0A13 /* ModernClipboardServiceProtocol.swift in Sources */,

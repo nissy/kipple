@@ -64,30 +64,25 @@ extension MainView {
 
             Spacer()
 
-            Button(action: {
-                onOpenSettings?()
-            }, label: {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            colors: [
-                                Color(NSColor.controlBackgroundColor),
-                                Color(NSColor.controlBackgroundColor).opacity(0.8)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 28, height: 28)
-                        .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
+            HStack(alignment: .center, spacing: 10) {
+                bottomBarActionButton(
+                    systemName: "info.circle.fill",
+                    help: String(localized: "About"),
+                    action: onOpenAbout
+                )
 
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
-                }
-            })
-            .buttonStyle(PlainButtonStyle())
-            .scaleEffect(1.0)
-            .help("Settings")
+                bottomBarActionButton(
+                    systemName: "power.circle.fill",
+                    help: String(localized: "Quit Kipple"),
+                    action: showQuitConfirmationAlert
+                )
+
+                bottomBarActionButton(
+                    systemName: "gearshape.fill",
+                    help: String(localized: "Settings"),
+                    action: onOpenSettings
+                )
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -95,5 +90,47 @@ extension MainView {
             Color(NSColor.windowBackgroundColor).opacity(0.95)
                 .background(.ultraThinMaterial)
         )
+        .alert("quit.alert.title", isPresented: quitConfirmationBinding) {
+            Button("quit.alert.cancel", role: .cancel) {
+                cancelQuitConfirmationIfNeeded()
+            }
+            Button("quit.alert.confirm", role: .destructive) {
+                confirmQuitFromDialog()
+            }
+        } message: {
+            Text("quit.alert.message")
+        }
+    }
+}
+
+private extension MainView {
+    func bottomBarActionButton(
+        systemName: String,
+        help: String,
+        action: (() -> Void)?
+    ) -> some View {
+        Button(action: {
+            action?()
+        }, label: {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [
+                            Color(NSColor.controlBackgroundColor),
+                            Color(NSColor.controlBackgroundColor).opacity(0.8)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 28, height: 28)
+                    .shadow(color: Color.black.opacity(0.1), radius: 3, y: 2)
+
+                Image(systemName: systemName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+            }
+        })
+        .buttonStyle(PlainButtonStyle())
+        .help(help)
     }
 }

@@ -126,6 +126,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
             onOpenSettings: { [weak self] in
                 self?.openSettings()
             },
+            onOpenAbout: { [weak self] in
+                self?.showAbout()
+            },
+            onQuitApplication: {
+                NSApplication.shared.terminate(nil)
+            },
             onSetPreventAutoClose: { [weak self] flag in
                 self?.setPreventAutoClose(flag)
             },

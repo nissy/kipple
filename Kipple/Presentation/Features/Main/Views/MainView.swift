@@ -37,18 +37,34 @@ struct MainView: View {
     @State private var lastKnownEditorPosition: String = AppSettings.shared.editorPosition
     private let minimumSectionHeight: Double = 150
     private let titleBarHeight: CGFloat = 8
+    @State private var isShowingQuitConfirmation = false
+    var quitConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { isShowingQuitConfirmation },
+            set: { newValue in
+                if !newValue {
+                    onSetPreventAutoClose?(false)
+                }
+                isShowingQuitConfirmation = newValue
+            }
+        )
+    }
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
+    let onOpenAbout: (() -> Void)?
+    let onQuitApplication: (() -> Void)?
     let onSetPreventAutoClose: ((Bool) -> Void)?
     let onStartTextCapture: (() -> Void)?
-    
+
     init(
         titleBarState: MainWindowTitleBarState = MainWindowTitleBarState(),
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
+        onOpenAbout: (() -> Void)? = nil,
+        onQuitApplication: (() -> Void)? = nil,
         onSetPreventAutoClose: ((Bool) -> Void)? = nil,
         onStartTextCapture: (() -> Void)? = nil
     ) {
@@ -56,12 +72,33 @@ struct MainView: View {
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
+        self.onOpenAbout = onOpenAbout
+        self.onQuitApplication = onQuitApplication
         self.onSetPreventAutoClose = onSetPreventAutoClose
         self.onStartTextCapture = onStartTextCapture
     }
 }
 
 extension MainView {
+    func showQuitConfirmationAlert() {
+        onSetPreventAutoClose?(true)
+        DispatchQueue.main.async {
+            isShowingQuitConfirmation = true
+        }
+    }
+
+    func cancelQuitConfirmationIfNeeded() {
+        guard isShowingQuitConfirmation else { return }
+        onSetPreventAutoClose?(false)
+        isShowingQuitConfirmation = false
+    }
+
+    func confirmQuitFromDialog() {
+        onSetPreventAutoClose?(false)
+        isShowingQuitConfirmation = false
+        onQuitApplication?()
+    }
+
     private func handleItemSelection(_ item: ClipItem) {
         let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if viewModel.canUsePasteQueue,
@@ -266,6 +303,7 @@ extension MainView {
             viewModel.handleModifierFlagsChanged(currentFlags)
         }
         .onDisappear {
+            cancelQuitConfirmationIfNeeded()
             if let monitor = keyDownMonitor {
                 NSEvent.removeMonitor(monitor)
                 keyDownMonitor = nil
