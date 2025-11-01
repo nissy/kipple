@@ -543,7 +543,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             aboutWindow?.title = String(localized: "About Kipple")
             aboutWindow?.styleMask = [.titled, .closable]
             aboutWindow?.isMovableByWindowBackground = true
-            aboutWindow?.setContentSize(NSSize(width: 400, height: 580))
+            aboutWindow?.setContentSize(NSSize(width: 360, height: 420))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
         } else {
