@@ -17,11 +17,11 @@ extension MainView {
                        let remainingTime = viewModel.autoClearRemainingTime {
                         HStack(spacing: 6) {
                             Image(systemName: "timer")
-                                .font(.system(size: 11))
+                                .font(MainViewMetrics.BottomBar.autoClearIconFont)
                                 .foregroundColor(.secondary)
 
                             Text(formatRemainingTime(remainingTime))
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(MainViewMetrics.BottomBar.autoClearTimerFont)
                                 .foregroundColor(.secondary)
                         }
 
@@ -31,7 +31,7 @@ extension MainView {
                     }
 
                     Image(systemName: "doc.on.clipboard")
-                        .font(.system(size: 11))
+                        .font(MainViewMetrics.BottomBar.clipboardIconFont)
                         .foregroundColor(.secondary)
 
                     Text(currentContent)
@@ -44,7 +44,7 @@ extension MainView {
                         clearSystemClipboard()
                     }, label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
+                            .font(MainViewMetrics.BottomBar.clearIconFont)
                             .foregroundColor(.secondary.opacity(0.6))
                             .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
                     })
@@ -122,11 +122,14 @@ private extension MainView {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ))
-                    .frame(width: 30, height: 30)
+                    .frame(
+                        width: MainViewMetrics.BottomBar.buttonSize,
+                        height: MainViewMetrics.BottomBar.buttonSize
+                    )
                     .shadow(color: Color.black.opacity(0.08), radius: 2, y: 2)
 
                 Image(systemName: systemName)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(MainViewMetrics.BottomBar.iconFont)
                     .foregroundColor(.secondary)
             }
         })

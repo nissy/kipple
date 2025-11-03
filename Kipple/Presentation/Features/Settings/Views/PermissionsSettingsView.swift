@@ -328,6 +328,7 @@ struct PermissionsSettingsView: View {
 
 extension Notification.Name {
     static let screenRecordingPermissionRequested = Notification.Name("ScreenRecordingPermissionRequested")
+    static let accessibilityPermissionRequested = Notification.Name("AccessibilityPermissionRequested")
 }
 
 // MARK: - PermissionStatusBadge

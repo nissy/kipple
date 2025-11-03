@@ -79,52 +79,59 @@ private extension MainViewTitleBarAccessory {
     }
 
     var captureButton: some View {
-        Button(action: state.requestStartCapture) {
-            ZStack {
-                Circle()
-                    .fill(inactiveGradient)
-                    .frame(width: 30, height: 30)
-                    .shadow(
-                        color: Color.black.opacity(state.isCaptureEnabled ? 0.12 : 0.08),
-                        radius: state.isCaptureEnabled ? 3 : 2,
-                        y: 2
-                    )
-                
-                Image(systemName: "text.magnifyingglass")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(state.isCaptureEnabled ? .secondary : .secondary.opacity(0.6))
-            }
+        let content = ZStack {
+            Circle()
+                .fill(inactiveGradient)
+                .frame(
+                    width: MainViewMetrics.TitleBar.buttonSize,
+                    height: MainViewMetrics.TitleBar.buttonSize
+                )
+                .shadow(
+                    color: Color.black.opacity(0.12),
+                    radius: 3,
+                    y: 2
+                )
+            
+            Image(systemName: "text.magnifyingglass")
+                .font(MainViewMetrics.TitleBar.iconFont)
+                .foregroundColor(.secondary)
+        }
+        
+        return Button(action: handleCaptureButtonTap) {
+            content
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(1.0)
-        .opacity(state.isCaptureEnabled ? 1.0 : 0.45)
-        .disabled(!state.isCaptureEnabled)
         .help(captureHelpText)
+        .overlay(permissionBadge(isActive: state.isCaptureEnabled), alignment: .topTrailing)
     }
     
     var queueButton: some View {
-        Button(action: state.requestToggleQueue) {
-            ZStack {
-                Circle()
-                    .fill(queueButtonBackground)
-                    .frame(width: 30, height: 30)
-                    .shadow(
-                        color: queueShadowColor,
-                        radius: state.isQueueEnabled ? (state.isQueueActive ? 4 : 2) : 2,
-                        y: 2
-                    )
-                
-                Image(systemName: "list.number")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(queueIconColor)
-            }
+        let content = ZStack {
+            Circle()
+                .fill(queueButtonBackground)
+                .frame(
+                    width: MainViewMetrics.TitleBar.buttonSize,
+                    height: MainViewMetrics.TitleBar.buttonSize
+                )
+                .shadow(
+                    color: queueShadowColor,
+                    radius: state.isQueueEnabled ? (state.isQueueActive ? 4 : 2) : 2,
+                    y: 2
+                )
+            
+            Image(systemName: "list.number")
+                .font(MainViewMetrics.TitleBar.iconFont)
+                .foregroundColor(queueIconColor)
+        }
+        .scaleEffect(state.isQueueActive ? 1.0 : 0.9)
+        .animation(.spring(response: 0.3), value: state.isQueueActive)
+        
+        return Button(action: handleQueueButtonTap) {
+            content
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isQueueEnabled ? (state.isQueueActive ? 1.0 : 0.9) : 1.0)
-        .animation(.spring(response: 0.3), value: state.isQueueActive)
-        .opacity(state.isQueueEnabled ? 1.0 : 0.45)
-        .disabled(!state.isQueueEnabled)
         .help(queueHelpText)
+        .overlay(permissionBadge(isActive: state.isQueueEnabled), alignment: .topTrailing)
     }
     
     var editorButton: some View {
@@ -132,7 +139,10 @@ private extension MainViewTitleBarAccessory {
             ZStack {
                 Circle()
                     .fill(editorButtonBackground)
-                    .frame(width: 30, height: 30)
+                    .frame(
+                        width: MainViewMetrics.TitleBar.buttonSize,
+                        height: MainViewMetrics.TitleBar.buttonSize
+                    )
                     .shadow(
                         color: state.isEditorEnabled ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08),
                         radius: state.isEditorEnabled ? 4 : 2,
@@ -140,7 +150,7 @@ private extension MainViewTitleBarAccessory {
                     )
                 
                 Image(systemName: state.isEditorEnabled ? "square.and.pencil" : "square.slash")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(MainViewMetrics.TitleBar.iconFont)
                     .foregroundColor(state.isEditorEnabled ? .white : .secondary)
             }
         }
@@ -174,23 +184,10 @@ private extension MainViewTitleBarAccessory {
     }
 
     private var queueButtonBackground: LinearGradient {
-        if !state.isQueueEnabled {
-            return LinearGradient(
-                colors: [
-                    Color(NSColor.controlBackgroundColor),
-                    Color(NSColor.controlBackgroundColor).opacity(0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
         return state.isQueueActive ? activeGradient : inactiveGradient
     }
 
     private var queueIconColor: Color {
-        if !state.isQueueEnabled {
-            return .secondary.opacity(0.6)
-        }
         return state.isQueueActive ? .white : .secondary
     }
 
@@ -199,6 +196,43 @@ private extension MainViewTitleBarAccessory {
             return Color.black.opacity(0.08)
         }
         return state.isQueueActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
+    }
+    
+    private func handleCaptureButtonTap() {
+        if state.isCaptureEnabled {
+            state.requestStartCapture()
+        } else {
+            NotificationCenter.default.post(
+                name: .screenRecordingPermissionRequested,
+                object: nil
+            )
+        }
+    }
+    
+    private func handleQueueButtonTap() {
+        if state.isQueueEnabled {
+            state.requestToggleQueue()
+        } else {
+            NotificationCenter.default.post(
+                name: .accessibilityPermissionRequested,
+                object: nil
+            )
+        }
+    }
+    
+    private func permissionBadge(isActive: Bool) -> some View {
+        Group {
+            if !isActive {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(MainViewMetrics.TitleBar.badgeFont)
+                    .foregroundColor(Color(.sRGB, red: 1.0, green: 0.0, blue: 0.0))
+                    .shadow(color: Color.black.opacity(0.25), radius: 1, y: 1)
+                    .offset(
+                        x: MainViewMetrics.TitleBar.badgeOffset.width,
+                        y: MainViewMetrics.TitleBar.badgeOffset.height
+                    )
+            }
+        }
     }
 }
 
@@ -211,7 +245,10 @@ struct MainViewTitleBarPinButton: View {
             ZStack {
                 Circle()
                     .fill(state.isAlwaysOnTop ? activeGradient : inactiveGradient)
-                    .frame(width: 30, height: 30)
+                    .frame(
+                        width: MainViewMetrics.TitleBar.buttonSize,
+                        height: MainViewMetrics.TitleBar.buttonSize
+                    )
                     .shadow(
                         color: state.isAlwaysOnTop ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.1),
                         radius: state.isAlwaysOnTop ? 4 : 2,
@@ -219,7 +256,7 @@ struct MainViewTitleBarPinButton: View {
                     )
                 
                 Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(MainViewMetrics.TitleBar.iconFont)
                     .foregroundColor(state.isAlwaysOnTop ? .white : .secondary)
                     .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
             }

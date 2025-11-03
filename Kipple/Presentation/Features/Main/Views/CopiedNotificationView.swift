@@ -48,9 +48,9 @@ struct CopiedNotificationView: View {
             if showNotification {
                 HStack(spacing: 4) {
                     Image(systemName: notificationType.icon)
-                        .font(.system(size: 11))
+                        .font(MainViewMetrics.Notification.iconFont)
                     Text(notificationType.text)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(MainViewMetrics.Notification.textFont)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 10)

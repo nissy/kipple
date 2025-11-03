@@ -194,12 +194,15 @@ struct MainViewHistorySection: View {
                 background: isPinnedFilterActive ? Color.accentColor : Color.secondary.opacity(0.1),
                 iconName: isPinnedFilterActive ? "pin.fill" : "pin",
                 iconColor: isPinnedFilterActive ? .white : .secondary,
-                iconSize: 10,
+                iconFont: MainViewMetrics.HistoryFilterIcon.pinnedFont,
                 rotation: isPinnedFilterActive ? 0 : -45
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .frame(width: 22, height: 22)
+        .frame(
+            width: MainViewMetrics.HistoryFilterIcon.diameter,
+            height: MainViewMetrics.HistoryFilterIcon.diameter
+        )
         .help(
             Text(
                 isPinnedFilterActive
@@ -237,11 +240,14 @@ struct MainViewHistorySection: View {
                     background: Color.accentColor,
                     iconName: iconName,
                     iconColor: .white,
-                    iconSize: 13
+                    iconFont: MainViewMetrics.HistoryFilterIcon.categoryFont
                 )
             }
             .buttonStyle(PlainButtonStyle())
-            .frame(width: 22, height: 22)
+            .frame(
+                width: MainViewMetrics.HistoryFilterIcon.diameter,
+                height: MainViewMetrics.HistoryFilterIcon.diameter
+            )
             .help(Text(verbatim: currentCategoryFilterLabel))
         } else {
             Menu {
@@ -280,12 +286,15 @@ struct MainViewHistorySection: View {
                     background: Color.secondary.opacity(0.1),
                     iconName: noneCategoryIconName,
                     iconColor: .secondary,
-                    iconSize: 13
+                    iconFont: MainViewMetrics.HistoryFilterIcon.categoryFont
                 )
             }
             .menuStyle(BorderlessButtonMenuStyle())
             .menuIndicator(.hidden)
-            .frame(width: 22, height: 22)
+            .frame(
+                width: MainViewMetrics.HistoryFilterIcon.diameter,
+                height: MainViewMetrics.HistoryFilterIcon.diameter
+            )
             .help(Text(verbatim: noneCategoryDisplayName))
         }
     }
@@ -309,15 +318,15 @@ struct MainViewHistorySection: View {
         HStack(spacing: 8) {
             if let systemImage {
                 Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .regular))
+                    .font(MainViewMetrics.HistoryFilterMenu.iconFont)
                     .foregroundColor(.secondary)
             }
             Text(verbatim: text)
-                .font(.system(size: 12))
+                .font(MainViewMetrics.HistoryFilterMenu.labelFont)
             Spacer()
             if selected {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(MainViewMetrics.HistoryFilterMenu.checkmarkFont)
             }
         }
         .padding(.vertical, 2)
@@ -339,11 +348,14 @@ struct MainViewHistorySection: View {
                 background: isQueueLoopActive ? Color.accentColor : Color.secondary.opacity(0.1),
                 iconName: "repeat",
                 iconColor: isQueueLoopActive ? .white : .secondary,
-                iconSize: 12
+                iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .frame(width: 22, height: 22)
+        .frame(
+            width: MainViewMetrics.HistoryFilterIcon.diameter,
+            height: MainViewMetrics.HistoryFilterIcon.diameter
+        )
         .disabled(!canToggleQueueLoop)
         .opacity(canToggleQueueLoop ? 1.0 : 0.4)
         .help(Text(String(localized: "Queue loop")))
@@ -357,7 +369,7 @@ struct MainViewHistorySection: View {
 
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(MainViewMetrics.HistorySearchField.iconFont)
                     .foregroundColor(.secondary)
                     .padding(.leading, 8)
 
@@ -373,7 +385,7 @@ struct MainViewHistorySection: View {
                         }
                     }, label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
+                            .font(MainViewMetrics.HistorySearchField.clearIconFont)
                             .foregroundColor(.secondary)
                     })
                     .buttonStyle(PlainButtonStyle())
@@ -383,7 +395,7 @@ struct MainViewHistorySection: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 32)
+        .frame(height: MainViewMetrics.HistorySearchField.height)
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
@@ -394,20 +406,20 @@ struct MainViewHistorySection: View {
         background: Color,
         iconName: String,
         iconColor: Color,
-        iconSize: CGFloat = 12,
+        iconFont: Font = MainViewMetrics.HistoryFilterIcon.defaultFont,
         rotation: Double = 0
     ) -> some View {
         ZStack {
             Circle()
                 .fill(background)
-                .frame(width: 22, height: 22)
+                .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
 
             Image(systemName: iconName)
-                .font(.system(size: iconSize, weight: .medium))
+                .font(iconFont)
                 .foregroundColor(iconColor)
                 .rotationEffect(.degrees(rotation))
         }
-        .frame(width: 22, height: 22)
+        .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
         .contentShape(Circle())
     }
 }

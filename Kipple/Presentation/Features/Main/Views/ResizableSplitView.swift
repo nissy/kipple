@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+private enum SplitHandleMetrics {
+    static let dotSize: CGFloat = 5
+    static let dotSpacing: CGFloat = 3
+    static let dotCount: Int = 3
+    static let activeScale: CGFloat = 1.2
+}
+
 struct SplitViewResetConfiguration: Equatable {
     let id: UUID
     let preferredTopHeight: Double?
@@ -66,14 +73,17 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
                         .frame(height: handleHeight)  // 高さを少し増やす
                     
                     // Visual handle - 中央に配置
-                    HStack(spacing: 3) {
-                        ForEach(0..<3) { _ in
+                    HStack(spacing: SplitHandleMetrics.dotSpacing) {
+                        ForEach(0..<SplitHandleMetrics.dotCount) { _ in
                             Circle()
                                 .fill(isDragging ? Color.accentColor : Color.gray.opacity(0.4))
-                                .frame(width: 5, height: 5)  // サイズを少し大きく
+                                .frame(
+                                    width: SplitHandleMetrics.dotSize,
+                                    height: SplitHandleMetrics.dotSize
+                                )
                         }
                     }
-                    .scaleEffect(isDragging ? 1.2 : 1.0)
+                    .scaleEffect(isDragging ? SplitHandleMetrics.activeScale : 1.0)
                     .animation(.spring(response: 0.3), value: isDragging)
                 }
                 .contentShape(Rectangle())

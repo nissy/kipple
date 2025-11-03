@@ -74,6 +74,7 @@
 		7062E8CFC0AA11960FB5ACEC /* TrimmedHistoryRecopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F59BE9F660F6741711F637 /* TrimmedHistoryRecopyTests.swift */; };
 		707328A41353257DD6277962 /* SwiftDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F433A1E4092D8E995AB41D /* SwiftDataModels.swift */; };
 		71ED0C92C9F135E30E122457 /* ScreenSelectionOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B126E5FF094DFBF53AD8BBA /* ScreenSelectionOverlayController.swift */; };
+		7567F2C58CFFD708C4EA9398 /* MainViewMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93103F63F0F538CD5443897C /* MainViewMetrics.swift */; };
 		76F04D59D6CF00DA20D0E32D /* SearchAndFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49708A82996F2F3A065FF4E2 /* SearchAndFilterTests.swift */; };
 		7915190E49313A4EB5A9474C /* HistoryPopoverLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3794E8C4BD8C40F2E779C777 /* HistoryPopoverLifecycleTests.swift */; };
 		794F518FDEB520F7E63AFD2F /* TextRecognitionServiceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E17CD7D8F9335118F51BC88 /* TextRecognitionServiceProvider.swift */; };
@@ -275,6 +276,7 @@
 		908CCD2C22B080418E5FCE8F /* VisionTextRecognitionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionTextRecognitionService.swift; sourceTree = "<group>"; };
 		9160FB1D093AC8ADADFD916C /* SwiftDataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepository.swift; sourceTree = "<group>"; };
 		91778173C4E051ADCDEA9E05 /* MainViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModel.swift; sourceTree = "<group>"; };
+		93103F63F0F538CD5443897C /* MainViewMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewMetrics.swift; sourceTree = "<group>"; };
 		95A21AC6929667A00FB9B0DF /* ModernClipboardServiceStartupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceStartupTests.swift; sourceTree = "<group>"; };
 		97217BFE5D2FF6230E91571D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		97E383759C2BA7CA63D0A153 /* ModernClipboardMetadataAccuracyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardMetadataAccuracyTests.swift; sourceTree = "<group>"; };
@@ -810,6 +812,7 @@
 				C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */,
 				FE96C222A5E167BABAE17011 /* MainViewEditorSection.swift */,
 				B1088BA3F9356CC79A508A02 /* MainViewHistorySection.swift */,
+				93103F63F0F538CD5443897C /* MainViewMetrics.swift */,
 				4F0241ABC3DA767CFBA780D6 /* MainViewTitleBar.swift */,
 				B538EF6166B8332429EF10E7 /* ResizableSplitView.swift */,
 				6049C5E3BDEFC0FF5344A625 /* SimpleLineNumberCoordinator.swift */,
@@ -1063,6 +1066,7 @@
 				FB1BCF2185DA68F62529EAAE /* MainViewControlSection.swift in Sources */,
 				4C2F5C953ACAD48CD26DD1BE /* MainViewEditorSection.swift in Sources */,
 				AF778ECCA9E520AC5A8CD4B8 /* MainViewHistorySection.swift in Sources */,
+				7567F2C58CFFD708C4EA9398 /* MainViewMetrics.swift in Sources */,
 				F09D930768983860F965E45A /* MainViewModel.swift in Sources */,
 				14B405D051834F8C2F1A5295 /* MainViewModelProtocol.swift in Sources */,
 				B7A3D47B0622ED27ADAAD188 /* MainViewTitleBar.swift in Sources */,

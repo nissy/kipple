@@ -27,6 +27,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     var textCaptureHotkeyManager: TextCaptureHotkeyManager?
     var textCaptureHotkeyObserver: NSObjectProtocol?
     private var screenRecordingPermissionObserver: NSObjectProtocol?
+    private var accessibilityPermissionObserver: NSObjectProtocol?
     
     // Properties for asynchronous termination handling
     private var isTerminating = false
@@ -60,7 +61,21 @@ final class MenuBarApp: NSObject, ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.windowManager.openSettings(tab: .permission)
+                guard let self else { return }
+                self.windowManager.openSettings(tab: .permission)
+                ScreenRecordingPermissionOpener.openSystemSettings()
+            }
+        }
+
+        accessibilityPermissionObserver = NotificationCenter.default.addObserver(
+            forName: .accessibilityPermissionRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.windowManager.openSettings(tab: .permission)
+                self.openAccessibilityPreferences()
             }
         }
 
@@ -173,6 +188,13 @@ final class MenuBarApp: NSObject, ObservableObject {
     
     @objc private func showAbout() {
         windowManager.showAbout()
+    }
+
+    @MainActor
+    private func openAccessibilityPreferences() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc private func quit() {
