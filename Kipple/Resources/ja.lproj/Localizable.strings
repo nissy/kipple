@@ -7,7 +7,7 @@
 "Abc 123 あいう" = "Abc 123 あいう";
 "App Language" = "アプリの表示言語";
 "All" = "すべて";
-"About" = "バージョン情報";
+"About" = "アプリ情報";
 "About Kipple" = "Kipple について";
 "Accessibility Permission" = "アクセシビリティの許可";
 "Accessibility Permission Ready" = "アクセシビリティの許可は設定済み";
@@ -42,6 +42,7 @@
 "Remove all clipboard history items (pinned items stay)" = "クリップボード履歴をすべて削除します（ピン留めは残ります）";
 "Delete" = "削除";
 "Delete category" = "カテゴリを削除";
+"Delete item" = "項目を削除";
 "Editor Clear" = "エディタのクリア";
 "Editor Copy" = "エディタのコピー";
 "Editor Font" = "エディタのフォント";
@@ -91,7 +92,9 @@
 "Launch at login" = "ログイン時に起動";
 "Global Hotkey" = "グローバルホットキー";
 "Pin limit reached" = "ピン留め数の上限に達しました";
+"Pin item" = "項目をピン留め";
 "Pinned" = "Pinned";
+"Unpin item" = "ピン留めを解除";
 "Privacy & Security" = "プライバシーとセキュリティ";
 "Hide editor panel" = "エディタパネルを非表示";
 "Show editor panel" = "エディタパネルを表示";
@@ -103,6 +106,7 @@
 "Protected by macOS security features" = "macOSのセキュリティ機能で保護されています";
 "Data can be cleared at any time" = "いつでもデータを削除できます";
 "Queue" = "Queue";
+"Queue paste mode" = "キューペーストモード";
 "Queue position %d" = "キューの位置 %d";
 "Quick Editor" = "クイックエディタ";
 "Quit Kipple" = "Kipple を終了";
@@ -123,6 +127,9 @@
 "Select a font to add as fallback" = "追加するフォールバックフォントを選択";
 "Select a key and modifier to enable the shortcut." = "ショートカットを有効にするキーと修飾キーを選択してください。";
 "Settings" = "設定";
+"MainWindowTitle" = "Kipple";
+"AboutWindowTitle" = "Kipple について";
+"SettingsTitleFormat" = "%1$@ %2$@";
 "Settings…" = "設定…";
 "Shortcut is ready to use. Hold the selected modifiers and key to capture text." = "ショートカットの準備ができました。選択した修飾キーとキーを押し続けてテキストを取得します。";
 "Show in filter" = "フィルタに表示";
@@ -168,3 +175,9 @@
 "⌃ Control" = "⌃ Control";
 "⌘ Command" = "⌘ Command";
 "⌥ Option" = "⌥ Option";
+"AboutAppName" = "Kipple";
+"AboutHighlightLocal" = "すべてのデータはお使いのMac内に保存されます";
+"AboutHighlightNetwork" = "外部サーバーへデータを送信しません";
+"AboutHighlightSecurity" = "macOSのセキュリティ機能で保護されています";
+"AboutHighlightDeletion" = "いつでもデータを削除できます";
+"AboutCopyright" = "© 2025 Kipple";

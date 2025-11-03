@@ -49,7 +49,7 @@ extension MainView {
                             .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
                     })
                     .buttonStyle(PlainButtonStyle())
-                    .help("Clear clipboard")
+                    .help(Text("Clear clipboard"))
                     .onHover { hovering in
                         hoveredClearButton = hovering
                     }
@@ -67,19 +67,19 @@ extension MainView {
             HStack(alignment: .center, spacing: 10) {
                 bottomBarActionButton(
                     systemName: "info.circle",
-                    help: String(localized: "About"),
+                    helpKey: "About",
                     action: onOpenAbout
                 )
 
                 bottomBarActionButton(
                     systemName: "power.circle",
-                    help: String(localized: "Quit Kipple"),
+                    helpKey: "Quit Kipple",
                     action: showQuitConfirmationAlert
                 )
 
                 bottomBarActionButton(
                     systemName: "gearshape",
-                    help: String(localized: "Settings"),
+                    helpKey: "Settings",
                     action: onOpenSettings
                 )
             }
@@ -106,7 +106,7 @@ extension MainView {
 private extension MainView {
     func bottomBarActionButton(
         systemName: String,
-        help: String,
+        helpKey: LocalizedStringKey,
         action: (() -> Void)?
     ) -> some View {
         Button(action: {
@@ -131,6 +131,6 @@ private extension MainView {
             }
         })
         .buttonStyle(PlainButtonStyle())
-        .help(help)
+        .help(Text(helpKey))
     }
 }

@@ -149,7 +149,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func configureMainWindow(_ window: NSWindow) {
         // ウィンドウの基本設定
-        window.title = "Kipple"
+        window.title = localizedMainWindowTitle()
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.styleMask = [.titled, .closable, .fullSizeContentView, .resizable]
@@ -486,7 +486,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = SettingsHostingController(rootView: settingsView)
 
             let window = NSWindow(contentViewController: hostingController)
-            window.title = String(localized: "Settings")
+        window.title = localizedSettingsWindowTitle()
             window.styleMask = [.titled, .closable]
             window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
@@ -540,14 +540,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = NSHostingController(rootView: aboutView)
             
             aboutWindow = NSWindow(contentViewController: hostingController)
-            aboutWindow?.title = String(localized: "About Kipple")
+            aboutWindow?.title = localizedAboutWindowTitle()
             aboutWindow?.styleMask = [.titled, .closable]
             aboutWindow?.isMovableByWindowBackground = true
             aboutWindow?.setContentSize(NSSize(width: 360, height: 420))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
         } else {
-            aboutWindow?.title = String(localized: "About Kipple")
+            aboutWindow?.title = localizedAboutWindowTitle()
         }
         
         NSApp.setActivationPolicy(.regular)
@@ -570,8 +570,22 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func updateLocalization() {
-        settingsWindow?.title = appSettings.localizedString("Settings", comment: "Settings window title")
+        mainWindow?.title = localizedMainWindowTitle()
+        settingsWindow?.title = localizedSettingsWindowTitle()
         settingsCoordinator?.refreshLocalization()
+        aboutWindow?.title = localizedAboutWindowTitle()
+    }
+
+    private func localizedMainWindowTitle() -> String {
+        appSettings.localizedString("MainWindowTitle", comment: "Main window title")
+    }
+
+    private func localizedSettingsWindowTitle() -> String {
+        appSettings.localizedString("Settings", comment: "Settings window title")
+    }
+
+    private func localizedAboutWindowTitle() -> String {
+        appSettings.localizedString("AboutWindowTitle", comment: "About window title")
     }
     
     // MARK: - Focus Management

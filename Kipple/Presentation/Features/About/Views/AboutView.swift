@@ -11,17 +11,19 @@ struct AboutView: View {
     private struct Highlight: Identifiable {
         let id: String
         let icon: String
-        let text: LocalizedStringKey
+        let textKey: String
     }
 
     @ObservedObject private var appSettings = AppSettings.shared
 
-    private let highlights: [Highlight] = [
-        .init(id: "local", icon: "lock.shield", text: "All data is stored locally on your Mac"),
-        .init(id: "network", icon: "network.slash", text: "No data is sent to external servers"),
-        .init(id: "security", icon: "hand.raised", text: "Protected by macOS security features"),
-        .init(id: "deletion", icon: "trash", text: "Data can be cleared at any time")
-    ]
+    private var highlights: [Highlight] {
+        [
+            .init(id: "local", icon: "lock.shield", textKey: "AboutHighlightLocal"),
+            .init(id: "network", icon: "network.slash", textKey: "AboutHighlightNetwork"),
+            .init(id: "security", icon: "hand.raised", textKey: "AboutHighlightSecurity"),
+            .init(id: "deletion", icon: "trash", textKey: "AboutHighlightDeletion")
+        ]
+    }
 
     var body: some View {
         VStack(spacing: 24) {
@@ -47,7 +49,7 @@ struct AboutView: View {
                     .shadow(color: Color.black.opacity(0.08), radius: 6, y: 3)
             }
 
-            Text("Kipple")
+            Text(appSettings.localizedString("AboutAppName", comment: "About screen app name"))
                 .font(.title2.weight(.semibold))
 
             if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
@@ -55,20 +57,23 @@ struct AboutView: View {
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
-
         }
         .frame(maxWidth: .infinity)
     }
 
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Privacy & Security")
+            Text(appSettings.localizedString("Privacy & Security", comment: "About screen privacy heading"))
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(highlights) { item in
+                    let text = appSettings.localizedString(
+                        item.textKey,
+                        comment: "About screen highlight item"
+                    )
                     Label {
-                        Text(item.text)
+                        Text(text)
                             .font(.callout)
                             .foregroundColor(.primary)
                             .multilineTextAlignment(.leading)
@@ -88,13 +93,16 @@ struct AboutView: View {
         VStack(spacing: 8) {
             if let url = URL(string: "https://github.com/nissy/Kipple") {
                 Link(destination: url) {
-                    Label("View on GitHub", systemImage: "link")
+                    Label(
+                        appSettings.localizedString("View on GitHub", comment: "About screen GitHub link"),
+                        systemImage: "link"
+                    )
                         .font(.callout.weight(.medium))
                 }
                 .buttonStyle(.plain)
             }
 
-            Text("© 2025 Kipple")
+            Text(appSettings.localizedString("AboutCopyright", comment: "About screen copyright"))
                 .font(.footnote)
                 .foregroundColor(.secondary)
         }
@@ -102,10 +110,8 @@ struct AboutView: View {
     }
 
     private func versionText(_ version: String) -> String {
-        String(
-            format: NSLocalizedString("Version %@", comment: "App version label"),
-            version
-        )
+        let format = appSettings.localizedString("Version %@", comment: "App version label")
+        return String(format: format, locale: appSettings.appLocale, arguments: [version])
     }
 }
 

@@ -42,6 +42,7 @@ final class MainWindowTitleBarState: ObservableObject {
 
 struct MainViewTitleBarAccessory: View {
     @ObservedObject var state: MainWindowTitleBarState
+    @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
         HStack(spacing: 8) {
@@ -61,6 +62,22 @@ struct MainViewTitleBarAccessory: View {
 }
 
 private extension MainViewTitleBarAccessory {
+    var captureHelpText: String {
+        appSettings.localizedString("Screen Text Capture", comment: "Tooltip for screen text capture button")
+    }
+
+    var queueHelpText: String {
+        appSettings.localizedString("Queue paste mode", comment: "Tooltip for queue toggle button")
+    }
+
+    var hideEditorHelpText: String {
+        appSettings.localizedString("Hide editor panel", comment: "Tooltip when editor is visible")
+    }
+
+    var showEditorHelpText: String {
+        appSettings.localizedString("Show editor panel", comment: "Tooltip when editor is hidden")
+    }
+
     var captureButton: some View {
         Button(action: state.requestStartCapture) {
             ZStack {
@@ -82,7 +99,7 @@ private extension MainViewTitleBarAccessory {
         .scaleEffect(1.0)
         .opacity(state.isCaptureEnabled ? 1.0 : 0.45)
         .disabled(!state.isCaptureEnabled)
-        .help(Text("Screen Text Capture"))
+        .help(captureHelpText)
     }
     
     var queueButton: some View {
@@ -107,7 +124,7 @@ private extension MainViewTitleBarAccessory {
         .animation(.spring(response: 0.3), value: state.isQueueActive)
         .opacity(state.isQueueEnabled ? 1.0 : 0.45)
         .disabled(!state.isQueueEnabled)
-        .help(Text("Queue"))
+        .help(queueHelpText)
     }
     
     var editorButton: some View {
@@ -130,7 +147,7 @@ private extension MainViewTitleBarAccessory {
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(state.isEditorEnabled ? 1.0 : 0.92)
         .animation(.spring(response: 0.3), value: state.isEditorEnabled)
-        .help(state.isEditorEnabled ? Text("Hide editor panel") : Text("Show editor panel"))
+        .help(state.isEditorEnabled ? hideEditorHelpText : showEditorHelpText)
     }
     
     var editorButtonBackground: LinearGradient {
@@ -187,6 +204,7 @@ private extension MainViewTitleBarAccessory {
 
 struct MainViewTitleBarPinButton: View {
     @ObservedObject var state: MainWindowTitleBarState
+    @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
         Button(action: state.requestToggleAlwaysOnTop) {
@@ -211,12 +229,8 @@ struct MainViewTitleBarPinButton: View {
         .animation(.spring(response: 0.3), value: state.isAlwaysOnTop)
         .help(
             state.isAlwaysOnTopForcedByQueue && !state.isAlwaysOnTop
-                ? Text("Queue mode is active but Always on Top is disabled")
-                : Text(
-                    state.isAlwaysOnTop
-                        ? "Disable always on top"
-                        : "Enable always on top"
-                )
+                ? queueForcedHelpText
+                : (state.isAlwaysOnTop ? disableAlwaysOnTopHelpText : enableAlwaysOnTopHelpText)
         )
     }
     
@@ -237,5 +251,22 @@ struct MainViewTitleBarPinButton: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+}
+
+private extension MainViewTitleBarPinButton {
+    var queueForcedHelpText: String {
+        appSettings.localizedString(
+            "Queue mode is active but Always on Top is disabled",
+            comment: "Tooltip when queue forces always on top but is disabled"
+        )
+    }
+
+    var disableAlwaysOnTopHelpText: String {
+        appSettings.localizedString("Disable always on top", comment: "Tooltip when disabling always on top")
+    }
+
+    var enableAlwaysOnTopHelpText: String {
+        appSettings.localizedString("Enable always on top", comment: "Tooltip when enabling always on top")
     }
 }

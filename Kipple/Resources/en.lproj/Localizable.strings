@@ -42,6 +42,7 @@
 "Remove all clipboard history items (pinned items stay)" = "Remove all clipboard history items (pinned items stay)";
 "Delete" = "Delete";
 "Delete category" = "Delete category";
+"Delete item" = "Delete item";
 "Editor Clear" = "Editor Clear";
 "Editor Copy" = "Editor Copy";
 "Editor Font" = "Editor Font";
@@ -91,7 +92,9 @@
 "Launch at login" = "Launch at login";
 "Global Hotkey" = "Global Hotkey";
 "Pin limit reached" = "Pin limit reached";
+"Pin item" = "Pin item";
 "Pinned" = "Pinned";
+"Unpin item" = "Unpin item";
 "Privacy & Security" = "Privacy & Security";
 "Hide editor panel" = "Hide editor panel";
 "Show editor panel" = "Show editor panel";
@@ -103,6 +106,7 @@
 "Protected by macOS security features" = "Protected by macOS security features";
 "Data can be cleared at any time" = "Data can be cleared at any time";
 "Queue" = "Queue";
+"Queue paste mode" = "Queue paste mode";
 "Queue position %d" = "Queue position %d";
 "Quick Editor" = "Quick Editor";
 "Quit Kipple" = "Quit Kipple";
@@ -123,6 +127,9 @@
 "Select a font to add as fallback" = "Select a font to add as fallback";
 "Select a key and modifier to enable the shortcut." = "Select a key and modifier to enable the shortcut.";
 "Settings" = "Settings";
+"MainWindowTitle" = "Kipple";
+"AboutWindowTitle" = "About Kipple";
+"SettingsTitleFormat" = "%1$@ %2$@";
 "Settings…" = "Settings…";
 "Shortcut is ready to use. Hold the selected modifiers and key to capture text." = "Shortcut is ready to use. Hold the selected modifiers and key to capture text.";
 "Show in filter" = "Show in filter";
@@ -168,3 +175,9 @@
 "⌃ Control" = "⌃ Control";
 "⌘ Command" = "⌘ Command";
 "⌥ Option" = "⌥ Option";
+"AboutAppName" = "Kipple";
+"AboutHighlightLocal" = "All data is stored locally on your Mac";
+"AboutHighlightNetwork" = "No data is sent to external servers";
+"AboutHighlightSecurity" = "Protected by macOS security features";
+"AboutHighlightDeletion" = "Data can be cleared at any time";
+"AboutCopyright" = "© 2025 Kipple";

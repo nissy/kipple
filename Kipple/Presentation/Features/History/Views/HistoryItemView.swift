@@ -22,7 +22,7 @@ struct HistoryItemView: View {
     let onChangeCategory: ((UUID?) -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
-
+    @ObservedObject private var appSettings = AppSettings.shared
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
@@ -182,6 +182,7 @@ struct HistoryItemView: View {
             closePopover()
             onTogglePin()
         }
+        .help(pinHelpText)
     }
 
     @ViewBuilder
@@ -261,12 +262,27 @@ struct HistoryItemView: View {
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
                 .contentShape(Circle())
+                .help(deleteHelpText)
                 .onTapGesture {
                     closePopover()
                     onDelete()
                 }
                 .transition(.opacity.animation(.easeInOut(duration: 0.15)))
         }
+    }
+
+    private var pinHelpText: String {
+        appSettings.localizedString(
+            item.isPinned ? "Unpin item" : "Pin item",
+            comment: "Tooltip for toggling pin state in history list"
+        )
+    }
+
+    private var deleteHelpText: String {
+        appSettings.localizedString(
+            "Delete item",
+            comment: "Tooltip for deleting a history item"
+        )
     }
 
     private func getDisplayContent() -> String {
