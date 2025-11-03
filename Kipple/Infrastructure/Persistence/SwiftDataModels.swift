@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-@available(macOS 14.0, *)
 @Model
+@available(macOS 14.0, *)
 final class ClipItemModel {
     @Attribute(.unique) var id: UUID
     var content: String

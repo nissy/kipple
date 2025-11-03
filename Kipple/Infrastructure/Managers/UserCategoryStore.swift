@@ -88,6 +88,8 @@ final class UserCategoryStore: ObservableObject {
 
     func noneCategory() -> UserCategory { Self.builtInNone }
     func noneCategoryId() -> UUID { Self.builtInNoneID }
+    func urlCategory() -> UserCategory { Self.builtInURL }
+    func urlCategoryId() -> UUID { Self.builtInURLID }
 
     enum BuiltInKind { case none, url }
     func builtInKind(for id: UUID) -> BuiltInKind? {

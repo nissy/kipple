@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 import Combine
 
+// swiftlint:disable file_length
 @MainActor
 protocol WindowManaging: AnyObject {
     func openMainWindow()
@@ -30,6 +31,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsCoordinator: SettingsToolbarController?
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
+    private let titleBarState = MainWindowTitleBarState()
+    private var titleBarLeftHostingView: NSHostingView<MainViewTitleBarAccessory>?
+    private var titleBarPinHostingView: NSHostingView<MainViewTitleBarPinButton>?
     private let appSettings = AppSettings.shared
     private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
@@ -40,6 +44,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.hidesOnDeactivate = !isAlwaysOnTop
                 Logger.shared.log("isAlwaysOnTop changed to: \(isAlwaysOnTop), hidesOnDeactivate: \(!isAlwaysOnTop)")
             }
+            titleBarState.isAlwaysOnTop = isAlwaysOnTop
         }
     }
     private var preventAutoClose = false
@@ -111,6 +116,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         
         let contentView = MainView(
+            titleBarState: titleBarState,
             onClose: { [weak self] in
                 self?.mainWindow?.close()
             },
@@ -119,6 +125,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
             },
             onOpenSettings: { [weak self] in
                 self?.openSettings()
+            },
+            onOpenAbout: { [weak self] in
+                self?.showAbout()
+            },
+            onQuitApplication: {
+                NSApplication.shared.terminate(nil)
             },
             onSetPreventAutoClose: { [weak self] flag in
                 self?.setPreventAutoClose(flag)
@@ -137,17 +149,18 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func configureMainWindow(_ window: NSWindow) {
         // ウィンドウの基本設定
-        window.title = "Kipple"
+        window.title = localizedMainWindowTitle()
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.styleMask = [.titled, .closable, .fullSizeContentView, .resizable]
-        window.level = .floating
+        window.level = isAlwaysOnTop ? .floating : .normal
         // M2 Mac対応: hidesOnDeactivateを動的に設定
         window.hidesOnDeactivate = !isAlwaysOnTop
         
         // ツールバーボタンを無効化（×ボタン以外を非表示）
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.standardWindowButton(.closeButton)?.isHidden = true
         
         // デリゲートを設定
         window.delegate = self
@@ -156,6 +169,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         configureWindowSize(window)
         
         // カーソル位置にウィンドウを配置
+        attachAlwaysOnTopButton(to: window)
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let window else { return }
+            self?.attachAlwaysOnTopButton(to: window)
+        }
         positionWindowAtCursor(window)
     }
     
@@ -172,6 +190,52 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.setContentSize(NSSize(width: initialWidth, height: initialHeight))
         window.minSize = NSSize(width: 300, height: 300)
         window.maxSize = NSSize(width: 800, height: 1200)
+    }
+    
+    private func attachAlwaysOnTopButton(to window: NSWindow) {
+        titleBarLeftHostingView?.removeFromSuperview()
+        titleBarPinHostingView?.removeFromSuperview()
+        
+        guard let titlebarContainer = window.standardWindowButton(.closeButton)?.superview?.superview else {
+            Logger.shared.log("Failed to locate titlebar container for pin button")
+            return
+        }
+        
+        let leftView = NSHostingView(rootView: MainViewTitleBarAccessory(state: titleBarState))
+        leftView.translatesAutoresizingMaskIntoConstraints = false
+        leftView.wantsLayer = true
+        leftView.layer?.backgroundColor = NSColor.clear.cgColor
+        leftView.layer?.zPosition = 1
+        leftView.setContentHuggingPriority(.required, for: .horizontal)
+        leftView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        leftView.isHidden = false
+
+        titlebarContainer.addSubview(leftView, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            leftView.leadingAnchor.constraint(equalTo: titlebarContainer.leadingAnchor, constant: 6),
+            leftView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
+            leftView.heightAnchor.constraint(equalToConstant: 34)
+        ])
+
+        let pinView = NSHostingView(rootView: MainViewTitleBarPinButton(state: titleBarState))
+        pinView.translatesAutoresizingMaskIntoConstraints = false
+        pinView.wantsLayer = true
+        pinView.layer?.backgroundColor = NSColor.clear.cgColor
+        pinView.layer?.zPosition = 1
+        pinView.setContentHuggingPriority(.required, for: .horizontal)
+        pinView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        pinView.isHidden = false
+
+        titlebarContainer.addSubview(pinView, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            pinView.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor, constant: -6),
+            pinView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
+            pinView.heightAnchor.constraint(equalToConstant: 34),
+            pinView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34)
+        ])
+
+        titleBarLeftHostingView = leftView
+        titleBarPinHostingView = pinView
     }
     
     private func positionWindowAtCursor(_ window: NSWindow) {
@@ -422,7 +486,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = SettingsHostingController(rootView: settingsView)
 
             let window = NSWindow(contentViewController: hostingController)
-            window.title = String(localized: "Settings")
+        window.title = localizedSettingsWindowTitle()
             window.styleMask = [.titled, .closable]
             window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
@@ -476,14 +540,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = NSHostingController(rootView: aboutView)
             
             aboutWindow = NSWindow(contentViewController: hostingController)
-            aboutWindow?.title = String(localized: "About Kipple")
+            aboutWindow?.title = localizedAboutWindowTitle()
             aboutWindow?.styleMask = [.titled, .closable]
             aboutWindow?.isMovableByWindowBackground = true
-            aboutWindow?.setContentSize(NSSize(width: 400, height: 580))
+            aboutWindow?.setContentSize(NSSize(width: 360, height: 420))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
         } else {
-            aboutWindow?.title = String(localized: "About Kipple")
+            aboutWindow?.title = localizedAboutWindowTitle()
         }
         
         NSApp.setActivationPolicy(.regular)
@@ -506,8 +570,22 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func updateLocalization() {
-        settingsWindow?.title = appSettings.localizedString("Settings", comment: "Settings window title")
+        mainWindow?.title = localizedMainWindowTitle()
+        settingsWindow?.title = localizedSettingsWindowTitle()
         settingsCoordinator?.refreshLocalization()
+        aboutWindow?.title = localizedAboutWindowTitle()
+    }
+
+    private func localizedMainWindowTitle() -> String {
+        appSettings.localizedString("MainWindowTitle", comment: "Main window title")
+    }
+
+    private func localizedSettingsWindowTitle() -> String {
+        appSettings.localizedString("Settings", comment: "Settings window title")
+    }
+
+    private func localizedAboutWindowTitle() -> String {
+        appSettings.localizedString("AboutWindowTitle", comment: "About window title")
     }
     
     // MARK: - Focus Management
@@ -598,3 +676,5 @@ extension WindowManager {
 }
 
 extension WindowManager: WindowManaging {}
+
+// swiftlint:enable file_length

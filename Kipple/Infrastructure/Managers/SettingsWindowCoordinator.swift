@@ -72,9 +72,6 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
                 if self.toolbar.selectedItemIdentifier != tab.toolbarIdentifier {
                     self.toolbar.selectedItemIdentifier = tab.toolbarIdentifier
                 }
-                if #available(macOS 11.0, *) {
-                    self.window?.subtitle = self.appSettings.localizedString(tab.titleKey, comment: "Settings tab title")
-                }
                 self.refreshLocalization()
                 self.updateWindowSize(animated: true)
                 DispatchQueue.main.async { [weak self] in
@@ -150,9 +147,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
                 item.image = image
             }
         }
-        if #available(macOS 11.0, *) {
-            window.subtitle = appSettings.localizedString(viewModel.selectedTab.titleKey, comment: "Settings tab title")
-        }
+        updateWindowTitle()
     }
 
     private func updateWindowSize(animated: Bool) {
@@ -169,6 +164,17 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
                 abs(currentSize.height - targetSize.height) > 0.5 else { return }
 
         window.setContentSize(targetSize)
+    }
+
+    private func updateWindowTitle() {
+        guard let window else { return }
+        let settingsTitle = appSettings.localizedString("Settings", comment: "Settings window title")
+        let tabTitle = appSettings.localizedString(viewModel.selectedTab.titleKey, comment: "Settings tab title")
+        let format = appSettings.localizedString("SettingsTitleFormat", comment: "Settings window combined title format")
+        window.title = String(format: format, settingsTitle, tabTitle)
+        if #available(macOS 11.0, *) {
+            window.subtitle = ""
+        }
     }
 }
 

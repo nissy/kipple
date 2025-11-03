@@ -130,6 +130,7 @@ struct PermissionsSettingsView: View {
                     Text("2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”.")
                     Text("3. Return to Kipple; the status badge switches to Granted automatically.")
                     Text("Tip: Granting Accessibility lets Kipple observe Command+V while running in the background.")
+                    Text(LocalizedStringKey("Automation Prompt Tip"))
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
@@ -327,6 +328,7 @@ struct PermissionsSettingsView: View {
 
 extension Notification.Name {
     static let screenRecordingPermissionRequested = Notification.Name("ScreenRecordingPermissionRequested")
+    static let accessibilityPermissionRequested = Notification.Name("AccessibilityPermissionRequested")
 }
 
 // MARK: - PermissionStatusBadge

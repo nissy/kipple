@@ -88,7 +88,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             history = pinnedItems
 
             if !pinnedItems.isEmpty {
-                Logger.shared.log("Loaded \(pinnedItems.count) pinned items from repository")
                 notifyHistoryObservers()
             }
 
@@ -118,12 +117,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             history = combinedItems
             let wasTrimmed = trimHistory()
-
-            if wasTrimmed {
-                Logger.shared.log("Trimmed history to \(history.count) items (max: \(maxHistoryItems))")
-            } else {
-                Logger.shared.log("Loaded \(history.count) items from repository (max: \(maxHistoryItems))")
-            }
 
             snapshotNeedsPriming = true
             saveSubject.send(history)
@@ -260,14 +253,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         var newItem = item
         newItem.timestamp = Date()  // Update timestamp to current time
 
-        // Check if an item with same content exists and preserve its pin state
-        if let existingIndex = history.firstIndex(where: { $0.content == item.content }) {
-            let existingItem = history[existingIndex]
-            // Preserve pin state and user category from existing item
+        // Try to match by ID first to avoid expensive content comparisons
+        if let existingIndex = history.firstIndex(where: { $0.id == item.id }) {
+            let existingItem = history.remove(at: existingIndex)
             if existingItem.isPinned { newItem.isPinned = true }
             newItem.userCategoryId = existingItem.userCategoryId
-            // Remove the existing item
-            history.remove(at: existingIndex)
+        } else if let duplicateIndex = history.firstIndex(where: { $0.content == item.content }) {
+            // Preserve pin state and user category from any remaining duplicate content
+            let existingItem = history.remove(at: duplicateIndex)
+            if existingItem.isPinned { newItem.isPinned = true }
+            newItem.userCategoryId = existingItem.userCategoryId
         }
 
         // Add item at the beginning with preserved metadata and new timestamp

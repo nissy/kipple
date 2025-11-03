@@ -74,15 +74,22 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling 
     func recopyFromHistory(_ item: ClipItem) {
         lastRecopiedItem = item
 
-        // Remove existing item with same content
-        if let index = history.firstIndex(where: { $0.content == item.content }) {
-            history.remove(at: index)
+        var updatedItem = item
+
+        if let index = history.firstIndex(where: { $0.id == item.id }) {
+            let existing = history.remove(at: index)
+            if existing.isPinned { updatedItem.isPinned = true }
+            updatedItem.userCategoryId = existing.userCategoryId
+        } else if let index = history.firstIndex(where: { $0.content == item.content }) {
+            let existing = history.remove(at: index)
+            if existing.isPinned { updatedItem.isPinned = true }
+            updatedItem.userCategoryId = existing.userCategoryId
         }
 
         // Add to top with preserved metadata
-        history.insert(item, at: 0)
-        currentClipboardContent = item.content
-        onHistoryChanged?(item)
+        history.insert(updatedItem, at: 0)
+        currentClipboardContent = updatedItem.content
+        onHistoryChanged?(updatedItem)
     }
 
     func clearSystemClipboard() async {

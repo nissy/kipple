@@ -4,7 +4,6 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
-
 import SwiftUI
 import AppKit
 import Combine
@@ -18,6 +17,7 @@ struct MainView: View {
     @State var isAlwaysOnTopForcedByQueue = false
     @State var userPreferredAlwaysOnTop = false
     @State var hasQueueForceOverride = false
+    let titleBarState: MainWindowTitleBarState
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject var appSettings = AppSettings.shared
@@ -33,29 +33,72 @@ struct MainView: View {
     @State private var modifierMonitor: Any?
     // Copied通知の遅延非表示を管理（多重スケジュール防止）
     @State var copiedHideWorkItem: DispatchWorkItem?
+    @State var editorHeightResetID: UUID?
+    @State private var lastKnownEditorPosition: String = AppSettings.shared.editorPosition
+    private let minimumSectionHeight: Double = 150
+    private let titleBarHeight: CGFloat = 8
+    @State private var isShowingQuitConfirmation = false
+    var quitConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { isShowingQuitConfirmation },
+            set: { newValue in
+                if !newValue {
+                    onSetPreventAutoClose?(false)
+                }
+                isShowingQuitConfirmation = newValue
+            }
+        )
+    }
     
     let onClose: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
+    let onOpenAbout: (() -> Void)?
+    let onQuitApplication: (() -> Void)?
     let onSetPreventAutoClose: ((Bool) -> Void)?
     let onStartTextCapture: (() -> Void)?
-    
+
     init(
+        titleBarState: MainWindowTitleBarState = MainWindowTitleBarState(),
         onClose: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
+        onOpenAbout: (() -> Void)? = nil,
+        onQuitApplication: (() -> Void)? = nil,
         onSetPreventAutoClose: ((Bool) -> Void)? = nil,
         onStartTextCapture: (() -> Void)? = nil
     ) {
+        self.titleBarState = titleBarState
         self.onClose = onClose
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
+        self.onOpenAbout = onOpenAbout
+        self.onQuitApplication = onQuitApplication
         self.onSetPreventAutoClose = onSetPreventAutoClose
         self.onStartTextCapture = onStartTextCapture
     }
 }
 
 extension MainView {
+    func showQuitConfirmationAlert() {
+        onSetPreventAutoClose?(true)
+        DispatchQueue.main.async {
+            isShowingQuitConfirmation = true
+        }
+    }
+
+    func cancelQuitConfirmationIfNeeded() {
+        guard isShowingQuitConfirmation else { return }
+        onSetPreventAutoClose?(false)
+        isShowingQuitConfirmation = false
+    }
+
+    func confirmQuitFromDialog() {
+        onSetPreventAutoClose?(false)
+        isShowingQuitConfirmation = false
+        onQuitApplication?()
+    }
+
     private func handleItemSelection(_ item: ClipItem) {
         let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if viewModel.canUsePasteQueue,
@@ -82,6 +125,7 @@ extension MainView {
     }
 
     func enforceQueueAlwaysOnTopIfNeeded(queueCount: Int, isQueueModeActive: Bool) {
+        defer { syncTitleBarState() }
         let shouldForce = isQueueModeActive && queueCount > 0
         if shouldForce {
             if !isAlwaysOnTopForcedByQueue {
@@ -119,9 +163,12 @@ extension MainView {
             } else {
                 // メインコンテンツ（分割ビュー）
                 ResizableSplitView(
-                    topHeight: $editorSectionHeight,
-                    minTopHeight: 150,
-                    minBottomHeight: 150,
+                    topHeight: splitTopSectionHeight,
+                    minTopHeight: minimumSectionHeight,
+                    minBottomHeight: minimumSectionHeight,
+                    reset: splitResetConfiguration,
+                    preferredHeights: splitPreferredHeightsProvider,
+                    onHeightsChanged: updateSectionHeights(topHeight:bottomHeight:),
                     topContent: {
                         if appSettings.editorPosition == "top" {
                             editorSection
@@ -139,10 +186,12 @@ extension MainView {
                 )
             }
         }
-        .frame(minWidth: 300, maxWidth: .infinity)
         .background(
             Color(NSColor.windowBackgroundColor)
         )
+
+        .padding(.top, titleBarHeight)
+        .frame(minWidth: 300, maxWidth: .infinity)
         .overlay(
             CopiedNotificationView(
                 showNotification: $isShowingCopiedNotification,
@@ -167,8 +216,32 @@ extension MainView {
             // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
         }
+        .onChange(of: appSettings.editorPosition) { newValue in
+            if lastKnownEditorPosition == "disabled", newValue != "disabled" {
+                editorHeightResetID = UUID()
+            }
+            if newValue == "disabled" {
+                editorHeightResetID = nil
+            }
+            lastKnownEditorPosition = newValue
+            syncTitleBarState()
+        }
         .onAppear {
+            titleBarState.toggleAlwaysOnTopHandler = {
+                toggleAlwaysOnTop()
+            }
+            titleBarState.toggleEditorHandler = {
+                toggleEditorVisibility(animated: true)
+            }
+            titleBarState.startCaptureHandler = {
+                startCaptureFromTitleBar()
+            }
+            titleBarState.toggleQueueHandler = {
+                toggleQueueModeFromTitleBar()
+            }
+            syncTitleBarState()
             userPreferredAlwaysOnTop = isAlwaysOnTop
+            lastKnownEditorPosition = appSettings.editorPosition
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
@@ -230,6 +303,7 @@ extension MainView {
             viewModel.handleModifierFlagsChanged(currentFlags)
         }
         .onDisappear {
+            cancelQuitConfirmationIfNeeded()
             if let monitor = keyDownMonitor {
                 NSEvent.removeMonitor(monitor)
                 keyDownMonitor = nil
@@ -242,6 +316,10 @@ extension MainView {
             copiedHideWorkItem?.cancel()
             copiedHideWorkItem = nil
             isShowingCopiedNotification = false
+            titleBarState.toggleAlwaysOnTopHandler = nil
+            titleBarState.toggleEditorHandler = nil
+            titleBarState.startCaptureHandler = nil
+            titleBarState.toggleQueueHandler = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
@@ -257,6 +335,40 @@ extension MainView {
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
+        }
+    }
+
+    private var splitTopSectionHeight: Binding<Double> {
+        Binding(
+            get: {
+                if appSettings.editorPosition == "top" {
+                    return editorSectionHeight
+                }
+                return historySectionHeight
+            },
+            set: { newValue in
+                if appSettings.editorPosition == "top" {
+                    editorSectionHeight = newValue
+                } else {
+                    historySectionHeight = newValue
+                }
+            }
+        )
+    }
+
+    private func updateSectionHeights(topHeight: Double, bottomHeight: Double) {
+        switch appSettings.editorPosition {
+        case "top":
+            editorSectionHeight = topHeight
+            historySectionHeight = bottomHeight
+        case "bottom":
+            historySectionHeight = topHeight
+            editorSectionHeight = bottomHeight
+        default:
+            break
+        }
+        if editorHeightResetID != nil {
+            editorHeightResetID = nil
         }
     }
     
@@ -280,51 +392,31 @@ extension MainView {
     // 履歴とピン留めセクションのコンテンツ
     @ViewBuilder
     private var historyAndPinnedContent: some View {
-        HStack(spacing: 0) {
-            // 有効なフィルターを取得
-            let enabledCategories = [
-                ClipItemCategory.url
-            ]
-                .filter { isCategoryFilterEnabled($0) }
-            let customCategories: [UserCategory] = {
-                var list = userCategoryStore.userDefinedFilters()
-                if appSettings.filterCategoryNone {
-                    var noneCategory = userCategoryStore.noneCategory()
-                    if noneCategory.name != "None" {
-                        noneCategory.name = "None"
-                    }
-                    list.insert(noneCategory, at: 0)
+        // 有効なフィルターを取得
+        let enabledCategories = [
+            ClipItemCategory.url
+        ]
+            .filter { isCategoryFilterEnabled($0) }
+        let customCategories: [UserCategory] = {
+            var list = userCategoryStore.userDefinedFilters()
+            if appSettings.filterCategoryNone {
+                var noneCategory = userCategoryStore.noneCategory()
+                if noneCategory.name != "None" {
+                    noneCategory.name = "None"
                 }
-                return list
-            }()
-            
-            // フィルターパネルを常に表示（ピンフィルターがあるため）
-                VStack(spacing: 6) {
-                    editorToggleButton
+                list.insert(noneCategory, at: 0)
+            }
+            return list
+        }()
 
-                    if onStartTextCapture != nil {
-                        sectionDivider
-                    }
+        let queueLoopToggleHandler: () -> Void = {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                viewModel.toggleQueueRepetition()
+            }
+            syncTitleBarState()
+        }
 
-                    captureButton(onStartTextCapture: onStartTextCapture)
-
-                    sectionDivider
-
-                    queueModeFilterButton
-
-                    if viewModel.pasteMode != .clipboard {
-                        queueLoopFilterButton
-                    }
-
-                    Spacer()
-                }
-                .padding(.vertical, 6)
-                .background(
-                    Color(NSColor.controlBackgroundColor).opacity(0.5)
-                )
-
-            // メインコンテンツ（履歴セクションのみ）
-            MainViewHistorySection(
+        return MainViewHistorySection(
                 history: viewModel.history,
                 currentClipboardContent: viewModel.currentClipboardContent,
                 selectedHistoryItem: $selectedHistoryItem,
@@ -370,121 +462,12 @@ extension MainView {
                 onToggleUserCategoryFilter: { viewModel.toggleUserCategoryFilter($0) },
                 pasteMode: viewModel.pasteMode,
                 queueBadgeProvider: viewModel.queueBadge(for:),
-                queueSelectionPreview: viewModel.queueSelectionPreview
+                queueSelectionPreview: viewModel.queueSelectionPreview,
+                isQueueLoopActive: viewModel.pasteMode == .queueToggle,
+                canToggleQueueLoop: viewModel.canUsePasteQueue,
+                onToggleQueueLoop: queueLoopToggleHandler
             )
             .id(historyRefreshID)
-        }
-    }
-
-    private var queueModeFilterButton: some View {
-        let isActive = viewModel.pasteMode != .clipboard
-        let isEnabled = viewModel.canUsePasteQueue
-
-        return Button {
-            guard isEnabled else { return }
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueMode()
-            }
-        } label: {
-            sidebarButtonContent(
-                isActive: isActive,
-                iconName: "list.number",
-                label: "Queue"
-            )
-            .opacity(isEnabled ? 1.0 : 0.4)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isEnabled)
-        .help(Text(verbatim: "Queue"))
-    }
-
-    private var queueLoopFilterButton: some View {
-        let isLooping = viewModel.pasteMode == .queueToggle
-        let isEnabled = viewModel.canUsePasteQueue
-
-        return Button {
-            guard isEnabled else { return }
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueRepetition()
-            }
-        } label: {
-            sidebarButtonContent(
-                isActive: isLooping,
-                iconName: "repeat",
-                activeIconName: "repeat.circle.fill",
-                label: "Loop"
-            )
-            .opacity(isEnabled ? 1.0 : 0.4)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .disabled(!isEnabled)
-        .help(Text(verbatim: "Loop"))
-    }
-
-    private var editorToggleButton: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3)) {
-                toggleEditorVisibility()
-            }
-        }, label: {
-            VStack(spacing: 3) {
-                ZStack {
-                    Circle()
-                        .fill(isEditorEnabled ?
-                              Color.accentColor :
-                              Color.secondary.opacity(0.1))
-                        .frame(width: 30, height: 30)
-                        .shadow(
-                            color: isEditorEnabled ?
-                                Color.accentColor.opacity(0.3) :
-                                .clear,
-                            radius: 3,
-                            y: 2
-                        )
-
-                    Image(systemName: isEditorEnabled ? "square.and.pencil" : "square.slash")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isEditorEnabled ? .white : .secondary)
-                }
-
-                Text(verbatim: "Editor")
-                    .font(.system(size: 9))
-                    .foregroundColor(isEditorEnabled ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 52)
-        })
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isEditorEnabled ? 1.05 : 1.0)
-        .animation(.spring(response: 0.3), value: isEditorEnabled)
-        .help(isEditorEnabled ? "Hide editor panel" : "Show editor panel")
-    }
-
-    @ViewBuilder
-    private func captureButton(onStartTextCapture: (() -> Void)?) -> some View {
-        if let onStartTextCapture {
-            let captureEnabled = viewModel.canUseScreenTextCapture
-
-            Button(action: {
-                onStartTextCapture()
-            }, label: {
-                sidebarButtonContent(
-                    isActive: false,
-                    iconName: "text.magnifyingglass",
-                    label: "Capture"
-                )
-                .opacity(captureEnabled ? 1.0 : 0.4)
-            })
-            .buttonStyle(PlainButtonStyle())
-            .disabled(!captureEnabled)
-            .help(Text(verbatim: "Screen Text Capture"))
-        }
-    }
-
-    private var sectionDivider: some View {
-        Divider()
-            .frame(width: 44)
-            .padding(.vertical, 6)
     }
 
     // 下部バー
@@ -492,36 +475,35 @@ extension MainView {
     private var bottomBar: some View { bottomBarContent }
 }
 
-// MARK: - Sidebar Button Styling
-
 private extension MainView {
-    func sidebarButtonContent(
-        isActive: Bool,
-        iconName: String,
-        activeIconName: String? = nil,
-        label: LocalizedStringKey
-    ) -> some View {
-        VStack(spacing: 3) {
-            ZStack {
-                Circle()
-                    .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.1))
-                    .frame(width: 30, height: 30)
-                    .shadow(
-                        color: isActive ? Color.accentColor.opacity(0.3) : .clear,
-                        radius: 3,
-                        y: 2
-                    )
-
-                Image(systemName: isActive ? (activeIconName ?? iconName) : iconName)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(isActive ? .white : .secondary)
-            }
-
-            Text(label)
-                .font(.system(size: 9))
-                .foregroundColor(isActive ? .primary : .secondary)
-                .lineLimit(1)
+    var splitPreferredHeightsProvider: (() -> (top: Double?, bottom: Double?))? {
+        switch appSettings.editorPosition {
+        case "top":
+            return { (top: editorSectionHeight, bottom: nil) }
+        case "bottom":
+            return { (top: nil, bottom: editorSectionHeight) }
+        default:
+            return nil
         }
-        .frame(width: 52)
+    }
+
+    var splitResetConfiguration: SplitViewResetConfiguration? {
+        guard let id = editorHeightResetID else { return nil }
+        switch appSettings.editorPosition {
+        case "top":
+            return SplitViewResetConfiguration(
+                id: id,
+                preferredTopHeight: minimumSectionHeight,
+                preferredBottomHeight: nil
+            )
+        case "bottom":
+            return SplitViewResetConfiguration(
+                id: id,
+                preferredTopHeight: nil,
+                preferredBottomHeight: minimumSectionHeight
+            )
+        default:
+            return nil
+        }
     }
 }

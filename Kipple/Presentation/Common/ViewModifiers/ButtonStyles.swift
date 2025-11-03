@@ -10,9 +10,9 @@ import SwiftUI
 struct ProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .font(.system(size: 12, weight: .semibold))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
             .background(
                 ZStack {
                     // Shadow layer
@@ -79,9 +79,9 @@ struct PopoverButtonStyle: ButtonStyle {
 struct DestructiveButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .font(.system(size: 12, weight: .semibold))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
             .background(
                 ZStack {
                     // Shadow layer

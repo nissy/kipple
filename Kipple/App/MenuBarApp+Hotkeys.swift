@@ -21,8 +21,6 @@ extension MenuBarApp {
         }
 
         textCaptureHotkeyObserver = registerTextCaptureSettingsObserver(for: manager)
-
-        updateScreenTextCaptureMenuItemShortcut()
     }
 
     func removeTextCaptureHotkeyObserver() {
@@ -68,208 +66,10 @@ extension MenuBarApp {
 
         if enabled, keyCode != 0, !resolvedModifiers.isEmpty {
             guard manager.applyHotKey(keyCode: keyCode, modifiers: resolvedModifiers) else { return }
-            updateScreenTextCaptureMenuItemShortcut(with: keyCode, modifiers: resolvedModifiers)
             return
         }
 
         guard manager.applyHotKey(keyCode: 0, modifiers: []) else { return }
-        updateScreenTextCaptureMenuItemShortcut()
-    }
-}
-
-extension MenuBarApp {
-    func openKippleMenuEntry() -> NSMenuItem {
-        let title = localizedMenuString("Open Kipple")
-        openKippleMenuItem.title = title
-        openKippleMenuItem.target = self
-        openKippleMenuItem.action = #selector(openMainWindow)
-        return openKippleMenuItem
-    }
-
-    func screenTextCaptureMenuEntry() -> NSMenuItem {
-        screenTextCaptureMenuItem.title = localizedMenuString("Screen Text Capture")
-        screenTextCaptureMenuItem.target = self
-        screenTextCaptureMenuItem.action = #selector(captureTextFromScreen)
-        return screenTextCaptureMenuItem
-    }
-
-    func updateOpenKippleMenuItemShortcut() {
-        let baseTitle = localizedMenuString("Open Kipple")
-        guard let manager = hotkeyManager as? SimplifiedHotkeyManager else {
-            applyShortcut(to: openKippleMenuItem, title: baseTitle, combination: nil)
-            return
-        }
-
-        guard manager.getEnabled() else {
-            applyShortcut(to: openKippleMenuItem, title: baseTitle, combination: nil)
-            return
-        }
-
-        let hotkey = manager.getHotkey()
-        let sanitizedModifiers = hotkey.modifiers.intersection([.command, .control, .option, .shift])
-
-        if hotkey.keyCode == 0 || sanitizedModifiers.isEmpty {
-            applyShortcut(to: openKippleMenuItem, title: baseTitle, combination: nil)
-            return
-        }
-
-        applyShortcut(
-            to: openKippleMenuItem,
-            title: baseTitle,
-            combination: (hotkey.keyCode, sanitizedModifiers)
-        )
-    }
-
-    func updateScreenTextCaptureMenuItemShortcut(
-        with keyCode: UInt16? = nil,
-        modifiers: NSEvent.ModifierFlags? = nil
-    ) {
-        let baseTitle = localizedMenuString("Screen Text Capture")
-        let screenPermissionGranted = CGPreflightScreenCaptureAccess()
-        screenTextCaptureMenuItem.isEnabled = screenPermissionGranted
-        screenTextCaptureMenuItem.toolTip = screenPermissionGranted
-            ? nil
-            : localizedMenuString("Grant Screen Recording permission in System Settings to enable Screen Text Capture.")
-
-        guard screenPermissionGranted else {
-            applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
-            return
-        }
-
-        let combination: (UInt16, NSEvent.ModifierFlags)?
-
-        if let keyCode, let modifiers {
-            combination = (keyCode, modifiers)
-        } else if let hotkey = textCaptureHotkeyManager?.currentHotkey ?? TextCaptureHotkeyManager.shared.currentHotkey {
-            combination = hotkey
-        } else {
-            combination = nil
-        }
-
-        if let combination {
-            let sanitizedModifiers = combination.1.intersection([.command, .control, .option, .shift])
-            if combination.0 == 0 || sanitizedModifiers.isEmpty {
-                applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
-            } else {
-                applyShortcut(
-                    to: screenTextCaptureMenuItem,
-                    title: baseTitle,
-                    combination: (combination.0, sanitizedModifiers)
-                )
-            }
-        } else {
-            applyShortcut(to: screenTextCaptureMenuItem, title: baseTitle, combination: nil)
-        }
-    }
-
-    func shortcutDisplayString(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> String {
-        var parts: [String] = []
-
-        if modifiers.contains(.control) { parts.append("⌃") }
-        if modifiers.contains(.option) { parts.append("⌥") }
-        if modifiers.contains(.shift) { parts.append("⇧") }
-        if modifiers.contains(.command) { parts.append("⌘") }
-
-        if let mapping = shortcutMapping(for: keyCode) {
-            parts.append(mapping.display)
-        }
-
-        return parts.joined()
-    }
-
-    func applyShortcut(
-        to menuItem: NSMenuItem,
-        title: String,
-        combination: (UInt16, NSEvent.ModifierFlags)?
-    ) {
-        menuItem.toolTip = nil
-
-        guard let (keyCode, modifiers) = combination else {
-            menuItem.title = title
-            menuItem.keyEquivalent = ""
-            menuItem.keyEquivalentModifierMask = []
-            return
-        }
-
-        let mapping = shortcutMapping(for: keyCode)
-        let displayString = shortcutDisplayString(keyCode: keyCode, modifiers: modifiers)
-
-        if let keyEquivalent = mapping?.keyEquivalent {
-            menuItem.title = title
-            menuItem.keyEquivalent = keyEquivalent
-            menuItem.keyEquivalentModifierMask = modifiers
-        } else if !displayString.isEmpty {
-            menuItem.title = "\(title) (\(displayString))"
-            menuItem.keyEquivalent = ""
-            menuItem.keyEquivalentModifierMask = []
-        } else {
-            menuItem.title = title
-            menuItem.keyEquivalent = ""
-            menuItem.keyEquivalentModifierMask = []
-        }
-    }
-
-    func shortcutMapping(for keyCode: UInt16) -> (display: String, keyEquivalent: String?)? {
-        MenuBarShortcutMapping.map[keyCode]
-    }
-
-    func screenCaptureMenuItem() -> NSMenuItem {
-        screenCaptureStatusItem.target = self
-        screenCaptureStatusItem.action = #selector(openScreenRecordingSettingsFromMenu)
-        screenCaptureStatusItem.keyEquivalent = ""
-        return screenCaptureStatusItem
-    }
-
-    func updateScreenCaptureMenuItem() {
-        let screenPermissionGranted = CGPreflightScreenCaptureAccess()
-        screenCaptureStatusItem.title = screenPermissionGranted
-            ? localizedMenuString("Screen Recording Permission Ready")
-            : localizedMenuString("Grant Screen Recording Permission…")
-        screenCaptureStatusItem.state = screenPermissionGranted ? .on : .off
-        screenCaptureStatusItem.isEnabled = !screenPermissionGranted
-        screenCaptureStatusItem.target = screenPermissionGranted ? nil : self
-        screenCaptureStatusItem.action = screenPermissionGranted ? nil : #selector(openScreenRecordingSettingsFromMenu)
-    }
-
-    func accessibilityMenuItem() -> NSMenuItem {
-        accessibilityStatusItem.target = self
-        accessibilityStatusItem.action = #selector(openAccessibilitySettingsFromMenu)
-        accessibilityStatusItem.keyEquivalent = ""
-        return accessibilityStatusItem
-    }
-
-    func updateAccessibilityMenuItem() {
-        let accessibilityPermissionGranted = AXIsProcessTrusted()
-        accessibilityStatusItem.title = accessibilityPermissionGranted
-            ? localizedMenuString("Accessibility Permission Ready")
-            : localizedMenuString("Grant Accessibility Permission…")
-        accessibilityStatusItem.state = accessibilityPermissionGranted ? .on : .off
-        accessibilityStatusItem.isEnabled = !accessibilityPermissionGranted
-        accessibilityStatusItem.target = accessibilityPermissionGranted ? nil : self
-        accessibilityStatusItem.action = accessibilityPermissionGranted ? nil : #selector(openAccessibilitySettingsFromMenu)
-    }
-
-    @objc func openScreenRecordingSettingsFromMenu() {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.windowManager.openSettings(tab: .permission)
-
-            // Only open System Settings when the inline request action is unavailable (permission already granted)
-            if CGPreflightScreenCaptureAccess() {
-                ScreenRecordingPermissionOpener.openSystemSettings()
-            }
-        }
-    }
-
-    @objc func openAccessibilitySettingsFromMenu() {
-        Task { @MainActor [weak self] in
-            self?.windowManager.openSettings(tab: .permission)
-            if let url = URL(
-                string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-            ) {
-                NSWorkspace.shared.open(url)
-            }
-        }
     }
 
     @objc func captureTextFromScreen() {
@@ -280,7 +80,6 @@ extension MenuBarApp {
 
             guard screenPermissionGranted else {
                 Logger.shared.warning("Screen Text Capture blocked: screen recording permission not granted.")
-                updateScreenTextCaptureMenuItemShortcut()
                 windowManager.openSettings(tab: .permission)
 
                 if CGPreflightScreenCaptureAccess() {

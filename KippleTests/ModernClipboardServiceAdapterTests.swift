@@ -185,6 +185,30 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         XCTAssertEqual(asyncResults.count, 2)
     }
 
+    func testRecopyUpdatesTimestampAndTriggersHistoryRefresh() async {
+        adapter.copyToClipboard("Timestamp Test", fromEditor: false)
+        try? await Task.sleep(for: .milliseconds(200))
+
+        guard let originalItem = adapter.history.first else {
+            XCTFail("Expected history item after copy")
+            return
+        }
+
+        let originalTimestamp = originalItem.timestamp
+
+        adapter.recopyFromHistory(originalItem)
+
+        try? await Task.sleep(for: .milliseconds(200))
+
+        guard let updatedItem = adapter.history.first else {
+            XCTFail("Expected history item after recopy")
+            return
+        }
+
+        XCTAssertEqual(updatedItem.id, originalItem.id)
+        XCTAssertGreaterThan(updatedItem.timestamp, originalTimestamp)
+    }
+
     func testAutoClearTimer() async {
         // Given
         adapter.copyToClipboard("Item 1", fromEditor: false)

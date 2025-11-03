@@ -213,7 +213,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func stopAutoClearTimer(resetRemaining: Bool = true) {
         autoClearTimer?.invalidate()
         autoClearTimer = nil
-        if resetRemaining {
+        if resetRemaining || autoClearPausedByQueue {
             autoClearRemainingTime = nil
         }
     }
@@ -224,11 +224,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     internal func performAutoClear() async {
         // Check if current clipboard content is text
         guard NSPasteboard.general.string(forType: .string) != nil else {
-            Logger.shared.log("Skipping auto-clear: current clipboard content is not text")
             return
         }
-
-        Logger.shared.log("Performing auto-clear of system clipboard (Modern pathway)")
 
         await clearSystemClipboard()
     }
@@ -249,7 +246,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
         // Only update if history actually changed (comparing IDs and pinned states)
-        let historyChanged = history != newHistory
+        let historyChanged = historiesDiffer(lhs: history, rhs: newHistory)
 
         if historyChanged {
             history = newHistory
@@ -297,6 +294,15 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         Task { [weak self] in
             guard let self else { return }
             await self.refreshHistory()
+        }
+    }
+    private func historiesDiffer(lhs: [ClipItem], rhs: [ClipItem]) -> Bool {
+        guard lhs.count == rhs.count else { return true }
+        return zip(lhs, rhs).contains { left, right in
+            left.id != right.id ||
+            left.isPinned != right.isPinned ||
+            left.timestamp != right.timestamp ||
+            left.userCategoryId != right.userCategoryId
         }
     }
 }
