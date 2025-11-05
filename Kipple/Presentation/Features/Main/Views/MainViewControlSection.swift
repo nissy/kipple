@@ -65,7 +65,8 @@ struct MainViewControlSection: View {
             .fixedSize()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
     }
     
     private func getShortcutKeyDisplay() -> String {
