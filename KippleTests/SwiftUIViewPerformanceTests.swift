@@ -100,7 +100,9 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     onCategoryTap: {},
                     onChangeCategory: { _ in },
                     onOpenCategoryManager: {},
-                    historyFont: .system(size: 13)
+                    historyFont: .system(size: 13),
+                    onOpenItem: nil,
+                    onInsertToEditor: nil
                 )
             }
         }

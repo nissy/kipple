@@ -22,6 +22,8 @@ struct HistoryItemView: View {
     let onChangeCategory: ((UUID?) -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
+    let onOpenItem: (() -> Void)?
+    let onInsertToEditor: (() -> Void)?
     @ObservedObject private var appSettings = AppSettings.shared
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
@@ -32,7 +34,7 @@ struct HistoryItemView: View {
     @State private var flagsMonitor: Any?
 
     var body: some View {
-        HoverTrackingView(content: rowContent) { hovering, anchor in
+        let baseView = HoverTrackingView(content: rowContent) { hovering, anchor in
             currentAnchorView = anchor
 
             if isScrolling {
@@ -81,6 +83,14 @@ struct HistoryItemView: View {
                 }
             }
         }
+
+        return Group {
+            if hasContextMenuActions {
+                baseView.contextMenu { contextMenuContent }
+            } else {
+                baseView
+            }
+        }
     }
 
     private var rowContent: some View {
@@ -92,7 +102,7 @@ struct HistoryItemView: View {
             HStack(spacing: 8) {
                 queueBadgeView
                 pinButton
-                categoryMenu
+                categoryMenuView
                 historyText
                 deleteButton
             }
@@ -345,90 +355,57 @@ struct HistoryItemView: View {
     var pinButtonRotation: Double {
         item.isPinned ? 0 : -45
     }
-}
 
-// MARK: - Category Menu
-private extension HistoryItemView {
-    @ViewBuilder
-    var categoryMenu: some View {
-        Menu(content: {
-            let store = UserCategoryStore.shared
+    var openMenuTitle: String {
+        appSettings.localizedString(
+            "Open",
+            comment: "Context menu item to open a history entry"
+        )
+    }
 
-            let currentUserCategoryId = item.userCategoryId
-            let noneCategory = store.noneCategory()
-            let noneId = store.noneCategoryId()
-            let isNoneSelected =
-                (currentUserCategoryId == nil && item.category != .url) ||
-                currentUserCategoryId == noneId
-            Button {
-                onChangeCategory?(noneId)
-            } label: {
-                categoryMenuRow(
-                    name: noneCategory.name,
-                    systemImage: store.iconName(for: noneCategory),
-                    selected: isNoneSelected
-                )
-            }
-
-            let urlCategory = store.urlCategory()
-            let urlId = store.urlCategoryId()
-            let isURLSelected =
-                (currentUserCategoryId == nil && item.category == .url) ||
-                currentUserCategoryId == urlId
-            Button {
-                onChangeCategory?(urlId)
-            } label: {
-                categoryMenuRow(
-                    name: urlCategory.name,
-                    systemImage: store.iconName(for: urlCategory),
-                    selected: isURLSelected
-                )
-            }
-
-            let userDefinedCategories = store.userDefined()
-            if !userDefinedCategories.isEmpty {
-                Divider()
-                ForEach(userDefinedCategories) { cat in
-                    Button {
-                        onChangeCategory?(cat.id)
-                    } label: {
-                        categoryMenuRow(
-                            name: cat.name,
-                            systemImage: store.iconName(for: cat),
-                            selected: item.userCategoryId == cat.id
-                        )
-                    }
-                }
-            }
-
-            if onOpenCategoryManager != nil {
-                Divider()
-                Button("Manage Categories…") {
-                    onOpenCategoryManager?()
-                }
-            }
-        }, label: {
-            let current = UserCategoryStore.shared.category(id: item.userCategoryId)
-            let iconName = current.map { UserCategoryStore.shared.iconName(for: $0) } ?? item.category.icon
-            ZStack {
-                Capsule()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 36, height: 24)
-
-                Image(systemName: iconName)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
-                    .frame(width: 16, height: 16)
-            }
-        })
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .frame(width: 35, alignment: .leading)
+    var insertMenuTitle: String {
+        appSettings.localizedString(
+            "Insert into Editor",
+            comment: "Context menu item to insert history entry into the editor"
+        )
     }
 }
 
 // MARK: - Action helpers
 private extension HistoryItemView {
+    var categoryMenuView: some View {
+        HistoryCategoryMenu(
+            item: item,
+            isSelected: isSelected,
+            onChangeCategory: onChangeCategory,
+            onOpenCategoryManager: onOpenCategoryManager
+        )
+    }
+
+    var hasContextMenuActions: Bool {
+        (item.isActionable && onOpenItem != nil) || onInsertToEditor != nil
+    }
+
+    @ViewBuilder
+    var contextMenuContent: some View {
+        if let onOpenItem, item.isActionable {
+            Button {
+                closePopover()
+                onOpenItem()
+            } label: {
+                Label(openMenuTitle, systemImage: "arrow.up.right.square")
+            }
+        }
+        if let onInsertToEditor {
+            Button {
+                closePopover()
+                onInsertToEditor()
+            } label: {
+                Label(insertMenuTitle, systemImage: "square.and.pencil")
+            }
+        }
+    }
+
     var linkColor: Color { Color(NSColor.linkColor) }
 
     func handleTap() {
@@ -480,21 +457,5 @@ private extension HistoryItemView {
             key,
             actionTitle
         )
-    }
-
-    private func categoryMenuRow(name: String, systemImage: String, selected: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundColor(.secondary)
-            Text(verbatim: name)
-                .font(.system(size: 12))
-            Spacer()
-            if selected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-        }
-        .padding(.vertical, 2)
     }
 }

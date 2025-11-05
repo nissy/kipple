@@ -132,6 +132,7 @@
 "SettingsTitleFormat" = "%1$@ %2$@";
 "Settings…" = "Settings…";
 "Shortcut is ready to use. Hold the selected modifiers and key to capture text." = "Global shortcut ready. Hold the selected modifiers and key to capture text anywhere.";
+"Insert into Editor" = "Insert into Editor";
 "Show in filter" = "Show in filter";
 "Fallback font" = "Fallback font";
 "Slide" = "Slide";

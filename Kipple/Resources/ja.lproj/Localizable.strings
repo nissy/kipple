@@ -53,7 +53,7 @@
 "Font" = "フォント";
 "Position" = "位置";
 "Hotkey" = "ホットキー";
-"Enable Screen Recording permission to configure the text capture shortcut." = "画面収録の権限を有効にすると、グローバルショートカットを設定できます。";
+"Enable Screen Recording permission to configure the text capture shortcut." = "画面収録の権限を有効にすると、グローバルホットキーを設定できます。";
 "Fade" = "フェード";
 "Filter by “%@”" = "「%@」でフィルタ";
 "General" = "一般";
@@ -125,13 +125,14 @@
 "Search" = "検索";
 "Search fonts…" = "フォントを検索…";
 "Select a font to add as fallback" = "追加するフォールバックフォントを選択";
-"Select a key and modifier to enable the shortcut." = "グローバルショートカットに使うキーと修飾キーを選択してください。";
+"Select a key and modifier to enable the shortcut." = "グローバルホットキーに使うキーと修飾キーを選択してください。";
 "Settings" = "設定";
 "MainWindowTitle" = "Kipple";
 "AboutWindowTitle" = "Kipple について";
 "SettingsTitleFormat" = "%1$@ %2$@";
 "Settings…" = "設定…";
-"Shortcut is ready to use. Hold the selected modifiers and key to capture text." = "グローバルショートカットの準備ができました。どこでも選択した修飾キーとキーを押し続けてテキストを取得します。";
+"Shortcut is ready to use. Hold the selected modifiers and key to capture text." = "グローバルホットキーの準備ができました。どこでも選択した修飾キーとキーを押し続けてテキストを取得します。";
+"Insert into Editor" = "エディタに挿入";
 "Show in filter" = "フィルタに表示";
 "Fallback font" = "フォールバックフォント";
 "Slide" = "スライド";

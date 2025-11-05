@@ -13,6 +13,8 @@ struct MainViewHistorySection: View {
     let currentClipboardContent: String?
     @Binding var selectedHistoryItem: ClipItem?
     let onSelectItem: (ClipItem) -> Void
+    let onOpenItem: ((ClipItem) -> Void)?
+    let onInsertToEditor: ((ClipItem) -> Void)?
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     let onCategoryFilter: ((ClipItemCategory) -> Void)?
@@ -45,6 +47,8 @@ struct MainViewHistorySection: View {
         currentClipboardContent: String?,
         selectedHistoryItem: Binding<ClipItem?>,
         onSelectItem: @escaping (ClipItem) -> Void,
+        onOpenItem: ((ClipItem) -> Void)? = nil,
+        onInsertToEditor: ((ClipItem) -> Void)? = nil,
         onTogglePin: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
         onCategoryFilter: ((ClipItemCategory) -> Void)?,
@@ -72,6 +76,8 @@ struct MainViewHistorySection: View {
         self.currentClipboardContent = currentClipboardContent
         self._selectedHistoryItem = selectedHistoryItem
         self.onSelectItem = onSelectItem
+        self.onOpenItem = onOpenItem
+        self.onInsertToEditor = onInsertToEditor
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onCategoryFilter = onCategoryFilter
@@ -110,67 +116,24 @@ struct MainViewHistorySection: View {
             .padding(.horizontal, 8)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            
-                // 履歴リスト
-                ScrollView {
-                    LazyVStack(spacing: 2, pinnedViews: []) {
-                        ForEach(history) { item in
-                            let queueBadgeValue: Int? = {
-                                if let badge = queueBadgeProvider(item) {
-                                    return badge
-                                }
-                                if pasteMode != .clipboard {
-                                    return 0
-                                }
-                                return nil
-                            }()
-
-                            HistoryItemView(
-                                item: item,
-                                isSelected: selectedHistoryItem?.id == item.id,
-                                isCurrentClipboardItem: item.content == currentClipboardContent,
-                                queueBadge: queueBadgeValue,
-                                isQueuePreviewed: queueSelectionPreview.contains(item.id),
-                                onTap: {
-                                    withAnimation(.spring(response: 0.3)) {
-                                        onSelectItem(item)
-                                    }
-                                },
-                                onTogglePin: {
-                                    onTogglePin(item)
-                                },
-                                onDelete: onDelete != nil ? {
-                                    withAnimation(.spring(response: 0.3)) {
-                                        onDelete?(item)
-                                    }
-                                } : nil,
-                                onCategoryTap: nil, // カテゴリタップは無効化
-                                onChangeCategory: onChangeUserCategory != nil ? { catId in
-                                    onChangeUserCategory?(item, catId)
-                                } : nil,
-                                onOpenCategoryManager: onOpenCategoryManager,
-                                historyFont: Font(fontManager.historyFont)
-                            )
-                            .frame(height: 32) // 固定高さでパフォーマンス向上
-                            .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.2), value: item.isPinned)
-                            .onAppear {
-                                onLoadMore(item)
-                            }
-                        }
-                        if hasMoreItems {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                }
-                .background(
-                    Color(NSColor.controlBackgroundColor).opacity(0.3)
-                )
+            HistoryListView(
+                history: history,
+                selectedHistoryItem: selectedHistoryItem,
+                currentClipboardContent: currentClipboardContent,
+                queueBadgeProvider: queueBadgeProvider,
+                queueSelectionPreview: queueSelectionPreview,
+                pasteMode: pasteMode,
+                historyFont: Font(fontManager.historyFont),
+                onSelectItem: onSelectItem,
+                onTogglePin: onTogglePin,
+                onDelete: onDelete,
+                onChangeUserCategory: onChangeUserCategory,
+                onOpenCategoryManager: onOpenCategoryManager,
+                onOpenItem: onOpenItem,
+                onInsertToEditor: onInsertToEditor,
+                onLoadMore: onLoadMore,
+                hasMoreItems: hasMoreItems
+            )
         }
         .onChange(of: searchText) { newValue in
             // 検索テキストの変更をデバウンス（パフォーマンス最適化）
