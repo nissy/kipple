@@ -84,20 +84,26 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 existingWindow.deminiaturize(nil)
             }
 
+            // 表示状態の判定を先に保持
+            let wasVisible = existingWindow.isVisible
+
             // ウィンドウが画面に表示されていない場合は中央に配置
-            if !existingWindow.isVisible {
+            if !wasVisible {
                 existingWindow.center()
             }
 
-            // ウィンドウを最前面に表示してフォーカスを当てる
-            existingWindow.makeKeyAndOrderFront(nil)
-
-            // カーソル位置に再配置
+            // カーソル位置に再配置（アニメーションの最終位置を先に決める）
             positionWindowAtCursor(existingWindow)
 
-            // エディタにフォーカスを設定
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.focusOnEditor()
+            // 非表示→再表示のときはアニメーション設定に従って表示
+            if !wasVisible {
+                animateWindowOpen(existingWindow)
+            } else {
+                // すでに可視なら通常の前面化のみ
+                existingWindow.makeKeyAndOrderFront(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.focusOnEditor()
+                }
             }
             return
         }
