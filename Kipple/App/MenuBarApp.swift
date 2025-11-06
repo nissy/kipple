@@ -95,9 +95,12 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Set the application delegate synchronously (required)
         NSApplication.shared.delegate = self
 
+        // 初回クリック取りこぼし対策: ステータスバーは同期セットアップ
+        self.setupMenuBar()
+
+        // その他は非同期初期化
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.setupMenuBar()
             self.setupTextCaptureHotkey()
             self.startServices()
         }
@@ -153,6 +156,7 @@ final class MenuBarApp: NSObject, ObservableObject {
             button.toolTip = localizedMenuString("Kipple - Clipboard Manager")
             button.target = self
             button.action = #selector(openMainWindow)
+            // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
             button.sendAction(on: [.leftMouseUp])
         }
 
@@ -177,7 +181,13 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @objc func openMainWindow() {
-        Task { @MainActor in
+        if !NSApp.isActive {
+            // まずアクティブ化し、次フレームで前面化（初回クリック対策）
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async { [weak self] in
+                self?.windowManager.openMainWindow()
+            }
+        } else {
             windowManager.openMainWindow()
         }
     }

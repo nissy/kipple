@@ -71,6 +71,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     @MainActor
     func openMainWindow() {
+        // Upイベント直後の誤クローズ抑止
+        preventAutoClose = true
+
+        // 前面化
         NSApp.activate(ignoringOtherApps: true)
 
         // 既存のウィンドウがある場合は再利用
@@ -105,6 +109,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         configureMainWindow(window)
         setupMainWindowObservers(window)
         animateWindowOpen(window)
+
+        // Upイベント完了まで少し待って抑止解除
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            self?.preventAutoClose = false
+        }
     }
     
     @MainActor
@@ -281,6 +290,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
         default: // "fade"
             animateFade(window)
+        }
+        // 前面化のフォロー（取りこぼし対策）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak window] in
+            guard let window else { return }
+            if !window.isKeyWindow {
+                NSApp.activate(ignoringOtherApps: true)
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+            }
         }
     }
     
