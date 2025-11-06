@@ -74,9 +74,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // Upイベント直後の誤クローズ抑止
         preventAutoClose = true
 
-        // 前面化
-        NSApp.activate(ignoringOtherApps: true)
-
         // 既存のウィンドウがある場合は再利用
         if let existingWindow = mainWindow {
             // ウィンドウが最小化されている場合は復元
@@ -97,9 +94,17 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
             // 非表示→再表示のときはアニメーション設定に従って表示
             if !wasVisible {
+                // 自動再表示の一瞬のチラつきを防ぐため、必要なら透明化してからアクティブ化
+                let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+                if animationType != "none" {
+                    existingWindow.alphaValue = 0
+                }
+                // アプリをこのタイミングでアクティブ化（以前の位置での自動再表示を避ける）
+                NSApp.activate(ignoringOtherApps: true)
                 animateWindowOpen(existingWindow)
             } else {
                 // すでに可視なら通常の前面化のみ
+                NSApp.activate(ignoringOtherApps: true)
                 existingWindow.makeKeyAndOrderFront(nil)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     self?.focusOnEditor()
@@ -114,6 +119,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         configureMainWindow(window)
         setupMainWindowObservers(window)
+        // 位置を決めてからアクティブ化→表示の順にする
+        positionWindowAtCursor(window)
+        NSApp.activate(ignoringOtherApps: true)
         animateWindowOpen(window)
 
         // Upイベント完了まで少し待って抑止解除
