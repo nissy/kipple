@@ -92,7 +92,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             }
 
             let fetchLimit = await initialLoadLimit(pinnedCount: pinnedItems.count)
-            Logger.shared.debug("Initial history load limit set to \(fetchLimit) entries")
 
             async let allItemsTask = repository.load(limit: fetchLimit)
             let loadedItems = try await allItemsTask
@@ -166,7 +165,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 removed: removedIDs
             )
             persistedSnapshot = currentSnapshot
-            Logger.shared.debug("Persisted history diff (inserted: \(inserted.count), updated: \(updated.count), removed: \(removedIDs.count))")
         } catch {
             Logger.shared.error("Failed to persist history diff: \(error)")
         }

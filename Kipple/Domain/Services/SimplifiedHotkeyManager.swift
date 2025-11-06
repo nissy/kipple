@@ -108,7 +108,6 @@ final class SimplifiedHotkeyManager {
         if let monitor = testMonitor {
             NSEvent.removeMonitor(monitor)
             hasInputMonitoringPermission = true
-            Logger.shared.info("Input Monitoring permission: GRANTED")
         } else {
             hasInputMonitoringPermission = false
             Logger.shared.warning("Input Monitoring permission: NOT GRANTED - Global hotkey will only work when Kipple is active")

@@ -14,10 +14,7 @@ extension MenuBarApp {
 
     func performTermination() async {
         // Extract the async work from performAsyncTermination so tests can await completion.
-        Logger.shared.log("Flushing pending saves...")
         await clipboardService.flushPendingSaves()
-
-        Logger.shared.log("✅ Successfully saved data before quit")
     }
 
     func registerHotkeys() async {

@@ -22,7 +22,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("lastEditorText") var lastEditorText: String = ""
     @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
     @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
-    @AppStorage("editorPosition") private var storedEditorPosition: String = "bottom"
+    @AppStorage("editorPosition") private var storedEditorPosition: String = "disabled"
     @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
 
     var editorPosition: String {

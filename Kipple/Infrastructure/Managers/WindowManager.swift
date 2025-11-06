@@ -42,7 +42,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.level = isAlwaysOnTop ? .floating : .normal
                 // M2 Mac対応: hidesOnDeactivateも更新
                 window.hidesOnDeactivate = !isAlwaysOnTop
-                Logger.shared.log("isAlwaysOnTop changed to: \(isAlwaysOnTop), hidesOnDeactivate: \(!isAlwaysOnTop)")
             }
             titleBarState.isAlwaysOnTop = isAlwaysOnTop
         }
@@ -178,7 +177,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func setPreventAutoClose(_ flag: Bool) {
-        Logger.shared.log("setPreventAutoClose: \(flag)")
         preventAutoClose = flag
     }
     
@@ -197,7 +195,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         titleBarPinHostingView?.removeFromSuperview()
         
         guard let titlebarContainer = window.standardWindowButton(.closeButton)?.superview?.superview else {
-            Logger.shared.log("Failed to locate titlebar container for pin button")
+            Logger.shared.warning("Failed to locate titlebar container for pin button")
             return
         }
         
@@ -352,14 +350,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSWindow.didBecomeKeyNotification,
             object: window,
             queue: .main
-        ) { [weak window] _ in
-            Logger.shared.log("=== Window didBecomeKey notification received ===")
-            if let win = window {
-                Logger.shared.log("window.isKeyWindow: \(win.isKeyWindow)")
-                Logger.shared.log("window.isMainWindow: \(win.isMainWindow)")
-            }
-            Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-        }
+        ) { _ in }
     }
 
     private func addWindowDidBecomeMainObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -367,13 +358,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSWindow.didBecomeMainNotification,
             object: window,
             queue: .main
-        ) { [weak window] _ in
-            Logger.shared.log("=== Window didBecomeMain notification received ===")
-            if let win = window {
-                Logger.shared.log("window.isKeyWindow: \(win.isKeyWindow)")
-                Logger.shared.log("window.isMainWindow: \(win.isMainWindow)")
-            }
-        }
+        ) { _ in }
     }
 
     private func addWindowResizeObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -394,14 +379,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSApplication.didResignActiveNotification,
             object: nil,
             queue: .main
-        ) { [weak window] _ in
-            Logger.shared.log("=== App didResignActive notification received ===")
-            Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-            if let win = window {
-                Logger.shared.log("mainWindow?.isKeyWindow: \(win.isKeyWindow)")
-                Logger.shared.log("mainWindow?.isMainWindow: \(win.isMainWindow)")
-            }
-        }
+        ) { _ in }
     }
 
     private func addAppDidBecomeActiveObserver() -> NSObjectProtocol {
@@ -409,10 +387,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            Logger.shared.log("=== App didBecomeActive notification received ===")
-            Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-        }
+        ) { _ in }
     }
     
     private func removeMainWindowObservers() {
@@ -623,16 +598,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
 // MARK: - NSWindowDelegate
 extension WindowManager {
     func windowDidBecomeKey(_ notification: Notification) {
-        Logger.shared.log("=== NSWindowDelegate: windowDidBecomeKey ===")
-        if let window = notification.object as? NSWindow {
-            Logger.shared.log("window.isKeyWindow: \(window.isKeyWindow)")
-            Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
-        }
         NotificationCenter.default.post(name: .mainWindowDidBecomeKey, object: nil)
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        Logger.shared.log("=== NSWindowDelegate: windowDidResignKey ===")
         guard let window = notification.object as? NSWindow,
               window === mainWindow else { return }
 
@@ -641,34 +610,23 @@ extension WindowManager {
         #else
         let architecture = "Intel (x86_64)"
         #endif
-        Logger.shared.log("Architecture: \(architecture)")
-        Logger.shared.log("macOS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
-        Logger.shared.log("isAlwaysOnTop: \(isAlwaysOnTop)")
-        Logger.shared.log("window.isKeyWindow: \(window.isKeyWindow)")
-        Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
-        Logger.shared.log("window.level: \(window.level.rawValue)")
-        Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
 
         if !isAlwaysOnTop && !preventAutoClose {
-            Logger.shared.log("Closing window via NSWindowDelegate because it's not always on top")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
                       !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose else {
-                    Logger.shared.log("Window became key again or is always on top, not closing")
                     return
                 }
-                Logger.shared.log("Confirming window close after delay")
                 window.close()
             }
         } else {
-            Logger.shared.log("NOT closing window via NSWindowDelegate because it's always on top")
+            // keep window open when always on top
         }
         NotificationCenter.default.post(name: .mainWindowDidResignKey, object: nil)
     }
 
     func windowWillClose(_ notification: Notification) {
-        Logger.shared.log("=== NSWindowDelegate: windowWillClose ===")
        if notification.object as? NSWindow === mainWindow {
             handleMainWindowClose()
         }
