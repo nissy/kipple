@@ -26,26 +26,27 @@ struct AboutView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 16) {
             header
             Divider()
             privacySection
             Divider()
             footer
         }
-        .padding(24)
-        .frame(width: 340)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .frame(width: 320)
         .background(Color(NSColor.windowBackgroundColor))
         .environment(\.locale, appSettings.appLocale)
     }
 
     private var header: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             if let appIcon = NSApp.applicationIconImage {
                 Image(nsImage: appIcon)
                     .resizable()
-                    .frame(width: 64, height: 64)
-                    .cornerRadius(14)
+                    .frame(width: 56, height: 56)
+                    .cornerRadius(12)
                     .shadow(color: Color.black.opacity(0.08), radius: 6, y: 3)
             }
 
@@ -62,11 +63,11 @@ struct AboutView: View {
     }
 
     private var privacySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(appSettings.localizedString("Privacy & Security", comment: "About screen privacy heading"))
                 .font(.headline)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(highlights) { item in
                     let text = appSettings.localizedString(
                         item.textKey,

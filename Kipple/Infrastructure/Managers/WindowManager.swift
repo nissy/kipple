@@ -543,7 +543,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             aboutWindow?.title = localizedAboutWindowTitle()
             aboutWindow?.styleMask = [.titled, .closable]
             aboutWindow?.isMovableByWindowBackground = true
-            aboutWindow?.setContentSize(NSSize(width: 360, height: 420))
+            aboutWindow?.setContentSize(NSSize(width: 340, height: 360))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
         } else {
