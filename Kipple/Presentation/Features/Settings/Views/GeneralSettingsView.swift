@@ -88,7 +88,6 @@ struct GeneralSettingsView: View {
                     Text("None").tag("none")
                     Text("Fade").tag("fade")
                     Text("Slide").tag("slide")
-                    Text("Scale").tag("scale")
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .frame(width: 200)

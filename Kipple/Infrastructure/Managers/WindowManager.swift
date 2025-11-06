@@ -98,7 +98,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         let target = computeOriginAtCursor(for: window)
         if !window.isVisible {
-            window.orderOut(nil)
+            // None: 非表示→表示でも隠し直さず即位置決定
             window.setFrameOrigin(target)
             let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
             NSApp.activate(ignoringOtherApps: true)
@@ -111,28 +111,26 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 animateWindowOpen(window)
             }
         } else {
-            window.orderOut(nil)
-            window.setFrameOrigin(target)
             let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
             if style == "none" {
-                window.alphaValue = 1.0
-                window.makeKeyAndOrderFront(nil)
-            } else {
-                window.alphaValue = 0
-                window.makeKeyAndOrderFront(nil)
-                NSAnimationContext.runAnimationGroup { context in
-                    context.duration = 0.18
-                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                    window.animator().alphaValue = 1.0
-                }
+                // None: 可視中は隠さず即座に座標だけ反映（完全ノーアニメ）
+                var frame = window.frame
+                frame.origin = target
+                window.setFrame(frame, display: true, animate: false)
+                if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
+                completeOpen()
+                return
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.focusOnEditor() }
+            // アニメあり: 旧位置を見せないため一旦隠し、選択されたスタイルで再表示
+            window.orderOut(nil)
+            window.setFrameOrigin(target)
+            NSApp.activate(ignoringOtherApps: true)
+            animateWindowOpen(window)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            self?.isOpening = false
-            self?.preventAutoClose = false
-        }
+        completeOpen()
     }
 
     private func openNewWindow() {
@@ -144,6 +142,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.setFrameOrigin(target)
         NSApp.activate(ignoringOtherApps: true)
         animateWindowOpen(window)
+        completeOpen()
+    }
+
+    private func completeOpen() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             self?.isOpening = false
             self?.preventAutoClose = false
@@ -316,8 +318,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
         let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
         
         switch animationType {
-        case "scale":
-            animateScale(window)
         case "slide":
             animateSlide(window)
         case "none":
@@ -345,34 +345,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
+            context.duration = 0.28
             window.animator().alphaValue = 1.0
         } completionHandler: { [weak self] in
             self?.focusOnEditor()
         }
     }
     
-    private func animateScale(_ window: NSWindow) {
-        let targetFrame = window.frame
-        var smallerFrame = targetFrame
-        smallerFrame.size.width = targetFrame.width * 0.9
-        smallerFrame.size.height = targetFrame.height * 0.9
-        smallerFrame.origin.x = targetFrame.origin.x + (targetFrame.width - smallerFrame.width) / 2
-        smallerFrame.origin.y = targetFrame.origin.y + (targetFrame.height - smallerFrame.height) / 2
-        
-        window.setFrame(smallerFrame, display: false)
-        window.alphaValue = 0
-        window.makeKeyAndOrderFront(nil)
-        
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().alphaValue = 1.0
-            window.animator().setFrame(targetFrame, display: true)
-        } completionHandler: { [weak self] in
-            self?.focusOnEditor()
-        }
-    }
+    // scale アニメーションは削除（互換は slide にフォールバック）
     
     private func animateSlide(_ window: NSWindow) {
         let targetFrame = window.frame
@@ -383,7 +363,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
+            context.duration = 0.20
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 1.0
             window.animator().setFrame(targetFrame, display: true)
