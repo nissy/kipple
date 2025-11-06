@@ -204,7 +204,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     // swiftlint:disable:next function_body_length
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
         
-
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let selectedUserCategory = selectedUserCategoryId
@@ -286,8 +285,6 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         } else {
             applyState()
         }
-
-        
     }
 
     func loadMoreHistoryIfNeeded(currentItem: ClipItem) {

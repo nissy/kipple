@@ -200,6 +200,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.level = isAlwaysOnTop ? .floating : .normal
         // M2 Mac対応: hidesOnDeactivateを動的に設定
         window.hidesOnDeactivate = !isAlwaysOnTop
+        // 常に現在アクティブなスペースで開くようにする
+        if !window.collectionBehavior.contains(.moveToActiveSpace) {
+            window.collectionBehavior.insert(.moveToActiveSpace)
+        }
         
         // ツールバーボタンを無効化（×ボタン以外を非表示）
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
