@@ -40,7 +40,6 @@ final class HistoryPopoverManager {
 
         controller.view.layoutSubtreeIfNeeded()
         let fittingSize = controller.view.fittingSize
-
         guard let window = anchorView.window,
               let screen = window.screen ?? NSScreen.main else {
             hide()

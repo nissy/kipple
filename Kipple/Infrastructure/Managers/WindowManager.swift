@@ -462,23 +462,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     // MARK: - Public Methods
-    
-    func closeMainWindow() {
-        mainWindow?.close()
-    }
-    
-    @MainActor
-    func getMainViewModel() -> MainViewModel? {
-        if mainViewModel == nil {
-            mainViewModel = MainViewModel()
-        }
-        return mainViewModel
-    }
-    
-    func isWindowAlwaysOnTop() -> Bool {
-        return isAlwaysOnTop
-    }
-    
+
     @MainActor
     func showCopiedNotification() {
         // MainViewにコピー通知を表示する
@@ -654,7 +638,10 @@ extension WindowManager {
                       !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
-                window.close()
+                // パネルを破棄せず非表示にして再利用（毎回の再構築コストを回避）
+                window.orderOut(nil)
+                // 付随のポップオーバーも確実に閉じる
+                HistoryPopoverManager.shared.forceClose()
             }
         } else {
             // keep window open when always on top

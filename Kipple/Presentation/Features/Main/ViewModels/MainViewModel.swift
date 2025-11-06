@@ -203,6 +203,8 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
+        
+
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let selectedUserCategory = selectedUserCategoryId
@@ -215,36 +217,48 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         let urlCategoryId = categoryStore.urlCategoryId()
         let filterByURLCategory = (selectedUserCategory == nil) && (activeCategory == .url)
 
-        let filtered = items.filter { item in
-            let matchesSearch: Bool = {
-                guard hasSearchQuery else { return true }
-                let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
-                let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
-                return matchesContent || matchesSourceApp
-            }()
+        // Fast-path: no filters and no queue ordering → avoid O(n) filter
+        let noFiltersActive = !hasSearchQuery &&
+                              selectedUserCategory == nil &&
+                              activeCategory == nil &&
+                              !requireURLsOnly &&
+                              !requirePinnedOnly
 
-            let matchesUserCategory: Bool = {
-                guard let userCatId = selectedUserCategory else { return true }
-                if userCatId == noneCategoryId {
-                    if let assignedId = item.userCategoryId {
-                        return assignedId == userCatId
+        let filtered: [ClipItem]
+        if noFiltersActive {
+            filtered = items
+        } else {
+            filtered = items.filter { item in
+                let matchesSearch: Bool = {
+                    guard hasSearchQuery else { return true }
+                    let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
+                    let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
+                    return matchesContent || matchesSourceApp
+                }()
+
+                let matchesUserCategory: Bool = {
+                    guard let userCatId = selectedUserCategory else { return true }
+                    if userCatId == noneCategoryId {
+                        if let assignedId = item.userCategoryId {
+                            return assignedId == userCatId
+                        }
+                        return true
                     }
-                    return true
-                }
-                return item.userCategoryId == userCatId
-            }()
+                    return item.userCategoryId == userCatId
+                }()
 
-            let needsURLMembership = filterByURLCategory || requireURLsOnly
-            let isURLItem = needsURLMembership ? itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) : true
-            let matchesURLCategory = !filterByURLCategory || isURLItem
-            let matchesURLsOnly = !requireURLsOnly || isURLItem
-            let matchesPinned = !requirePinnedOnly || item.isPinned
+                let needsURLMembership = filterByURLCategory || requireURLsOnly
+                let isURLItem = needsURLMembership ? itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) : true
+                let matchesURLCategory = !filterByURLCategory || isURLItem
+                let matchesURLsOnly = !requireURLsOnly || isURLItem
+                let matchesPinned = !requirePinnedOnly || item.isPinned
 
-            return matchesSearch &&
-                matchesUserCategory &&
-                matchesURLCategory &&
-                matchesURLsOnly &&
-                matchesPinned
+                return matchesSearch &&
+                    matchesUserCategory &&
+                    matchesURLCategory &&
+                    matchesURLsOnly &&
+                    matchesPinned
+            }
         }
 
         let queueOrdered = applyQueueOrdering(to: filtered)
@@ -268,12 +282,12 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         let shouldAnimate = animated && newHistory.count <= filterAnimationThreshold
 
         if shouldAnimate {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                applyState()
-            }
+            withAnimation(.easeInOut(duration: 0.2)) { applyState() }
         } else {
             applyState()
         }
+
+        
     }
 
     func loadMoreHistoryIfNeeded(currentItem: ClipItem) {
