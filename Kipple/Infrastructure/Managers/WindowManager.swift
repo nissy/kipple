@@ -57,6 +57,17 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
     var onTextCaptureRequested: (() -> Void)?
+    // オープン処理中フラグ（フォーカス喪失時の自動クローズを抑止）
+    private var isOpening: Bool = false
+
+    // メニューバー経路などでアクティベート直前に呼び出し、
+    // OSの自動再表示（旧位置一瞬表示）を抑止するための準備
+    @MainActor
+    func prepareForActivationBeforeOpen() {
+        if let window = mainWindow {
+            window.orderOut(nil)
+        }
+    }
 
     override init() {
         super.init()
@@ -71,61 +82,70 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     @MainActor
     func openMainWindow() {
-        // Upイベント直後の誤クローズ抑止
+        isOpening = true
         preventAutoClose = true
 
-        // 既存のウィンドウがある場合は再利用
         if let existingWindow = mainWindow {
-            // ウィンドウが最小化されている場合は復元
-            if existingWindow.isMiniaturized {
-                existingWindow.deminiaturize(nil)
-            }
-
-            // 表示状態の判定を先に保持
-            let wasVisible = existingWindow.isVisible
-
-            // ウィンドウが画面に表示されていない場合は中央に配置
-            if !wasVisible {
-                existingWindow.center()
-            }
-
-            // カーソル位置に再配置（アニメーションの最終位置を先に決める）
-            positionWindowAtCursor(existingWindow)
-
-            // 非表示→再表示のときはアニメーション設定に従って表示
-            if !wasVisible {
-                // 自動再表示の一瞬のチラつきを防ぐため、必要なら透明化してからアクティブ化
-                let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
-                if animationType != "none" {
-                    existingWindow.alphaValue = 0
-                }
-                // アプリをこのタイミングでアクティブ化（以前の位置での自動再表示を避ける）
-                NSApp.activate(ignoringOtherApps: true)
-                animateWindowOpen(existingWindow)
-            } else {
-                // すでに可視なら通常の前面化のみ
-                NSApp.activate(ignoringOtherApps: true)
-                existingWindow.makeKeyAndOrderFront(nil)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                    self?.focusOnEditor()
-                }
-            }
+            reopenExistingWindow(existingWindow)
             return
         }
 
-        // 新規ウィンドウ作成
-        let window = createMainWindow()
-        guard let window = window else { return }
+        openNewWindow()
+    }
 
+    private func reopenExistingWindow(_ window: NSWindow) {
+        if window.isMiniaturized { window.deminiaturize(nil) }
+
+        let target = computeOriginAtCursor(for: window)
+        if !window.isVisible {
+            window.orderOut(nil)
+            window.setFrameOrigin(target)
+            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            NSApp.activate(ignoringOtherApps: true)
+            if style == "none" {
+                window.alphaValue = 1.0
+                window.makeKeyAndOrderFront(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusOnEditor() }
+            } else {
+                window.alphaValue = 0
+                animateWindowOpen(window)
+            }
+        } else {
+            window.orderOut(nil)
+            window.setFrameOrigin(target)
+            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            if style == "none" {
+                window.alphaValue = 1.0
+                window.makeKeyAndOrderFront(nil)
+            } else {
+                window.alphaValue = 0
+                window.makeKeyAndOrderFront(nil)
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.18
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    window.animator().alphaValue = 1.0
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.focusOnEditor() }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.isOpening = false
+            self?.preventAutoClose = false
+        }
+    }
+
+    private func openNewWindow() {
+        let optional = createMainWindow()
+        guard let window = optional else { return }
         configureMainWindow(window)
         setupMainWindowObservers(window)
-        // 位置を決めてからアクティブ化→表示の順にする
-        positionWindowAtCursor(window)
+        let target = computeOriginAtCursor(for: window)
+        window.setFrameOrigin(target)
         NSApp.activate(ignoringOtherApps: true)
         animateWindowOpen(window)
-
-        // Upイベント完了まで少し待って抑止解除
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.isOpening = false
             self?.preventAutoClose = false
         }
     }
@@ -260,17 +280,23 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func positionWindowAtCursor(_ window: NSWindow) {
+        let origin = computeOriginAtCursor(for: window)
+        window.setFrameOrigin(origin)
+    }
+
+    private func computeOriginAtCursor(for window: NSWindow) -> NSPoint {
         let mouseLocation = NSEvent.mouseLocation
         let windowSize = window.frame.size
-        let screenFrame = NSScreen.main?.frame ?? NSRect.zero
-        
-        // ウィンドウの左上をカーソル位置に配置（少しオフセットを追加）
+        // カーソルが存在するスクリーンを優先（複数ディスプレイ対応）
+        let screens = NSScreen.screens
+        let targetScreen = screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
+        let screenFrame = targetScreen?.frame ?? NSRect.zero
+
         var windowOrigin = NSPoint(
             x: mouseLocation.x + 10,
             y: mouseLocation.y - windowSize.height - 10
         )
-        
-        // 画面からはみ出ないように調整
+
         if windowOrigin.x + windowSize.width > screenFrame.maxX {
             windowOrigin.x = screenFrame.maxX - windowSize.width - 10
         }
@@ -281,11 +307,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             windowOrigin.y = screenFrame.minY + 10
         }
         if windowOrigin.y + windowSize.height > screenFrame.maxY {
-            // カーソルの上に表示
             windowOrigin.y = mouseLocation.y + 10
         }
-        
-        window.setFrameOrigin(windowOrigin)
+        return windowOrigin
     }
     
     private func animateWindowOpen(_ window: NSWindow) {
@@ -643,11 +667,11 @@ extension WindowManager {
         let architecture = "Intel (x86_64)"
         #endif
 
-        if !isAlwaysOnTop && !preventAutoClose {
+        if !isAlwaysOnTop && !preventAutoClose && !isOpening {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
-                      !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose else {
+                      !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
                 window.close()

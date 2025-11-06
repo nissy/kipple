@@ -157,6 +157,7 @@ final class MenuBarApp: NSObject, ObservableObject {
             button.target = self
             button.action = #selector(openMainWindow)
             // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
+            // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
             button.sendAction(on: [.leftMouseUp])
         }
 
@@ -182,6 +183,8 @@ final class MenuBarApp: NSObject, ObservableObject {
     
     @objc func openMainWindow() {
         if !NSApp.isActive {
+            // 旧位置の自動再表示を防ぐため、先に不可視化
+            windowManager.prepareForActivationBeforeOpen()
             // まずアクティブ化し、次フレームで前面化（初回クリック対策）
             NSApp.activate(ignoringOtherApps: true)
             DispatchQueue.main.async { [weak self] in
