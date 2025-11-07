@@ -42,7 +42,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.level = isAlwaysOnTop ? .floating : .normal
                 // M2 Mac対応: hidesOnDeactivateも更新
                 window.hidesOnDeactivate = !isAlwaysOnTop
-                Logger.shared.log("isAlwaysOnTop changed to: \(isAlwaysOnTop), hidesOnDeactivate: \(!isAlwaysOnTop)")
             }
             titleBarState.isAlwaysOnTop = isAlwaysOnTop
         }
@@ -58,6 +57,17 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
     var onTextCaptureRequested: (() -> Void)?
+    // オープン処理中フラグ（フォーカス喪失時の自動クローズを抑止）
+    private var isOpening: Bool = false
+
+    // メニューバー経路などでアクティベート直前に呼び出し、
+    // OSの自動再表示（旧位置一瞬表示）を抑止するための準備
+    @MainActor
+    func prepareForActivationBeforeOpen() {
+        if let window = mainWindow {
+            window.orderOut(nil)
+        }
+    }
 
     override init() {
         super.init()
@@ -72,40 +82,74 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     @MainActor
     func openMainWindow() {
-        NSApp.activate(ignoringOtherApps: true)
+        isOpening = true
+        preventAutoClose = true
 
-        // 既存のウィンドウがある場合は再利用
         if let existingWindow = mainWindow {
-            // ウィンドウが最小化されている場合は復元
-            if existingWindow.isMiniaturized {
-                existingWindow.deminiaturize(nil)
-            }
-
-            // ウィンドウが画面に表示されていない場合は中央に配置
-            if !existingWindow.isVisible {
-                existingWindow.center()
-            }
-
-            // ウィンドウを最前面に表示してフォーカスを当てる
-            existingWindow.makeKeyAndOrderFront(nil)
-
-            // カーソル位置に再配置
-            positionWindowAtCursor(existingWindow)
-
-            // エディタにフォーカスを設定
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.focusOnEditor()
-            }
+            reopenExistingWindow(existingWindow)
             return
         }
 
-        // 新規ウィンドウ作成
-        let window = createMainWindow()
-        guard let window = window else { return }
+        openNewWindow()
+    }
 
+    private func reopenExistingWindow(_ window: NSWindow) {
+        if window.isMiniaturized { window.deminiaturize(nil) }
+
+        let target = computeOriginAtCursor(for: window)
+        if !window.isVisible {
+            // None: 非表示→表示でも隠し直さず即位置決定
+            window.setFrameOrigin(target)
+            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            NSApp.activate(ignoringOtherApps: true)
+            if style == "none" {
+                window.alphaValue = 1.0
+                window.makeKeyAndOrderFront(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusOnEditor() }
+            } else {
+                window.alphaValue = 0
+                animateWindowOpen(window)
+            }
+        } else {
+            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            if style == "none" {
+                // None: 可視中は隠さず即座に座標だけ反映（完全ノーアニメ）
+                var frame = window.frame
+                frame.origin = target
+                window.setFrame(frame, display: true, animate: false)
+                if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
+                completeOpen()
+                return
+            }
+            // アニメあり: 旧位置を見せないため一旦隠し、選択されたスタイルで再表示
+            window.orderOut(nil)
+            window.setFrameOrigin(target)
+            NSApp.activate(ignoringOtherApps: true)
+            animateWindowOpen(window)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
+        }
+
+        completeOpen()
+    }
+
+    private func openNewWindow() {
+        let optional = createMainWindow()
+        guard let window = optional else { return }
         configureMainWindow(window)
         setupMainWindowObservers(window)
+        let target = computeOriginAtCursor(for: window)
+        window.setFrameOrigin(target)
+        NSApp.activate(ignoringOtherApps: true)
         animateWindowOpen(window)
+        completeOpen()
+    }
+
+    private func completeOpen() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.isOpening = false
+            self?.preventAutoClose = false
+        }
     }
     
     @MainActor
@@ -156,6 +200,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.level = isAlwaysOnTop ? .floating : .normal
         // M2 Mac対応: hidesOnDeactivateを動的に設定
         window.hidesOnDeactivate = !isAlwaysOnTop
+        // 常に現在アクティブなスペースで開くようにする
+        if !window.collectionBehavior.contains(.moveToActiveSpace) {
+            window.collectionBehavior.insert(.moveToActiveSpace)
+        }
         
         // ツールバーボタンを無効化（×ボタン以外を非表示）
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
@@ -178,7 +226,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func setPreventAutoClose(_ flag: Bool) {
-        Logger.shared.log("setPreventAutoClose: \(flag)")
         preventAutoClose = flag
     }
     
@@ -197,7 +244,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         titleBarPinHostingView?.removeFromSuperview()
         
         guard let titlebarContainer = window.standardWindowButton(.closeButton)?.superview?.superview else {
-            Logger.shared.log("Failed to locate titlebar container for pin button")
+            Logger.shared.warning("Failed to locate titlebar container for pin button")
             return
         }
         
@@ -239,17 +286,23 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func positionWindowAtCursor(_ window: NSWindow) {
+        let origin = computeOriginAtCursor(for: window)
+        window.setFrameOrigin(origin)
+    }
+
+    private func computeOriginAtCursor(for window: NSWindow) -> NSPoint {
         let mouseLocation = NSEvent.mouseLocation
         let windowSize = window.frame.size
-        let screenFrame = NSScreen.main?.frame ?? NSRect.zero
-        
-        // ウィンドウの左上をカーソル位置に配置（少しオフセットを追加）
+        // カーソルが存在するスクリーンを優先（複数ディスプレイ対応）
+        let screens = NSScreen.screens
+        let targetScreen = screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
+        let screenFrame = targetScreen?.frame ?? NSRect.zero
+
         var windowOrigin = NSPoint(
             x: mouseLocation.x + 10,
             y: mouseLocation.y - windowSize.height - 10
         )
-        
-        // 画面からはみ出ないように調整
+
         if windowOrigin.x + windowSize.width > screenFrame.maxX {
             windowOrigin.x = screenFrame.maxX - windowSize.width - 10
         }
@@ -260,19 +313,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
             windowOrigin.y = screenFrame.minY + 10
         }
         if windowOrigin.y + windowSize.height > screenFrame.maxY {
-            // カーソルの上に表示
             windowOrigin.y = mouseLocation.y + 10
         }
-        
-        window.setFrameOrigin(windowOrigin)
+        return windowOrigin
     }
     
     private func animateWindowOpen(_ window: NSWindow) {
         let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
         
         switch animationType {
-        case "scale":
-            animateScale(window)
         case "slide":
             animateSlide(window)
         case "none":
@@ -284,6 +333,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
         default: // "fade"
             animateFade(window)
         }
+        // 前面化のフォロー（取りこぼし対策）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak window] in
+            guard let window else { return }
+            if !window.isKeyWindow {
+                NSApp.activate(ignoringOtherApps: true)
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
     }
     
     private func animateFade(_ window: NSWindow) {
@@ -291,34 +349,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
+            context.duration = 0.28
             window.animator().alphaValue = 1.0
         } completionHandler: { [weak self] in
             self?.focusOnEditor()
         }
     }
     
-    private func animateScale(_ window: NSWindow) {
-        let targetFrame = window.frame
-        var smallerFrame = targetFrame
-        smallerFrame.size.width = targetFrame.width * 0.9
-        smallerFrame.size.height = targetFrame.height * 0.9
-        smallerFrame.origin.x = targetFrame.origin.x + (targetFrame.width - smallerFrame.width) / 2
-        smallerFrame.origin.y = targetFrame.origin.y + (targetFrame.height - smallerFrame.height) / 2
-        
-        window.setFrame(smallerFrame, display: false)
-        window.alphaValue = 0
-        window.makeKeyAndOrderFront(nil)
-        
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().alphaValue = 1.0
-            window.animator().setFrame(targetFrame, display: true)
-        } completionHandler: { [weak self] in
-            self?.focusOnEditor()
-        }
-    }
+    // scale アニメーションは削除（互換は slide にフォールバック）
     
     private func animateSlide(_ window: NSWindow) {
         let targetFrame = window.frame
@@ -329,7 +367,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
+            context.duration = 0.20
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 1.0
             window.animator().setFrame(targetFrame, display: true)
@@ -352,14 +390,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSWindow.didBecomeKeyNotification,
             object: window,
             queue: .main
-        ) { [weak window] _ in
-            Logger.shared.log("=== Window didBecomeKey notification received ===")
-            if let win = window {
-                Logger.shared.log("window.isKeyWindow: \(win.isKeyWindow)")
-                Logger.shared.log("window.isMainWindow: \(win.isMainWindow)")
-            }
-            Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-        }
+        ) { _ in }
     }
 
     private func addWindowDidBecomeMainObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -367,13 +398,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSWindow.didBecomeMainNotification,
             object: window,
             queue: .main
-        ) { [weak window] _ in
-            Logger.shared.log("=== Window didBecomeMain notification received ===")
-            if let win = window {
-                Logger.shared.log("window.isKeyWindow: \(win.isKeyWindow)")
-                Logger.shared.log("window.isMainWindow: \(win.isMainWindow)")
-            }
-        }
+        ) { _ in }
     }
 
     private func addWindowResizeObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -394,14 +419,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSApplication.didResignActiveNotification,
             object: nil,
             queue: .main
-        ) { [weak window] _ in
-            Logger.shared.log("=== App didResignActive notification received ===")
-            Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-            if let win = window {
-                Logger.shared.log("mainWindow?.isKeyWindow: \(win.isKeyWindow)")
-                Logger.shared.log("mainWindow?.isMainWindow: \(win.isMainWindow)")
-            }
-        }
+        ) { _ in }
     }
 
     private func addAppDidBecomeActiveObserver() -> NSObjectProtocol {
@@ -409,10 +427,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            Logger.shared.log("=== App didBecomeActive notification received ===")
-            Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
-        }
+        ) { _ in }
     }
     
     private func removeMainWindowObservers() {
@@ -451,23 +466,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     // MARK: - Public Methods
-    
-    func closeMainWindow() {
-        mainWindow?.close()
-    }
-    
-    @MainActor
-    func getMainViewModel() -> MainViewModel? {
-        if mainViewModel == nil {
-            mainViewModel = MainViewModel()
-        }
-        return mainViewModel
-    }
-    
-    func isWindowAlwaysOnTop() -> Bool {
-        return isAlwaysOnTop
-    }
-    
+
     @MainActor
     func showCopiedNotification() {
         // MainViewにコピー通知を表示する
@@ -543,7 +542,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             aboutWindow?.title = localizedAboutWindowTitle()
             aboutWindow?.styleMask = [.titled, .closable]
             aboutWindow?.isMovableByWindowBackground = true
-            aboutWindow?.setContentSize(NSSize(width: 360, height: 420))
+            aboutWindow?.setContentSize(NSSize(width: 340, height: 360))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
         } else {
@@ -623,16 +622,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
 // MARK: - NSWindowDelegate
 extension WindowManager {
     func windowDidBecomeKey(_ notification: Notification) {
-        Logger.shared.log("=== NSWindowDelegate: windowDidBecomeKey ===")
-        if let window = notification.object as? NSWindow {
-            Logger.shared.log("window.isKeyWindow: \(window.isKeyWindow)")
-            Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
-        }
         NotificationCenter.default.post(name: .mainWindowDidBecomeKey, object: nil)
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        Logger.shared.log("=== NSWindowDelegate: windowDidResignKey ===")
         guard let window = notification.object as? NSWindow,
               window === mainWindow else { return }
 
@@ -641,34 +634,26 @@ extension WindowManager {
         #else
         let architecture = "Intel (x86_64)"
         #endif
-        Logger.shared.log("Architecture: \(architecture)")
-        Logger.shared.log("macOS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
-        Logger.shared.log("isAlwaysOnTop: \(isAlwaysOnTop)")
-        Logger.shared.log("window.isKeyWindow: \(window.isKeyWindow)")
-        Logger.shared.log("window.isMainWindow: \(window.isMainWindow)")
-        Logger.shared.log("window.level: \(window.level.rawValue)")
-        Logger.shared.log("NSApp.isActive: \(NSApp.isActive)")
 
-        if !isAlwaysOnTop && !preventAutoClose {
-            Logger.shared.log("Closing window via NSWindowDelegate because it's not always on top")
+        if !isAlwaysOnTop && !preventAutoClose && !isOpening {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
-                      !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose else {
-                    Logger.shared.log("Window became key again or is always on top, not closing")
+                      !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
-                Logger.shared.log("Confirming window close after delay")
-                window.close()
+                // パネルを破棄せず非表示にして再利用（毎回の再構築コストを回避）
+                window.orderOut(nil)
+                // 付随のポップオーバーも確実に閉じる
+                HistoryPopoverManager.shared.forceClose()
             }
         } else {
-            Logger.shared.log("NOT closing window via NSWindowDelegate because it's always on top")
+            // keep window open when always on top
         }
         NotificationCenter.default.post(name: .mainWindowDidResignKey, object: nil)
     }
 
     func windowWillClose(_ notification: Notification) {
-        Logger.shared.log("=== NSWindowDelegate: windowWillClose ===")
        if notification.object as? NSWindow === mainWindow {
             handleMainWindowClose()
         }

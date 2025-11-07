@@ -36,20 +36,16 @@ class LaunchAtLogin {
             do {
                 if enabled {
                     if SMAppService.mainApp.status == .enabled {
-                        Logger.shared.info("Launch at login is already enabled")
                         return
                     }
                     
                     try SMAppService.mainApp.register()
-                    Logger.shared.info("Successfully enabled launch at login")
                 } else {
                     if SMAppService.mainApp.status != .enabled {
-                        Logger.shared.info("Launch at login is already disabled")
                         return
                     }
                     
                     try SMAppService.mainApp.unregister()
-                    Logger.shared.info("Successfully disabled launch at login")
                 }
                 
                 // 設定を同期
@@ -76,19 +72,7 @@ class LaunchAtLogin {
     
     func checkStatus() {
         if #available(macOS 13.0, *) {
-            let status = SMAppService.mainApp.status
-            switch status {
-            case .enabled:
-                Logger.shared.debug("Launch at login status: enabled")
-            case .notRegistered:
-                Logger.shared.debug("Launch at login status: not registered")
-            case .notFound:
-                Logger.shared.debug("Launch at login status: not found")
-            case .requiresApproval:
-                Logger.shared.debug("Launch at login status: requires approval")
-            @unknown default:
-                Logger.shared.debug("Launch at login status: unknown")
-            }
+            _ = SMAppService.mainApp.status
         }
     }
 }

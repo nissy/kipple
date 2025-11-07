@@ -69,9 +69,7 @@ final class LastActiveAppTracker {
                         pid: app.processIdentifier
                     )
 
-                    Logger.shared.log(
-                        "Updated last active app: \(app.localizedName ?? "Unknown")"
-                    )
+                    // noisy: アプリ切替のたびに発火するため削除
                 }
             }
         }
@@ -99,9 +97,7 @@ final class LastActiveAppTracker {
         // If Kipple is frontmost, use the last active non-Kipple app
         if bundleId == kippleBundleId {
             if let lastApp = lastActiveNonKippleApp {
-                Logger.shared.log(
-                    "Kipple is frontmost, using last active app: \(lastApp.name ?? "Unknown")"
-                )
+                // noisy: 毎回出るため削除
                 return lastApp
             }
             // Fallback to Kipple if no other app was tracked

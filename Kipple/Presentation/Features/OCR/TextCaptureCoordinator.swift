@@ -49,7 +49,6 @@ final class TextCaptureCoordinator {
     }
 
     func startCaptureFlow() {
-        Logger.shared.info("Starting OCR capture flow.")
 
         guard screenCapturePermission.preflight() else {
             shouldResumeCaptureAfterPermission = true
@@ -136,7 +135,6 @@ final class TextCaptureCoordinator {
     }
 
     private func handleSelection(rect: CGRect, screen: NSScreen) {
-        Logger.shared.info("Selection finished. rect: \(rect)")
         overlayController = nil
 
         guard let image = captureImage(from: rect, on: screen) else {

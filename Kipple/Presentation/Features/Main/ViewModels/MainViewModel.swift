@@ -203,6 +203,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
+        
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let selectedUserCategory = selectedUserCategoryId
@@ -215,36 +216,48 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         let urlCategoryId = categoryStore.urlCategoryId()
         let filterByURLCategory = (selectedUserCategory == nil) && (activeCategory == .url)
 
-        let filtered = items.filter { item in
-            let matchesSearch: Bool = {
-                guard hasSearchQuery else { return true }
-                let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
-                let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
-                return matchesContent || matchesSourceApp
-            }()
+        // Fast-path: no filters and no queue ordering → avoid O(n) filter
+        let noFiltersActive = !hasSearchQuery &&
+                              selectedUserCategory == nil &&
+                              activeCategory == nil &&
+                              !requireURLsOnly &&
+                              !requirePinnedOnly
 
-            let matchesUserCategory: Bool = {
-                guard let userCatId = selectedUserCategory else { return true }
-                if userCatId == noneCategoryId {
-                    if let assignedId = item.userCategoryId {
-                        return assignedId == userCatId
+        let filtered: [ClipItem]
+        if noFiltersActive {
+            filtered = items
+        } else {
+            filtered = items.filter { item in
+                let matchesSearch: Bool = {
+                    guard hasSearchQuery else { return true }
+                    let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
+                    let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
+                    return matchesContent || matchesSourceApp
+                }()
+
+                let matchesUserCategory: Bool = {
+                    guard let userCatId = selectedUserCategory else { return true }
+                    if userCatId == noneCategoryId {
+                        if let assignedId = item.userCategoryId {
+                            return assignedId == userCatId
+                        }
+                        return true
                     }
-                    return true
-                }
-                return item.userCategoryId == userCatId
-            }()
+                    return item.userCategoryId == userCatId
+                }()
 
-            let needsURLMembership = filterByURLCategory || requireURLsOnly
-            let isURLItem = needsURLMembership ? itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) : true
-            let matchesURLCategory = !filterByURLCategory || isURLItem
-            let matchesURLsOnly = !requireURLsOnly || isURLItem
-            let matchesPinned = !requirePinnedOnly || item.isPinned
+                let needsURLMembership = filterByURLCategory || requireURLsOnly
+                let isURLItem = needsURLMembership ? itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) : true
+                let matchesURLCategory = !filterByURLCategory || isURLItem
+                let matchesURLsOnly = !requireURLsOnly || isURLItem
+                let matchesPinned = !requirePinnedOnly || item.isPinned
 
-            return matchesSearch &&
-                matchesUserCategory &&
-                matchesURLCategory &&
-                matchesURLsOnly &&
-                matchesPinned
+                return matchesSearch &&
+                    matchesUserCategory &&
+                    matchesURLCategory &&
+                    matchesURLsOnly &&
+                    matchesPinned
+            }
         }
 
         let queueOrdered = applyQueueOrdering(to: filtered)
@@ -268,9 +281,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
         let shouldAnimate = animated && newHistory.count <= filterAnimationThreshold
 
         if shouldAnimate {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                applyState()
-            }
+            withAnimation(.easeInOut(duration: 0.2)) { applyState() }
         } else {
             applyState()
         }
@@ -316,6 +327,7 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// エディタに内容を挿入（既存内容をクリア）
     func insertToEditor(content: String) {
+        ensureEditorPanelVisible()
         // 同期的に処理（非同期は不要）
         editorText = content
     }
@@ -328,13 +340,13 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 現在の修飾キーがエディタ挿入用かチェック
     func shouldInsertToEditor() -> Bool {
-        guard appSettings.editorPosition != "disabled" else { return false }
-        let currentModifiers = NSEvent.modifierFlags
         let requiredModifiers = getEditorInsertModifiers()
         // None(=0) のときは無効
         if requiredModifiers.isEmpty { return false }
+        let normalizedRequired = requiredModifiers.intersection(.deviceIndependentFlagsMask)
+        let currentModifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
         // 必要な修飾キーがすべて押されているかチェック
-        return currentModifiers.intersection(requiredModifiers) == requiredModifiers
+        return currentModifiers.contains(normalizedRequired)
     }
     
     /// 履歴アイテム選択（修飾キー検出対応）
@@ -346,6 +358,13 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
             resetFiltersAfterCopy()
             clearQueueAfterManualCopyIfNeeded()
         }
+    }
+    
+    /// エディタパネルが閉じている場合に再表示
+    private func ensureEditorPanelVisible() {
+        guard appSettings.editorPosition == "disabled" else { return }
+        let targetPosition = appSettings.editorPositionLastEnabled
+        appSettings.editorPosition = targetPosition.isEmpty ? "bottom" : targetPosition
     }
     
     /// カテゴリフィルタの切り替え

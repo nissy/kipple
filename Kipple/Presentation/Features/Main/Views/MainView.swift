@@ -421,6 +421,13 @@ extension MainView {
                 currentClipboardContent: viewModel.currentClipboardContent,
                 selectedHistoryItem: $selectedHistoryItem,
                 onSelectItem: handleItemSelection,
+                onOpenItem: { item in
+                    guard item.isActionable else { return }
+                    item.performAction()
+                },
+                onInsertToEditor: { item in
+                    viewModel.selectHistoryItem(item, forceInsert: true)
+                },
                 onTogglePin: { item in
                     let wasPinned = item.isPinned
                     let newState = viewModel.togglePinSync(for: item)

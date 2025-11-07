@@ -53,7 +53,6 @@ final class TextCaptureHotkeyManager {
         if keyCode == 0 || modifiers.isEmpty {
             defaults.set(0, forKey: Self.keyCodeDefaultsKey)
             defaults.set(0, forKey: Self.modifierDefaultsKey)
-            Logger.shared.info("Text capture hotkey disabled.")
             return true
         }
 
@@ -114,7 +113,6 @@ final class TextCaptureHotkeyManager {
         }
 
         hotKeyRef = registeredRef
-        Logger.shared.info("Text capture hotkey registered (Carbon). keyCode=\(currentKeyCode), modifiers=\(currentModifiers)")
         return true
     }
 
@@ -142,7 +140,6 @@ final class TextCaptureHotkeyManager {
         currentModifiers = storedModifiers
 
         if storedKeyCode == 0 || storedModifiers.isEmpty {
-            Logger.shared.info("Text capture hotkey not registered (disabled in settings).")
             return
         }
 

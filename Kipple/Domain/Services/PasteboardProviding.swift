@@ -16,46 +16,20 @@ final class SystemPasteboard: PasteboardProviding {
     private init() {}
 
     func currentChangeCount() -> Int {
-        if Thread.isMainThread {
-            return NSPasteboard.general.changeCount
-        }
-        var result = 0
-        DispatchQueue.main.sync {
-            result = NSPasteboard.general.changeCount
-        }
-        return result
+        // @MainActor により必ずメインスレッドで実行されるため、
+        // 追加のスレッド分岐や同期呼び出しは不要。
+        return NSPasteboard.general.changeCount
     }
 
     func string() -> String? {
-        if Thread.isMainThread {
-            return NSPasteboard.general.string(forType: .string)
-        }
-        var value: String?
-        DispatchQueue.main.sync {
-            value = NSPasteboard.general.string(forType: .string)
-        }
-        return value
+        return NSPasteboard.general.string(forType: .string)
     }
 
     func setString(_ string: String) {
-        let writeBlock = { () -> Bool in
-            NSPasteboard.general.setString(string, forType: .string)
-        }
-        if Thread.isMainThread {
-            _ = writeBlock()
-        } else {
-            _ = DispatchQueue.main.sync(execute: writeBlock)
-        }
+        NSPasteboard.general.setString(string, forType: .string)
     }
 
     func clearContents() {
-        let clearBlock = { () -> Int in
-            NSPasteboard.general.clearContents()
-        }
-        if Thread.isMainThread {
-            _ = clearBlock()
-        } else {
-            _ = DispatchQueue.main.sync(execute: clearBlock)
-        }
+        NSPasteboard.general.clearContents()
     }
 }

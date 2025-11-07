@@ -95,9 +95,12 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Set the application delegate synchronously (required)
         NSApplication.shared.delegate = self
 
+        // 初回クリック取りこぼし対策: ステータスバーは同期セットアップ
+        self.setupMenuBar()
+
+        // その他は非同期初期化
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.setupMenuBar()
             self.setupTextCaptureHotkey()
             self.startServices()
         }
@@ -153,6 +156,8 @@ final class MenuBarApp: NSObject, ObservableObject {
             button.toolTip = localizedMenuString("Kipple - Clipboard Manager")
             button.target = self
             button.action = #selector(openMainWindow)
+            // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
+            // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
             button.sendAction(on: [.leftMouseUp])
         }
 
@@ -177,7 +182,15 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @objc func openMainWindow() {
-        Task { @MainActor in
+        if !NSApp.isActive {
+            // 旧位置の自動再表示を防ぐため、先に不可視化
+            windowManager.prepareForActivationBeforeOpen()
+            // まずアクティブ化し、次フレームで前面化（初回クリック対策）
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async { [weak self] in
+                self?.windowManager.openMainWindow()
+            }
+        } else {
             windowManager.openMainWindow()
         }
     }
@@ -198,14 +211,11 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
 
     @objc private func quit() {
-        Logger.shared.log("=== QUIT MENU CLICKED ===")
         // Calling terminate triggers applicationShouldTerminate
         NSApplication.shared.terminate(nil)
     }
     
     private func performAsyncTermination() {
-        Logger.shared.log("=== ASYNC APP QUIT SEQUENCE STARTED ===")
-        Logger.shared.log("Current history count: \(clipboardService.history.count)")
         
         // Timeout handler (maximum 2 seconds)
         let timeoutWorkItem = DispatchWorkItem { [weak self] in
@@ -218,53 +228,39 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Execute the save work asynchronously
         Task {
             // Flush any debounced saves immediately
-            Logger.shared.log("Flushing pending saves...")
             await clipboardService.flushPendingSaves()
 
-            Logger.shared.log("✅ Successfully saved data before quit")
-            
             // Cancel the watchdog timeout
             self.terminationWorkItem?.cancel()
-            Logger.shared.log("Save operation completed, cancelling timeout")
             
             // Finish termination on the main thread
             await MainActor.run { [weak self] in
-                Logger.shared.log("Calling completeTermination on main thread")
                 self?.completeTermination()
             }
         }
     }
     
     private func completeTermination() {
-        Logger.shared.log("completeTermination called on thread: \(Thread.current)")
         
-        Logger.shared.log("Stopping clipboard monitoring...")
         clipboardService.stopMonitoring()
         
-        Logger.shared.log("Cleaning up windows...")
         // cleanup method was removed in Swift 6.2 migration
         
-        Logger.shared.log("=== APP QUIT SEQUENCE COMPLETED ===")
-        
         // Allow the application to terminate
-        Logger.shared.log("Calling reply(toApplicationShouldTerminate: true)")
         NSApplication.shared.reply(toApplicationShouldTerminate: true)
-        Logger.shared.log("reply(toApplicationShouldTerminate: true) called successfully")
     }
     
     private func forceTerminate() {
-        Logger.shared.log("forceTerminate called - timeout occurred")
         
         // Force termination when the timeout fires
         DispatchQueue.main.async { [weak self] in
-            Logger.shared.log("forceTerminate on main thread")
+            
             self?.clipboardService.stopMonitoring()
             // cleanup method was removed in Swift 6.2 migration
             
             // Allow the application to terminate immediately
-            Logger.shared.log("Calling reply(toApplicationShouldTerminate: true) from forceTerminate")
+            
             NSApplication.shared.reply(toApplicationShouldTerminate: true)
-            Logger.shared.log("forceTerminate completed")
         }
     }
 }
@@ -296,10 +292,6 @@ extension MenuBarApp {
 // MARK: - NSApplicationDelegate
 extension MenuBarApp: NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        Logger.shared.log("=== applicationShouldTerminate called ===")
-        Logger.shared.log("isTerminating flag: \(isTerminating)")
-        Logger.shared.log("Sender: \(sender)")
-        Logger.shared.log("Current thread: \(Thread.current)")
         
         // Allow immediate termination during tests
         if Self.isTestEnvironment {
@@ -308,7 +300,7 @@ extension MenuBarApp: NSApplicationDelegate {
         
         // If termination is already in progress
         if isTerminating {
-            Logger.shared.log("WARNING: Already terminating, this should not happen!")
+            Logger.shared.warning("Already terminating, this should not happen!")
             // Permit immediate termination if previous async work is stuck
             return .terminateNow
         }
@@ -322,7 +314,7 @@ extension MenuBarApp: NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        Logger.shared.log("=== applicationWillTerminate called ===")
+        
         // The save work should be finished by this point
     }
 }
