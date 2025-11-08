@@ -12,7 +12,7 @@ import Combine
 
 // swiftlint:disable type_body_length file_length
 @MainActor
-class MainViewModel: ObservableObject, MainViewModelProtocol {
+final class MainViewModel: ObservableObject, MainViewModelProtocol {
     enum PasteMode {
         case clipboard
         case queueOnce

@@ -10,7 +10,7 @@ import Combine
 import AppKit
 
 @MainActor
-class SettingsViewModel: ObservableObject {
+final class SettingsViewModel: ObservableObject {
     @Published var selectedTab: Tab = .general
     @Published var showLaunchAtLoginError = false
     @Published var launchAtLoginErrorMessage = ""

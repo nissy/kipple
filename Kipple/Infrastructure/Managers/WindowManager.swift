@@ -155,9 +155,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     @MainActor
     private func createMainWindow() -> NSWindow? {
         // MainViewModelを作成または再利用
-        if mainViewModel == nil {
-            mainViewModel = MainViewModel()
-        }
+        let viewModel = mainViewModel ?? MainViewModel()
+        mainViewModel = viewModel
         
         let contentView = MainView(
             titleBarState: titleBarState,
@@ -183,7 +182,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 self?.onTextCaptureRequested?()
             }
         )
-        .environmentObject(mainViewModel!)
+        .environmentObject(viewModel)
         
         let hostingController = NSHostingController(rootView: contentView)
         hostingController.sizingOptions = []
@@ -628,12 +627,6 @@ extension WindowManager {
     func windowDidResignKey(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               window === mainWindow else { return }
-
-        #if arch(arm64)
-        let architecture = "Apple Silicon (arm64)"
-        #else
-        let architecture = "Intel (x86_64)"
-        #endif
 
         if !isAlwaysOnTop && !preventAutoClose && !isOpening {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in

@@ -110,9 +110,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         appSettings.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                DispatchQueue.main.async { [weak self] in
-                    self?.refreshLocalizedStrings()
-                }
+                self?.refreshLocalizedStrings()
             }
             .store(in: &cancellables)
     }

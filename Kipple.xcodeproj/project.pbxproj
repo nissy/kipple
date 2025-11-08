@@ -85,6 +85,7 @@
 		7B8972EDF365BC4BC7D5A6F7 /* ModernClipboardServiceInitialLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E709953D569676F69301025F /* ModernClipboardServiceInitialLoadTests.swift */; };
 		7D21F2708879F96FABBF693F /* Localizable.stringsdict in Resources */ = {isa = PBXBuildFile; fileRef = 47C920569402BF9A18A9313C /* Localizable.stringsdict */; };
 		7EE694319BB60EF09524CC65 /* TogglePinSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032B8315C1F7DFED645AAFD5 /* TogglePinSyncTests.swift */; };
+		8579983D8274D0739D4303EB /* SimpleLineNumberRulerViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B5E5249A9419B3E8AF410F /* SimpleLineNumberRulerViewTests.swift */; };
 		8611D0D8B61C3EFD2A7127C2 /* ClipItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8AECFC0197258F5CABC3C31 /* ClipItem.swift */; };
 		86996318823139ECAB61B80D /* MockClipboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE27F632B10A5817688AA5E /* MockClipboardService.swift */; };
 		889D878A047E63712FD8685A /* DuplicateRecopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3635D451D2C85F5060AE4BE /* DuplicateRecopyTests.swift */; };
@@ -325,6 +326,7 @@
 		D3A8A074D41803EB02702E99 /* PerformanceMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMetricsTests.swift; sourceTree = "<group>"; };
 		D44138ED69D85A15DE70E6B1 /* TextRecognitionServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextRecognitionServiceProtocol.swift; sourceTree = "<group>"; };
 		D4FA5B2DC8D6ED611907A4F3 /* MenuBarAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarAppTests.swift; sourceTree = "<group>"; };
+		D6B5E5249A9419B3E8AF410F /* SimpleLineNumberRulerViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberRulerViewTests.swift; sourceTree = "<group>"; };
 		D8C1A7D14BB479766C7E44F6 /* KippleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KippleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D9C5F08C099B7059A59ACB71 /* ClipboardServiceProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardServiceProviderTests.swift; sourceTree = "<group>"; };
 		DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerProviderTests.swift; sourceTree = "<group>"; };
@@ -655,6 +657,7 @@
 			children = (
 				B82DA84942D28289B14E53E4 /* JapaneseFontAlignmentTest.swift */,
 				4EED9C20C507C9F412883670 /* LineNumberAlignmentVisualTest.swift */,
+				D6B5E5249A9419B3E8AF410F /* SimpleLineNumberRulerViewTests.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -1185,6 +1188,7 @@
 				FE559C2AA720A6221F37680D /* SettingsBackupTests.swift in Sources */,
 				2BFF305F6C7562391A4F2518 /* SettingsRestorationExampleTests.swift in Sources */,
 				C369B11A9F7AC498D6F5EBCB /* SettingsToolbarControllerTests.swift in Sources */,
+				8579983D8274D0739D4303EB /* SimpleLineNumberRulerViewTests.swift in Sources */,
 				DF8A5EC8443873C9568465A9 /* SimplifiedHotkeyManagerFullTests.swift in Sources */,
 				9D5DE584D34C9C952A6DE350 /* SimplifiedHotkeyManagerTests.swift in Sources */,
 				BE83F3D96570EC1EAEDCD33C /* SwiftDataPersistenceTests.swift in Sources */,
@@ -1295,7 +1299,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = R7LKF73J2W;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1410,7 +1414,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = R7LKF73J2W;
 				ENABLE_HARDENED_RUNTIME = YES;

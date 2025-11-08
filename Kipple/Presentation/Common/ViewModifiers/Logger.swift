@@ -15,7 +15,7 @@ enum LogLevel: String {
     case error = "ERROR"
 }
 
-class Logger {
+final class Logger {
     static let shared = Logger()
     private let subsystem = Bundle.main.bundleIdentifier ?? "com.Kipple"
     private let osLog: OSLog?
