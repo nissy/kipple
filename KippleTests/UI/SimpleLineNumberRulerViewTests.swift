@@ -7,6 +7,7 @@ import XCTest
 import AppKit
 @testable import Kipple
 
+@MainActor
 final class SimpleLineNumberRulerViewTests: XCTestCase {
     func testDrawSelectedLineBackgroundSkipsWhenTextContainerMissing() {
         let textView = NilTextContainerTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
@@ -26,7 +27,10 @@ final class SimpleLineNumberRulerViewTests: XCTestCase {
 }
 
 private final class NilTextContainerTextView: NSTextView {
-    override var textContainer: NSTextContainer? { nil }
+    override var textContainer: NSTextContainer? {
+        get { nil }
+        set { }
+    }
 }
 
 private final class RecordingLayoutManager: NSLayoutManager {

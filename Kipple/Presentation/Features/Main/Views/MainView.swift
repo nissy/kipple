@@ -461,6 +461,7 @@ extension MainView {
                     viewModel.loadMoreHistoryIfNeeded(currentItem: item)
                 },
                 hasMoreItems: viewModel.hasMoreHistory,
+                isLoadingMore: viewModel.isLoadingMoreHistory,
                 isPinnedFilterActive: viewModel.isPinnedFilterActive,
                 onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
                 availableCategories: enabledCategories,
