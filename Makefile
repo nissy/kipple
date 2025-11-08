@@ -24,14 +24,24 @@ TEST_DERIVED_DATA_DIR = $(DERIVED_DATA_DIR)/Test
 ARCHIVE_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).xcarchive
 EXPORT_PATH = $(PROD_BUILD_DIR)/export
 DMG_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).dmg
+APPSTORE_ARCHIVE_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME)-AppStore.xcarchive
+APPSTORE_EXPORT_DIR = $(PROD_BUILD_DIR)/AppStoreExport
+APPSTORE_PKG_PATH = $(APPSTORE_EXPORT_DIR)/$(PROJECT_NAME).pkg
+APPSTORE_EXPORT_OPTIONS = $(PROD_BUILD_DIR)/AppStoreExportOptions.plist
 
 # SwiftData plugin path (required for Swift macros)
 SWIFTDATA_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftDataMacros.dylib
+SWIFT_PLUGIN_FLAGS = -load-plugin-library $(SWIFTDATA_PLUGIN)
 
 # Environment variables (from .envrc)
 DEVELOPMENT_TEAM ?= R7LKF73J2W
 PRODUCT_BUNDLE_IDENTIFIER ?= com.nissy.Kipple
 TEST_BUNDLE_IDENTIFIER ?= com.nissy.KippleTests
+APPLE_DISTRIBUTION_IDENTITY ?= Apple Distribution
+APPLE_INSTALLER_IDENTITY ?= 3rd Party Mac Developer Installer
+APP_STORE_CONNECT_APPLE_ID ?= $(APPLE_ID)
+APP_STORE_CONNECT_PASSWORD ?= $(APPLE_PASSWORD)
+APP_STORE_CONNECT_PROVIDER ?= $(DEVELOPMENT_TEAM)
 
 # Version management
 VERSION_FILE = VERSION
@@ -56,7 +66,7 @@ NC = \033[0m # No Color
 .PHONY: all help build-dev test test-coverage test-specific lint lint-fix clean-dev version status
 
 # Production targets  
-.PHONY: build archive package dmg notarize notarize-status notarize-staple release clean-release
+.PHONY: build archive package dmg notarize notarize-status notarize-staple release clean-release appstore appstore-archive appstore-export appstore-upload
 
 # Utility targets
 .PHONY: generate run clean clean-all
@@ -81,6 +91,8 @@ help: ## Show this help message
 	@echo "$(YELLOW)=== Production Commands ===$(NC)"
 	@echo "  $(GREEN)make build$(NC)         Build production version"
 	@echo "  $(GREEN)make release$(NC)       Full release build (clean, lint, test, archive, package, dmg)"
+	@echo "  $(GREEN)make appstore$(NC)      Clean, lint, test, and export .pkg for Mac App Store"
+	@echo "  $(GREEN)make appstore-upload$(NC) Upload exported pkg to App Store Connect"
 	@echo "  $(GREEN)make notarize$(NC)      Notarize DMG for distribution"
 	@echo "  $(GREEN)make clean-release$(NC) Clean release build"
 	@echo ""
@@ -124,6 +136,7 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		CODE_SIGN_IDENTITY="-" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
 		build
 	@echo "$(GREEN)Copying to dev directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_DEBUG) -derivedDataPath $(DEV_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
@@ -181,6 +194,7 @@ build: generate ## Build production version
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
 		ARCHS="x86_64 arm64" \
 		ONLY_ACTIVE_ARCH=NO \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
 		build
 	@echo "$(GREEN)Copying to prod directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_RELEASE) -derivedDataPath $(PROD_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
@@ -207,7 +221,7 @@ test: generate ## Run all tests
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
 		-only-testing:KippleTests
 
 test-coverage: generate ## Run tests with coverage report
@@ -224,7 +238,7 @@ test-coverage: generate ## Run tests with coverage report
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
 		-only-testing:KippleTests
 
 test-specific: generate ## Run specific test (use TEST=ClassName)
@@ -242,7 +256,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="-plugin-path $(SWIFTDATA_PLUGIN)" \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
 		-only-testing:KippleTests/$(TEST)
 
 #===============================================================================
@@ -286,6 +300,7 @@ archive: generate ## Create xcarchive with Developer ID signing
 		CODE_SIGN_IDENTITY="Developer ID Application: Yoshihiko Nishida (R7LKF73J2W)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
 		archive
 	@echo "$(GREEN)Archive created at: $(ARCHIVE_PATH)$(NC)"
 
@@ -429,6 +444,88 @@ release: clean lint test dmg ## Full release build (clean, lint, test, archive, 
 	@echo "  2. Run 'make notarize' to submit DMG for notarization"
 	@echo "  3. Run 'make notarize-status' to check notarization progress"
 	@echo "  4. Run 'make notarize-staple' once notarization is approved"
+
+#===============================================================================
+# MAC APP STORE TARGETS
+#===============================================================================
+
+appstore-archive: generate ## Create xcarchive for Mac App Store submission
+	@echo "$(BLUE)Creating Mac App Store archive…$(NC)"
+	@mkdir -p $(PROD_BUILD_DIR)
+	xcodebuild -project $(XCODE_PROJECT) \
+		-scheme $(SCHEME) \
+		-configuration $(CONFIGURATION_RELEASE) \
+		-archivePath $(APPSTORE_ARCHIVE_PATH) \
+		-destination $(DESTINATION) \
+		-allowProvisioningUpdates \
+		-xcconfig Config/Version.xcconfig \
+		DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) \
+		PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
+		TEST_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
+		CODE_SIGN_STYLE=Manual \
+		CODE_SIGN_IDENTITY="$(APPLE_DISTRIBUTION_IDENTITY)" \
+		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
+		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		archive
+	@echo "$(GREEN)Archive created at: $(APPSTORE_ARCHIVE_PATH)$(NC)"
+
+appstore-export: appstore-archive ## Export signed .pkg for Mac App Store
+	@echo "$(BLUE)Exporting .pkg for Mac App Store…$(NC)"
+	@mkdir -p $(APPSTORE_EXPORT_DIR)
+	@printf '%s\n' \
+'<?xml version="1.0" encoding="UTF-8"?>' \
+'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+'<plist version="1.0">' \
+'<dict>' \
+'	<key>method</key>' \
+'	<string>app-store</string>' \
+'	<key>teamID</key>' \
+'	<string>$(DEVELOPMENT_TEAM)</string>' \
+'	<key>signingStyle</key>' \
+'	<string>manual</string>' \
+'	<key>signingCertificate</key>' \
+'	<string>$(APPLE_DISTRIBUTION_IDENTITY)</string>' \
+'	<key>installerSigningCertificate</key>' \
+'	<string>$(APPLE_INSTALLER_IDENTITY)</string>' \
+'	<key>uploadBitcode</key>' \
+'	<false/>' \
+'	<key>uploadSymbols</key>' \
+'	<true/>' \
+'</dict>' \
+'</plist>' \
+	> $(APPSTORE_EXPORT_OPTIONS)
+	xcodebuild -exportArchive \
+		-archivePath $(APPSTORE_ARCHIVE_PATH) \
+		-exportPath $(APPSTORE_EXPORT_DIR) \
+		-exportOptionsPlist $(APPSTORE_EXPORT_OPTIONS) \
+		-allowProvisioningUpdates
+	@if [ -f "$(APPSTORE_PKG_PATH)" ]; then \
+		echo "$(GREEN)App Store package ready at: $(APPSTORE_PKG_PATH)$(NC)"; \
+	else \
+		echo "$(RED)Error: Failed to export $(APPSTORE_PKG_PATH)$(NC)"; \
+		exit 1; \
+	fi
+
+appstore-upload: ## Upload exported pkg to App Store Connect via altool
+	@if [ ! -f "$(APPSTORE_PKG_PATH)" ]; then \
+		echo "$(RED)Error: $(APPSTORE_PKG_PATH) not found. Run 'make appstore-export' first.$(NC)"; \
+		exit 1; \
+	fi
+	@if [ -z "$(APP_STORE_CONNECT_APPLE_ID)" ] || [ -z "$(APP_STORE_CONNECT_PASSWORD)" ]; then \
+		echo "$(RED)Error: APP_STORE_CONNECT_APPLE_ID and APP_STORE_CONNECT_PASSWORD must be set.$(NC)"; \
+		exit 1; \
+	fi
+	@CMD="xcrun altool --upload-app --type macos --file \"$(APPSTORE_PKG_PATH)\" --apple-id \"$(APP_STORE_CONNECT_APPLE_ID)\" --password \"$(APP_STORE_CONNECT_PASSWORD)\""; \
+	if [ -n "$(APP_STORE_CONNECT_PROVIDER)" ]; then \
+		CMD="$$CMD --asc-provider \"$(APP_STORE_CONNECT_PROVIDER)\""; \
+	fi; \
+	echo "$(BLUE)Uploading $(APPSTORE_PKG_PATH) to App Store Connect…$(NC)"; \
+	/bin/bash -c "$$CMD"
+
+appstore: clean lint test appstore-export ## Clean, lint, test, and export Mac App Store package
+	@echo "$(GREEN)Mac App Store export completed: $(APPSTORE_PKG_PATH)$(NC)"
+	@echo "$(YELLOW)Next: configure metadata in App Store Connect, then run 'make appstore-upload'.$(NC)"
 
 #===============================================================================
 # UTILITIES
