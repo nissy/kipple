@@ -130,9 +130,7 @@ private final class SelectionOverlayWindow: NSWindow {
         )
 
         setFrame(screenFrame, display: false)
-        if let backingScale = screen.backingScaleFactor as CGFloat? {
-            contentView?.layer?.contentsScale = backingScale
-        }
+        contentView?.layer?.contentsScale = screen.backingScaleFactor
 
         isReleasedWhenClosed = false
         ignoresMouseEvents = false
@@ -339,7 +337,8 @@ private final class SelectionOverlayView: NSView {
     override func mouseDragged(with event: NSEvent) {
         guard let start = startPoint else { return }
         currentPoint = convert(event.locationInWindow, from: nil)
-        selectionRect = rect(from: start, to: currentPoint!)
+        guard let currentPoint else { return }
+        selectionRect = rect(from: start, to: currentPoint)
         NSCursor.crosshair.set()
     }
 

@@ -25,6 +25,7 @@ struct MainViewHistorySection: View {
     let onSearchTextChanged: (String) -> Void
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
+    let isLoadingMore: Bool
     let isPinnedFilterActive: Bool
     let onTogglePinnedFilter: () -> Void
     let availableCategories: [ClipItemCategory]
@@ -59,6 +60,7 @@ struct MainViewHistorySection: View {
         onSearchTextChanged: @escaping (String) -> Void,
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
+        isLoadingMore: Bool,
         isPinnedFilterActive: Bool,
         onTogglePinnedFilter: @escaping () -> Void,
         availableCategories: [ClipItemCategory],
@@ -87,6 +89,7 @@ struct MainViewHistorySection: View {
         self.onSearchTextChanged = onSearchTextChanged
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
+        self.isLoadingMore = isLoadingMore
         self.isPinnedFilterActive = isPinnedFilterActive
         self.onTogglePinnedFilter = onTogglePinnedFilter
         self.availableCategories = availableCategories
@@ -132,7 +135,8 @@ struct MainViewHistorySection: View {
                 onOpenItem: onOpenItem,
                 onInsertToEditor: onInsertToEditor,
                 onLoadMore: onLoadMore,
-                hasMoreItems: hasMoreItems
+                hasMoreItems: hasMoreItems,
+                isLoadingMore: isLoadingMore
             )
         }
         .onChange(of: searchText) { newValue in

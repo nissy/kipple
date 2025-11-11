@@ -7,6 +7,7 @@
 
 import XCTest
 import SwiftUI
+import Combine
 @testable import Kipple
 
 @MainActor
@@ -196,6 +197,53 @@ class MainViewModelTests: XCTestCase {
         // Then
         XCTAssertEqual(viewModel.history.count, 100)
         XCTAssertTrue(viewModel.hasMoreHistory)
+    }
+
+    func testLoadMoreHistoryPublishesLoadingState() {
+        // Given
+        mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }
+        viewModel.loadHistory()
+        guard let lastVisible = viewModel.history.last else {
+            XCTFail("Expected initial history to contain items")
+            return
+        }
+
+        var loadingStates: [Bool] = []
+        let cancellable = viewModel.$isLoadingMoreHistory.sink { value in
+            loadingStates.append(value)
+        }
+
+        // When
+        viewModel.loadMoreHistoryIfNeeded(currentItem: lastVisible)
+        cancellable.cancel()
+
+        // Then
+        XCTAssertTrue(loadingStates.contains(true), "Loading flag should publish true at least once")
+        XCTAssertFalse(viewModel.isLoadingMoreHistory)
+    }
+
+    func testLoadHistoryUntilAllItemsLoaded() {
+        // Given
+        let totalItems = 180
+        mockClipboardService.history = (1...totalItems).map { ClipItem(content: "Item \($0)") }
+        viewModel.loadHistory()
+
+        var iteration = 0
+        let maxIterations = 10
+
+        // When
+        while viewModel.hasMoreHistory && iteration < maxIterations {
+            guard let lastVisible = viewModel.history.last else {
+                XCTFail("Expected history to contain items while loading")
+                break
+            }
+            viewModel.loadMoreHistoryIfNeeded(currentItem: lastVisible)
+            iteration += 1
+        }
+
+        // Then
+        XCTAssertEqual(viewModel.history.count, totalItems)
+        XCTAssertFalse(viewModel.hasMoreHistory)
     }
 
     func testSearchDisablesPagination() {

@@ -110,7 +110,7 @@ struct FontSettings: Codable, Equatable {
 
 // MARK: - Font Manager
 @MainActor
-class FontManager: ObservableObject {
+final class FontManager: ObservableObject {
     static let shared = FontManager()
     
     @Published var editorSettings: FontSettings {

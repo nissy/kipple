@@ -17,6 +17,7 @@ struct HistoryListView: View {
     let onInsertToEditor: ((ClipItem) -> Void)?
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
+    let isLoadingMore: Bool
 
     var body: some View {
         ScrollView {
@@ -71,7 +72,7 @@ struct HistoryListView: View {
                         onLoadMore(item)
                     }
                 }
-                if hasMoreItems {
+                if hasMoreItems && isLoadingMore {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .frame(maxWidth: .infinity)

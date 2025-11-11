@@ -101,6 +101,13 @@ cp "$VERSION_CONFIG" "${VERSION_CONFIG}.bak"
 sed -i '' "s/^MARKETING_VERSION = .*/MARKETING_VERSION = ${NEW_VERSION}/" "$VERSION_CONFIG"
 sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = ${NEW_BUILD}/" "$VERSION_CONFIG"
 
+# Keep project.yml in sync so xcodegen doesn't revert versions
+PROJECT_SPEC="project.yml"
+if [ -f "$PROJECT_SPEC" ]; then
+    sed -i '' "s/^\([[:space:]]*MARKETING_VERSION:\).*/\1 ${NEW_VERSION}/" "$PROJECT_SPEC"
+    sed -i '' "s/^\([[:space:]]*CURRENT_PROJECT_VERSION:\).*/\1 ${NEW_BUILD}/" "$PROJECT_SPEC"
+fi
+
 echo -e "${GREEN}✓ Updated to version ${NEW_VERSION} (${NEW_BUILD})${NC}"
 
 # Show the changes

@@ -12,7 +12,7 @@ import Combine
 
 // swiftlint:disable type_body_length file_length
 @MainActor
-class MainViewModel: ObservableObject, MainViewModelProtocol {
+final class MainViewModel: ObservableObject, MainViewModelProtocol {
     enum PasteMode {
         case clipboard
         case queueOnce
@@ -64,9 +64,9 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // ページネーション関連
     @Published private(set) var hasMoreHistory: Bool = false
+    @Published private(set) var isLoadingMoreHistory: Bool = false
     private let pageSize: Int
     private var currentHistoryLimit: Int = 0
-    private var isLoadingMore = false
     private var lastQueueAnchorID: UUID?
     private var shouldResetAnchorOnNextShiftSelection = false
     private var filteredOrderingSnapshot: [ClipItem] = []
@@ -289,15 +289,15 @@ class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     func loadMoreHistoryIfNeeded(currentItem: ClipItem) {
         guard history.count < filteredHistory.count else { return }
-        guard !isLoadingMore else { return }
+        guard !isLoadingMoreHistory else { return }
         guard let lastItem = history.last, lastItem.id == currentItem.id else { return }
 
-        isLoadingMore = true
+        isLoadingMoreHistory = true
+        defer { isLoadingMoreHistory = false }
         let newLimit = min(history.count + pageSize, filteredHistory.count)
         currentHistoryLimit = newLimit
         history = Array(filteredHistory.prefix(currentHistoryLimit))
         hasMoreHistory = history.count < filteredHistory.count
-        isLoadingMore = false
     }
 
     func copyEditor() {

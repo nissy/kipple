@@ -9,10 +9,8 @@ import Foundation
 import ServiceManagement
 
 @MainActor
-class LaunchAtLogin {
+final class LaunchAtLogin {
     static let shared = LaunchAtLogin()
-    
-    private let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.Kipple"
     
     private init() {}
     
@@ -55,13 +53,11 @@ class LaunchAtLogin {
                 Logger.shared.error("Failed to \(action) launch at login: \(error.localizedDescription)")
                 
                 // エラーの詳細をユーザーに通知
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("LaunchAtLoginError"),
-                        object: nil,
-                        userInfo: ["error": error.localizedDescription]
-                    )
-                }
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("LaunchAtLoginError"),
+                    object: nil,
+                    userInfo: ["error": error.localizedDescription]
+                )
             }
         } else {
             // Fallback for older versions

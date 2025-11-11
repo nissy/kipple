@@ -38,9 +38,10 @@ extension SimpleLineNumberRulerView {
         }
 
         let visibleRect = textView.visibleRect
+        guard let textContainer = textView.textContainer else { return }
         let visibleGlyphRange = layoutManager.glyphRange(
             forBoundingRect: visibleRect,
-            in: textView.textContainer!
+            in: textContainer
         )
         let startLocation = max(0, visibleGlyphRange.location - 1000)
         let extendedGlyphRange = NSRange(

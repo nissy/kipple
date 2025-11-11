@@ -173,7 +173,7 @@ struct KeyEventHandler: NSViewRepresentable {
     }
 }
 
-class KeyCaptureView: NSView {
+final class KeyCaptureView: NSView {
     var onKeyDown: ((NSEvent) -> Bool)?
     var isActive = false {
         didSet {
