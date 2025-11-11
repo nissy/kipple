@@ -36,19 +36,19 @@ struct MainViewControlSection: View {
                 systemImage: "trash",
                 shortcut: getClearShortcutKeyDisplay()
             )
+            .foregroundColor(.white)
             .padding(.horizontal, horizontalPadding)
             .frame(height: buttonHeight)
+            .background(clearButtonBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
         }
         .buttonStyle(PlainButtonStyle())
-        .foregroundColor(.white)
-        .background(clearButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-        )
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
-        .frame(height: buttonHeight)
+        .contentShape(Rectangle())
     }
 
     private var copySplitButton: some View {
@@ -61,13 +61,15 @@ struct MainViewControlSection: View {
                 )
                 .padding(.horizontal, horizontalPadding)
                 .frame(height: buttonHeight)
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
 
             Rectangle()
-                .fill(Color.white.opacity(0.2))
+                .fill(Color.white.opacity(0.25))
                 .frame(width: 1, height: buttonHeight - 12)
                 .padding(.vertical, 6)
+                .allowsHitTesting(false)
 
             Menu {
                 Button(action: onSplitCopy) {
@@ -82,7 +84,7 @@ struct MainViewControlSection: View {
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(Color.white)
                     .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 30, height: buttonHeight)
+                    .frame(width: 32, height: buttonHeight)
                     .contentShape(Rectangle())
             }
             .menuStyle(BorderlessButtonMenuStyle())
@@ -97,7 +99,23 @@ struct MainViewControlSection: View {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
-        .frame(height: buttonHeight)
+        .contentShape(Rectangle())
+    }
+
+    private func buttonLabel(title: String, systemImage: String, shortcut: String) -> some View {
+        HStack(spacing: 4) {
+            Label {
+                Text(verbatim: title)
+                    .font(.system(size: 11, weight: .semibold))
+            } icon: {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .regular))
+            }
+
+            if !shortcut.isEmpty {
+                shortcutBadge(shortcut)
+            }
+        }
     }
 
     private func shortcutBadge(_ text: String) -> some View {
@@ -125,27 +143,11 @@ struct MainViewControlSection: View {
         LinearGradient(
             colors: [
                 Color(NSColor.systemRed),
-                Color(NSColor.systemRed).opacity(0.8)
+                Color(NSColor.systemRed).opacity(0.85)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-
-    private func buttonLabel(title: String, systemImage: String, shortcut: String) -> some View {
-        HStack(spacing: 4) {
-            Label {
-                Text(verbatim: title)
-                    .font(.system(size: 11, weight: .semibold))
-            } icon: {
-                Image(systemName: systemImage)
-                    .font(.system(size: 11, weight: .regular))
-            }
-
-            if !shortcut.isEmpty {
-                shortcutBadge(shortcut)
-            }
-        }
     }
 
     private func getShortcutKeyDisplay() -> String {
