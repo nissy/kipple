@@ -37,11 +37,11 @@ validate_version() {
 
 # Function to get current values
 get_current_version() {
-    grep "^MARKETING_VERSION" "$VERSION_CONFIG" | cut -d'=' -f2 | xargs
+    awk -F'=' '/^MARKETING_VERSION/ {gsub(/[[:space:]]*/, "", $2); print $2}' "$VERSION_CONFIG"
 }
 
 get_current_build() {
-    grep "^CURRENT_PROJECT_VERSION" "$VERSION_CONFIG" | cut -d'=' -f2 | xargs
+    awk -F'=' '/^CURRENT_PROJECT_VERSION/ {gsub(/[[:space:]]*/, "", $2); print $2}' "$VERSION_CONFIG"
 }
 
 # Check if config file exists
