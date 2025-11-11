@@ -313,6 +313,27 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         editorText = ""
         UserDefaults.standard.removeObject(forKey: "lastEditorText")
     }
+
+    @discardableResult
+    func splitEditorLinesIntoHistory() async -> Int {
+        let components = editorText
+            .components(separatedBy: CharacterSet.newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !components.isEmpty else { return 0 }
+
+        let addedItems = await clipboardService.addEditorItems(components)
+
+        if let first = addedItems.first {
+            clipboardService.recopyFromHistory(first)
+        }
+
+        editorText = ""
+        UserDefaults.standard.removeObject(forKey: "lastEditorText")
+
+        return addedItems.count
+    }
     
     // These are now async methods above, keeping for backward compatibility
     func togglePinSync(for item: ClipItem) -> Bool {

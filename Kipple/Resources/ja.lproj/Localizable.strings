@@ -47,6 +47,7 @@
 "Editor Copy" = "エディタのコピー";
 "Editor Font" = "エディタのフォント";
 "Editor History Insert" = "エディタ履歴挿入";
+"editor.splitCopy.menu" = "行分割して履歴に追加";
 "Editor Position" = "エディタの位置";
 "External Source" = "外部アプリ";
 "English" = "英語";

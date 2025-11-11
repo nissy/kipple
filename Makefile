@@ -584,16 +584,21 @@ status: ## Show project status
 
 show-version: ## Show version from xcconfig files
 	@echo "$(BLUE)Version from xcconfig:$(NC)"
-	@echo "Marketing Version: $$(grep '^MARKETING_VERSION' Config/Version.xcconfig | cut -d'=' -f2 | xargs)"
-	@echo "Build Number: $$(grep '^CURRENT_PROJECT_VERSION' Config/Version.xcconfig | cut -d'=' -f2 | xargs)"
+	@echo "Marketing Version: $$(awk -F'=' '/^MARKETING_VERSION/ {gsub(/[[:space:]]*/, \"\", $$2); print $$2}' Config/Version.xcconfig)"
+	@echo "Build Number: $$(awk -F'=' '/^CURRENT_PROJECT_VERSION/ {gsub(/[[:space:]]*/, \"\", $$2); print $$2}' Config/Version.xcconfig)"
 
 bump-version: ## Update version (usage: make bump-version VERSION=2.0.6)
+	@if [ -n "$(NEW_VERSION)" ]; then \
+		echo "$(RED)Error: Use VERSION=<value> instead of NEW_VERSION$(NC)"; \
+		exit 1; \
+	fi
 	@if [ -z "$(VERSION)" ]; then \
 		echo "$(RED)Error: VERSION not specified$(NC)"; \
 		echo "Usage: make bump-version VERSION=2.0.6"; \
 		exit 1; \
 	fi
 	@./Scripts/update_version.sh $(VERSION)
+	@$(MAKE) generate
 
 bump-build: ## Increment build number only
 	@./Scripts/update_version.sh --build-only

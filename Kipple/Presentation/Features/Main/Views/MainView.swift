@@ -383,7 +383,8 @@ extension MainView {
             )
             MainViewControlSection(
                 onCopy: confirmAction,
-                onClear: clearAction
+                onClear: clearAction,
+                onSplitCopy: splitEditorIntoHistory
             )
         }
         .id(editorRefreshID)
