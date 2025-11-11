@@ -319,6 +319,31 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
         history.insert(item, at: 0)
     }
 
+    func addEditorItems(_ contents: [String]) async -> [ClipItem] {
+        let sanitized = contents
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !sanitized.isEmpty else { return [] }
+
+        let created = sanitized.map {
+            ClipItem(
+                content: $0,
+                sourceApp: "Kipple",
+                windowTitle: "Quick Editor",
+                bundleIdentifier: Bundle.main.bundleIdentifier,
+                processID: ProcessInfo.processInfo.processIdentifier,
+                isFromEditor: true
+            )
+        }
+
+        for item in created.reversed() {
+            history.insert(item, at: 0)
+        }
+
+        return created
+    }
+
     func recopyFromHistory(_ item: ClipItem) async {
         if let index = history.firstIndex(where: { $0.content == item.content }) {
             history.remove(at: index)
