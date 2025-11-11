@@ -69,6 +69,13 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
+    @discardableResult
+    func addEditorItems(_ contents: [String]) async -> [ClipItem] {
+        let items = await modernService.addEditorItems(contents)
+        await refreshHistory()
+        return items
+    }
+
     func recopyFromHistory(_ item: ClipItem) {
         pendingClipboardContent = item.content
         currentClipboardContent = item.content

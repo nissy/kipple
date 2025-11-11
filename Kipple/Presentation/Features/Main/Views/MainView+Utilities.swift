@@ -19,6 +19,15 @@ extension MainView {
         showCopiedNotification(.copied)
     }
 
+    func splitEditorIntoHistory() {
+        Task { @MainActor in
+            let insertedCount = await viewModel.splitEditorLinesIntoHistory()
+            if insertedCount > 0 {
+                showCopiedNotification(.copied)
+            }
+        }
+    }
+
     func clearAction() {
         viewModel.clearEditor()
     }

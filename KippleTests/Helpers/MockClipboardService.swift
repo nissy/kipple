@@ -71,6 +71,33 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling 
         onHistoryChanged?(item)
     }
 
+    @discardableResult
+    func addEditorItems(_ contents: [String]) async -> [ClipItem] {
+        let sanitized = contents
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !sanitized.isEmpty else { return [] }
+
+        let createdItems = sanitized.map { content -> ClipItem in
+            ClipItem(
+                content: content,
+                sourceApp: "Kipple",
+                windowTitle: "Quick Editor",
+                bundleIdentifier: Bundle.main.bundleIdentifier,
+                processID: ProcessInfo.processInfo.processIdentifier,
+                isFromEditor: true
+            )
+        }
+
+        for item in createdItems.reversed() {
+            history.insert(item, at: 0)
+            onHistoryChanged?(item)
+        }
+
+        return createdItems
+    }
+
     func recopyFromHistory(_ item: ClipItem) {
         lastRecopiedItem = item
 

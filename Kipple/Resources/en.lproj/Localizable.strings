@@ -47,6 +47,7 @@
 "Editor Copy" = "Editor Copy";
 "Editor Font" = "Editor Font";
 "Editor History Insert" = "Editor History Insert";
+"editor.splitCopy.menu" = "Split lines and add to history";
 "Editor Position" = "Editor Position";
 "External Source" = "External Source";
 "English" = "English";

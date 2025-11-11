@@ -242,6 +242,36 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await state.setExpectedChangeCount(newChangeCount)
     }
 
+    func addEditorItems(_ contents: [String]) async -> [ClipItem] {
+        let sanitized = contents
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !sanitized.isEmpty else { return [] }
+
+        var createdItems: [ClipItem] = []
+        createdItems.reserveCapacity(sanitized.count)
+
+        for content in sanitized {
+            let item = ClipItem(
+                content: content,
+                kind: determineKind(for: content, isFromEditor: true),
+                sourceApp: "Kipple",
+                windowTitle: "Quick Editor",
+                bundleIdentifier: Bundle.main.bundleIdentifier,
+                processID: ProcessInfo.processInfo.processIdentifier,
+                isFromEditor: true
+            )
+            createdItems.append(item)
+        }
+
+        for item in createdItems.reversed() {
+            addToHistory(item)
+        }
+
+        return createdItems
+    }
+
     func recopyFromHistory(_ item: ClipItem) async {
         // Set flags BEFORE updating clipboard to prevent race condition
         await state.setInternalCopy(true)
