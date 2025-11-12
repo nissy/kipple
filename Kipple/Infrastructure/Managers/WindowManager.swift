@@ -47,6 +47,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
     }
     private var preventAutoClose = false
+    private let referenceScreenshotPixelSize = NSSize(width: 750, height: 1500)
     
     // Observers
     private var windowObserver: NSObjectProtocol?
@@ -231,11 +232,33 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func configureWindowSize(_ window: NSWindow) {
         let savedHeight = UserDefaults.standard.double(forKey: "windowHeight")
         let savedWidth = UserDefaults.standard.double(forKey: "windowWidth")
-        let initialHeight = savedHeight > 0 ? savedHeight : 600
-        let initialWidth = savedWidth > 0 ? savedWidth : 420
-        window.setContentSize(NSSize(width: initialWidth, height: initialHeight))
-        window.minSize = NSSize(width: 300, height: 300)
-        window.maxSize = NSSize(width: 800, height: 1200)
+        let minimumSize = resolvedMinimumWindowSize(for: window)
+        let defaultWidth: CGFloat = minimumSize.width
+        let defaultHeight: CGFloat = minimumSize.height
+        let resolvedWidth = max(savedWidth > 0 ? CGFloat(savedWidth) : defaultWidth, minimumSize.width)
+        let resolvedHeight = max(savedHeight > 0 ? CGFloat(savedHeight) : defaultHeight, minimumSize.height)
+        window.setContentSize(NSSize(width: resolvedWidth, height: resolvedHeight))
+        window.contentMinSize = minimumSize
+        window.minSize = minimumSize
+        let maxWidth = max(CGFloat(800), minimumSize.width)
+        let maxHeight = max(CGFloat(1200), minimumSize.height)
+        window.maxSize = NSSize(width: maxWidth, height: maxHeight)
+    }
+
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        let minimumSize = resolvedMinimumWindowSize(for: sender)
+        var adjustedSize = frameSize
+        adjustedSize.width = max(adjustedSize.width, minimumSize.width)
+        adjustedSize.height = max(adjustedSize.height, minimumSize.height)
+        return adjustedSize
+    }
+
+    private func resolvedMinimumWindowSize(for window: NSWindow?) -> NSSize {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+        return NSSize(
+            width: referenceScreenshotPixelSize.width / scale,
+            height: referenceScreenshotPixelSize.height / scale
+        )
     }
     
     private func attachAlwaysOnTopButton(to window: NSWindow) {

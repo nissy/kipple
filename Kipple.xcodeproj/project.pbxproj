@@ -652,6 +652,13 @@
 			path = Infrastructure;
 			sourceTree = "<group>";
 		};
+		94806DC9AC495111E28029DE /* Styles */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Styles;
+			sourceTree = "<group>";
+		};
 		97F52B1D22576093A7239EDB /* UI */ = {
 			isa = PBXGroup;
 			children = (
@@ -694,6 +701,7 @@
 			children = (
 				9FF219BC641C43253C850EEC /* Common */,
 				5F562EAE35522AD0B198A616 /* Features */,
+				94806DC9AC495111E28029DE /* Styles */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
