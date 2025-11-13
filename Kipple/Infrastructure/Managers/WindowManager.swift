@@ -567,10 +567,22 @@ final class WindowManager: NSObject, NSWindowDelegate {
             aboutWindow?.setContentSize(NSSize(width: 340, height: 360))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
+            if let window = aboutWindow,
+               !window.collectionBehavior.contains(.moveToActiveSpace) {
+                // 常に現在のSpaceに追従させ、画面切り替えを防ぐ
+                window.collectionBehavior.insert(.moveToActiveSpace)
+            }
         } else {
             aboutWindow?.title = localizedAboutWindowTitle()
         }
+
+        if let window = aboutWindow,
+           !window.collectionBehavior.contains(.moveToActiveSpace) {
+            window.collectionBehavior.insert(.moveToActiveSpace)
+        }
         
+        centerAboutWindowOnActiveScreen()
+
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         aboutWindow?.makeKeyAndOrderFront(nil)
@@ -609,6 +621,19 @@ final class WindowManager: NSObject, NSWindowDelegate {
         appSettings.localizedString("AboutWindowTitle", comment: "About window title")
     }
     
+    private func centerAboutWindowOnActiveScreen() {
+        guard let window = aboutWindow else { return }
+        guard let screen = mainWindow?.screen ?? NSScreen.main else {
+            window.center()
+            return
+        }
+        var frame = window.frame
+        let visibleFrame = screen.visibleFrame
+        frame.origin.x = visibleFrame.midX - frame.width / 2
+        frame.origin.y = visibleFrame.midY - frame.height / 2
+        window.setFrame(frame, display: false, animate: false)
+    }
+
     // MARK: - Focus Management
     
     private func focusOnEditor() {
