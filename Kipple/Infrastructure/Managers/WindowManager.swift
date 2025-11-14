@@ -102,10 +102,13 @@ final class WindowManager: NSObject, NSWindowDelegate {
             // None: 非表示→表示でも隠し直さず即位置決定
             window.setFrameOrigin(target)
             let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            applyAnimationBehavior(style: style, to: window)
             NSApp.activate(ignoringOtherApps: true)
             if style == "none" {
-                window.alphaValue = 1.0
-                window.makeKeyAndOrderFront(nil)
+                bringWindowToFrontWithoutSystemAnimation(window) {
+                    window.alphaValue = 1.0
+                    window.makeKeyAndOrderFront(nil)
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusOnEditor() }
             } else {
                 window.alphaValue = 0
@@ -113,12 +116,17 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
         } else {
             let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            applyAnimationBehavior(style: style, to: window)
             if style == "none" {
                 // None: 可視中は隠さず即座に座標だけ反映（完全ノーアニメ）
                 var frame = window.frame
                 frame.origin = target
                 window.setFrame(frame, display: true, animate: false)
-                if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
+                if !window.isKeyWindow {
+                    bringWindowToFrontWithoutSystemAnimation(window) {
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
                 completeOpen()
                 return
@@ -342,12 +350,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func animateWindowOpen(_ window: NSWindow) {
         let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
-        
+        applyAnimationBehavior(style: animationType, to: window)
+
         switch animationType {
         case "slide":
             animateSlide(window)
         case "none":
-            window.makeKeyAndOrderFront(nil)
+            bringWindowToFrontWithoutSystemAnimation(window) {
+                window.makeKeyAndOrderFront(nil)
+            }
             // アニメーションなしの場合も少し遅延してフォーカス
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.focusOnEditor()
@@ -356,19 +367,23 @@ final class WindowManager: NSObject, NSWindowDelegate {
             animateFade(window)
         }
         // 前面化のフォロー（取りこぼし対策）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak window] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak window] in
             guard let window else { return }
             if !window.isKeyWindow {
-                NSApp.activate(ignoringOtherApps: true)
-                window.orderFrontRegardless()
-                window.makeKeyAndOrderFront(nil)
+                self?.bringWindowToFrontWithoutSystemAnimation(window) {
+                    NSApp.activate(ignoringOtherApps: true)
+                    window.orderFrontRegardless()
+                    window.makeKeyAndOrderFront(nil)
+                }
             }
         }
     }
     
     private func animateFade(_ window: NSWindow) {
-        window.alphaValue = 0
-        window.makeKeyAndOrderFront(nil)
+        bringWindowToFrontWithoutSystemAnimation(window) {
+            window.alphaValue = 0
+            window.makeKeyAndOrderFront(nil)
+        }
         
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.28
@@ -377,16 +392,33 @@ final class WindowManager: NSObject, NSWindowDelegate {
             self?.focusOnEditor()
         }
     }
-    
+
+    private func applyAnimationBehavior(style: String, to window: NSWindow) {
+        if style == "none" {
+            window.animationBehavior = .none
+        } else {
+            window.animationBehavior = .default
+        }
+    }
+
+    private func bringWindowToFrontWithoutSystemAnimation(_ window: NSWindow, actions: () -> Void) {
+        NSDisableScreenUpdates()
+        defer { NSEnableScreenUpdates() }
+        actions()
+        window.displayIfNeeded()
+    }
+
     // scale アニメーションは削除（互換は slide にフォールバック）
-    
+
     private func animateSlide(_ window: NSWindow) {
         let targetFrame = window.frame
         var startFrame = targetFrame
         startFrame.origin.y += 50
-        window.setFrame(startFrame, display: false)
-        window.alphaValue = 0
-        window.makeKeyAndOrderFront(nil)
+        bringWindowToFrontWithoutSystemAnimation(window) {
+            window.setFrame(startFrame, display: false)
+            window.alphaValue = 0
+            window.makeKeyAndOrderFront(nil)
+        }
         
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.20
