@@ -84,6 +84,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     // OSの自動再表示（旧位置一瞬表示）を抑止するための準備
     @MainActor
     func prepareForActivationBeforeOpen() {
+        let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+        guard style != "none" else { return }
         if let window = mainWindow {
             window.orderOut(nil)
         }
