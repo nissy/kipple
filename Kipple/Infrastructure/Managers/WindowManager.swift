@@ -8,6 +8,9 @@
 import SwiftUI
 import AppKit
 import Combine
+import Darwin
+
+private typealias ScreenUpdateFunction = @convention(c) () -> Void
 
 // swiftlint:disable file_length
 @MainActor
@@ -25,6 +28,22 @@ extension Notification.Name {
 @MainActor
 // swiftlint:disable:next type_body_length
 final class WindowManager: NSObject, NSWindowDelegate {
+    private static let rtldDefaultHandle = UnsafeMutableRawPointer(bitPattern: -2)
+    private static let disableGlobalScreenUpdates: ScreenUpdateFunction? =
+        WindowManager.resolveScreenUpdateFunction(named: "NSDisableScreenUpdates")
+    private static let enableGlobalScreenUpdates: ScreenUpdateFunction? =
+        WindowManager.resolveScreenUpdateFunction(named: "NSEnableScreenUpdates")
+
+    private static func resolveScreenUpdateFunction(named name: String) -> ScreenUpdateFunction? {
+        guard
+            let handle = rtldDefaultHandle,
+            let symbol = dlsym(handle, name)
+        else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: ScreenUpdateFunction.self)
+    }
+
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
@@ -368,9 +387,16 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         // 前面化のフォロー（取りこぼし対策）
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak window] in
-            guard let window else { return }
+            guard let self, let window else { return }
             if !window.isKeyWindow {
-                self?.bringWindowToFrontWithoutSystemAnimation(window) {
+                let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+                if style == "none" {
+                    self.bringWindowToFrontWithoutSystemAnimation(window) {
+                        NSApp.activate(ignoringOtherApps: true)
+                        window.orderFrontRegardless()
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                } else {
                     NSApp.activate(ignoringOtherApps: true)
                     window.orderFrontRegardless()
                     window.makeKeyAndOrderFront(nil)
@@ -380,8 +406,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func animateFade(_ window: NSWindow) {
-        bringWindowToFrontWithoutSystemAnimation(window) {
-            window.alphaValue = 0
+        window.alphaValue = 0
+        suppressSystemShowAnimation(on: window) {
             window.makeKeyAndOrderFront(nil)
         }
         
@@ -402,21 +428,34 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func bringWindowToFrontWithoutSystemAnimation(_ window: NSWindow, actions: () -> Void) {
-        NSDisableScreenUpdates()
-        defer { NSEnableScreenUpdates() }
-        actions()
+        performWithScreenUpdatesSuppressed(actions: actions)
         window.displayIfNeeded()
     }
 
-    // scale アニメーションは削除（互換は slide にフォールバック）
+    private func suppressSystemShowAnimation(on window: NSWindow, actions: () -> Void) {
+        performWithScreenUpdatesSuppressed(actions: actions)
+        window.displayIfNeeded()
+    }
 
+    private func performWithScreenUpdatesSuppressed(actions: () -> Void) {
+        if let disable = Self.disableGlobalScreenUpdates, let enable = Self.enableGlobalScreenUpdates {
+            disable()
+            defer { enable() }
+            actions()
+        } else {
+            actions()
+        }
+    }
+
+    // scale アニメーションは削除（互換は slide にフォールバック）
+    
     private func animateSlide(_ window: NSWindow) {
         let targetFrame = window.frame
         var startFrame = targetFrame
         startFrame.origin.y += 50
-        bringWindowToFrontWithoutSystemAnimation(window) {
-            window.setFrame(startFrame, display: false)
-            window.alphaValue = 0
+        window.setFrame(startFrame, display: false)
+        window.alphaValue = 0
+        suppressSystemShowAnimation(on: window) {
             window.makeKeyAndOrderFront(nil)
         }
         
