@@ -47,6 +47,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
     }
     private var preventAutoClose = false
+    private let referenceScreenshotPixelSize = NSSize(width: 750, height: 1500)
     
     // Observers
     private var windowObserver: NSObjectProtocol?
@@ -97,10 +98,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         if window.isMiniaturized { window.deminiaturize(nil) }
 
         let target = computeOriginAtCursor(for: window)
+        let style = currentWindowAnimationStyle()
+        applyWindowAnimationBehavior(style, to: window)
         if !window.isVisible {
             // None: 非表示→表示でも隠し直さず即位置決定
             window.setFrameOrigin(target)
-            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
             NSApp.activate(ignoringOtherApps: true)
             if style == "none" {
                 window.alphaValue = 1.0
@@ -108,10 +110,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusOnEditor() }
             } else {
                 window.alphaValue = 0
-                animateWindowOpen(window)
+                animateWindowOpen(window, style: style)
             }
         } else {
-            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
             if style == "none" {
                 // None: 可視中は隠さず即座に座標だけ反映（完全ノーアニメ）
                 var frame = window.frame
@@ -126,7 +127,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.orderOut(nil)
             window.setFrameOrigin(target)
             NSApp.activate(ignoringOtherApps: true)
-            animateWindowOpen(window)
+            animateWindowOpen(window, style: style)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
         }
 
@@ -141,7 +142,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
         let target = computeOriginAtCursor(for: window)
         window.setFrameOrigin(target)
         NSApp.activate(ignoringOtherApps: true)
-        animateWindowOpen(window)
+        let style = currentWindowAnimationStyle()
+        applyWindowAnimationBehavior(style, to: window)
+        animateWindowOpen(window, style: style)
         completeOpen()
     }
 
@@ -231,11 +234,33 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func configureWindowSize(_ window: NSWindow) {
         let savedHeight = UserDefaults.standard.double(forKey: "windowHeight")
         let savedWidth = UserDefaults.standard.double(forKey: "windowWidth")
-        let initialHeight = savedHeight > 0 ? savedHeight : 600
-        let initialWidth = savedWidth > 0 ? savedWidth : 420
-        window.setContentSize(NSSize(width: initialWidth, height: initialHeight))
-        window.minSize = NSSize(width: 300, height: 300)
-        window.maxSize = NSSize(width: 800, height: 1200)
+        let minimumSize = resolvedMinimumWindowSize(for: window)
+        let defaultWidth: CGFloat = minimumSize.width
+        let defaultHeight: CGFloat = minimumSize.height
+        let resolvedWidth = max(savedWidth > 0 ? CGFloat(savedWidth) : defaultWidth, minimumSize.width)
+        let resolvedHeight = max(savedHeight > 0 ? CGFloat(savedHeight) : defaultHeight, minimumSize.height)
+        window.setContentSize(NSSize(width: resolvedWidth, height: resolvedHeight))
+        window.contentMinSize = minimumSize
+        window.minSize = minimumSize
+        let maxWidth = max(CGFloat(800), minimumSize.width)
+        let maxHeight = max(CGFloat(1200), minimumSize.height)
+        window.maxSize = NSSize(width: maxWidth, height: maxHeight)
+    }
+
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        let minimumSize = resolvedMinimumWindowSize(for: sender)
+        var adjustedSize = frameSize
+        adjustedSize.width = max(adjustedSize.width, minimumSize.width)
+        adjustedSize.height = max(adjustedSize.height, minimumSize.height)
+        return adjustedSize
+    }
+
+    private func resolvedMinimumWindowSize(for window: NSWindow?) -> NSSize {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+        return NSSize(
+            width: referenceScreenshotPixelSize.width / scale,
+            height: referenceScreenshotPixelSize.height / scale
+        )
     }
     
     private func attachAlwaysOnTopButton(to window: NSWindow) {
@@ -317,13 +342,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
         return windowOrigin
     }
     
-    private func animateWindowOpen(_ window: NSWindow) {
-        let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+    private func animateWindowOpen(_ window: NSWindow, style: String? = nil) {
+        let animationType = style ?? currentWindowAnimationStyle()
         
         switch animationType {
         case "slide":
             animateSlide(window)
         case "none":
+            window.alphaValue = 1.0
             window.makeKeyAndOrderFront(nil)
             // アニメーションなしの場合も少し遅延してフォーカス
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -340,6 +366,18 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.orderFrontRegardless()
                 window.makeKeyAndOrderFront(nil)
             }
+        }
+    }
+
+    private func currentWindowAnimationStyle() -> String {
+        UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+    }
+
+    private func applyWindowAnimationBehavior(_ style: String, to window: NSWindow) {
+        if style == "none" {
+            window.animationBehavior = .none
+        } else {
+            window.animationBehavior = .default
         }
     }
     
