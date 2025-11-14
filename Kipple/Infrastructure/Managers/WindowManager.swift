@@ -122,14 +122,20 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.setFrameOrigin(target)
             let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
             applyAnimationBehavior(style: style, to: window)
-            NSApp.activate(ignoringOtherApps: true)
             if style == "none" {
+                if !NSApp.isActive {
+                    NSApp.activate(ignoringOtherApps: true)
+                }
                 bringWindowToFrontWithoutSystemAnimation(window) {
                     window.alphaValue = 1.0
+                    window.orderFrontRegardless()
                     window.makeKeyAndOrderFront(nil)
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusOnEditor() }
+                DispatchQueue.main.async { [weak self] in
+                    self?.focusOnEditor()
+                }
             } else {
+                NSApp.activate(ignoringOtherApps: true)
                 window.alphaValue = 0
                 animateWindowOpen(window)
             }
@@ -146,7 +152,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
                         window.makeKeyAndOrderFront(nil)
                     }
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
+                DispatchQueue.main.async { [weak self] in
+                    self?.focusOnEditor()
+                }
                 completeOpen()
                 return
             }
@@ -376,10 +384,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
             animateSlide(window)
         case "none":
             bringWindowToFrontWithoutSystemAnimation(window) {
+                NSApp.activate(ignoringOtherApps: true)
+                window.orderFrontRegardless()
                 window.makeKeyAndOrderFront(nil)
             }
-            // アニメーションなしの場合も少し遅延してフォーカス
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 self?.focusOnEditor()
             }
         default: // "fade"
