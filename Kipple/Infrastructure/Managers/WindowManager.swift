@@ -106,6 +106,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     func openMainWindow() {
         isOpening = true
         preventAutoClose = true
+        syncTitleBarQueueState()
 
         if let existingWindow = mainWindow {
             reopenExistingWindow(existingWindow)
@@ -195,6 +196,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // MainViewModelを作成または再利用
         let viewModel = mainViewModel ?? MainViewModel()
         mainViewModel = viewModel
+        syncTitleBarQueueState()
         
         let contentView = MainView(
             titleBarState: titleBarState,
@@ -568,6 +570,23 @@ final class WindowManager: NSObject, NSWindowDelegate {
         isAlwaysOnTop = false
         removeMainWindowObservers()
     }
+
+    private func exitQueueModeIfNeededBeforeAutoHide() {
+        guard let viewModel = mainViewModel,
+              viewModel.isQueueModeActive else { return }
+        guard viewModel.pasteQueue.isEmpty else { return }
+        viewModel.resetPasteQueue()
+        titleBarState.isQueueActive = false
+    }
+
+    private func syncTitleBarQueueState() {
+        guard let viewModel = mainViewModel else {
+            titleBarState.isQueueActive = false
+            return
+        }
+        titleBarState.isQueueActive = viewModel.isQueueModeActive
+        titleBarState.isQueueEnabled = viewModel.canUsePasteQueue
+    }
     
     // MARK: - Public Methods
 
@@ -765,6 +784,7 @@ extension WindowManager {
                       !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
+                self.exitQueueModeIfNeededBeforeAutoHide()
                 // パネルを破棄せず非表示にして再利用（毎回の再構築コストを回避）
                 window.orderOut(nil)
                 // 付随のポップオーバーも確実に閉じる

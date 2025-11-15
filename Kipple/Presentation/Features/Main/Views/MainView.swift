@@ -329,12 +329,14 @@ extension MainView {
                 queueCount: queue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
+            syncTitleBarState()
         }
         .onReceive(viewModel.$pasteMode) { _ in
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
+            syncTitleBarState()
         }
     }
 
