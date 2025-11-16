@@ -38,6 +38,7 @@ struct MainViewHistorySection: View {
     let isQueueLoopActive: Bool
     let canToggleQueueLoop: Bool
     let onToggleQueueLoop: () -> Void
+    let historyScrollResetToken: UUID
     @ObservedObject private var fontManager = FontManager.shared
 
     @State private var searchText: String
@@ -72,7 +73,8 @@ struct MainViewHistorySection: View {
         queueSelectionPreview: Set<UUID>,
         isQueueLoopActive: Bool,
         canToggleQueueLoop: Bool,
-        onToggleQueueLoop: @escaping () -> Void
+        onToggleQueueLoop: @escaping () -> Void,
+        historyScrollResetToken: UUID
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
@@ -102,6 +104,7 @@ struct MainViewHistorySection: View {
         self.isQueueLoopActive = isQueueLoopActive
         self.canToggleQueueLoop = canToggleQueueLoop
         self.onToggleQueueLoop = onToggleQueueLoop
+        self.historyScrollResetToken = historyScrollResetToken
         _searchText = State(initialValue: initialSearchText)
     }
 
@@ -136,7 +139,8 @@ struct MainViewHistorySection: View {
                 onInsertToEditor: onInsertToEditor,
                 onLoadMore: onLoadMore,
                 hasMoreItems: hasMoreItems,
-                isLoadingMore: isLoadingMore
+                isLoadingMore: isLoadingMore,
+                scrollResetToken: historyScrollResetToken
             )
         }
         .onChange(of: searchText) { newValue in

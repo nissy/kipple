@@ -45,7 +45,7 @@ struct MainView: View {
     private let minimumSectionHeight: Double = 150
     private let titleBarHeight: CGFloat = 8
     @State private var isShowingQuitConfirmation = false
-    @State private var shouldIgnoreNextAutoCloseAfterQueueFinish = false
+    @State private var ignoreNextAutoCloseAfterQueueFinish = false
     @State private var pendingReactivateAfterQueueFinish = false
     @State private var wasQueueEngagedBeforeLatestUpdate = false
     var quitConfirmationBinding: Binding<Bool> {
@@ -347,7 +347,7 @@ extension MainView {
             titleBarState.toggleEditorHandler = nil
             titleBarState.startCaptureHandler = nil
             titleBarState.toggleQueueHandler = nil
-            shouldIgnoreNextAutoCloseAfterQueueFinish = false
+            ignoreNextAutoCloseAfterQueueFinish = false
             pendingReactivateAfterQueueFinish = false
             if !activePreventAutoCloseReasons.isEmpty {
                 activePreventAutoCloseReasons.removeAll()
@@ -358,8 +358,8 @@ extension MainView {
             showCopiedNotification(.copied)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            if shouldIgnoreNextAutoCloseAfterQueueFinish {
-                shouldIgnoreNextAutoCloseAfterQueueFinish = false
+            if ignoreNextAutoCloseAfterQueueFinish {
+                ignoreNextAutoCloseAfterQueueFinish = false
             }
             attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: true)
         }
@@ -431,15 +431,15 @@ extension MainView {
         if queueFinished {
             pendingReactivateAfterQueueFinish = true
             if NSApp.isActive {
-                shouldIgnoreNextAutoCloseAfterQueueFinish = true
-            } else if shouldIgnoreNextAutoCloseAfterQueueFinish {
-                shouldIgnoreNextAutoCloseAfterQueueFinish = false
+                ignoreNextAutoCloseAfterQueueFinish = true
+            } else if ignoreNextAutoCloseAfterQueueFinish {
+                ignoreNextAutoCloseAfterQueueFinish = false
                 attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: true)
             } else {
                 attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: true)
             }
-        } else if shouldIgnoreNextAutoCloseAfterQueueFinish {
-            shouldIgnoreNextAutoCloseAfterQueueFinish = false
+        } else if ignoreNextAutoCloseAfterQueueFinish {
+            ignoreNextAutoCloseAfterQueueFinish = false
             pendingReactivateAfterQueueFinish = false
         } else if pendingReactivateAfterQueueFinish {
             pendingReactivateAfterQueueFinish = false
@@ -454,7 +454,7 @@ extension MainView {
         if ignoreWindowActiveState {
             canReactivateNow = true
         } else {
-            canReactivateNow = !shouldIgnoreNextAutoCloseAfterQueueFinish && !NSApp.isActive
+            canReactivateNow = !ignoreNextAutoCloseAfterQueueFinish && !NSApp.isActive
         }
         guard canReactivateNow else { return }
         pendingReactivateAfterQueueFinish = false
@@ -479,95 +479,6 @@ extension MainView {
         .id(editorRefreshID)
     }
     
-    // 履歴とピン留めセクションのコンテンツ
-    @ViewBuilder
-    private var historyAndPinnedContent: some View {
-        // 有効なフィルターを取得
-        let enabledCategories = [
-            ClipItemCategory.url
-        ]
-            .filter { isCategoryFilterEnabled($0) }
-        let customCategories: [UserCategory] = {
-            var list = userCategoryStore.userDefinedFilters()
-            if appSettings.filterCategoryNone {
-                var noneCategory = userCategoryStore.noneCategory()
-                if noneCategory.name != "None" {
-                    noneCategory.name = "None"
-                }
-                list.insert(noneCategory, at: 0)
-            }
-            return list
-        }()
-
-        let queueLoopToggleHandler: () -> Void = {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueRepetition()
-            }
-            syncTitleBarState()
-        }
-
-        return MainViewHistorySection(
-                history: viewModel.history,
-                currentClipboardContent: viewModel.currentClipboardContent,
-                selectedHistoryItem: $selectedHistoryItem,
-                onSelectItem: handleItemSelection,
-                onOpenItem: { item in
-                    guard item.isActionable else { return }
-                    item.performAction()
-                },
-                onInsertToEditor: { item in
-                    viewModel.selectHistoryItem(item, forceInsert: true)
-                },
-                onTogglePin: { item in
-                    let wasPinned = item.isPinned
-                    let newState = viewModel.togglePinSync(for: item)
-                    if !wasPinned && !newState {
-                        // ピン留め失敗（最大数に達している）
-                        showCopiedNotification(.pinLimitReached)
-                    }
-                },
-                onDelete: { item in
-                    viewModel.deleteItemSync(item)
-                },
-                onCategoryFilter: { category in
-                    viewModel.toggleCategoryFilter(category)
-                },
-                onChangeUserCategory: { item, catId in
-                    Task { @MainActor in
-                        var updated = item
-                        updated.userCategoryId = catId
-                        if let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter {
-                            await adapter.updateItem(updated)
-                        }
-                    }
-                },
-                onOpenCategoryManager: { presentCategoryManager() },
-                selectedCategory: $viewModel.selectedCategory,
-                initialSearchText: viewModel.searchText,
-                onSearchTextChanged: { text in
-                    viewModel.searchText = text
-                },
-                onLoadMore: { item in
-                    viewModel.loadMoreHistoryIfNeeded(currentItem: item)
-                },
-                hasMoreItems: viewModel.hasMoreHistory,
-                isLoadingMore: viewModel.isLoadingMoreHistory,
-                isPinnedFilterActive: viewModel.isPinnedFilterActive,
-                onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
-                availableCategories: enabledCategories,
-                customCategories: customCategories,
-                selectedUserCategoryId: viewModel.selectedUserCategoryId,
-                onToggleUserCategoryFilter: { viewModel.toggleUserCategoryFilter($0) },
-                pasteMode: viewModel.pasteMode,
-                queueBadgeProvider: viewModel.queueBadge(for:),
-                queueSelectionPreview: viewModel.queueSelectionPreview,
-                isQueueLoopActive: viewModel.pasteMode == .queueToggle,
-                canToggleQueueLoop: viewModel.canUsePasteQueue,
-                onToggleQueueLoop: queueLoopToggleHandler
-            )
-            .id(historyRefreshID)
-    }
-
     // 下部バー
     @ViewBuilder
     private var bottomBar: some View { bottomBarContent }

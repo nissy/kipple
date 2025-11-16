@@ -205,7 +205,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         let contentView = MainView(
             titleBarState: titleBarState,
             onClose: { [weak self] in
-                self?.mainWindow?.close()
+                self?.hideMainWindowWithoutDestroying()
             },
             onReactivatePreviousApp: { [weak self] in
                 self?.reactivatePreviousAppIfPossible()
@@ -270,7 +270,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         positionWindowAtCursor(window)
     }
-    
+
+    private func hideMainWindowWithoutDestroying() {
+        guard let window = mainWindow, window.isVisible else { return }
+        exitQueueModeIfNeededBeforeAutoHide()
+        window.orderOut(nil)
+        mainViewModel?.scrollHistoryToTop()
+        HistoryPopoverManager.shared.forceClose()
+    }
+
     private func setPreventAutoClose(_ flag: Bool) {
         preventAutoClose = flag
         guard flag else { return }
