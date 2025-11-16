@@ -54,6 +54,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var titleBarLeftHostingView: NSHostingView<MainViewTitleBarAccessory>?
     private var titleBarPinHostingView: NSHostingView<MainViewTitleBarPinButton>?
     private let appSettings = AppSettings.shared
+    private var appToRestoreAfterClose: LastActiveAppTracker.AppInfo?
     private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
         didSet {
@@ -106,6 +107,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     func openMainWindow() {
         isOpening = true
         preventAutoClose = true
+        capturePreviousAppForFocusReturn()
         syncTitleBarQueueState()
 
         if let existingWindow = mainWindow {
@@ -202,6 +204,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             titleBarState: titleBarState,
             onClose: { [weak self] in
                 self?.mainWindow?.close()
+            },
+            onReactivatePreviousApp: { [weak self] in
+                self?.reactivatePreviousAppIfPossible()
             },
             onAlwaysOnTopChanged: { [weak self] isOnTop in
                 self?.isAlwaysOnTop = isOnTop
@@ -381,6 +386,37 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         return windowOrigin
     }
+
+    private func capturePreviousAppForFocusReturn() {
+        let candidate = LastActiveAppTracker.shared.getSourceAppInfo()
+        let isValidPID = candidate.pid != 0
+        let hasBundle = candidate.bundleId != nil
+        let isKipple = candidate.bundleId == Bundle.main.bundleIdentifier
+        if (isValidPID || hasBundle) && !isKipple {
+            appToRestoreAfterClose = candidate
+        } else {
+            appToRestoreAfterClose = nil
+        }
+    }
+
+    private func reactivatePreviousAppIfPossible() {
+        guard let target = appToRestoreAfterClose else {
+            LastActiveAppTracker.shared.activateLastTrackedAppIfAvailable()
+            return
+        }
+        appToRestoreAfterClose = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            if target.pid != 0,
+               let running = NSRunningApplication(processIdentifier: target.pid) {
+                running.activate(options: [.activateIgnoringOtherApps])
+                return
+            }
+            if let bundleId = target.bundleId {
+                let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+                apps.first?.activate(options: [.activateIgnoringOtherApps])
+            }
+        }
+    }
     
     private func animateWindowOpen(_ window: NSWindow) {
         let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
@@ -558,6 +594,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func handleMainWindowClose() {
         NSApp.setActivationPolicy(.accessory)
         HistoryPopoverManager.shared.forceClose()
+        appToRestoreAfterClose = nil
         // 余計な参照を明示的に解放して解体順序を安定化
         if let window = mainWindow {
             window.delegate = nil

@@ -60,6 +60,7 @@ struct MainView: View {
     }
     
     let onClose: (() -> Void)?
+    let onReactivatePreviousApp: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
     let onOpenAbout: (() -> Void)?
@@ -70,6 +71,7 @@ struct MainView: View {
     init(
         titleBarState: MainWindowTitleBarState = MainWindowTitleBarState(),
         onClose: (() -> Void)? = nil,
+        onReactivatePreviousApp: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
         onOpenAbout: (() -> Void)? = nil,
@@ -79,6 +81,7 @@ struct MainView: View {
     ) {
         self.titleBarState = titleBarState
         self.onClose = onClose
+        self.onReactivatePreviousApp = onReactivatePreviousApp
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
         self.onOpenAbout = onOpenAbout
@@ -129,6 +132,7 @@ extension MainView {
             } else {
                 // Always on Topが無効の場合は即座にウィンドウを閉じる
                 onClose?()
+                onReactivatePreviousApp?()
             }
         }
     }
