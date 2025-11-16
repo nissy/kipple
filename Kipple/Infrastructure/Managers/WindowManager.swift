@@ -56,6 +56,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private let appSettings = AppSettings.shared
     private var appToRestoreAfterClose: LastActiveAppTracker.AppInfo?
     private var localizationCancellable: AnyCancellable?
+    private var pendingAppReactivation: DispatchWorkItem?
     private var isAlwaysOnTop = false {
         didSet {
             if let window = mainWindow {
@@ -105,6 +106,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     @MainActor
     func openMainWindow() {
+        cancelPendingAppReactivation()
         isOpening = true
         preventAutoClose = true
         capturePreviousAppForFocusReturn()
@@ -400,13 +402,21 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
     }
 
+    private func cancelPendingAppReactivation() {
+        pendingAppReactivation?.cancel()
+        pendingAppReactivation = nil
+    }
+
     private func reactivatePreviousAppIfPossible() {
         guard let target = appToRestoreAfterClose else {
             LastActiveAppTracker.shared.activateLastTrackedAppIfAvailable()
             return
         }
         appToRestoreAfterClose = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        pendingAppReactivation?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingAppReactivation = nil
             if target.pid != 0,
                let running = NSRunningApplication(processIdentifier: target.pid) {
                 running.activate(options: [.activateIgnoringOtherApps])
@@ -417,6 +427,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 apps.first?.activate(options: [.activateIgnoringOtherApps])
             }
         }
+        pendingAppReactivation = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
     
     private func animateWindowOpen(_ window: NSWindow) {
