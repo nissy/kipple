@@ -350,6 +350,9 @@ extension MainView {
                 isQueueModeActive: viewModel.isQueueModeActive
             )
             syncTitleBarState()
+            if queue.isEmpty, viewModel.pasteMode != .clipboard {
+                viewModel.resetPasteQueue()
+            }
         }
         .onReceive(viewModel.$pasteMode) { _ in
             enforceQueueAlwaysOnTopIfNeeded(
