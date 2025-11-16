@@ -266,6 +266,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func setPreventAutoClose(_ flag: Bool) {
         preventAutoClose = flag
+        guard flag else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        mainWindow?.makeKeyAndOrderFront(nil)
     }
     
     private func configureWindowSize(_ window: NSWindow) {
