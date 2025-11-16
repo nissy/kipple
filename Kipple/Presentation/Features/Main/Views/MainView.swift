@@ -47,6 +47,7 @@ struct MainView: View {
     @State private var isShowingQuitConfirmation = false
     @State private var shouldIgnoreNextAutoCloseAfterQueueFinish = false
     @State private var pendingReactivateAfterQueueFinish = false
+    @State private var wasQueueEngagedBeforeLatestUpdate = false
     var quitConfirmationBinding: Binding<Bool> {
         Binding(
             get: { isShowingQuitConfirmation },
@@ -424,7 +425,9 @@ extension MainView {
     }
 
     private func updateQueueFinishAutoCloseState(queueCount: Int, isQueueModeActive: Bool) {
-        let queueFinished = queueCount == 0 && !isQueueModeActive
+        let queueFinished = queueCount == 0 && !isQueueModeActive && wasQueueEngagedBeforeLatestUpdate
+        let queueEngaged = isQueueModeActive || queueCount > 0
+        defer { wasQueueEngagedBeforeLatestUpdate = queueEngaged }
         if queueFinished {
             pendingReactivateAfterQueueFinish = true
             if NSApp.isActive {
