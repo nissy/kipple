@@ -18,7 +18,6 @@ struct HistoryListView: View {
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
-    let scrollResetToken: UUID
 
     var body: some View {
         ScrollView {
@@ -89,6 +88,6 @@ struct HistoryListView: View {
         .background(
             Color(NSColor.controlBackgroundColor).opacity(0.3)
         )
-        .id(scrollResetToken)
+        .historyListScrollBridge()
     }
 }

@@ -126,6 +126,7 @@
 		B817313A4CF71496C0D6ABB6 /* MainViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 275DFFC02347F3912374B823 /* MainViewModelTests.swift */; };
 		B94C93E0E5A4AB6C0F5A6274 /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48420E5048DC095008EB41EF /* HistoryListView.swift */; };
 		B9DD76EBB1EFEDA6E574E1D4 /* RepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4661A4D60B3DA10C5BACE2F5 /* RepositoryProvider.swift */; };
+		B9EC9D93CBCF1A58A1CA6337 /* MainView+HistoryContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A0011F69548969A91F9884 /* MainView+HistoryContent.swift */; };
 		BB32A7DAC45088B04E6F1610 /* ModernClipboardMetadataAccuracyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97E383759C2BA7CA63D0A153 /* ModernClipboardMetadataAccuracyTests.swift */; };
 		BE071AC44C46F8565114CD56 /* JapaneseFontAlignmentTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82DA84942D28289B14E53E4 /* JapaneseFontAlignmentTest.swift */; };
 		BE83F3D96570EC1EAEDCD33C /* SwiftDataPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CC5DBC53E0C2D680CCE42D /* SwiftDataPersistenceTests.swift */; };
@@ -159,6 +160,7 @@
 		EB49D860628367B9F51E6F0D /* SettingsSidebarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B70F6D565F5E4D7DBB160D /* SettingsSidebarItem.swift */; };
 		ECF960991E35A8A70CF5093F /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0A937AF0219AC13A31FBBD /* AboutView.swift */; };
 		F09D930768983860F965E45A /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91778173C4E051ADCDEA9E05 /* MainViewModel.swift */; };
+		F33CE186333647D2A54C838A /* HistoryListScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710295362260267F035569A /* HistoryListScrollBridge.swift */; };
 		F3C9555AFCA3FCDC61FC0A13 /* ModernClipboardServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6805FAF51BA5FFDDC8167C46 /* ModernClipboardServiceProtocol.swift */; };
 		F54B58C44D8D8457403D5AD6 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 6752AEBCD45E494DC76F703C /* libsqlite3.tbd */; };
 		F75E81F10AFE3D009A4DCA29 /* HistoryLimitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141F74397BC94FC87C361325 /* HistoryLimitTests.swift */; };
@@ -295,6 +297,7 @@
 		A37EA352932E46C425A5EE57 /* ClearClipboardSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearClipboardSyncTests.swift; sourceTree = "<group>"; };
 		A582C8A5F8898B8901CAFA50 /* Kipple.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kipple.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5E96A9E775E48366E37AA17 /* LastActiveAppTrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastActiveAppTrackingTests.swift; sourceTree = "<group>"; };
+		A710295362260267F035569A /* HistoryListScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListScrollBridge.swift; sourceTree = "<group>"; };
 		A8AECFC0197258F5CABC3C31 /* ClipItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipItem.swift; sourceTree = "<group>"; };
 		A9609229904FC7A347DD9F6B /* Kipple.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Kipple.entitlements; sourceTree = "<group>"; };
 		AA000B813F456AB52D33BDED /* MenuBarApp+Hotkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarApp+Hotkeys.swift"; sourceTree = "<group>"; };
@@ -325,6 +328,7 @@
 		D36EF972EACF9279EE76CFE9 /* SettingsGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsGroup.swift; sourceTree = "<group>"; };
 		D3A8A074D41803EB02702E99 /* PerformanceMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceMetricsTests.swift; sourceTree = "<group>"; };
 		D44138ED69D85A15DE70E6B1 /* TextRecognitionServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextRecognitionServiceProtocol.swift; sourceTree = "<group>"; };
+		D4A0011F69548969A91F9884 /* MainView+HistoryContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainView+HistoryContent.swift"; sourceTree = "<group>"; };
 		D4FA5B2DC8D6ED611907A4F3 /* MenuBarAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarAppTests.swift; sourceTree = "<group>"; };
 		D6B5E5249A9419B3E8AF410F /* SimpleLineNumberRulerViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberRulerViewTests.swift; sourceTree = "<group>"; };
 		D8C1A7D14BB479766C7E44F6 /* KippleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KippleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -821,10 +825,12 @@
 			isa = PBXGroup;
 			children = (
 				3A09DA616DE838519C325D3A /* CopiedNotificationView.swift */,
+				A710295362260267F035569A /* HistoryListScrollBridge.swift */,
 				48420E5048DC095008EB41EF /* HistoryListView.swift */,
 				54FE442129DA6DBFA679C63C /* MainView.swift */,
 				F06D6CD2CB34C53BE15740E6 /* MainView+BottomBar.swift */,
 				007C7037738330372CC30B6B /* MainView+Filters.swift */,
+				D4A0011F69548969A91F9884 /* MainView+HistoryContent.swift */,
 				66A50D82DF828DDB54DD9447 /* MainView+Utilities.swift */,
 				C4FFFF51C0B3CF6F7B917719 /* MainViewControlSection.swift */,
 				FE96C222A5E167BABAE17011 /* MainViewEditorSection.swift */,
@@ -1069,6 +1075,7 @@
 				3170C40F0D335A3A2C408A51 /* HistoryCategoryMenu.swift in Sources */,
 				C51B1B3F901D602D9A26EF2C /* HistoryItemPopoverComponents.swift in Sources */,
 				ABA16FADADE89FB7D04377B0 /* HistoryItemView.swift in Sources */,
+				F33CE186333647D2A54C838A /* HistoryListScrollBridge.swift in Sources */,
 				B94C93E0E5A4AB6C0F5A6274 /* HistoryListView.swift in Sources */,
 				27C4BEC2A8ED50140609BDE8 /* HistoryPopoverManager.swift in Sources */,
 				975C219CF1E3B59DF6699A1A /* HotkeyManagerProvider.swift in Sources */,
@@ -1080,6 +1087,7 @@
 				04C2C232AE6342045AEAD4F9 /* Logger.swift in Sources */,
 				E42A2105915BB2935893CD32 /* MainView+BottomBar.swift in Sources */,
 				93C1F00AC796BCBED5FE4AD1 /* MainView+Filters.swift in Sources */,
+				B9EC9D93CBCF1A58A1CA6337 /* MainView+HistoryContent.swift in Sources */,
 				E7D22F126CF86FFA16233965 /* MainView+Utilities.swift in Sources */,
 				7990B44BFC58A59419C41CFD /* MainView.swift in Sources */,
 				FB1BCF2185DA68F62529EAAE /* MainViewControlSection.swift in Sources */,

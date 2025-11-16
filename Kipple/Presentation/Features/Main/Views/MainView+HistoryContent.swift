@@ -90,8 +90,7 @@ extension MainView {
             queueSelectionPreview: viewModel.queueSelectionPreview,
             isQueueLoopActive: viewModel.pasteMode == .queueToggle,
             canToggleQueueLoop: viewModel.canUsePasteQueue,
-            onToggleQueueLoop: queueLoopToggleHandler,
-            historyScrollResetToken: viewModel.historyScrollResetToken
+            onToggleQueueLoop: queueLoopToggleHandler
         )
         .id(historyRefreshID)
     }

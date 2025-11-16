@@ -49,7 +49,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             applyFilters()
         }
     }
-    @Published var historyScrollResetToken = UUID()
     @Published var selectedCategory: ClipItemCategory?
     @Published var selectedUserCategoryId: UUID?
     @Published var isPinnedFilterActive: Bool = false
@@ -346,7 +345,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func scrollHistoryToTop() {
-        historyScrollResetToken = UUID()
+        NotificationCenter.default.post(name: .historyListShouldScrollToTop, object: nil)
     }
     
     // MARK: - Editor Insert Functions

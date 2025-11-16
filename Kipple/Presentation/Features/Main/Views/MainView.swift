@@ -16,7 +16,7 @@ enum MainViewPreventAutoCloseReason: Hashable {
 
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
-    @State private var selectedHistoryItem: ClipItem?
+    @State var selectedHistoryItem: ClipItem?
     @State var isShowingCopiedNotification = false
     @State var currentNotificationType: CopiedNotificationView.NotificationType = .copied
     @State var isAlwaysOnTop = false
@@ -28,11 +28,11 @@ struct MainView: View {
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject var appSettings = AppSettings.shared
     @ObservedObject var fontManager = FontManager.shared
-    @ObservedObject private var userCategoryStore = UserCategoryStore.shared
+    @ObservedObject var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
-    @State private var historyRefreshID = UUID()
+    @State var historyRefreshID = UUID()
     @State var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
@@ -114,7 +114,7 @@ extension MainView {
         onQuitApplication?()
     }
 
-    private func handleItemSelection(_ item: ClipItem) {
+    func handleItemSelection(_ item: ClipItem) {
         let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if viewModel.canUsePasteQueue,
            viewModel.isQueueModeActive {
