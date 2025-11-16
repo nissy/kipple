@@ -33,6 +33,10 @@ extension MainView {
     }
 
     func toggleAlwaysOnTop() {
+        let shouldPrepareForPinRelease = isAlwaysOnTop && !isAlwaysOnTopForcedByQueue
+        if shouldPrepareForPinRelease {
+            requestPreventAutoClose(.pinRelease)
+        }
         isAlwaysOnTop.toggle()
         userPreferredAlwaysOnTop = isAlwaysOnTop
         if isAlwaysOnTopForcedByQueue {
@@ -46,6 +50,9 @@ extension MainView {
         }
         syncTitleBarState()
         onAlwaysOnTopChanged?(isAlwaysOnTop)
+        if shouldPrepareForPinRelease {
+            releasePreventAutoClose(.pinRelease)
+        }
     }
 
     func toggleEditorVisibility(animated: Bool = false) {
@@ -110,8 +117,8 @@ extension MainView {
         let anchor = NSApp.keyWindow
         CategoryManagerWindowCoordinator.shared.open(
             relativeTo: anchor,
-            onOpen: { onSetPreventAutoClose?(true) },
-            onClose: { onSetPreventAutoClose?(false) }
+            onOpen: { requestPreventAutoClose(.categoryManager) },
+            onClose: { releasePreventAutoClose(.categoryManager) }
         )
     }
 
@@ -139,5 +146,18 @@ extension MainView {
     func startCaptureFromTitleBar() {
         guard let onStartTextCapture else { return }
         onStartTextCapture()
+    }
+
+    func requestPreventAutoClose(_ reason: MainViewPreventAutoCloseReason) {
+        activePreventAutoCloseReasons.insert(reason)
+        onSetPreventAutoClose?(true)
+    }
+
+    func releasePreventAutoClose(_ reason: MainViewPreventAutoCloseReason) {
+        guard activePreventAutoCloseReasons.contains(reason) else { return }
+        activePreventAutoCloseReasons.remove(reason)
+        if activePreventAutoCloseReasons.isEmpty {
+            onSetPreventAutoClose?(false)
+        }
     }
 }

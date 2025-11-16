@@ -8,6 +8,9 @@
 import SwiftUI
 import AppKit
 import Combine
+import Darwin
+
+private typealias ScreenUpdateFunction = @convention(c) () -> Void
 
 // swiftlint:disable file_length
 @MainActor
@@ -25,6 +28,22 @@ extension Notification.Name {
 @MainActor
 // swiftlint:disable:next type_body_length
 final class WindowManager: NSObject, NSWindowDelegate {
+    private static let rtldDefaultHandle = UnsafeMutableRawPointer(bitPattern: -2)
+    private static let disableGlobalScreenUpdates: ScreenUpdateFunction? =
+        WindowManager.resolveScreenUpdateFunction(named: "NSDisableScreenUpdates")
+    private static let enableGlobalScreenUpdates: ScreenUpdateFunction? =
+        WindowManager.resolveScreenUpdateFunction(named: "NSEnableScreenUpdates")
+
+    private static func resolveScreenUpdateFunction(named name: String) -> ScreenUpdateFunction? {
+        guard
+            let handle = rtldDefaultHandle,
+            let symbol = dlsym(handle, name)
+        else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: ScreenUpdateFunction.self)
+    }
+
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
@@ -35,6 +54,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var titleBarLeftHostingView: NSHostingView<MainViewTitleBarAccessory>?
     private var titleBarPinHostingView: NSHostingView<MainViewTitleBarPinButton>?
     private let appSettings = AppSettings.shared
+    private var appToRestoreAfterClose: LastActiveAppTracker.AppInfo?
     private var localizationCancellable: AnyCancellable?
     private var isAlwaysOnTop = false {
         didSet {
@@ -65,6 +85,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     // OSの自動再表示（旧位置一瞬表示）を抑止するための準備
     @MainActor
     func prepareForActivationBeforeOpen() {
+        let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+        guard style != "none" else { return }
         if let window = mainWindow {
             window.orderOut(nil)
         }
@@ -85,6 +107,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     func openMainWindow() {
         isOpening = true
         preventAutoClose = true
+        capturePreviousAppForFocusReturn()
+        syncTitleBarQueueState()
 
         if let existingWindow = mainWindow {
             reopenExistingWindow(existingWindow)
@@ -98,28 +122,44 @@ final class WindowManager: NSObject, NSWindowDelegate {
         if window.isMiniaturized { window.deminiaturize(nil) }
 
         let target = computeOriginAtCursor(for: window)
-        let style = currentWindowAnimationStyle()
-        applyWindowAnimationBehavior(style, to: window)
         if !window.isVisible {
             // None: 非表示→表示でも隠し直さず即位置決定
             window.setFrameOrigin(target)
-            NSApp.activate(ignoringOtherApps: true)
+            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            applyAnimationBehavior(style: style, to: window)
             if style == "none" {
-                window.alphaValue = 1.0
-                window.makeKeyAndOrderFront(nil)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.focusOnEditor() }
+                if !NSApp.isActive {
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+                bringWindowToFrontWithoutSystemAnimation(window) {
+                    window.alphaValue = 1.0
+                    window.orderFrontRegardless()
+                    window.makeKeyAndOrderFront(nil)
+                }
+                DispatchQueue.main.async { [weak self] in
+                    self?.focusOnEditor()
+                }
             } else {
+                NSApp.activate(ignoringOtherApps: true)
                 window.alphaValue = 0
-                animateWindowOpen(window, style: style)
+                animateWindowOpen(window)
             }
         } else {
+            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+            applyAnimationBehavior(style: style, to: window)
             if style == "none" {
                 // None: 可視中は隠さず即座に座標だけ反映（完全ノーアニメ）
                 var frame = window.frame
                 frame.origin = target
                 window.setFrame(frame, display: true, animate: false)
-                if !window.isKeyWindow { window.makeKeyAndOrderFront(nil) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
+                if !window.isKeyWindow {
+                    bringWindowToFrontWithoutSystemAnimation(window) {
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                }
+                DispatchQueue.main.async { [weak self] in
+                    self?.focusOnEditor()
+                }
                 completeOpen()
                 return
             }
@@ -127,7 +167,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.orderOut(nil)
             window.setFrameOrigin(target)
             NSApp.activate(ignoringOtherApps: true)
-            animateWindowOpen(window, style: style)
+            animateWindowOpen(window)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
         }
 
@@ -142,9 +182,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         let target = computeOriginAtCursor(for: window)
         window.setFrameOrigin(target)
         NSApp.activate(ignoringOtherApps: true)
-        let style = currentWindowAnimationStyle()
-        applyWindowAnimationBehavior(style, to: window)
-        animateWindowOpen(window, style: style)
+        animateWindowOpen(window)
         completeOpen()
     }
 
@@ -160,11 +198,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // MainViewModelを作成または再利用
         let viewModel = mainViewModel ?? MainViewModel()
         mainViewModel = viewModel
+        syncTitleBarQueueState()
         
         let contentView = MainView(
             titleBarState: titleBarState,
             onClose: { [weak self] in
                 self?.mainWindow?.close()
+            },
+            onReactivatePreviousApp: { [weak self] in
+                self?.reactivatePreviousAppIfPossible()
             },
             onAlwaysOnTopChanged: { [weak self] isOnTop in
                 self?.isAlwaysOnTop = isOnTop
@@ -229,6 +271,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func setPreventAutoClose(_ flag: Bool) {
         preventAutoClose = flag
+        guard flag else { return }
+        capturePreviousAppForFocusReturn()
+        NSApp.activate(ignoringOtherApps: true)
+        mainWindow?.makeKeyAndOrderFront(nil)
     }
     
     private func configureWindowSize(_ window: NSWindow) {
@@ -341,49 +387,82 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         return windowOrigin
     }
+
+    private func capturePreviousAppForFocusReturn() {
+        let candidate = LastActiveAppTracker.shared.getSourceAppInfo()
+        let isValidPID = candidate.pid != 0
+        let hasBundle = candidate.bundleId != nil
+        let isKipple = candidate.bundleId == Bundle.main.bundleIdentifier
+        if (isValidPID || hasBundle) && !isKipple {
+            appToRestoreAfterClose = candidate
+        } else {
+            appToRestoreAfterClose = nil
+        }
+    }
+
+    private func reactivatePreviousAppIfPossible() {
+        guard let target = appToRestoreAfterClose else {
+            LastActiveAppTracker.shared.activateLastTrackedAppIfAvailable()
+            return
+        }
+        appToRestoreAfterClose = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            if target.pid != 0,
+               let running = NSRunningApplication(processIdentifier: target.pid) {
+                running.activate(options: [.activateIgnoringOtherApps])
+                return
+            }
+            if let bundleId = target.bundleId {
+                let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+                apps.first?.activate(options: [.activateIgnoringOtherApps])
+            }
+        }
+    }
     
-    private func animateWindowOpen(_ window: NSWindow, style: String? = nil) {
-        let animationType = style ?? currentWindowAnimationStyle()
-        
+    private func animateWindowOpen(_ window: NSWindow) {
+        let animationType = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+        applyAnimationBehavior(style: animationType, to: window)
+
         switch animationType {
         case "slide":
             animateSlide(window)
         case "none":
-            window.alphaValue = 1.0
-            window.makeKeyAndOrderFront(nil)
-            // アニメーションなしの場合も少し遅延してフォーカス
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            bringWindowToFrontWithoutSystemAnimation(window) {
+                NSApp.activate(ignoringOtherApps: true)
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+            }
+            DispatchQueue.main.async { [weak self] in
                 self?.focusOnEditor()
             }
         default: // "fade"
             animateFade(window)
         }
         // 前面化のフォロー（取りこぼし対策）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak window] in
-            guard let window else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak window] in
+            guard let self, let window else { return }
             if !window.isKeyWindow {
-                NSApp.activate(ignoringOtherApps: true)
-                window.orderFrontRegardless()
-                window.makeKeyAndOrderFront(nil)
+                let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+                if style == "none" {
+                    self.bringWindowToFrontWithoutSystemAnimation(window) {
+                        NSApp.activate(ignoringOtherApps: true)
+                        window.orderFrontRegardless()
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                } else {
+                    NSApp.activate(ignoringOtherApps: true)
+                    window.orderFrontRegardless()
+                    window.makeKeyAndOrderFront(nil)
+                }
             }
-        }
-    }
-
-    private func currentWindowAnimationStyle() -> String {
-        UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
-    }
-
-    private func applyWindowAnimationBehavior(_ style: String, to window: NSWindow) {
-        if style == "none" {
-            window.animationBehavior = .none
-        } else {
-            window.animationBehavior = .default
         }
     }
     
     private func animateFade(_ window: NSWindow) {
         window.alphaValue = 0
-        window.makeKeyAndOrderFront(nil)
+        suppressSystemShowAnimation(on: window) {
+            window.makeKeyAndOrderFront(nil)
+        }
         
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.28
@@ -392,7 +471,35 @@ final class WindowManager: NSObject, NSWindowDelegate {
             self?.focusOnEditor()
         }
     }
-    
+
+    private func applyAnimationBehavior(style: String, to window: NSWindow) {
+        if style == "none" {
+            window.animationBehavior = .none
+        } else {
+            window.animationBehavior = .default
+        }
+    }
+
+    private func bringWindowToFrontWithoutSystemAnimation(_ window: NSWindow, actions: () -> Void) {
+        performWithScreenUpdatesSuppressed(actions: actions)
+        window.displayIfNeeded()
+    }
+
+    private func suppressSystemShowAnimation(on window: NSWindow, actions: () -> Void) {
+        performWithScreenUpdatesSuppressed(actions: actions)
+        window.displayIfNeeded()
+    }
+
+    private func performWithScreenUpdatesSuppressed(actions: () -> Void) {
+        if let disable = Self.disableGlobalScreenUpdates, let enable = Self.enableGlobalScreenUpdates {
+            disable()
+            defer { enable() }
+            actions()
+        } else {
+            actions()
+        }
+    }
+
     // scale アニメーションは削除（互換は slide にフォールバック）
     
     private func animateSlide(_ window: NSWindow) {
@@ -401,7 +508,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
         startFrame.origin.y += 50
         window.setFrame(startFrame, display: false)
         window.alphaValue = 0
-        window.makeKeyAndOrderFront(nil)
+        suppressSystemShowAnimation(on: window) {
+            window.makeKeyAndOrderFront(nil)
+        }
         
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.20
@@ -486,6 +595,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func handleMainWindowClose() {
         NSApp.setActivationPolicy(.accessory)
         HistoryPopoverManager.shared.forceClose()
+        appToRestoreAfterClose = nil
         // 余計な参照を明示的に解放して解体順序を安定化
         if let window = mainWindow {
             window.delegate = nil
@@ -500,6 +610,23 @@ final class WindowManager: NSObject, NSWindowDelegate {
         mainWindow = nil
         isAlwaysOnTop = false
         removeMainWindowObservers()
+    }
+
+    private func exitQueueModeIfNeededBeforeAutoHide() {
+        guard let viewModel = mainViewModel,
+              viewModel.isQueueModeActive else { return }
+        guard viewModel.pasteQueue.isEmpty else { return }
+        viewModel.resetPasteQueue()
+        titleBarState.isQueueActive = false
+    }
+
+    private func syncTitleBarQueueState() {
+        guard let viewModel = mainViewModel else {
+            titleBarState.isQueueActive = false
+            return
+        }
+        titleBarState.isQueueActive = viewModel.isQueueModeActive
+        titleBarState.isQueueEnabled = viewModel.canUsePasteQueue
     }
     
     // MARK: - Public Methods
@@ -582,10 +709,22 @@ final class WindowManager: NSObject, NSWindowDelegate {
             aboutWindow?.setContentSize(NSSize(width: 340, height: 360))
             aboutWindow?.center()
             aboutWindow?.isReleasedWhenClosed = false
+            if let window = aboutWindow,
+               !window.collectionBehavior.contains(.moveToActiveSpace) {
+                // 常に現在のSpaceに追従させ、画面切り替えを防ぐ
+                window.collectionBehavior.insert(.moveToActiveSpace)
+            }
         } else {
             aboutWindow?.title = localizedAboutWindowTitle()
         }
+
+        if let window = aboutWindow,
+           !window.collectionBehavior.contains(.moveToActiveSpace) {
+            window.collectionBehavior.insert(.moveToActiveSpace)
+        }
         
+        centerAboutWindowOnActiveScreen()
+
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         aboutWindow?.makeKeyAndOrderFront(nil)
@@ -624,6 +763,19 @@ final class WindowManager: NSObject, NSWindowDelegate {
         appSettings.localizedString("AboutWindowTitle", comment: "About window title")
     }
     
+    private func centerAboutWindowOnActiveScreen() {
+        guard let window = aboutWindow else { return }
+        guard let screen = mainWindow?.screen ?? NSScreen.main else {
+            window.center()
+            return
+        }
+        var frame = window.frame
+        let visibleFrame = screen.visibleFrame
+        frame.origin.x = visibleFrame.midX - frame.width / 2
+        frame.origin.y = visibleFrame.midY - frame.height / 2
+        window.setFrame(frame, display: false, animate: false)
+    }
+
     // MARK: - Focus Management
     
     private func focusOnEditor() {
@@ -673,6 +825,7 @@ extension WindowManager {
                       !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
+                self.exitQueueModeIfNeededBeforeAutoHide()
                 // パネルを破棄せず非表示にして再利用（毎回の再構築コストを回避）
                 window.orderOut(nil)
                 // 付随のポップオーバーも確実に閉じる

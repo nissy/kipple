@@ -180,13 +180,20 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @objc func openMainWindow() {
+        let animationStyle = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
         if !NSApp.isActive {
-            // 旧位置の自動再表示を防ぐため、先に不可視化
-            windowManager.prepareForActivationBeforeOpen()
-            // まずアクティブ化し、次フレームで前面化（初回クリック対策）
+            if animationStyle != "none" {
+                // 旧位置の自動再表示を防ぐため、先に不可視化
+                windowManager.prepareForActivationBeforeOpen()
+            }
             NSApp.activate(ignoringOtherApps: true)
-            DispatchQueue.main.async { [weak self] in
-                self?.windowManager.openMainWindow()
+            if animationStyle == "none" {
+                windowManager.openMainWindow()
+            } else {
+                // アニメーションありは1フレーム遅延で前面化（初回クリック対策）
+                DispatchQueue.main.async { [weak self] in
+                    self?.windowManager.openMainWindow()
+                }
             }
         } else {
             windowManager.openMainWindow()

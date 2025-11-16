@@ -121,6 +121,23 @@ final class LastActiveAppTracker {
         return appInfo
     }
 
+    /// 直前にアクティブだった非Kippleアプリを再アクティブ化
+    func activateLastTrackedAppIfAvailable() {
+        guard let candidate = lastActiveNonKippleApp else { return }
+
+        if let runningApp = NSRunningApplication(processIdentifier: candidate.pid) {
+            runningApp.activate(options: [.activateIgnoringOtherApps])
+            return
+        }
+
+        if let bundleId = candidate.bundleId {
+            let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            if let app = apps.first {
+                app.activate(options: [.activateIgnoringOtherApps])
+            }
+        }
+    }
+
     // MARK: - Private Methods
 
     private func updateFromCurrentApp() {

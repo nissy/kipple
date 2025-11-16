@@ -8,6 +8,12 @@ import SwiftUI
 import AppKit
 import Combine
 
+enum MainViewPreventAutoCloseReason: Hashable {
+    case pinRelease
+    case quitConfirmation
+    case categoryManager
+}
+
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
     @State private var selectedHistoryItem: ClipItem?
@@ -33,6 +39,7 @@ struct MainView: View {
     @State private var modifierMonitor: Any?
     // Copied通知の遅延非表示を管理（多重スケジュール防止）
     @State var copiedHideWorkItem: DispatchWorkItem?
+    @State var activePreventAutoCloseReasons: Set<MainViewPreventAutoCloseReason> = []
     @State var editorHeightResetID: UUID?
     @State private var lastKnownEditorPosition: String = AppSettings.shared.editorPosition
     private let minimumSectionHeight: Double = 150
@@ -42,8 +49,10 @@ struct MainView: View {
         Binding(
             get: { isShowingQuitConfirmation },
             set: { newValue in
-                if !newValue {
-                    onSetPreventAutoClose?(false)
+                if newValue {
+                    requestPreventAutoClose(.quitConfirmation)
+                } else {
+                    releasePreventAutoClose(.quitConfirmation)
                 }
                 isShowingQuitConfirmation = newValue
             }
@@ -51,6 +60,7 @@ struct MainView: View {
     }
     
     let onClose: (() -> Void)?
+    let onReactivatePreviousApp: (() -> Void)?
     let onAlwaysOnTopChanged: ((Bool) -> Void)?
     let onOpenSettings: (() -> Void)?
     let onOpenAbout: (() -> Void)?
@@ -61,6 +71,7 @@ struct MainView: View {
     init(
         titleBarState: MainWindowTitleBarState = MainWindowTitleBarState(),
         onClose: (() -> Void)? = nil,
+        onReactivatePreviousApp: (() -> Void)? = nil,
         onAlwaysOnTopChanged: ((Bool) -> Void)? = nil,
         onOpenSettings: (() -> Void)? = nil,
         onOpenAbout: (() -> Void)? = nil,
@@ -70,6 +81,7 @@ struct MainView: View {
     ) {
         self.titleBarState = titleBarState
         self.onClose = onClose
+        self.onReactivatePreviousApp = onReactivatePreviousApp
         self.onAlwaysOnTopChanged = onAlwaysOnTopChanged
         self.onOpenSettings = onOpenSettings
         self.onOpenAbout = onOpenAbout
@@ -81,7 +93,7 @@ struct MainView: View {
 
 extension MainView {
     func showQuitConfirmationAlert() {
-        onSetPreventAutoClose?(true)
+        requestPreventAutoClose(.quitConfirmation)
         DispatchQueue.main.async {
             isShowingQuitConfirmation = true
         }
@@ -89,12 +101,12 @@ extension MainView {
 
     func cancelQuitConfirmationIfNeeded() {
         guard isShowingQuitConfirmation else { return }
-        onSetPreventAutoClose?(false)
+        releasePreventAutoClose(.quitConfirmation)
         isShowingQuitConfirmation = false
     }
 
     func confirmQuitFromDialog() {
-        onSetPreventAutoClose?(false)
+        releasePreventAutoClose(.quitConfirmation)
         isShowingQuitConfirmation = false
         onQuitApplication?()
     }
@@ -120,6 +132,7 @@ extension MainView {
             } else {
                 // Always on Topが無効の場合は即座にウィンドウを閉じる
                 onClose?()
+                onReactivatePreviousApp?()
             }
         }
     }
@@ -141,9 +154,19 @@ extension MainView {
                 isAlwaysOnTopForcedByQueue = false
                 hasQueueForceOverride = false
                 let target = userPreferredAlwaysOnTop
+                let shouldDisablePin = isAlwaysOnTop && !target
+                if shouldDisablePin {
+                    requestPreventAutoClose(.pinRelease)
+                }
                 if isAlwaysOnTop != target {
                     isAlwaysOnTop = target
                     onAlwaysOnTopChanged?(target)
+                }
+                if shouldDisablePin {
+                    releasePreventAutoClose(.pinRelease)
+                    if activePreventAutoCloseReasons.isEmpty {
+                        onReactivatePreviousApp?()
+                    }
                 }
             }
         }
@@ -320,6 +343,10 @@ extension MainView {
             titleBarState.toggleEditorHandler = nil
             titleBarState.startCaptureHandler = nil
             titleBarState.toggleQueueHandler = nil
+            if !activePreventAutoCloseReasons.isEmpty {
+                activePreventAutoCloseReasons.removeAll()
+                onSetPreventAutoClose?(false)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
@@ -329,12 +356,17 @@ extension MainView {
                 queueCount: queue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
+            syncTitleBarState()
+            if queue.isEmpty, viewModel.pasteMode != .clipboard {
+                viewModel.resetPasteQueue()
+            }
         }
         .onReceive(viewModel.$pasteMode) { _ in
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
+            syncTitleBarState()
         }
     }
 
