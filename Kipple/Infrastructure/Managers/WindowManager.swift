@@ -272,6 +272,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func setPreventAutoClose(_ flag: Bool) {
         preventAutoClose = flag
         guard flag else { return }
+        capturePreviousAppForFocusReturn()
         NSApp.activate(ignoringOtherApps: true)
         mainWindow?.makeKeyAndOrderFront(nil)
     }
