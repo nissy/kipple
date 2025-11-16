@@ -45,6 +45,8 @@ struct MainView: View {
     private let minimumSectionHeight: Double = 150
     private let titleBarHeight: CGFloat = 8
     @State private var isShowingQuitConfirmation = false
+    @State private var shouldIgnoreNextAutoCloseAfterQueueFinish = false
+    @State private var pendingReactivateAfterQueueFinish = false
     var quitConfirmationBinding: Binding<Bool> {
         Binding(
             get: { isShowingQuitConfirmation },
@@ -164,8 +166,9 @@ extension MainView {
                 }
                 if shouldDisablePin {
                     releasePreventAutoClose(.pinRelease)
-                    if activePreventAutoCloseReasons.isEmpty {
-                        onReactivatePreviousApp?()
+                    if !isQueueModeActive {
+                        pendingReactivateAfterQueueFinish = true
+                        attemptPendingReactivateAfterQueueFinish()
                     }
                 }
             }
@@ -343,6 +346,8 @@ extension MainView {
             titleBarState.toggleEditorHandler = nil
             titleBarState.startCaptureHandler = nil
             titleBarState.toggleQueueHandler = nil
+            shouldIgnoreNextAutoCloseAfterQueueFinish = false
+            pendingReactivateAfterQueueFinish = false
             if !activePreventAutoCloseReasons.isEmpty {
                 activePreventAutoCloseReasons.removeAll()
                 onSetPreventAutoClose?(false)
@@ -351,12 +356,22 @@ extension MainView {
         .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
             showCopiedNotification(.copied)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            if shouldIgnoreNextAutoCloseAfterQueueFinish {
+                shouldIgnoreNextAutoCloseAfterQueueFinish = false
+            }
+            attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: true)
+        }
         .onReceive(viewModel.$pasteQueue) { queue in
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: queue.count,
                 isQueueModeActive: viewModel.isQueueModeActive
             )
             syncTitleBarState()
+            updateQueueFinishAutoCloseState(
+                queueCount: queue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
             if queue.isEmpty, viewModel.pasteMode != .clipboard {
                 viewModel.resetPasteQueue()
             }
@@ -367,6 +382,10 @@ extension MainView {
                 isQueueModeActive: viewModel.isQueueModeActive
             )
             syncTitleBarState()
+            updateQueueFinishAutoCloseState(
+                queueCount: viewModel.pasteQueue.count,
+                isQueueModeActive: viewModel.isQueueModeActive
+            )
         }
     }
 
@@ -402,6 +421,41 @@ extension MainView {
         if editorHeightResetID != nil {
             editorHeightResetID = nil
         }
+    }
+
+    private func updateQueueFinishAutoCloseState(queueCount: Int, isQueueModeActive: Bool) {
+        let queueFinished = queueCount == 0 && !isQueueModeActive
+        if queueFinished {
+            pendingReactivateAfterQueueFinish = true
+            if NSApp.isActive {
+                shouldIgnoreNextAutoCloseAfterQueueFinish = true
+            } else if shouldIgnoreNextAutoCloseAfterQueueFinish {
+                shouldIgnoreNextAutoCloseAfterQueueFinish = false
+                attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: true)
+            } else {
+                attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: true)
+            }
+        } else if shouldIgnoreNextAutoCloseAfterQueueFinish {
+            shouldIgnoreNextAutoCloseAfterQueueFinish = false
+            pendingReactivateAfterQueueFinish = false
+        } else if pendingReactivateAfterQueueFinish {
+            pendingReactivateAfterQueueFinish = false
+        }
+    }
+
+    private func attemptPendingReactivateAfterQueueFinish(ignoreWindowActiveState: Bool = false) {
+        guard pendingReactivateAfterQueueFinish else { return }
+        guard activePreventAutoCloseReasons.isEmpty else { return }
+        guard !viewModel.isQueueModeActive else { return }
+        let canReactivateNow: Bool
+        if ignoreWindowActiveState {
+            canReactivateNow = true
+        } else {
+            canReactivateNow = !shouldIgnoreNextAutoCloseAfterQueueFinish && !NSApp.isActive
+        }
+        guard canReactivateNow else { return }
+        pendingReactivateAfterQueueFinish = false
+        onReactivatePreviousApp?()
     }
     
     // エディタセクション
