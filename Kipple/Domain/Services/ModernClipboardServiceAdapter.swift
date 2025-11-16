@@ -82,6 +82,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         restartAutoClearTimerIfNeeded()
         Task {
             await modernService.recopyFromHistory(item)
+            await refreshHistory()
         }
     }
 
