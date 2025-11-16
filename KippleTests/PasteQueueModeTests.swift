@@ -429,6 +429,34 @@ final class PasteQueueModeTests: XCTestCase {
 
         XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[2].id, items[3].id])
     }
+
+    func testQueuePersistsWhenHistoryRecopyMatchesExpectedHead() {
+        let items = Array(mockService.history.prefix(3))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: [items[0], items[1]], anchor: items[1])
+
+        let initialQueue = viewModel.pasteQueue
+        XCTAssertEqual(initialQueue.count, 2)
+
+        mockService.onHistoryChanged?(items[0])
+
+        XCTAssertEqual(viewModel.pasteQueue, initialQueue)
+        XCTAssertEqual(viewModel.pasteMode, .queueOnce)
+    }
+
+    func testQueueResetsWhenHistoryRecopyIsUnexpected() {
+        let items = Array(mockService.history.prefix(3))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: [items[0], items[1]], anchor: items[1])
+
+        let unexpected = ClipItem(content: "Unexpected")
+        mockService.onHistoryChanged?(unexpected)
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+    }
 }
 
 private final class MockPasteCommandMonitor: PasteCommandMonitoring {

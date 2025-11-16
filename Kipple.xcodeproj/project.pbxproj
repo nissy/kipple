@@ -160,7 +160,6 @@
 		EB49D860628367B9F51E6F0D /* SettingsSidebarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B70F6D565F5E4D7DBB160D /* SettingsSidebarItem.swift */; };
 		ECF960991E35A8A70CF5093F /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0A937AF0219AC13A31FBBD /* AboutView.swift */; };
 		F09D930768983860F965E45A /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91778173C4E051ADCDEA9E05 /* MainViewModel.swift */; };
-		F33CE186333647D2A54C838A /* HistoryListScrollBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A710295362260267F035569A /* HistoryListScrollBridge.swift */; };
 		F3C9555AFCA3FCDC61FC0A13 /* ModernClipboardServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6805FAF51BA5FFDDC8167C46 /* ModernClipboardServiceProtocol.swift */; };
 		F54B58C44D8D8457403D5AD6 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 6752AEBCD45E494DC76F703C /* libsqlite3.tbd */; };
 		F75E81F10AFE3D009A4DCA29 /* HistoryLimitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 141F74397BC94FC87C361325 /* HistoryLimitTests.swift */; };
@@ -297,7 +296,6 @@
 		A37EA352932E46C425A5EE57 /* ClearClipboardSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearClipboardSyncTests.swift; sourceTree = "<group>"; };
 		A582C8A5F8898B8901CAFA50 /* Kipple.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kipple.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5E96A9E775E48366E37AA17 /* LastActiveAppTrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastActiveAppTrackingTests.swift; sourceTree = "<group>"; };
-		A710295362260267F035569A /* HistoryListScrollBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListScrollBridge.swift; sourceTree = "<group>"; };
 		A8AECFC0197258F5CABC3C31 /* ClipItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipItem.swift; sourceTree = "<group>"; };
 		A9609229904FC7A347DD9F6B /* Kipple.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Kipple.entitlements; sourceTree = "<group>"; };
 		AA000B813F456AB52D33BDED /* MenuBarApp+Hotkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarApp+Hotkeys.swift"; sourceTree = "<group>"; };
@@ -825,7 +823,6 @@
 			isa = PBXGroup;
 			children = (
 				3A09DA616DE838519C325D3A /* CopiedNotificationView.swift */,
-				A710295362260267F035569A /* HistoryListScrollBridge.swift */,
 				48420E5048DC095008EB41EF /* HistoryListView.swift */,
 				54FE442129DA6DBFA679C63C /* MainView.swift */,
 				F06D6CD2CB34C53BE15740E6 /* MainView+BottomBar.swift */,
@@ -1075,7 +1072,6 @@
 				3170C40F0D335A3A2C408A51 /* HistoryCategoryMenu.swift in Sources */,
 				C51B1B3F901D602D9A26EF2C /* HistoryItemPopoverComponents.swift in Sources */,
 				ABA16FADADE89FB7D04377B0 /* HistoryItemView.swift in Sources */,
-				F33CE186333647D2A54C838A /* HistoryListScrollBridge.swift in Sources */,
 				B94C93E0E5A4AB6C0F5A6274 /* HistoryListView.swift in Sources */,
 				27C4BEC2A8ED50140609BDE8 /* HistoryPopoverManager.swift in Sources */,
 				975C219CF1E3B59DF6699A1A /* HotkeyManagerProvider.swift in Sources */,
@@ -1336,7 +1332,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.1.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1445,7 +1441,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 2.1.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = Kipple;

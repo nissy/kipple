@@ -275,7 +275,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
         guard let window = mainWindow, window.isVisible else { return }
         exitQueueModeIfNeededBeforeAutoHide()
         window.orderOut(nil)
-        mainViewModel?.scrollHistoryToTop()
         HistoryPopoverManager.shared.forceClose()
     }
 
