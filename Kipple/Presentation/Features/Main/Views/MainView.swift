@@ -165,9 +165,7 @@ extension MainView {
                 if shouldDisablePin {
                     releasePreventAutoClose(.pinRelease)
                     if activePreventAutoCloseReasons.isEmpty {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                            onReactivatePreviousApp?()
-                        }
+                        onReactivatePreviousApp?()
                     }
                 }
             }
