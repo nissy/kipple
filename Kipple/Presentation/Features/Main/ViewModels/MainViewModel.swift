@@ -343,6 +343,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     func deleteItemSync(_ item: ClipItem) {
         clipboardService.deleteItem(item)
     }
+
+    func scrollHistoryToTop() {
+        NotificationCenter.default.post(name: .historyListShouldScrollToTop, object: nil)
+    }
     
     // MARK: - Editor Insert Functions
     
@@ -451,7 +455,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
 
         isFilterMutating = false
-        updateFilteredItems(clipboardService.history, animated: didMutate)
+        guard didMutate else { return }
+        updateFilteredItems(clipboardService.history, animated: true)
     }
 
     // MARK: - Paste Queue Management

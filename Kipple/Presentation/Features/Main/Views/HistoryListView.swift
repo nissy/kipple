@@ -22,6 +22,9 @@ struct HistoryListView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 2, pinnedViews: []) {
+                Color.clear
+                    .frame(height: 0)
+                    .id("historyListTopAnchor")
                 ForEach(history, id: \.id) { item in
                     let queueBadgeValue: Int? = {
                         if let badge = queueBadgeProvider(item) {
@@ -85,5 +88,6 @@ struct HistoryListView: View {
         .background(
             Color(NSColor.controlBackgroundColor).opacity(0.3)
         )
+        .historyListScrollBridge()
     }
 }
