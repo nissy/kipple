@@ -80,6 +80,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         pendingClipboardContent = item.content
         currentClipboardContent = item.content
         restartAutoClearTimerIfNeeded()
+        promoteHistoryItemToFront(item)
         Task {
             await modernService.recopyFromHistory(item)
             await refreshHistory()
@@ -160,6 +161,31 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func updateItem(_ item: ClipItem) async {
         await modernService.updateItem(item)
         await refreshHistory()
+    }
+
+    private func promoteHistoryItemToFront(_ item: ClipItem) {
+        var updated = item
+        updated.timestamp = Date()
+
+        if let existingIndex = history.firstIndex(where: { $0.id == item.id }) {
+            let existingItem = history.remove(at: existingIndex)
+            if existingItem.isPinned { updated.isPinned = true }
+            updated.userCategoryId = existingItem.userCategoryId
+        } else if let duplicateIndex = history.firstIndex(where: { $0.content == item.content }) {
+            let existingItem = history.remove(at: duplicateIndex)
+            if existingItem.isPinned { updated.isPinned = true }
+            updated.userCategoryId = existingItem.userCategoryId
+        }
+
+        history.insert(updated, at: 0)
+        trimHistoryIfNeeded()
+        onHistoryChanged?(updated)
+    }
+
+    private func trimHistoryIfNeeded() {
+        let maxItems = AppSettings.shared.maxHistoryItems
+        guard history.count > maxItems else { return }
+        history = Array(history.prefix(maxItems))
     }
 
     func clearAllHistory(keepPinned: Bool = false) {

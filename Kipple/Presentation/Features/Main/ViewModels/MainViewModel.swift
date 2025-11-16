@@ -344,10 +344,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         clipboardService.deleteItem(item)
     }
 
-    func scrollHistoryToTop() {
-        NotificationCenter.default.post(name: .historyListShouldScrollToTop, object: nil)
-    }
-    
     // MARK: - Editor Insert Functions
     
     /// エディタに内容を挿入（既存内容をクリア）
