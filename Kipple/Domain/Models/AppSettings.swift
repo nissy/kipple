@@ -89,7 +89,7 @@ final class AppSettings: ObservableObject {
             storedFilterCategoryNone = newValue
         }
     }
-    
+
     // Auto-Clear Settings
     @AppStorage("enableAutoClear") var enableAutoClear: Bool = true
     @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
