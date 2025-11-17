@@ -87,7 +87,6 @@ struct HistoryListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
-        .coordinateSpace(name: "HistoryListScroll")
         .background(
             Color(NSColor.controlBackgroundColor).opacity(0.3)
         )
