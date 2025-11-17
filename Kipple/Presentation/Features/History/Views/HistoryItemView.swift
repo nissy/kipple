@@ -24,11 +24,16 @@ struct HistoryItemView: View {
     let historyFont: Font
     let onOpenItem: (() -> Void)?
     let onInsertToEditor: (() -> Void)?
+    private enum ScrollState {
+        case idle
+        case scrolling
+    }
+
     @ObservedObject private var appSettings = AppSettings.shared
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
-    @State private var isScrolling = false
+    @State private var scrollState: ScrollState = .idle
     @State private var currentAnchorView: NSView?
     @State private var isActionKeyActive = false
     @State private var flagsMonitor: Any?
@@ -37,7 +42,7 @@ struct HistoryItemView: View {
         let baseView = HoverTrackingView(content: rowContent) { hovering, anchor in
             currentAnchorView = anchor
 
-            if isScrolling {
+            if isScrollLocked {
                 isHovered = hovering
                 if !hovering {
                     HistoryPopoverManager.shared.scheduleHide()
@@ -58,11 +63,11 @@ struct HistoryItemView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
-            isScrolling = true
+            scrollState = .scrolling
             HistoryPopoverManager.shared.scheduleHide()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification)) { _ in
-            isScrolling = false
+            scrollState = .idle
             if isHovered, let anchor = currentAnchorView {
                 schedulePopoverPresentation(anchor: anchor)
             }
@@ -267,7 +272,7 @@ struct HistoryItemView: View {
 
     @ViewBuilder
     private var deleteButton: some View {
-        if let onDelete = onDelete, isHovered && !isScrolling && !item.isPinned {
+        if let onDelete = onDelete, isHovered && !isScrollLocked && !item.isPinned {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
@@ -320,13 +325,17 @@ struct HistoryItemView: View {
     private func schedulePopoverPresentation(anchor: NSView) {
         cancelPopoverTask()
         let workItem = DispatchWorkItem {
-            if isHovered && !isScrolling {
+            if isHovered && !isScrollLocked {
                 let trailing = windowPosition ?? true
                 HistoryPopoverManager.shared.show(item: item, from: anchor, trailingEdge: trailing)
             }
         }
         popoverTask = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    private var isScrollLocked: Bool {
+        scrollState == .scrolling
     }
 
     private func cancelPopoverTask() {
