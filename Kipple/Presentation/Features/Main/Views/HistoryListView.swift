@@ -19,7 +19,6 @@ struct HistoryListView: View {
     let hasMoreItems: Bool
     let isLoadingMore: Bool
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
-    @Binding var hoverResetRequest: HistoryHoverResetRequest?
     @State private var hoverResetSignal = UUID()
 
     var body: some View {
@@ -93,22 +92,15 @@ struct HistoryListView: View {
         .onChange(of: copyScrollRequest?.id) { _ in
             handleCopyScrollRequest(with: proxy)
         }
-        .onChange(of: hoverResetRequest?.id) { _ in
-            handleHoverResetRequest()
         }
-        }
-    }
-
-    private func handleHoverResetRequest() {
-        guard hoverResetRequest != nil else { return }
-        hoverResetRequest = nil
-        hoverResetSignal = UUID()
     }
 
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
         guard copyScrollRequest != nil else { return }
         copyScrollRequest = nil
         guard let topID = history.first?.id else { return }
+
+        hoverResetSignal = UUID()
 
         DispatchQueue.main.async {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -119,9 +111,5 @@ struct HistoryListView: View {
 }
 
 struct HistoryCopyScrollRequest: Identifiable, Equatable {
-    let id = UUID()
-}
-
-struct HistoryHoverResetRequest: Identifiable, Equatable {
     let id = UUID()
 }

@@ -39,7 +39,6 @@ extension MainView {
             currentClipboardContent: viewModel.currentClipboardContent,
             selectedHistoryItem: $selectedHistoryItem,
             copyScrollRequest: $historyCopyScrollRequest,
-            hoverResetRequest: $historyHoverResetRequest,
             onSelectItem: handleItemSelection,
             onOpenItem: { item in
                 guard item.isActionable else { return }
