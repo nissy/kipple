@@ -169,9 +169,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     private func updateWindowTitle() {
         guard let window else { return }
         let settingsTitle = appSettings.localizedString("Settings", comment: "Settings window title")
-        let tabTitle = appSettings.localizedString(viewModel.selectedTab.titleKey, comment: "Settings tab title")
-        let format = appSettings.localizedString("SettingsTitleFormat", comment: "Settings window combined title format")
-        window.title = String(format: format, settingsTitle, tabTitle)
+        window.title = settingsTitle
         if #available(macOS 11.0, *) {
             window.subtitle = ""
         }
