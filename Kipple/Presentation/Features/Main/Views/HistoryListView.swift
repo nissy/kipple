@@ -18,8 +18,9 @@ struct HistoryListView: View {
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
-    @State private var lastHistoryIDs: [UUID] = []
-    @State private var scrollAnchorID: UUID?
+    @Binding var copyScrollRequest: HistoryCopyScrollRequest?
+    @Binding var hoverResetRequest: HistoryHoverResetRequest?
+    @State private var hoverResetSignal = UUID()
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -66,7 +67,8 @@ struct HistoryListView: View {
                         },
                         onInsertToEditor: onInsertToEditor.map { handler in
                             { handler(item) }
-                        }
+                        },
+                        hoverResetSignal: hoverResetSignal
                     )
                     .frame(height: 32)
                     .transition(.opacity)
@@ -74,19 +76,6 @@ struct HistoryListView: View {
                     .onAppear {
                         onLoadMore(item)
                     }
-                    .background(
-                        GeometryReader { geometry in
-                            Color.clear.preference(
-                                key: HistoryVisibleRowPreference.self,
-                                value: [
-                                    HistoryVisibleRow(
-                                        id: item.id,
-                                        distanceToTop: geometry.frame(in: .named("HistoryListScroll")).minY
-                                    )
-                                ]
-                            )
-                        }
-                    )
                     }
                     if hasMoreItems && isLoadingMore {
                         ProgressView()
@@ -102,34 +91,38 @@ struct HistoryListView: View {
         .background(
             Color(NSColor.controlBackgroundColor).opacity(0.3)
         )
-        .onPreferenceChange(HistoryVisibleRowPreference.self) { rows in
-            guard let nearest = rows.min(by: { abs($0.distanceToTop) < abs($1.distanceToTop) }) else { return }
-            scrollAnchorID = nearest.id
+        .onChange(of: copyScrollRequest?.id) { _ in
+            handleCopyScrollRequest(with: proxy)
         }
-        .onChange(of: history.map(\.id)) { newIDs in
-            guard lastHistoryIDs != newIDs else { return }
-            lastHistoryIDs = newIDs
-            guard let anchor = scrollAnchorID, newIDs.contains(anchor) else { return }
-            DispatchQueue.main.async {
-                proxy.scrollTo(anchor, anchor: .top)
+        .onChange(of: hoverResetRequest?.id) { _ in
+            handleHoverResetRequest()
+        }
+        }
+    }
+
+    private func handleHoverResetRequest() {
+        guard hoverResetRequest != nil else { return }
+        hoverResetRequest = nil
+        hoverResetSignal = UUID()
+    }
+
+    private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
+        guard copyScrollRequest != nil else { return }
+        copyScrollRequest = nil
+        guard let topID = history.first?.id else { return }
+
+        DispatchQueue.main.async {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                proxy.scrollTo(topID, anchor: .top)
             }
         }
-        .onAppear {
-            lastHistoryIDs = history.map(\.id)
-        }
-        }
     }
 }
 
-private struct HistoryVisibleRow: Equatable {
-    let id: UUID
-    let distanceToTop: CGFloat
+struct HistoryCopyScrollRequest: Identifiable, Equatable {
+    let id = UUID()
 }
 
-private struct HistoryVisibleRowPreference: PreferenceKey {
-    static var defaultValue: [HistoryVisibleRow] { [] }
-
-    static func reduce(value: inout [HistoryVisibleRow], nextValue: () -> [HistoryVisibleRow]) {
-        value.append(contentsOf: nextValue())
-    }
+struct HistoryHoverResetRequest: Identifiable, Equatable {
+    let id = UUID()
 }

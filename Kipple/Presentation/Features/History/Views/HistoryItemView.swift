@@ -24,6 +24,7 @@ struct HistoryItemView: View {
     let historyFont: Font
     let onOpenItem: (() -> Void)?
     let onInsertToEditor: (() -> Void)?
+    let hoverResetSignal: UUID
     private enum ScrollState {
         case idle
         case scrolling
@@ -95,6 +96,9 @@ struct HistoryItemView: View {
             } else {
                 baseView
             }
+        }
+        .onChange(of: hoverResetSignal) { _ in
+            resetHoverState()
         }
     }
 
@@ -344,6 +348,15 @@ struct HistoryItemView: View {
     }
 
     private func closePopover() {
+        cancelPopoverTask()
+        HistoryPopoverManager.shared.hide()
+    }
+
+    private func resetHoverState() {
+        if isHovered {
+            isHovered = false
+        }
+        currentAnchorView = nil
         cancelPopoverTask()
         HistoryPopoverManager.shared.hide()
     }
