@@ -15,6 +15,7 @@ struct DataSettingsView: View {
     @AppStorage("enableAutoClear") private var enableAutoClear = true
     @AppStorage("autoClearInterval") private var autoClearInterval = 10
     @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
+    @AppStorage("historySelectPaste") private var historySelectPaste = false
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
     @State private var clearedItemCount = 0
@@ -45,6 +46,14 @@ struct DataSettingsView: View {
                         ModifierKeyPicker(selection: $actionClickModifiers)
                             .frame(width: 120)
                     }
+                }
+
+                SettingsGroup("History Actions") {
+                    SettingsRow(
+                        label: "Paste on selection",
+                        description: "Paste on selection description",
+                        isOn: $historySelectPaste
+                    )
                 }
 
                 // Categories management entry (moved from Settings to Manager)

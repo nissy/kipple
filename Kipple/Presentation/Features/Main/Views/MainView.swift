@@ -127,7 +127,19 @@ extension MainView {
             // エディタ挿入の場合はウィンドウを閉じない
         } else {
             viewModel.selectHistoryItem(item)
-            
+
+            let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
+            let shouldAutoPaste = wantsAutoPaste && AutoPasteController.shared.canAutoPaste()
+
+            if shouldAutoPaste {
+                if !isAlwaysOnTop {
+                    onClose?()
+                }
+                onReactivatePreviousApp?()
+                AutoPasteController.shared.schedulePaste()
+                return
+            }
+
             // コピー時の処理
             if isAlwaysOnTop {
                 // Always on Topが有効な場合のみ通知を表示

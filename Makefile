@@ -29,9 +29,10 @@ APPSTORE_EXPORT_DIR = $(PROD_BUILD_DIR)/AppStoreExport
 APPSTORE_PKG_PATH = $(APPSTORE_EXPORT_DIR)/$(PROJECT_NAME).pkg
 APPSTORE_EXPORT_OPTIONS = $(PROD_BUILD_DIR)/AppStoreExportOptions.plist
 
-# SwiftData plugin path (required for Swift macros)
+# Swift macro plugin paths (SwiftData + Foundation predicates)
 SWIFTDATA_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftDataMacros.dylib
-SWIFT_PLUGIN_FLAGS = -load-plugin-library $(SWIFTDATA_PLUGIN)
+FOUNDATION_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib
+SWIFT_PLUGIN_FLAGS = -load-plugin-library $(SWIFTDATA_PLUGIN) -load-plugin-library $(FOUNDATION_PLUGIN)
 
 # Environment variables (from .envrc)
 DEVELOPMENT_TEAM ?= R7LKF73J2W
