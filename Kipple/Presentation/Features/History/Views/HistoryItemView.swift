@@ -14,6 +14,7 @@ struct HistoryItemView: View {
     let isCurrentClipboardItem: Bool
     let queueBadge: Int?
     let isQueuePreviewed: Bool
+    let isScrollLocked: Bool
     let onTap: () -> Void
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
@@ -25,16 +26,12 @@ struct HistoryItemView: View {
     let onOpenItem: (() -> Void)?
     let onInsertToEditor: (() -> Void)?
     let hoverResetSignal: UUID
-    private enum ScrollState {
-        case idle
-        case scrolling
-    }
 
     @ObservedObject private var appSettings = AppSettings.shared
+    @EnvironmentObject private var hoverCoordinator: HistoryHoverCoordinator
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
-    @State private var scrollState: ScrollState = .idle
     @State private var currentAnchorView: NSView?
     @State private var isActionKeyActive = false
     @State private var flagsMonitor: Any?
@@ -42,39 +39,12 @@ struct HistoryItemView: View {
     var body: some View {
         let baseView = HoverTrackingView(content: rowContent) { hovering, anchor in
             currentAnchorView = anchor
-
-            if isScrollLocked {
-                isHovered = hovering
-                if !hovering {
-                    HistoryPopoverManager.shared.scheduleHide()
-                }
-                return
-            }
-
-            isHovered = hovering
-            cancelPopoverTask()
-
-            if hovering {
-                if windowPosition == nil {
-                    windowPosition = evaluateWindowPosition()
-                }
-                schedulePopoverPresentation(anchor: anchor)
-            } else {
-                HistoryPopoverManager.shared.scheduleHide()
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSScrollView.willStartLiveScrollNotification)) { _ in
-            scrollState = .scrolling
-            HistoryPopoverManager.shared.scheduleHide()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification)) { _ in
-            scrollState = .idle
-            if isHovered, let anchor = currentAnchorView {
-                schedulePopoverPresentation(anchor: anchor)
-            }
+            handleHoverChange(hovering, anchor: anchor)
         }
         .onDisappear {
             HistoryPopoverManager.shared.hide()
+            currentAnchorView = nil
+            hoverCoordinator.clearHover(ifMatches: item.id)
             if let monitor = flagsMonitor {
                 NSEvent.removeMonitor(monitor)
                 flagsMonitor = nil
@@ -99,6 +69,29 @@ struct HistoryItemView: View {
         }
         .onChange(of: hoverResetSignal) { _ in
             resetHoverState()
+        }
+        .onChange(of: isScrollLocked) { locked in
+            if locked {
+                if isHovered {
+                    isHovered = false
+                }
+                cancelPopoverTask()
+                HistoryPopoverManager.shared.scheduleHide()
+            } else if isHovered, let anchor = currentAnchorView {
+                schedulePopoverPresentation(anchor: anchor)
+            }
+        }
+        .onReceive(hoverCoordinator.$hoveredItemID) { hoveredID in
+            let shouldHover = hoveredID == item.id
+            if isHovered != shouldHover {
+                isHovered = shouldHover
+                if shouldHover, !isScrollLocked, let anchor = currentAnchorView {
+                    schedulePopoverPresentation(anchor: anchor)
+                } else {
+                    cancelPopoverTask()
+                    HistoryPopoverManager.shared.scheduleHide()
+                }
+            }
         }
     }
 
@@ -338,10 +331,6 @@ struct HistoryItemView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
-    private var isScrollLocked: Bool {
-        scrollState == .scrolling
-    }
-
     private func cancelPopoverTask() {
         popoverTask?.cancel()
         popoverTask = nil
@@ -356,6 +345,7 @@ struct HistoryItemView: View {
         if isHovered {
             isHovered = false
         }
+        hoverCoordinator.clearHover(ifMatches: item.id)
         currentAnchorView = nil
         cancelPopoverTask()
         HistoryPopoverManager.shared.hide()
@@ -429,6 +419,26 @@ private extension HistoryItemView {
     }
 
     var linkColor: Color { Color(NSColor.linkColor) }
+
+    func handleHoverChange(_ hovering: Bool, anchor: NSView) {
+        if isScrollLocked {
+            hoverCoordinator.clearHover(ifMatches: item.id)
+            cancelPopoverTask()
+            HistoryPopoverManager.shared.scheduleHide()
+            return
+        }
+
+        if hovering {
+            hoverCoordinator.setHovered(itemID: item.id)
+            if windowPosition == nil {
+                windowPosition = evaluateWindowPosition()
+            }
+            schedulePopoverPresentation(anchor: anchor)
+        } else {
+            hoverCoordinator.clearHover(ifMatches: item.id)
+            HistoryPopoverManager.shared.scheduleHide()
+        }
+    }
 
     func handleTap() {
         closePopover()

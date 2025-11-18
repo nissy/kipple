@@ -152,7 +152,7 @@ build-dev: generate ## Build and run development version (keeps permissions)
 			sleep 2; \
 		fi; \
 		echo "$(BLUE)Starting development version…$(NC)"; \
-		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app"; \
+		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" || true; \
 	fi
 
 run: ## Run development version
