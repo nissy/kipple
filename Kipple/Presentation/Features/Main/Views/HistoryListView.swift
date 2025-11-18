@@ -91,6 +91,11 @@ struct HistoryListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
+            .transaction { tx in
+                if isScrollLocked {
+                    tx.disablesAnimations = true
+                }
+            }
         .background(
             Color(NSColor.controlBackgroundColor).opacity(0.3)
         )

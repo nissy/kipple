@@ -156,13 +156,13 @@ struct HistoryItemView: View {
         } else if isQueuePreviewed {
             baseFill = AnyShapeStyle(Color.accentColor.opacity(0.25))
         } else {
-            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHovered ? 0.5 : 0.2))
+            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHoverActive ? 0.5 : 0.2))
         }
 
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(baseFill)
             .overlay {
-                if isHovered && !isSelected {
+                if isHoverActive && !isSelected {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
                 } else if isQueuePreviewed && !isSelected {
@@ -269,7 +269,7 @@ struct HistoryItemView: View {
 
     @ViewBuilder
     private var deleteButton: some View {
-        if let onDelete = onDelete, isHovered && !isScrollLocked && !item.isPinned {
+        if let onDelete = onDelete, isHoverActive && !item.isPinned {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
@@ -366,6 +366,10 @@ struct HistoryItemView: View {
 
     var pinButtonRotation: Double {
         item.isPinned ? 0 : -45
+    }
+
+    private var isHoverActive: Bool {
+        isHovered && !isScrollLocked
     }
 
     var openMenuTitle: String {
