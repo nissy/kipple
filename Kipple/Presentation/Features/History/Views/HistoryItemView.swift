@@ -119,8 +119,8 @@ struct HistoryItemView: View {
         if let queueBadge {
             let isActiveBadge = queueBadge > 0
             let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
-            let badgeBackground = isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1)
-            let badgeForeground = isActiveBadge ? Color.white : Color.secondary
+            let badgeBackground = isScrollLocked ? Color.secondary.opacity(0.05) : (isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1))
+            let badgeForeground = isScrollLocked ? Color.secondary.opacity(0.8) : (isActiveBadge ? Color.white : Color.secondary)
 
             Text(badgeText)
                 .font(.system(size: 11, weight: .semibold))
@@ -147,7 +147,9 @@ struct HistoryItemView: View {
 
     private var backgroundView: some View {
         let baseFill: AnyShapeStyle
-        if isSelected {
+        if isScrollLocked {
+            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(0.15))
+        } else if isSelected {
             baseFill = AnyShapeStyle(LinearGradient(
                 colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
                 startPoint: .topLeading,
@@ -162,29 +164,32 @@ struct HistoryItemView: View {
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(baseFill)
             .overlay {
-                if isHoverActive && !isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
-                } else if isQueuePreviewed && !isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
+                if !isScrollLocked {
+                    if isHoverActive && !isSelected {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                    } else if isQueuePreviewed && !isSelected {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
+                    }
                 }
             }
             .shadow(
-                color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
-                radius: isSelected ? 8 : 0,
-                y: isSelected ? 4 : 0
+                color: (isSelected && !isScrollLocked) ? Color.accentColor.opacity(0.3) : Color.clear,
+                radius: (isSelected && !isScrollLocked) ? 8 : 0,
+                y: (isSelected && !isScrollLocked) ? 4 : 0
             )
     }
 
     private var pinButton: some View {
         ZStack {
-            Circle()
-                .fill(pinButtonBackground)
-                .frame(width: 22, height: 22)
+            if !isScrollLocked {
+                Circle()
+                    .fill(pinButtonBackground)
+            }
 
             Image(systemName: pinButtonIcon)
-                .foregroundColor(pinButtonForeground)
+                .foregroundColor(isScrollLocked ? .secondary : pinButtonForeground)
                 .font(.system(size: 10, weight: .medium))
                 .rotationEffect(.degrees(pinButtonRotation))
         }
@@ -201,13 +206,15 @@ struct HistoryItemView: View {
     private var categoryIcon: some View {
         if item.isActionable {
             ZStack {
-                Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 22, height: 22)
+                if !isScrollLocked {
+                    Circle()
+                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                        .frame(width: 22, height: 22)
+                }
 
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isScrollLocked ? .secondary.opacity(0.7) : (isSelected ? .white : .secondary))
             }
             .frame(width: 22, height: 22)
             .contentShape(Circle())
@@ -215,13 +222,15 @@ struct HistoryItemView: View {
             .help(actionHelpText)
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
-                Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 22, height: 22)
+                if !isScrollLocked {
+                    Circle()
+                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                        .frame(width: 22, height: 22)
+                }
 
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isScrollLocked ? .secondary.opacity(0.7) : (isSelected ? .white : .secondary))
             }
             .frame(width: 22, height: 22)
             .contentShape(Circle())
@@ -243,11 +252,15 @@ struct HistoryItemView: View {
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .foregroundColor(isScrollLocked ? .secondary.opacity(0.7) : (isSelected ? .white : .secondary))
                 .frame(width: 22, height: 22)
                 .background(
-                    Circle()
-                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    Group {
+                        if !isScrollLocked {
+                            Circle()
+                                .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                        }
+                    }
                 )
         }
     }
