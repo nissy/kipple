@@ -37,10 +37,10 @@ struct HistoryItemView: View {
     @State private var flagsMonitor: Any?
 
     var body: some View {
-        let baseView = HoverTrackingView(content: rowContent) { hovering, anchor in
+        let baseView = HoverTrackingView(content: rowContent, onHover: { hovering, anchor in
             currentAnchorView = anchor
             handleHoverChange(hovering, anchor: anchor)
-        }
+        }, isScrollLocked: isScrollLocked)
         .onDisappear {
             HistoryPopoverManager.shared.hide()
             currentAnchorView = nil
