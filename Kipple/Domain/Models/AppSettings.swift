@@ -49,6 +49,7 @@ final class AppSettings: ObservableObject {
     // History Settings
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
     @AppStorage("maxPinnedItems") var maxPinnedItems = 50
+    @AppStorage("historySelectPaste") var historySelectPaste = false
     
     // Hotkey Settings
     @AppStorage("enableHotkey") var enableHotkey: Bool = false  // デフォルトで無効
@@ -89,7 +90,7 @@ final class AppSettings: ObservableObject {
             storedFilterCategoryNone = newValue
         }
     }
-    
+
     // Auto-Clear Settings
     @AppStorage("enableAutoClear") var enableAutoClear: Bool = true
     @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
@@ -142,6 +143,9 @@ final class AppSettings: ObservableObject {
         if storedFilterCategoryNone {
             storedFilterCategoryNone = false
         }
+        if UserDefaults.standard.object(forKey: "historySelectPaste") == nil {
+            historySelectPaste = false
+        }
     }
     
     // Settings Keys for consistency
@@ -170,6 +174,7 @@ final class AppSettings: ObservableObject {
         static let filterCategoryURL = "filterCategoryURL"
         static let filterCategoryNone = "filterCategoryNone"
         static let appLanguage = "appLanguage"
+        static let historySelectPaste = "historySelectPaste"
     }
     
     enum LanguageOption: String, CaseIterable, Identifiable {

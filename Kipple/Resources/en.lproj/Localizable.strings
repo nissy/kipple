@@ -64,6 +64,8 @@
 "Grant Accessibility Permission…" = "Grant Accessibility Permission…";
 "Grant Screen Recording Permission…" = "Grant Screen Recording Permission…";
 "Grant Screen Recording permission in System Settings to enable Screen Text Capture." = "Grant Screen Recording permission in System Settings to enable Screen Text Capture.";
+"Paste on selection" = "Paste on selection";
+"Paste on selection description" = "Automatically paste the selected history item into the last active app.\nThis feature is unavailable for Kipple Editor.";
 "Hiragino Sans" = "Hiragino Sans";
 "History Cleared" = "History Cleared";
 "History Font" = "History Font";
@@ -90,6 +92,7 @@
 "Open %@" = "Open %@";
 "Open Kipple" = "Open Kipple";
 "Open URI" = "Open URI";
+"History Actions" = "History actions";
 "Launch at login" = "Launch at login";
 "Global Hotkey" = "Global Hotkey";
 "Pin limit reached" = "Pin limit reached";

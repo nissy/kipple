@@ -94,6 +94,7 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     isCurrentClipboardItem: false,
                     queueBadge: nil,
                     isQueuePreviewed: false,
+                    isScrollLocked: false,
                     onTap: {},
                     onTogglePin: {},
                     onDelete: {},
@@ -102,8 +103,9 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     onOpenCategoryManager: {},
                     historyFont: .system(size: 13),
                     onOpenItem: nil,
-                    onInsertToEditor: nil
-                )
+                    onInsertToEditor: nil,
+                    hoverResetSignal: UUID()
+                ).environmentObject(HistoryHoverCoordinator())
             }
         }
 

@@ -830,6 +830,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
 // MARK: - NSWindowDelegate
 extension WindowManager {
     func windowDidBecomeKey(_ notification: Notification) {
+        capturePreviousAppForFocusReturn()
         NotificationCenter.default.post(name: .mainWindowDidBecomeKey, object: nil)
     }
 

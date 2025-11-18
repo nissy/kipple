@@ -1,38 +1,59 @@
 import SwiftUI
 import AppKit
 
-struct HoverTrackingView<Content: View>: NSViewRepresentable {
+struct HoverTrackingView<Content: View>: View {
     let content: Content
     let onHover: (Bool, NSView) -> Void
+    let isScrollLocked: Bool
 
-    func makeNSView(context: Context) -> TrackingView<Content> {
-        TrackingView(rootView: content, onHover: onHover)
-    }
-
-    func updateNSView(_ nsView: TrackingView<Content>, context: Context) {
-        nsView.hosting.rootView = content
+    var body: some View {
+        content
+            .overlay(
+                TrackingOverlay(onHover: onHover, isScrollLocked: isScrollLocked)
+                    .allowsHitTesting(false)
+            )
     }
 }
 
-final class TrackingView<Content: View>: NSView {
-    let hosting: NSHostingView<Content>
-    private var onHover: (Bool, NSView) -> Void
-    private var trackingArea: NSTrackingArea?
+private struct TrackingOverlay: NSViewRepresentable {
+    let onHover: (Bool, NSView) -> Void
+    let isScrollLocked: Bool
 
-    init(rootView: Content, onHover: @escaping (Bool, NSView) -> Void) {
-        self.hosting = NSHostingView(rootView: rootView)
+    func makeNSView(context: Context) -> TrackingOverlayView {
+        let view = TrackingOverlayView(onHover: onHover)
+        view.isScrollLocked = isScrollLocked
+        return view
+    }
+
+    func updateNSView(_ nsView: TrackingOverlayView, context: Context) {
+        nsView.onHover = onHover
+        nsView.isScrollLocked = isScrollLocked
+        nsView.refreshTrackingArea()
+    }
+}
+
+private final class TrackingOverlayView: NSView {
+    var onHover: (Bool, NSView) -> Void
+    private var trackingArea: NSTrackingArea?
+    var isScrollLocked: Bool = false {
+        didSet {
+            if oldValue && !isScrollLocked {
+                // Scrollが解除され、マウスがまだ内部ならホバーを再送
+                if isMouseInside {
+                    onHover(true, self)
+                }
+            } else if !oldValue && isScrollLocked {
+                // ロック時はここでは何もしない（List側でクリア）
+            }
+        }
+    }
+    private var isMouseInside = false
+
+    init(onHover: @escaping (Bool, NSView) -> Void) {
         self.onHover = onHover
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        hosting.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(hosting)
-        NSLayoutConstraint.activate([
-            hosting.leadingAnchor.constraint(equalTo: leadingAnchor),
-            hosting.trailingAnchor.constraint(equalTo: trailingAnchor),
-            hosting.topAnchor.constraint(equalTo: topAnchor),
-            hosting.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-        updateTrackingArea()
+        wantsLayer = false
     }
 
     required init?(coder: NSCoder) {
@@ -41,24 +62,50 @@ final class TrackingView<Content: View>: NSView {
 
     override func layout() {
         super.layout()
-        updateTrackingArea()
+        refreshTrackingArea()
     }
 
-    private func updateTrackingArea() {
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        refreshTrackingArea()
+    }
+
+    func refreshTrackingArea() {
         if let trackingArea {
             removeTrackingArea(trackingArea)
         }
-        let options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect]
+        let options: NSTrackingArea.Options = [
+            .mouseEnteredAndExited,
+            .activeInKeyWindow,
+            .inVisibleRect
+        ]
         let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(area)
         trackingArea = area
     }
 
     override func mouseEntered(with event: NSEvent) {
-        onHover(true, self)
+        isMouseInside = true
+        if !isScrollLocked {
+            onHover(true, self)
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
-        onHover(false, self)
+        isMouseInside = false
+        if !isScrollLocked {
+            onHover(false, self)
+        }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func removeFromSuperview() {
+        if !isScrollLocked {
+            onHover(false, self)
+        }
+        super.removeFromSuperview()
     }
 }

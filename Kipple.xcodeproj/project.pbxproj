@@ -108,6 +108,7 @@
 		9D5DE584D34C9C952A6DE350 /* SimplifiedHotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC6B91B179AA5EFABC7CD87 /* SimplifiedHotkeyManagerTests.swift */; };
 		9D89CC36C54BF7F32256335B /* InternalOperationFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5147540CFEA499BC47D2B4 /* InternalOperationFlagTests.swift */; };
 		9E095EEA3349C139D0C2EBA1 /* PermissionsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11352CAF753DC8E9F7C402DA /* PermissionsSettingsView.swift */; };
+		A088458E665C2820A1C03D53 /* AutoPasteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AF21D2BE07BBC5D9D31716 /* AutoPasteController.swift */; };
 		A3DE9ECB686BA72A32C2CDDA /* SettingsGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36EF972EACF9279EE76CFE9 /* SettingsGroup.swift */; };
 		A667220B99F23F60D12B4E36 /* SettingsWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */; };
 		AB52FE7203F1C9B52E026D23 /* TextCaptureHotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7955B9273FADD78F8B637D13 /* TextCaptureHotkeyManagerTests.swift */; };
@@ -298,6 +299,7 @@
 		A5E96A9E775E48366E37AA17 /* LastActiveAppTrackingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastActiveAppTrackingTests.swift; sourceTree = "<group>"; };
 		A8AECFC0197258F5CABC3C31 /* ClipItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipItem.swift; sourceTree = "<group>"; };
 		A9609229904FC7A347DD9F6B /* Kipple.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Kipple.entitlements; sourceTree = "<group>"; };
+		A9AF21D2BE07BBC5D9D31716 /* AutoPasteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoPasteController.swift; sourceTree = "<group>"; };
 		AA000B813F456AB52D33BDED /* MenuBarApp+Hotkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarApp+Hotkeys.swift"; sourceTree = "<group>"; };
 		AD42C8770D3C55052325301A /* RecopyRaceConditionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecopyRaceConditionTests.swift; sourceTree = "<group>"; };
 		AEAB0897562E07633C08A4F1 /* DebouncingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebouncingTests.swift; sourceTree = "<group>"; };
@@ -684,6 +686,7 @@
 		A195B8316C5BEE5E275B79B8 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				A9AF21D2BE07BBC5D9D31716 /* AutoPasteController.swift */,
 				1B01ED0E79A9494F70A575FB /* ScreenRecordingPermissionOpener.swift */,
 			);
 			path = Utils;
@@ -1052,6 +1055,7 @@
 			files = (
 				ECF960991E35A8A70CF5093F /* AboutView.swift in Sources */,
 				91675D34939D0309CDB56412 /* AppSettings.swift in Sources */,
+				A088458E665C2820A1C03D53 /* AutoPasteController.swift in Sources */,
 				5EF8C1590662867113127642 /* ButtonStyles.swift in Sources */,
 				08881D0C932D78C6BA98D607 /* CategoryClassifier.swift in Sources */,
 				38541710930127A075D18A53 /* CategoryClassifierCache.swift in Sources */,
@@ -1332,7 +1336,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1441,7 +1445,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.1.1;
+				MARKETING_VERSION = 2.1.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = Kipple;

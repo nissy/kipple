@@ -12,6 +12,8 @@ struct MainViewHistorySection: View {
     let history: [ClipItem]
     let currentClipboardContent: String?
     @Binding var selectedHistoryItem: ClipItem?
+    @Binding var copyScrollRequest: HistoryCopyScrollRequest?
+    @Binding var hoverResetRequest: HistoryHoverResetRequest?
     let onSelectItem: (ClipItem) -> Void
     let onOpenItem: ((ClipItem) -> Void)?
     let onInsertToEditor: ((ClipItem) -> Void)?
@@ -47,6 +49,8 @@ struct MainViewHistorySection: View {
         history: [ClipItem],
         currentClipboardContent: String?,
         selectedHistoryItem: Binding<ClipItem?>,
+        copyScrollRequest: Binding<HistoryCopyScrollRequest?>,
+        hoverResetRequest: Binding<HistoryHoverResetRequest?>,
         onSelectItem: @escaping (ClipItem) -> Void,
         onOpenItem: ((ClipItem) -> Void)? = nil,
         onInsertToEditor: ((ClipItem) -> Void)? = nil,
@@ -77,6 +81,8 @@ struct MainViewHistorySection: View {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
         self._selectedHistoryItem = selectedHistoryItem
+        self._copyScrollRequest = copyScrollRequest
+        self._hoverResetRequest = hoverResetRequest
         self.onSelectItem = onSelectItem
         self.onOpenItem = onOpenItem
         self.onInsertToEditor = onInsertToEditor
@@ -136,7 +142,9 @@ struct MainViewHistorySection: View {
                 onInsertToEditor: onInsertToEditor,
                 onLoadMore: onLoadMore,
                 hasMoreItems: hasMoreItems,
-                isLoadingMore: isLoadingMore
+                isLoadingMore: isLoadingMore,
+                copyScrollRequest: $copyScrollRequest,
+                hoverResetRequest: $hoverResetRequest
             )
         }
         .onChange(of: searchText) { newValue in

@@ -64,6 +64,8 @@
 "Grant Accessibility Permission…" = "アクセシビリティの許可を付与…";
 "Grant Screen Recording Permission…" = "画面収録の許可を付与…";
 "Grant Screen Recording permission in System Settings to enable Screen Text Capture." = "画面テキストキャプチャを使うには、システム設定で画面収録の権限を許可してください。";
+"Paste on selection" = "選択してペースト";
+"Paste on selection description" = "履歴の項目を選ぶと最後に使ったアプリへ自動でペーストします。\nKipple Editorでは使用できません。";
 "Hiragino Sans" = "ヒラギノ角ゴシック";
 "History Cleared" = "履歴を削除しました";
 "History Font" = "履歴のフォント";
@@ -90,6 +92,7 @@
 "Open %@" = "%@ を開く";
 "Open Kipple" = "Kipple を開く";
 "Open URI" = "URI を開く";
+"History Actions" = "履歴の動作";
 "Launch at login" = "ログイン時に起動";
 "Global Hotkey" = "グローバルホットキー";
 "Pin limit reached" = "ピン留め数の上限に達しました";

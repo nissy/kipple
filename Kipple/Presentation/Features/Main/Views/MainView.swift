@@ -33,6 +33,8 @@ struct MainView: View {
     // パフォーマンス最適化: 部分更新用のID
     @State private var editorRefreshID = UUID()
     @State var historyRefreshID = UUID()
+    @State var historyCopyScrollRequest: HistoryCopyScrollRequest?
+    @State var historyHoverResetRequest: HistoryHoverResetRequest?
     @State var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
@@ -127,7 +129,21 @@ extension MainView {
             // エディタ挿入の場合はウィンドウを閉じない
         } else {
             viewModel.selectHistoryItem(item)
-            
+            historyCopyScrollRequest = HistoryCopyScrollRequest()
+            historyHoverResetRequest = HistoryHoverResetRequest()
+
+            let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
+            let shouldAutoPaste = wantsAutoPaste && AutoPasteController.shared.canAutoPaste()
+
+            if shouldAutoPaste {
+                if !isAlwaysOnTop {
+                    onClose?()
+                }
+                onReactivatePreviousApp?()
+                AutoPasteController.shared.schedulePaste()
+                return
+            }
+
             // コピー時の処理
             if isAlwaysOnTop {
                 // Always on Topが有効な場合のみ通知を表示
