@@ -24,6 +24,7 @@ struct HistoryListView: View {
     @State private var hoverResetSignal = UUID()
     @State private var isScrollLocked = false
     @StateObject private var hoverCoordinator = HistoryHoverCoordinator()
+    @StateObject private var actionKeyMonitor = HistoryActionKeyMonitor()
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -111,6 +112,7 @@ struct HistoryListView: View {
         }
         }
         .environmentObject(hoverCoordinator)
+        .environmentObject(actionKeyMonitor)
     }
 
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {

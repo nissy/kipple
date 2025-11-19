@@ -29,12 +29,11 @@ struct HistoryItemView: View {
 
     @ObservedObject private var appSettings = AppSettings.shared
     @EnvironmentObject private var hoverCoordinator: HistoryHoverCoordinator
+    @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
     @State private var currentAnchorView: NSView?
-    @State private var isActionKeyActive = false
-    @State private var flagsMonitor: Any?
 
     var body: some View {
         let baseView = HoverTrackingView(content: rowContent, onHover: { hovering, anchor in
@@ -45,19 +44,6 @@ struct HistoryItemView: View {
             HistoryPopoverManager.shared.hide()
             currentAnchorView = nil
             hoverCoordinator.clearHover(ifMatches: item.id)
-            if let monitor = flagsMonitor {
-                NSEvent.removeMonitor(monitor)
-                flagsMonitor = nil
-            }
-        }
-        .onAppear {
-            updateActionKeyActive()
-            if flagsMonitor == nil {
-                flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
-                    updateActionKeyActive(with: event.modifierFlags)
-                    return event
-                }
-            }
         }
 
         return Group {
@@ -249,7 +235,7 @@ struct HistoryItemView: View {
     }
 
     private var historyText: some View {
-        let isLinkActive = isActionKeyActive && item.isActionable
+        let isLinkActive = actionKeyMonitor.isActionKeyActive && item.isActionable
         return Text(getDisplayContent())
             .font(historyFont)
             .lineLimit(1)
@@ -456,17 +442,6 @@ private extension HistoryItemView {
         } else {
             onTap()
         }
-    }
-
-    func updateActionKeyActive(with flags: NSEvent.ModifierFlags? = nil) {
-        let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
-        let required = requiredBase.intersection(.deviceIndependentFlagsMask)
-        let current = (flags ?? NSEvent.modifierFlags).intersection(.deviceIndependentFlagsMask)
-        guard !required.isEmpty else {
-            isActionKeyActive = false
-            return
-        }
-        isActionKeyActive = (current == required)
     }
 
     var actionHelpText: String {
