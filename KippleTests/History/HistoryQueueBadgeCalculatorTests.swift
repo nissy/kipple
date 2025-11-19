@@ -36,4 +36,14 @@ final class HistoryQueueBadgeCalculatorTests: XCTestCase {
 
         XCTAssertEqual(value, 0)
     }
+
+    func testReturnsProviderNegativeValueUnchanged() {
+        let item = ClipItem(content: "negative")
+        let value = HistoryQueueBadgeCalculator.queueBadgeValue(
+            for: item,
+            pasteMode: .queueOnce
+        ) { _ in -3 }
+
+        XCTAssertEqual(value, -3)
+    }
 }
