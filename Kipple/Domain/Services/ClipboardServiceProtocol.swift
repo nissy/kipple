@@ -34,3 +34,8 @@ protocol QueueAutoClearControlling: AnyObject {
     func pauseAutoClearForQueue()
     func resumeAutoClearAfterQueue()
 }
+
+@MainActor
+protocol ClipboardServiceAsyncRecopying: AnyObject {
+    func recopyFromHistoryAndWait(_ item: ClipItem) async
+}

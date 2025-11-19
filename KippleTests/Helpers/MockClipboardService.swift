@@ -9,7 +9,7 @@ import Foundation
 @testable import Kipple
 
 @MainActor
-class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling {
+class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling, ClipboardServiceAsyncRecopying {
     var history: [ClipItem] = [] {
         didSet {
             pinnedItems = history.filter { $0.isPinned }
@@ -36,6 +36,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling 
     var pauseAutoClearCalled = false
     var resumeAutoClearCalled = false
     private(set) var isAutoClearPaused = false
+    var recopyFromHistoryAndWaitCallCount = 0
 
     func startMonitoring() {
         isMonitoringActive = true
@@ -119,6 +120,11 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling 
         onHistoryChanged?(updatedItem)
     }
 
+    func recopyFromHistoryAndWait(_ item: ClipItem) async {
+        recopyFromHistoryAndWaitCallCount += 1
+        recopyFromHistory(item)
+    }
+
     func clearSystemClipboard() async {
         currentClipboardContent = nil
     }
@@ -198,6 +204,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling 
         lastToggledItem = nil
         deleteItemCalled = false
         lastDeletedItem = nil
+        recopyFromHistoryAndWaitCallCount = 0
         clearAllHistoryCalled = false
         autoClearRemainingTime = nil
         pauseAutoClearCalled = false

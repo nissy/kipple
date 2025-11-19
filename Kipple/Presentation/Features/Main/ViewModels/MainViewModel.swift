@@ -398,9 +398,21 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             insertToEditor(content: item.content)
         } else {
             clipboardService.recopyFromHistory(item)
-            resetFiltersAfterCopy()
-            clearQueueAfterManualCopyIfNeeded()
+            finalizeHistorySelection()
         }
+    }
+
+    func selectHistoryItemAndWait(_ item: ClipItem, forceInsert: Bool = false) async {
+        if forceInsert || shouldInsertToEditor() {
+            insertToEditor(content: item.content)
+            return
+        }
+        if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
+            await asyncService.recopyFromHistoryAndWait(item)
+        } else {
+            clipboardService.recopyFromHistory(item)
+        }
+        finalizeHistorySelection()
     }
     
     /// エディタパネルが閉じている場合に再表示
@@ -475,6 +487,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         isFilterMutating = false
         guard didMutate else { return }
         updateFilteredItems(clipboardService.history, animated: true)
+    }
+
+    private func finalizeHistorySelection() {
+        resetFiltersAfterCopy()
+        clearQueueAfterManualCopyIfNeeded()
     }
 
     // MARK: - Paste Queue Management

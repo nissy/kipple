@@ -125,34 +125,38 @@ extension MainView {
         }
 
         if viewModel.shouldInsertToEditor() {
-            viewModel.insertToEditor(content: item.content)
-            // エディタ挿入の場合はウィンドウを閉じない
-        } else {
-            viewModel.selectHistoryItem(item)
-            historyCopyScrollRequest = HistoryCopyScrollRequest()
-            historyHoverResetRequest = HistoryHoverResetRequest()
+            viewModel.selectHistoryItem(item, forceInsert: true)
+            return
+        }
 
-            let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
-            let shouldAutoPaste = wantsAutoPaste && AutoPasteController.shared.canAutoPaste()
+        historyCopyScrollRequest = HistoryCopyScrollRequest()
+        historyHoverResetRequest = HistoryHoverResetRequest()
 
-            if shouldAutoPaste {
+        let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
+        let shouldAutoPaste = wantsAutoPaste && AutoPasteController.shared.canAutoPaste()
+
+        if shouldAutoPaste {
+            Task { @MainActor in
+                await viewModel.selectHistoryItemAndWait(item)
                 if !isAlwaysOnTop {
                     onClose?()
                 }
                 onReactivatePreviousApp?()
                 AutoPasteController.shared.schedulePaste()
-                return
             }
+            return
+        }
 
-            // コピー時の処理
-            if isAlwaysOnTop {
-                // Always on Topが有効な場合のみ通知を表示
-                showCopiedNotification(.copied)
-            } else {
-                // Always on Topが無効の場合は即座にウィンドウを閉じる
-                onClose?()
-                onReactivatePreviousApp?()
-            }
+        viewModel.selectHistoryItem(item)
+
+        // コピー時の処理
+        if isAlwaysOnTop {
+            // Always on Topが有効な場合のみ通知を表示
+            showCopiedNotification(.copied)
+        } else {
+            // Always on Topが無効の場合は即座にウィンドウを閉じる
+            onClose?()
+            onReactivatePreviousApp?()
         }
     }
 

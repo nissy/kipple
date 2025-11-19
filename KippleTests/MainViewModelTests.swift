@@ -247,6 +247,15 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentClipboardItemID, targetItem.id)
     }
 
+    func testSelectHistoryItemAndWaitUsesAsyncRecopy() async {
+        let item = ClipItem(content: "Waited")
+        mockClipboardService.history = [item]
+
+        await viewModel.selectHistoryItemAndWait(item)
+
+        XCTAssertEqual(mockClipboardService.recopyFromHistoryAndWaitCallCount, 1)
+    }
+
     func testLoadMoreHistoryPublishesLoadingState() {
         // Given
         mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }

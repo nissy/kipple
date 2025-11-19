@@ -77,9 +77,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func recopyFromHistory(_ item: ClipItem) {
-        pendingClipboardContent = item.content
-        currentClipboardContent = item.content
-        restartAutoClearTimerIfNeeded()
+        prepareForRecopy(of: item)
         Task {
             await modernService.recopyFromHistory(item)
             await refreshHistory()
@@ -316,7 +314,19 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
 // MARK: - Extensions for Compatibility
 
-extension ModernClipboardServiceAdapter {
+extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
+    func recopyFromHistoryAndWait(_ item: ClipItem) async {
+        prepareForRecopy(of: item)
+        await modernService.recopyFromHistory(item)
+        await refreshHistory()
+    }
+
+    private func prepareForRecopy(of item: ClipItem) {
+        pendingClipboardContent = item.content
+        currentClipboardContent = item.content
+        restartAutoClearTimerIfNeeded()
+    }
+
     /// Get pinned items from history
     var pinnedItems: [ClipItem] {
         history.filter { $0.isPinned }
