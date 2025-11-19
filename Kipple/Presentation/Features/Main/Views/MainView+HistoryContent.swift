@@ -37,6 +37,7 @@ extension MainView {
         MainViewHistorySection(
             history: viewModel.history,
             currentClipboardContent: viewModel.currentClipboardContent,
+            currentClipboardItemID: viewModel.currentClipboardItemID,
             selectedHistoryItem: $selectedHistoryItem,
             copyScrollRequest: $historyCopyScrollRequest,
             hoverResetRequest: $historyHoverResetRequest,

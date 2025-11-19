@@ -4,7 +4,7 @@ import AppKit
 struct HistoryListView: View {
     let history: [ClipItem]
     let selectedHistoryItem: ClipItem?
-    let currentClipboardContent: String?
+    let currentClipboardItemID: UUID?
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
     let pasteMode: MainViewModel.PasteMode
@@ -31,20 +31,16 @@ struct HistoryListView: View {
             ScrollView {
                 LazyVStack(spacing: 2, pinnedViews: []) {
                     ForEach(history, id: \.id) { item in
-                    let queueBadgeValue: Int? = {
-                        if let badge = queueBadgeProvider(item) {
-                            return badge
-                        }
-                        if pasteMode != .clipboard {
-                            return 0
-                        }
-                        return nil
-                    }()
+                    let queueBadgeValue = HistoryQueueBadgeCalculator.queueBadgeValue(
+                        for: item,
+                        pasteMode: pasteMode,
+                        provider: queueBadgeProvider
+                    )
 
                     HistoryItemView(
                         item: item,
                         isSelected: selectedHistoryItem?.id == item.id,
-                        isCurrentClipboardItem: item.content == currentClipboardContent,
+                        isCurrentClipboardItem: item.id == currentClipboardItemID,
                         queueBadge: queueBadgeValue,
                         isQueuePreviewed: queueSelectionPreview.contains(item.id),
                         isScrollLocked: isScrollLocked,
@@ -157,6 +153,19 @@ final class HistoryHoverCoordinator: ObservableObject {
             return
         }
         hoveredItemID = nil
+    }
+}
+
+enum HistoryQueueBadgeCalculator {
+    static func queueBadgeValue(
+        for item: ClipItem,
+        pasteMode: MainViewModel.PasteMode,
+        provider: (ClipItem) -> Int?
+    ) -> Int? {
+        guard pasteMode != .clipboard else {
+            return nil
+        }
+        return provider(item) ?? 0
     }
 }
 

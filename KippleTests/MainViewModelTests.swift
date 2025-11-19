@@ -199,6 +199,37 @@ class MainViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.hasMoreHistory)
     }
 
+    func testCurrentClipboardItemIDMatchesHistoryContent() {
+        // Given
+        let items = [
+            ClipItem(content: "First"),
+            ClipItem(content: "Second")
+        ]
+        mockClipboardService.history = items
+        viewModel.loadHistory()
+
+        // When
+        viewModel.currentClipboardContent = items[1].content
+
+        // Then
+        XCTAssertEqual(viewModel.currentClipboardItemID, items[1].id)
+    }
+
+    func testCurrentClipboardItemIDClearsWhenContentBecomesNil() {
+        // Given
+        let item = ClipItem(content: "Only")
+        mockClipboardService.history = [item]
+        viewModel.loadHistory()
+        viewModel.currentClipboardContent = item.content
+        XCTAssertEqual(viewModel.currentClipboardItemID, item.id)
+
+        // When
+        viewModel.currentClipboardContent = nil
+
+        // Then
+        XCTAssertNil(viewModel.currentClipboardItemID)
+    }
+
     func testLoadMoreHistoryPublishesLoadingState() {
         // Given
         mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }

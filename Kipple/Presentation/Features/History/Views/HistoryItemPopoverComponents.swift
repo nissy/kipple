@@ -20,22 +20,21 @@ struct ClipboardItemPopover: View {
         self.itemID = item.id
     }
 
-    private var item: ClipItem {
-        adapter.history.first { $0.id == itemID } ?? initialItem
-    }
-
     var body: some View {
-        content
+        let resolvedItem = Self.resolveItem(initialItem: initialItem, itemID: itemID, history: adapter.history)
+
+        return content(for: resolvedItem)
             .environment(\.locale, appSettings.appLocale)
     }
 
-    private var content: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            headerSection
+    private func content(for item: ClipItem) -> some View {
+        let previewText = Self.makePreviewText(for: item)
+        return VStack(alignment: .leading, spacing: 0) {
+            headerSection(for: item)
                 .padding(16)
                 .background(Color(NSColor.textBackgroundColor).opacity(0.5))
 
-            Text(String(item.content.prefix(500)))
+            Text(verbatim: previewText)
                 .font(Font(fontManager.historyFont))
                 .lineSpacing(4)
                 .lineLimit(10)
@@ -45,7 +44,7 @@ struct ClipboardItemPopover: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .background(Color(NSColor.textBackgroundColor))
 
-            metadataSection
+            metadataSection(for: item)
                 .padding(16)
                 .background(Color(NSColor.windowBackgroundColor))
         }
@@ -55,18 +54,20 @@ struct ClipboardItemPopover: View {
         .shadow(color: Color.black.opacity(0.1), radius: 6, y: 3)
     }
 
-    private var headerSection: some View {
-        HStack {
+    private func headerSection(for item: ClipItem) -> some View {
+        let categoryInfo = displayCategory(for: item)
+
+        return HStack {
             HStack(spacing: 6) {
-                Image(systemName: displayCategory.icon)
+                Image(systemName: categoryInfo.icon)
                     .font(.system(size: 12))
-                Text(verbatim: displayCategory.name)
+                Text(verbatim: categoryInfo.name)
                     .font(.system(size: 12, weight: .medium))
             }
             .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Capsule().fill(displayCategory.color))
+            .background(Capsule().fill(categoryInfo.color))
 
             Spacer()
 
@@ -100,7 +101,7 @@ struct ClipboardItemPopover: View {
         }
     }
 
-    private var metadataSection: some View {
+    private func metadataSection(for item: ClipItem) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Characters")
@@ -129,7 +130,7 @@ struct ClipboardItemPopover: View {
         let color: Color
     }
 
-    private var displayCategory: DisplayCategoryInfo {
+    private func displayCategory(for item: ClipItem) -> DisplayCategoryInfo {
         if let categoryId = item.userCategoryId,
            let category = categoryStore.category(id: categoryId) {
             if let kind = categoryStore.builtInKind(for: category.id) {
@@ -186,5 +187,15 @@ struct ClipboardItemPopover: View {
             return String(localized: "Quick Editor")
         }
         return title
+    }
+}
+
+extension ClipboardItemPopover {
+    static func resolveItem(initialItem: ClipItem, itemID: UUID, history: [ClipItem]) -> ClipItem {
+        history.first { $0.id == itemID } ?? initialItem
+    }
+
+    static func makePreviewText(for item: ClipItem, maxLength: Int = 500) -> String {
+        String(item.content.prefix(maxLength))
     }
 }

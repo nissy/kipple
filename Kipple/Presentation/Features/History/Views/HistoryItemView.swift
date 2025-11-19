@@ -26,6 +26,7 @@ struct HistoryItemView: View {
     let onOpenItem: (() -> Void)?
     let onInsertToEditor: (() -> Void)?
     let hoverResetSignal: UUID
+    private let displayContent: String
 
     @ObservedObject private var appSettings = AppSettings.shared
     @EnvironmentObject private var hoverCoordinator: HistoryHoverCoordinator
@@ -34,6 +35,43 @@ struct HistoryItemView: View {
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
     @State private var currentAnchorView: NSView?
+
+    init(
+        item: ClipItem,
+        isSelected: Bool,
+        isCurrentClipboardItem: Bool,
+        queueBadge: Int?,
+        isQueuePreviewed: Bool,
+        isScrollLocked: Bool,
+        onTap: @escaping () -> Void,
+        onTogglePin: @escaping () -> Void,
+        onDelete: (() -> Void)?,
+        onCategoryTap: (() -> Void)?,
+        onChangeCategory: ((UUID?) -> Void)?,
+        onOpenCategoryManager: (() -> Void)?,
+        historyFont: Font,
+        onOpenItem: (() -> Void)?,
+        onInsertToEditor: (() -> Void)?,
+        hoverResetSignal: UUID
+    ) {
+        self.item = item
+        self.isSelected = isSelected
+        self.isCurrentClipboardItem = isCurrentClipboardItem
+        self.queueBadge = queueBadge
+        self.isQueuePreviewed = isQueuePreviewed
+        self.isScrollLocked = isScrollLocked
+        self.onTap = onTap
+        self.onTogglePin = onTogglePin
+        self.onDelete = onDelete
+        self.onCategoryTap = onCategoryTap
+        self.onChangeCategory = onChangeCategory
+        self.onOpenCategoryManager = onOpenCategoryManager
+        self.historyFont = historyFont
+        self.onOpenItem = onOpenItem
+        self.onInsertToEditor = onInsertToEditor
+        self.hoverResetSignal = hoverResetSignal
+        self.displayContent = HistoryItemView.makeDisplayContent(from: item.content)
+    }
 
     var body: some View {
         let baseView = HoverTrackingView(content: rowContent, onHover: { hovering, anchor in
@@ -236,7 +274,7 @@ struct HistoryItemView: View {
 
     private var historyText: some View {
         let isLinkActive = actionKeyMonitor.isActionKeyActive && item.isActionable
-        return Text(getDisplayContent())
+        return Text(verbatim: displayContent)
             .font(historyFont)
             .lineLimit(1)
             .truncationMode(.tail)
@@ -279,11 +317,11 @@ struct HistoryItemView: View {
         )
     }
 
-    private func getDisplayContent() -> String {
-        if let newlineIndex = item.content.firstIndex(of: "\n") {
-            return String(item.content[..<newlineIndex]) + "…"
+    static func makeDisplayContent(from content: String) -> String {
+        if let newlineIndex = content.firstIndex(of: "\n") {
+            return String(content[..<newlineIndex]) + "…"
         }
-        return item.content
+        return content
     }
 
     private func evaluateWindowPosition() -> Bool {
