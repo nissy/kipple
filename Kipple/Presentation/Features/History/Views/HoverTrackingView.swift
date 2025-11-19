@@ -32,9 +32,10 @@ private struct TrackingOverlay: NSViewRepresentable {
     }
 }
 
-private final class TrackingOverlayView: NSView {
+final class TrackingOverlayView: NSView {
     var onHover: (Bool, NSView) -> Void
-    private var trackingArea: NSTrackingArea?
+    private(set) var trackingArea: NSTrackingArea?
+    private var cachedTrackingBounds: CGRect?
     var isScrollLocked: Bool = false {
         didSet {
             if oldValue && !isScrollLocked {
@@ -71,17 +72,26 @@ private final class TrackingOverlayView: NSView {
     }
 
     func refreshTrackingArea() {
+        let currentBounds = bounds
+        if let cached = cachedTrackingBounds,
+           cached.equalTo(currentBounds),
+           trackingArea != nil {
+            return
+        }
+
         if let trackingArea {
             removeTrackingArea(trackingArea)
         }
+
         let options: NSTrackingArea.Options = [
             .mouseEnteredAndExited,
             .activeInKeyWindow,
             .inVisibleRect
         ]
-        let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        let area = NSTrackingArea(rect: currentBounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(area)
         trackingArea = area
+        cachedTrackingBounds = currentBounds
     }
 
     override func mouseEntered(with event: NSEvent) {

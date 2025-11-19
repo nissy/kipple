@@ -26,15 +26,52 @@ struct HistoryItemView: View {
     let onOpenItem: (() -> Void)?
     let onInsertToEditor: (() -> Void)?
     let hoverResetSignal: UUID
+    private let displayContent: String
 
     @ObservedObject private var appSettings = AppSettings.shared
     @EnvironmentObject private var hoverCoordinator: HistoryHoverCoordinator
+    @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
     @State private var currentAnchorView: NSView?
-    @State private var isActionKeyActive = false
-    @State private var flagsMonitor: Any?
+
+    init(
+        item: ClipItem,
+        isSelected: Bool,
+        isCurrentClipboardItem: Bool,
+        queueBadge: Int?,
+        isQueuePreviewed: Bool,
+        isScrollLocked: Bool,
+        onTap: @escaping () -> Void,
+        onTogglePin: @escaping () -> Void,
+        onDelete: (() -> Void)?,
+        onCategoryTap: (() -> Void)?,
+        onChangeCategory: ((UUID?) -> Void)?,
+        onOpenCategoryManager: (() -> Void)?,
+        historyFont: Font,
+        onOpenItem: (() -> Void)?,
+        onInsertToEditor: (() -> Void)?,
+        hoverResetSignal: UUID
+    ) {
+        self.item = item
+        self.isSelected = isSelected
+        self.isCurrentClipboardItem = isCurrentClipboardItem
+        self.queueBadge = queueBadge
+        self.isQueuePreviewed = isQueuePreviewed
+        self.isScrollLocked = isScrollLocked
+        self.onTap = onTap
+        self.onTogglePin = onTogglePin
+        self.onDelete = onDelete
+        self.onCategoryTap = onCategoryTap
+        self.onChangeCategory = onChangeCategory
+        self.onOpenCategoryManager = onOpenCategoryManager
+        self.historyFont = historyFont
+        self.onOpenItem = onOpenItem
+        self.onInsertToEditor = onInsertToEditor
+        self.hoverResetSignal = hoverResetSignal
+        self.displayContent = HistoryItemView.makeDisplayContent(from: item.content)
+    }
 
     var body: some View {
         let baseView = HoverTrackingView(content: rowContent, onHover: { hovering, anchor in
@@ -45,19 +82,6 @@ struct HistoryItemView: View {
             HistoryPopoverManager.shared.hide()
             currentAnchorView = nil
             hoverCoordinator.clearHover(ifMatches: item.id)
-            if let monitor = flagsMonitor {
-                NSEvent.removeMonitor(monitor)
-                flagsMonitor = nil
-            }
-        }
-        .onAppear {
-            updateActionKeyActive()
-            if flagsMonitor == nil {
-                flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
-                    updateActionKeyActive(with: event.modifierFlags)
-                    return event
-                }
-            }
         }
 
         return Group {
@@ -119,8 +143,8 @@ struct HistoryItemView: View {
         if let queueBadge {
             let isActiveBadge = queueBadge > 0
             let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
-            let badgeBackground = isScrollLocked ? Color.secondary.opacity(0.05) : (isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1))
-            let badgeForeground = isScrollLocked ? Color.secondary.opacity(0.8) : (isActiveBadge ? Color.white : Color.secondary)
+            let badgeBackground = isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1)
+            let badgeForeground = isActiveBadge ? Color.white : Color.secondary
 
             Text(badgeText)
                 .font(.system(size: 11, weight: .semibold))
@@ -147,9 +171,7 @@ struct HistoryItemView: View {
 
     private var backgroundView: some View {
         let baseFill: AnyShapeStyle
-        if isScrollLocked {
-            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(0.15))
-        } else if isSelected {
+        if isSelected {
             baseFill = AnyShapeStyle(LinearGradient(
                 colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
                 startPoint: .topLeading,
@@ -164,32 +186,27 @@ struct HistoryItemView: View {
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(baseFill)
             .overlay {
-                if !isScrollLocked {
-                    if isHoverActive && !isSelected {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
-                    } else if isQueuePreviewed && !isSelected {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
-                    }
+                if isHoverActive && !isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                } else if isQueuePreviewed && !isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
                 }
             }
             .shadow(
-                color: (isSelected && !isScrollLocked) ? Color.accentColor.opacity(0.3) : Color.clear,
-                radius: (isSelected && !isScrollLocked) ? 8 : 0,
-                y: (isSelected && !isScrollLocked) ? 4 : 0
+                color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
+                radius: isSelected ? 8 : 0,
+                y: isSelected ? 4 : 0
             )
     }
 
     private var pinButton: some View {
         ZStack {
-            if !isScrollLocked {
-                Circle()
-                    .fill(pinButtonBackground)
-            }
-
+            Circle()
+                .fill(pinButtonBackground)
             Image(systemName: pinButtonIcon)
-                .foregroundColor(isScrollLocked ? .secondary : pinButtonForeground)
+                .foregroundColor(pinButtonForeground)
                 .font(.system(size: 10, weight: .medium))
                 .rotationEffect(.degrees(pinButtonRotation))
         }
@@ -206,15 +223,12 @@ struct HistoryItemView: View {
     private var categoryIcon: some View {
         if item.isActionable {
             ZStack {
-                if !isScrollLocked {
-                    Circle()
-                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                        .frame(width: 22, height: 22)
-                }
-
+                Circle()
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .frame(width: 22, height: 22)
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isScrollLocked ? .secondary.opacity(0.7) : (isSelected ? .white : .secondary))
+                    .foregroundColor(isSelected ? .white : .secondary)
             }
             .frame(width: 22, height: 22)
             .contentShape(Circle())
@@ -222,15 +236,12 @@ struct HistoryItemView: View {
             .help(actionHelpText)
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
-                if !isScrollLocked {
-                    Circle()
-                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                        .frame(width: 22, height: 22)
-                }
-
+                Circle()
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .frame(width: 22, height: 22)
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isScrollLocked ? .secondary.opacity(0.7) : (isSelected ? .white : .secondary))
+                    .foregroundColor(isSelected ? .white : .secondary)
             }
             .frame(width: 22, height: 22)
             .contentShape(Circle())
@@ -252,22 +263,18 @@ struct HistoryItemView: View {
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isScrollLocked ? .secondary.opacity(0.7) : (isSelected ? .white : .secondary))
+                .foregroundColor(isSelected ? .white : .secondary)
                 .frame(width: 22, height: 22)
                 .background(
-                    Group {
-                        if !isScrollLocked {
-                            Circle()
-                                .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                        }
-                    }
+                    Circle()
+                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
                 )
         }
     }
 
     private var historyText: some View {
-        let isLinkActive = isActionKeyActive && item.isActionable
-        return Text(getDisplayContent())
+        let isLinkActive = actionKeyMonitor.isActionKeyActive && item.isActionable
+        return Text(verbatim: displayContent)
             .font(historyFont)
             .lineLimit(1)
             .truncationMode(.tail)
@@ -310,11 +317,11 @@ struct HistoryItemView: View {
         )
     }
 
-    private func getDisplayContent() -> String {
-        if let newlineIndex = item.content.firstIndex(of: "\n") {
-            return String(item.content[..<newlineIndex]) + "…"
+    static func makeDisplayContent(from content: String) -> String {
+        if let newlineIndex = content.firstIndex(of: "\n") {
+            return String(content[..<newlineIndex]) + "…"
         }
-        return item.content
+        return content
     }
 
     private func evaluateWindowPosition() -> Bool {
@@ -473,17 +480,6 @@ private extension HistoryItemView {
         } else {
             onTap()
         }
-    }
-
-    func updateActionKeyActive(with flags: NSEvent.ModifierFlags? = nil) {
-        let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
-        let required = requiredBase.intersection(.deviceIndependentFlagsMask)
-        let current = (flags ?? NSEvent.modifierFlags).intersection(.deviceIndependentFlagsMask)
-        guard !required.isEmpty else {
-            isActionKeyActive = false
-            return
-        }
-        isActionKeyActive = (current == required)
     }
 
     var actionHelpText: String {

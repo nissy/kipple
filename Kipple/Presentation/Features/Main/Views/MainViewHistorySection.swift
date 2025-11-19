@@ -11,6 +11,7 @@ import Combine
 struct MainViewHistorySection: View {
     let history: [ClipItem]
     let currentClipboardContent: String?
+    let currentClipboardItemID: UUID?
     @Binding var selectedHistoryItem: ClipItem?
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
@@ -48,6 +49,7 @@ struct MainViewHistorySection: View {
     init(
         history: [ClipItem],
         currentClipboardContent: String?,
+        currentClipboardItemID: UUID?,
         selectedHistoryItem: Binding<ClipItem?>,
         copyScrollRequest: Binding<HistoryCopyScrollRequest?>,
         hoverResetRequest: Binding<HistoryHoverResetRequest?>,
@@ -80,6 +82,7 @@ struct MainViewHistorySection: View {
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
+        self.currentClipboardItemID = currentClipboardItemID
         self._selectedHistoryItem = selectedHistoryItem
         self._copyScrollRequest = copyScrollRequest
         self._hoverResetRequest = hoverResetRequest
@@ -128,7 +131,7 @@ struct MainViewHistorySection: View {
             HistoryListView(
                 history: history,
                 selectedHistoryItem: selectedHistoryItem,
-                currentClipboardContent: currentClipboardContent,
+                currentClipboardItemID: currentClipboardItemID,
                 queueBadgeProvider: queueBadgeProvider,
                 queueSelectionPreview: queueSelectionPreview,
                 pasteMode: pasteMode,

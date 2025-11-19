@@ -4,7 +4,7 @@ import AppKit
 struct HistoryListView: View {
     let history: [ClipItem]
     let selectedHistoryItem: ClipItem?
-    let currentClipboardContent: String?
+    let currentClipboardItemID: UUID?
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
     let pasteMode: MainViewModel.PasteMode
@@ -24,26 +24,27 @@ struct HistoryListView: View {
     @State private var hoverResetSignal = UUID()
     @State private var isScrollLocked = false
     @StateObject private var hoverCoordinator = HistoryHoverCoordinator()
+    @StateObject private var actionKeyMonitor = HistoryActionKeyMonitor()
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 2, pinnedViews: []) {
                     ForEach(history, id: \.id) { item in
-                    let queueBadgeValue: Int? = {
-                        if let badge = queueBadgeProvider(item) {
-                            return badge
-                        }
-                        if pasteMode != .clipboard {
-                            return 0
-                        }
-                        return nil
-                    }()
+                    let queueBadgeValue = HistoryQueueBadgeCalculator.queueBadgeValue(
+                        for: item,
+                        pasteMode: pasteMode,
+                        provider: queueBadgeProvider
+                    )
+                    let isClipboardItem = HistoryListView.isCurrentClipboardItem(
+                        item,
+                        currentID: currentClipboardItemID
+                    )
 
                     HistoryItemView(
                         item: item,
                         isSelected: selectedHistoryItem?.id == item.id,
-                        isCurrentClipboardItem: item.content == currentClipboardContent,
+                        isCurrentClipboardItem: isClipboardItem,
                         queueBadge: queueBadgeValue,
                         isQueuePreviewed: queueSelectionPreview.contains(item.id),
                         isScrollLocked: isScrollLocked,
@@ -91,11 +92,6 @@ struct HistoryListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
-            .transaction { tx in
-                if isScrollLocked {
-                    tx.disablesAnimations = true
-                }
-            }
         .background(
             Color(NSColor.controlBackgroundColor).opacity(0.3)
         )
@@ -116,6 +112,7 @@ struct HistoryListView: View {
         }
         }
         .environmentObject(hoverCoordinator)
+        .environmentObject(actionKeyMonitor)
     }
 
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
@@ -160,6 +157,26 @@ final class HistoryHoverCoordinator: ObservableObject {
             return
         }
         hoveredItemID = nil
+    }
+}
+
+enum HistoryQueueBadgeCalculator {
+    static func queueBadgeValue(
+        for item: ClipItem,
+        pasteMode: MainViewModel.PasteMode,
+        provider: (ClipItem) -> Int?
+    ) -> Int? {
+        guard pasteMode != .clipboard else {
+            return nil
+        }
+        return provider(item) ?? 0
+    }
+}
+
+extension HistoryListView {
+    static func isCurrentClipboardItem(_ item: ClipItem, currentID: UUID?) -> Bool {
+        guard let currentID else { return false }
+        return item.id == currentID
     }
 }
 

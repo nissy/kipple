@@ -57,7 +57,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published private(set) var queueSelectionPreview: Set<UUID> = []
     
     // 現在のクリップボードコンテンツを公開
-    @Published var currentClipboardContent: String?
+    @Published var currentClipboardContent: String? {
+        didSet {
+            updateCurrentClipboardItemID(using: latestHistorySnapshot)
+        }
+    }
+    @Published private(set) var currentClipboardItemID: UUID?
 
     // 自動消去タイマーの残り時間
     @Published var autoClearRemainingTime: TimeInterval?
@@ -77,6 +82,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
     private let appSettings = AppSettings.shared
+    private var latestHistorySnapshot: [ClipItem] = []
 
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
@@ -203,7 +209,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
-        
+        latestHistorySnapshot = items
+        updateCurrentClipboardItemID(using: items)
+
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let selectedUserCategory = selectedUserCategoryId
@@ -284,6 +292,20 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             withAnimation(.easeInOut(duration: 0.2)) { applyState() }
         } else {
             applyState()
+        }
+    }
+
+    private func updateCurrentClipboardItemID(using items: [ClipItem]) {
+        guard let currentContent = currentClipboardContent,
+              !currentContent.isEmpty else {
+            if currentClipboardItemID != nil {
+                currentClipboardItemID = nil
+            }
+            return
+        }
+        let matchedID = items.first { $0.content == currentContent }?.id
+        if currentClipboardItemID != matchedID {
+            currentClipboardItemID = matchedID
         }
     }
 
