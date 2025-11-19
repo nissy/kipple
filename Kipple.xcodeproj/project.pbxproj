@@ -69,6 +69,7 @@
 		5625744EC2A8F5A838BEE23B /* AutoClearBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AF4A7453157A2A730A8F9E /* AutoClearBehaviorTests.swift */; };
 		59A504619C472F5D87041F38 /* ResizableSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B538EF6166B8332429EF10E7 /* ResizableSplitView.swift */; };
 		5A08917C3CDE5860FB29C64E /* HotkeyManagerProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */; };
+		5CBBA050B4549931A071F4FE /* HistoryListViewHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DC0B764C1B9C0B7D59700E /* HistoryListViewHelperTests.swift */; };
 		5DA5FD30710060D9FF7158BF /* ModernClipboardServicePinUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643A0D867F7B8BE9E0C6DDB3 /* ModernClipboardServicePinUpdateTests.swift */; };
 		5EF8C1590662867113127642 /* ButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */; };
 		62F009B02F724594C0A15CCF /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297CBB8448A107E022CAC728 /* WindowManager.swift */; };
@@ -342,6 +343,7 @@
 		D6B5E5249A9419B3E8AF410F /* SimpleLineNumberRulerViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberRulerViewTests.swift; sourceTree = "<group>"; };
 		D8C1A7D14BB479766C7E44F6 /* KippleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KippleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D9C5F08C099B7059A59ACB71 /* ClipboardServiceProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardServiceProviderTests.swift; sourceTree = "<group>"; };
+		D9DC0B764C1B9C0B7D59700E /* HistoryListViewHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListViewHelperTests.swift; sourceTree = "<group>"; };
 		DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManagerProviderTests.swift; sourceTree = "<group>"; };
 		DEAC68556C2D7ACF0FA626A0 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		E23A39DCADF68DF5D7A47DCE /* ModernClipboardServiceComprehensiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceComprehensiveTests.swift; sourceTree = "<group>"; };
@@ -660,6 +662,7 @@
 			children = (
 				E4D702246E28B36A993E8DA2 /* ClipboardItemPopoverTests.swift */,
 				22DF90559A40134F4115FB69 /* HistoryItemViewDisplayContentTests.swift */,
+				D9DC0B764C1B9C0B7D59700E /* HistoryListViewHelperTests.swift */,
 				CDFDD8F3E28E859C05B367FB /* HistoryQueueBadgeCalculatorTests.swift */,
 				A9F951F9F9618DEACA42A4D9 /* HoverTrackingViewTests.swift */,
 			);
@@ -1191,6 +1194,7 @@
 				25AA8D9F6A665B653B9657DD /* FontSettingsTests.swift in Sources */,
 				AFD85D91D481C6EE54FE1236 /* HistoryItemViewDisplayContentTests.swift in Sources */,
 				F75E81F10AFE3D009A4DCA29 /* HistoryLimitTests.swift in Sources */,
+				5CBBA050B4549931A071F4FE /* HistoryListViewHelperTests.swift in Sources */,
 				7915190E49313A4EB5A9474C /* HistoryPopoverLifecycleTests.swift in Sources */,
 				0048E0531B0F925F9A1E2ABB /* HistoryQueueBadgeCalculatorTests.swift in Sources */,
 				5A08917C3CDE5860FB29C64E /* HotkeyManagerProviderTests.swift in Sources */,

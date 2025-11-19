@@ -36,11 +36,15 @@ struct HistoryListView: View {
                         pasteMode: pasteMode,
                         provider: queueBadgeProvider
                     )
+                    let isClipboardItem = HistoryListView.isCurrentClipboardItem(
+                        item,
+                        currentID: currentClipboardItemID
+                    )
 
                     HistoryItemView(
                         item: item,
                         isSelected: selectedHistoryItem?.id == item.id,
-                        isCurrentClipboardItem: item.id == currentClipboardItemID,
+                        isCurrentClipboardItem: isClipboardItem,
                         queueBadge: queueBadgeValue,
                         isQueuePreviewed: queueSelectionPreview.contains(item.id),
                         isScrollLocked: isScrollLocked,
@@ -166,6 +170,13 @@ enum HistoryQueueBadgeCalculator {
             return nil
         }
         return provider(item) ?? 0
+    }
+}
+
+extension HistoryListView {
+    static func isCurrentClipboardItem(_ item: ClipItem, currentID: UUID?) -> Bool {
+        guard let currentID else { return false }
+        return item.id == currentID
     }
 }
 

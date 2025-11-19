@@ -37,6 +37,16 @@ final class ClipboardItemPopoverTests: XCTestCase {
         XCTAssertTrue(preview.allSatisfy { $0 == "A" })
     }
 
+    func testMakePreviewTextHandlesEmptyContent() {
+        let item = ClipItem(content: "")
+        XCTAssertEqual(ClipboardItemPopover.makePreviewText(for: item), "")
+    }
+
+    func testMakePreviewTextKeepsNewlineOnlyContent() {
+        let item = ClipItem(content: "\n\n")
+        XCTAssertEqual(ClipboardItemPopover.makePreviewText(for: item), "\n\n")
+    }
+
     private func makeClipItem(id: UUID, content: String) -> ClipItem {
         ClipItem(
             id: id,
