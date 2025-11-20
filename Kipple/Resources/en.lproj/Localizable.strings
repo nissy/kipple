@@ -66,6 +66,7 @@
 "Grant Screen Recording permission in System Settings to enable Screen Text Capture." = "Grant Screen Recording permission in System Settings to enable Screen Text Capture.";
 "Paste on selection" = "Paste on selection";
 "Paste on selection description" = "Automatically paste the selected history item into the last active app.\nThis feature is unavailable for Kipple Editor.";
+"Paste on selection permission warning" = "Paste on selection needs Accessibility permission. Enable it in the Permissions tab.";
 "Hiragino Sans" = "Hiragino Sans";
 "History Cleared" = "History Cleared";
 "History Font" = "History Font";

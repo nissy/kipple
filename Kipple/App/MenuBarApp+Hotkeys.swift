@@ -81,10 +81,7 @@ extension MenuBarApp {
             guard screenPermissionGranted else {
                 Logger.shared.warning("Screen Text Capture blocked: screen recording permission not granted.")
                 windowManager.openSettings(tab: .permission)
-
-                if CGPreflightScreenCaptureAccess() {
-                    ScreenRecordingPermissionOpener.openSystemSettings()
-                }
+                ScreenRecordingPermissionOpener.openSystemSettings()
                 return
             }
 

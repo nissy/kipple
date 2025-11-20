@@ -11,18 +11,9 @@ import CoreGraphics
 import ApplicationServices
 
 struct PermissionsSettingsView: View {
-    @AppStorage("textCaptureHotkeyKeyCode") private var textCaptureHotkeyKeyCode: Int = 0
-    @AppStorage("textCaptureHotkeyModifierFlags") private var textCaptureHotkeyModifierFlags: Int = 0
-
-    @State private var tempCaptureKeyCode: UInt16 = 17
-    @State private var tempCaptureModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var hasScreenCapturePermission = CGPreflightScreenCaptureAccess()
     @State private var hasAccessibilityPermission = AXIsProcessTrusted()
-    @State private var captureHotkeyError: String?
     @State private var permissionPollingTimer: Timer?
-
-    private let defaultCaptureKeyCode: UInt16 = 17
-    private let defaultCaptureModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
 
     var body: some View {
         ScrollView {
@@ -34,7 +25,6 @@ struct PermissionsSettingsView: View {
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
-            loadCaptureHotkeyState()
             refreshPermissions()
         }
         .onDisappear {
@@ -72,43 +62,17 @@ struct PermissionsSettingsView: View {
                     Text("3. Return to Kipple; the status badge switches to Granted automatically.")
                     Text("MDM Tip: Configure AllowStandardUserToSetSystemService for ScreenCapture.")
                     Text("This enables standard users to approve the permission.")
-                    Text("Once granted, configure the screen text capture shortcut below.")
                 }
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
-            }
-
-            SettingsRow(label: "Text Capture Hotkey") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HotkeyRecorderField(
-                        keyCode: $tempCaptureKeyCode,
-                        modifierFlags: $tempCaptureModifierFlags
-                    )
-                    .disabled(!hasScreenCapturePermission)
-                    .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
-                    .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
-
-                    if let captureHotkeyError {
-                        Text(captureHotkeyError)
-                            .font(.system(size: 11))
-                            .foregroundColor(.red)
-                    } else if hasScreenCapturePermission {
-                        Text("Shortcut is ready to use. Hold the selected modifiers and key to capture text.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Enable Screen Recording permission to configure the text capture shortcut.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                }
             }
         }
     }
 
     private var accessibilitySection: some View {
         SettingsGroup(
-            "Accessibility Permission"
+            "Accessibility Permission",
+            includeTopDivider: true
         ) {
             SettingsRow(label: "Request Access") {
                 HStack(spacing: 10) {
@@ -138,98 +102,11 @@ struct PermissionsSettingsView: View {
         }
     }
 
-    private func loadCaptureHotkeyState() {
-        let defaults = UserDefaults.standard
-
-        if defaults.object(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey) == nil {
-            defaults.set(Int(defaultCaptureKeyCode), forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
-        }
-        if defaults.object(forKey: TextCaptureHotkeyManager.modifierDefaultsKey) == nil {
-            defaults.set(
-                Int(defaultCaptureModifierFlags.rawValue),
-                forKey: TextCaptureHotkeyManager.modifierDefaultsKey
-            )
-        }
-
-        textCaptureHotkeyKeyCode = defaults.integer(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
-        textCaptureHotkeyModifierFlags = defaults.integer(forKey: TextCaptureHotkeyManager.modifierDefaultsKey)
-
-        tempCaptureKeyCode = UInt16(textCaptureHotkeyKeyCode)
-        tempCaptureModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(textCaptureHotkeyModifierFlags))
-
-        if hasScreenCapturePermission {
-            captureHotkeyError = nil
-            updateCaptureHotkey()
-        } else {
-            disableCaptureHotkey()
-        }
-    }
-
-    @MainActor
-    private func updateCaptureHotkey() {
-        let manager = TextCaptureHotkeyManager.shared
-
-        guard hasScreenCapturePermission else {
-            disableCaptureHotkey()
-            return
-        }
-
-        let keyCode = tempCaptureKeyCode
-        let modifiers = tempCaptureModifierFlags
-
-        guard keyCode != 0, !modifiers.isEmpty else {
-            captureHotkeyError = NSLocalizedString(
-                "Select a key and modifier to enable the shortcut.",
-                comment: "Error message shown when no shortcut is selected"
-            )
-            disableCaptureHotkey()
-            return
-        }
-
-        let success = manager.applyHotKey(
-            keyCode: keyCode,
-            modifiers: modifiers
-        )
-
-        if success {
-            textCaptureHotkeyKeyCode = Int(keyCode)
-            textCaptureHotkeyModifierFlags = Int(modifiers.rawValue)
-            captureHotkeyError = nil
-            postCaptureHotkeyUpdate(
-                keyCode: Int(keyCode),
-                modifierFlags: Int(modifiers.rawValue),
-                enabled: true
-            )
-        } else {
-            captureHotkeyError = NSLocalizedString(
-                "The selected shortcut is already taken. Try another combination.",
-                comment: "Error message shown when shortcut conflicts"
-            )
-        }
-    }
-
-    private func disableCaptureHotkey() {
-        let manager = TextCaptureHotkeyManager.shared
-        _ = manager.applyHotKey(keyCode: 0, modifiers: [])
-        postCaptureHotkeyUpdate(
-            keyCode: 0,
-            modifierFlags: 0,
-            enabled: false
-        )
-    }
-
     @MainActor
     private func refreshScreenCapturePermission() {
         let granted = CGPreflightScreenCaptureAccess()
         if granted != hasScreenCapturePermission {
             hasScreenCapturePermission = granted
-            if granted {
-                stopPermissionPolling()
-                loadCaptureHotkeyState()
-            } else {
-                captureHotkeyError = nil
-                disableCaptureHotkey()
-            }
         }
     }
 
@@ -288,15 +165,6 @@ struct PermissionsSettingsView: View {
         }
     }
 
-    private func openPermissionTab() {
-        NotificationCenter.default.post(
-            name: .screenRecordingPermissionRequested,
-            object: nil,
-            userInfo: nil
-        )
-        startPermissionPolling()
-    }
-
     private func startPermissionPolling() {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
@@ -312,18 +180,6 @@ struct PermissionsSettingsView: View {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = nil
     }
-
-    private func postCaptureHotkeyUpdate(keyCode: Int, modifierFlags: Int, enabled: Bool) {
-        NotificationCenter.default.post(
-            name: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
-            object: nil,
-            userInfo: [
-                "keyCode": keyCode,
-                "modifierFlags": modifierFlags,
-                "enabled": enabled
-            ]
-        )
-    }
 }
 
 extension Notification.Name {
@@ -333,7 +189,7 @@ extension Notification.Name {
 
 // MARK: - PermissionStatusBadge
 
-private struct PermissionStatusBadge: View {
+struct PermissionStatusBadge: View {
     let isGranted: Bool
 
     var body: some View {

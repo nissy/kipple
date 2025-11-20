@@ -11,10 +11,11 @@ import Carbon
 struct HotkeyRecorderView: NSViewRepresentable {
     @Binding var keyCode: Int
     @Binding var modifierFlags: Int
+    let placeholder: String
     
     func makeNSView(context: Context) -> NSTextField {
         let textField = NSTextField()
-        textField.placeholderString = String(localized: "None")
+        textField.placeholderString = placeholder
         textField.alignment = .center
         textField.isEditable = false
         textField.isSelectable = false
@@ -35,7 +36,7 @@ struct HotkeyRecorderView: NSViewRepresentable {
         
         if keyCode == 0 && modifierFlagsValue.isEmpty {
             textField.stringValue = ""
-            textField.placeholderString = String(localized: "None")
+            textField.placeholderString = placeholder
             return
         }
         
@@ -91,6 +92,8 @@ struct HotkeyRecorderField: View {
     @State private var isRecording = false
     
     var body: some View {
+        let placeholder = AppSettings.shared.localizedString("None")
+
         HStack(spacing: 8) {
             HotkeyRecorderView(
                 keyCode: Binding<Int>(
@@ -100,7 +103,8 @@ struct HotkeyRecorderField: View {
                 modifierFlags: Binding<Int>(
                     get: { Int(modifierFlags.rawValue) },
                     set: { modifierFlags = NSEvent.ModifierFlags(rawValue: UInt($0)) }
-                )
+                ),
+                placeholder: placeholder
             )
                 .frame(width: 100, height: 28)
                 .background(isRecording ? Color.blue.opacity(0.1) : Color(NSColor.controlBackgroundColor))

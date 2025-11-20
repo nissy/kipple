@@ -7,6 +7,8 @@
 
 import SwiftUI
 import AppKit
+import CoreGraphics
+import ApplicationServices
 
 struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
@@ -46,14 +48,6 @@ struct DataSettingsView: View {
                         ModifierKeyPicker(selection: $actionClickModifiers)
                             .frame(width: 120)
                     }
-                }
-
-                SettingsGroup("History Actions") {
-                    SettingsRow(
-                        label: "Paste on selection",
-                        description: "Paste on selection description",
-                        isOn: $historySelectPaste
-                    )
                 }
 
                 // Categories management entry (moved from Settings to Manager)
@@ -218,6 +212,9 @@ struct DataSettingsView: View {
                         }
                     }
                 }
+
+                ScreenTextCaptureSettingsView()
+                PasteOnSelectionSettingsView(isOn: $historySelectPaste)
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
@@ -339,5 +336,225 @@ struct DataSettingsView: View {
             comment: "Summary after clearing history",
             count
         )
+    }
+}
+
+// MARK: - Screen Text Capture Settings
+
+private struct ScreenTextCaptureSettingsView: View {
+    @AppStorage("textCaptureHotkeyKeyCode") private var textCaptureHotkeyKeyCode: Int = 0
+    @AppStorage("textCaptureHotkeyModifierFlags") private var textCaptureHotkeyModifierFlags: Int = 0
+
+    @State private var tempCaptureKeyCode: UInt16 = 17
+    @State private var tempCaptureModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
+    @State private var hasScreenCapturePermission = CGPreflightScreenCaptureAccess()
+    @State private var captureHotkeyErrorKey: LocalizedStringKey?
+
+    private let defaultCaptureKeyCode: UInt16 = 17
+    private let defaultCaptureModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
+
+    var body: some View {
+        SettingsGroup(
+            "Screen Text Capture",
+            includeTopDivider: true,
+            headerAccessory: AnyView(
+                PermissionStatusBadge(isGranted: hasScreenCapturePermission)
+            ),
+            headerAccessoryAlignment: .leading
+        ) {
+            SettingsRow(label: "Text Capture Hotkey") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HotkeyRecorderField(
+                        keyCode: $tempCaptureKeyCode,
+                        modifierFlags: $tempCaptureModifierFlags
+                    )
+                    .disabled(!hasScreenCapturePermission)
+                    .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
+                    .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
+
+                    if let captureHotkeyErrorKey {
+                        Text(captureHotkeyErrorKey)
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                    } else if hasScreenCapturePermission {
+                        Text(
+                            "Shortcut is ready to use. Hold the selected " +
+                            "modifiers and key to capture text."
+                        )
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    } else {
+                        Text(
+                            LocalizedStringKey(
+                                "Enable Screen Recording permission to configure the text capture shortcut."
+                            )
+                        )
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            loadCaptureHotkeyState()
+            refreshScreenCapturePermission()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshScreenCapturePermission()
+        }
+    }
+
+    private func loadCaptureHotkeyState() {
+        let defaults = UserDefaults.standard
+
+        if defaults.object(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey) == nil {
+            defaults.set(Int(defaultCaptureKeyCode), forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
+        }
+        if defaults.object(forKey: TextCaptureHotkeyManager.modifierDefaultsKey) == nil {
+            defaults.set(
+                Int(defaultCaptureModifierFlags.rawValue),
+                forKey: TextCaptureHotkeyManager.modifierDefaultsKey
+            )
+        }
+
+        textCaptureHotkeyKeyCode = defaults.integer(forKey: TextCaptureHotkeyManager.keyCodeDefaultsKey)
+        textCaptureHotkeyModifierFlags = defaults.integer(forKey: TextCaptureHotkeyManager.modifierDefaultsKey)
+
+        tempCaptureKeyCode = UInt16(textCaptureHotkeyKeyCode)
+        tempCaptureModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(textCaptureHotkeyModifierFlags))
+
+        if hasScreenCapturePermission {
+            captureHotkeyErrorKey = nil
+            updateCaptureHotkey()
+        } else {
+            disableCaptureHotkey()
+        }
+    }
+
+    @MainActor
+    private func updateCaptureHotkey() {
+        let manager = TextCaptureHotkeyManager.shared
+
+        guard hasScreenCapturePermission else {
+            disableCaptureHotkey()
+            return
+        }
+
+        let keyCode = tempCaptureKeyCode
+        let modifiers = tempCaptureModifierFlags
+
+        guard keyCode != 0, !modifiers.isEmpty else {
+            captureHotkeyErrorKey = LocalizedStringKey("Select a key and modifier to enable the shortcut.")
+            disableCaptureHotkey()
+            return
+        }
+
+        let success = manager.applyHotKey(
+            keyCode: keyCode,
+            modifiers: modifiers
+        )
+
+        if success {
+            textCaptureHotkeyKeyCode = Int(keyCode)
+            textCaptureHotkeyModifierFlags = Int(modifiers.rawValue)
+            captureHotkeyErrorKey = nil
+            postCaptureHotkeyUpdate(
+                keyCode: Int(keyCode),
+                modifierFlags: Int(modifiers.rawValue),
+                enabled: true
+            )
+        } else {
+            captureHotkeyErrorKey = LocalizedStringKey(
+                "The selected shortcut is already taken. Try another combination."
+            )
+        }
+    }
+
+    private func disableCaptureHotkey() {
+        let manager = TextCaptureHotkeyManager.shared
+        _ = manager.applyHotKey(keyCode: 0, modifiers: [])
+        postCaptureHotkeyUpdate(
+            keyCode: 0,
+            modifierFlags: 0,
+            enabled: false
+        )
+    }
+
+    @MainActor
+    private func refreshScreenCapturePermission() {
+        let granted = CGPreflightScreenCaptureAccess()
+        if granted != hasScreenCapturePermission {
+            hasScreenCapturePermission = granted
+            if granted {
+                loadCaptureHotkeyState()
+            } else {
+                captureHotkeyErrorKey = nil
+                disableCaptureHotkey()
+            }
+        }
+    }
+
+    private func postCaptureHotkeyUpdate(keyCode: Int, modifierFlags: Int, enabled: Bool) {
+        NotificationCenter.default.post(
+            name: NSNotification.Name("TextCaptureHotkeySettingsChanged"),
+            object: nil,
+            userInfo: [
+                "keyCode": keyCode,
+                "modifierFlags": modifierFlags,
+                "enabled": enabled
+            ]
+        )
+    }
+}
+
+// MARK: - Paste on Selection Settings
+
+private struct PasteOnSelectionSettingsView: View {
+    @Binding var isOn: Bool
+    @State private var hasAccessibilityPermission = AXIsProcessTrusted()
+
+    var body: some View {
+        SettingsGroup(
+            "Paste on selection",
+            includeTopDivider: true,
+            headerAccessory: AnyView(
+                PermissionStatusBadge(isGranted: hasAccessibilityPermission)
+            ),
+            headerAccessoryAlignment: .leading
+        ) {
+            SettingsRow(
+                label: LocalizedStringKey("Paste on selection"),
+                description: "Paste on selection description",
+                layout: .inlineControl
+            ) {
+                Toggle(LocalizedStringKey("Paste on selection"), isOn: $isOn)
+                    .toggleStyle(.checkbox)
+                    .disabled(!hasAccessibilityPermission)
+                    .help(Text("Paste on selection description"))
+
+                if !hasAccessibilityPermission {
+                    Text(LocalizedStringKey("Paste on selection permission warning"))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .onAppear {
+            refreshAccessibilityPermission()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshAccessibilityPermission()
+        }
+    }
+
+    @MainActor
+    private func refreshAccessibilityPermission() {
+        let granted = AXIsProcessTrusted()
+        if granted != hasAccessibilityPermission {
+            hasAccessibilityPermission = granted
+        }
+        if !granted {
+            isOn = false
+        }
     }
 }
