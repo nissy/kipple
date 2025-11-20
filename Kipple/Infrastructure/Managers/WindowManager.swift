@@ -50,6 +50,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsCoordinator: SettingsToolbarController?
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
+    private let lastActiveAppTracker: LastActiveAppTracking
     private let titleBarState = MainWindowTitleBarState()
     private var titleBarLeftHostingView: NSHostingView<MainViewTitleBarAccessory>?
     private var titleBarPinHostingView: NSHostingView<MainViewTitleBarPinButton>?
@@ -57,6 +58,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var appToRestoreAfterClose: LastActiveAppTracker.AppInfo?
     private var localizationCancellable: AnyCancellable?
     private var pendingAppReactivation: DispatchWorkItem?
+    private let appReactivationDelay: TimeInterval
     private var isAlwaysOnTop = false {
         didSet {
             if let window = mainWindow {
@@ -82,6 +84,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
     // オープン処理中フラグ（フォーカス喪失時の自動クローズを抑止）
     private var isOpening: Bool = false
 
+    // 現在の前面アプリを後で復帰するために記録（NSApp.activate前にも使用）
+    @MainActor
+    func rememberFrontmostAppForRestore() {
+        if let candidate = preferredRestoreCandidate() {
+            appToRestoreAfterClose = candidate
+            lastActiveAppTracker.updateLastActiveApp(candidate)
+        }
+    }
+
     // メニューバー経路などでアクティベート直前に呼び出し、
     // OSの自動再表示（旧位置一瞬表示）を抑止するための準備
     @MainActor
@@ -93,7 +104,16 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
     }
 
-    override init() {
+    override convenience init() {
+        self.init(lastActiveAppTracker: LastActiveAppTracker.shared)
+    }
+
+    init(
+        lastActiveAppTracker: LastActiveAppTracking,
+        appReactivationDelay: TimeInterval = 0.05
+    ) {
+        self.lastActiveAppTracker = lastActiveAppTracker
+        self.appReactivationDelay = appReactivationDelay
         super.init()
         localizationCancellable = appSettings.objectWillChange
             .receive(on: RunLoop.main)
@@ -398,15 +418,30 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func capturePreviousAppForFocusReturn() {
-        let candidate = LastActiveAppTracker.shared.getSourceAppInfo()
+        if let candidate = preferredRestoreCandidate() {
+            appToRestoreAfterClose = candidate
+        }
+    }
+
+    /// 現在/最後に非Kippleだったアプリのうち復帰候補を決定
+    private func preferredRestoreCandidate() -> LastActiveAppTracker.AppInfo? {
+        if let front = NSWorkspace.shared.frontmostApplication,
+           front.bundleIdentifier != Bundle.main.bundleIdentifier {
+            return LastActiveAppTracker.AppInfo(
+                name: front.localizedName,
+                bundleId: front.bundleIdentifier,
+                pid: front.processIdentifier
+            )
+        }
+
+        let candidate = lastActiveAppTracker.getSourceAppInfo()
         let isValidPID = candidate.pid != 0
         let hasBundle = candidate.bundleId != nil
         let isKipple = candidate.bundleId == Bundle.main.bundleIdentifier
         if (isValidPID || hasBundle) && !isKipple {
-            appToRestoreAfterClose = candidate
-        } else {
-            appToRestoreAfterClose = nil
+            return candidate
         }
+        return nil
     }
 
     private func cancelPendingAppReactivation() {
@@ -416,7 +451,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
     private func reactivatePreviousAppIfPossible() {
         guard let target = appToRestoreAfterClose else {
-            LastActiveAppTracker.shared.activateLastTrackedAppIfAvailable()
+            lastActiveAppTracker.activateLastTrackedAppIfAvailable()
             return
         }
         appToRestoreAfterClose = nil
@@ -424,18 +459,30 @@ final class WindowManager: NSObject, NSWindowDelegate {
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.pendingAppReactivation = nil
-            if target.pid != 0,
-               let running = NSRunningApplication(processIdentifier: target.pid) {
-                running.activate(options: [.activateIgnoringOtherApps])
-                return
-            }
-            if let bundleId = target.bundleId {
-                let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
-                apps.first?.activate(options: [.activateIgnoringOtherApps])
+            let didActivate = self.activateAppInfoIfPossible(target)
+
+            if !didActivate {
+                self.lastActiveAppTracker.activateLastTrackedAppIfAvailable()
             }
         }
         pendingAppReactivation = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + appReactivationDelay, execute: workItem)
+    }
+
+    private func activateAppInfoIfPossible(_ info: LastActiveAppTracker.AppInfo) -> Bool {
+        if info.pid != 0,
+           let running = NSRunningApplication(processIdentifier: info.pid) {
+            running.activate(options: [.activateAllWindows])
+            return true
+        }
+        if let bundleId = info.bundleId {
+            let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            if let app = apps.first {
+                app.activate(options: [.activateAllWindows])
+                return true
+            }
+        }
+        return false
     }
     
     private func animateWindowOpen(_ window: NSWindow) {
@@ -865,5 +912,26 @@ extension WindowManager {
 }
 
 extension WindowManager: WindowManaging {}
+
+#if DEBUG
+extension WindowManager {
+    func setAppToRestoreForTesting(_ app: LastActiveAppTracker.AppInfo?) {
+        appToRestoreAfterClose = app
+    }
+
+    func triggerReactivationForTesting() {
+        reactivatePreviousAppIfPossible()
+    }
+
+    func restoreCandidateForTesting() -> LastActiveAppTracker.AppInfo? {
+        appToRestoreAfterClose
+    }
+
+    func rememberAppForRestoreForTesting(_ info: LastActiveAppTracker.AppInfo) {
+        appToRestoreAfterClose = info
+        lastActiveAppTracker.updateLastActiveApp(info)
+    }
+}
+#endif
 
 // swiftlint:enable file_length

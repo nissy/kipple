@@ -126,16 +126,20 @@ final class LastActiveAppTracker {
         guard let candidate = lastActiveNonKippleApp else { return }
 
         if let runningApp = NSRunningApplication(processIdentifier: candidate.pid) {
-            runningApp.activate(options: [.activateIgnoringOtherApps])
+            activate(runningApp)
             return
         }
 
         if let bundleId = candidate.bundleId {
             let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
             if let app = apps.first {
-                app.activate(options: [.activateIgnoringOtherApps])
+                activate(app)
             }
         }
+    }
+
+    func updateLastActiveApp(_ info: AppInfo) {
+        lastActiveNonKippleApp = info
     }
 
     // MARK: - Private Methods
@@ -152,4 +156,16 @@ final class LastActiveAppTracker {
             )
         }
     }
+
+    private func activate(_ app: NSRunningApplication) {
+        app.activate(options: [.activateAllWindows])
+    }
 }
+@MainActor
+protocol LastActiveAppTracking: AnyObject {
+    func getSourceAppInfo() -> LastActiveAppTracker.AppInfo
+    func activateLastTrackedAppIfAvailable()
+    func updateLastActiveApp(_ info: LastActiveAppTracker.AppInfo)
+}
+
+extension LastActiveAppTracker: LastActiveAppTracking {}

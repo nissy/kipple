@@ -6,6 +6,7 @@ import ApplicationServices
 extension MenuBarApp {
     @objc func handleHotkeyNotification() {
         Task { @MainActor in
+            windowManager.rememberFrontmostAppForRestore()
             windowManager.openMainWindow()
         }
     }

@@ -182,6 +182,8 @@ final class MenuBarApp: NSObject, ObservableObject {
     @objc func openMainWindow() {
         let animationStyle = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
         if !NSApp.isActive {
+            // NSApp.activate前に現在の前面アプリを記録（メニューバー起動でも復帰先を保持）
+            windowManager.rememberFrontmostAppForRestore()
             if animationStyle != "none" {
                 // 旧位置の自動再表示を防ぐため、先に不可視化
                 windowManager.prepareForActivationBeforeOpen()

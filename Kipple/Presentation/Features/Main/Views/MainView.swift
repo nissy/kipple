@@ -97,6 +97,11 @@ struct MainView: View {
 }
 
 extension MainView {
+    /// 履歴コピー後に前面アプリへフォーカスを戻す
+    func reactivatePreviousAppAfterCopy() {
+        onReactivatePreviousApp?()
+    }
+
     func showQuitConfirmationAlert() {
         requestPreventAutoClose(.quitConfirmation)
         DispatchQueue.main.async {
@@ -151,10 +156,12 @@ extension MainView {
             let needsNotification = isAlwaysOnTop
             if !isAlwaysOnTop {
                 onClose?()
-                onReactivatePreviousApp?()
             }
 
             await viewModel.selectHistoryItemAndWait(item)
+
+            // Always return focus to前面アプリ（ピン留め中でも復帰）
+            reactivatePreviousAppAfterCopy()
 
             // コピー時の処理
             if needsNotification {
