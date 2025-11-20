@@ -14,18 +14,23 @@ final class HistoryActionKeyMonitor: ObservableObject {
 
     private var flagsMonitor: EventMonitorToken?
     private var settingsCancellable: AnyCancellable?
+    private var activationObserver: EventMonitorToken?
+    private var resignationObserver: EventMonitorToken?
     private let appSettings = AppSettings.shared
     private var requiredModifiers: NSEvent.ModifierFlags = []
 
     init() {
         updateRequiredModifiers()
         updateActionState(with: NSEvent.modifierFlags)
-        if let token = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            Task { @MainActor in
-                self?.updateActionState(with: event.modifierFlags)
+        if let token = NSEvent.addLocalMonitorForEvents(
+            matching: .flagsChanged,
+            handler: { [weak self] event in
+                Task { @MainActor in
+                    self?.updateActionState(with: event.modifierFlags)
+                }
+                return event
             }
-            return event
-        } {
+        ) {
             flagsMonitor = EventMonitorToken(token)
         }
         settingsCancellable = appSettings.objectWillChange.sink { [weak self] _ in
@@ -34,6 +39,30 @@ final class HistoryActionKeyMonitor: ObservableObject {
                 self?.updateActionState(with: NSEvent.modifierFlags)
             }
         }
+
+        activationObserver = EventMonitorToken(
+            NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.updateActionState(with: NSEvent.modifierFlags)
+                }
+            }
+        )
+
+        resignationObserver = EventMonitorToken(
+            NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.isActionKeyActive = false
+                }
+            }
+        )
     }
 
     private func updateRequiredModifiers() {
@@ -61,6 +90,12 @@ final class HistoryActionKeyMonitor: ObservableObject {
     deinit {
         if let monitor = flagsMonitor?.rawValue {
             NSEvent.removeMonitor(monitor)
+        }
+        if let observer = activationObserver?.rawValue as? NSObjectProtocol {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = resignationObserver?.rawValue as? NSObjectProtocol {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 }

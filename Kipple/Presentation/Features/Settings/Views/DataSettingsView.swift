@@ -377,12 +377,9 @@ private struct ScreenTextCaptureSettingsView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.red)
                     } else if hasScreenCapturePermission {
-                        Text(
-                            "Shortcut is ready to use. Hold the selected " +
-                            "modifiers and key to capture text."
-                        )
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        Text("Shortcut is ready to use. Hold the selected modifiers and key to capture text.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
                     } else {
                         Text(
                             LocalizedStringKey(
