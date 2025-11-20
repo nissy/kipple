@@ -148,16 +148,18 @@ extension MainView {
         }
 
         Task { @MainActor in
+            let needsNotification = isAlwaysOnTop
+            if !isAlwaysOnTop {
+                onClose?()
+                onReactivatePreviousApp?()
+            }
+
             await viewModel.selectHistoryItemAndWait(item)
 
             // コピー時の処理
-            if isAlwaysOnTop {
+            if needsNotification {
                 // Always on Topが有効な場合のみ通知を表示
                 showCopiedNotification(.copied)
-            } else {
-                // Always on Topが無効の場合は即座にウィンドウを閉じる
-                onClose?()
-                onReactivatePreviousApp?()
             }
         }
     }
