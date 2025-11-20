@@ -10,7 +10,7 @@ import AppKit
 
 struct EditorSettingsView: View {
     @ObservedObject private var appSettings = AppSettings.shared
-    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
+    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @State private var tempCopyKeyCode: UInt16 = 6  // Z key
     @State private var tempCopyModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var tempClearKeyCode: UInt16 = 7  // X key

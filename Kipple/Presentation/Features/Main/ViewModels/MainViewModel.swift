@@ -377,7 +377,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 設定された修飾キーを取得
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
-        let rawValue = UserDefaults.standard.integer(forKey: "editorInsertModifiers")
+        // @AppStorageのデフォルト値（Control）が効くようにAppSettings経由で取得する
+        let rawValue = appSettings.editorInsertModifiers
         return NSEvent.ModifierFlags(rawValue: UInt(rawValue))
     }
     

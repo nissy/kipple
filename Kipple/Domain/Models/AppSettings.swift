@@ -21,7 +21,7 @@ final class AppSettings: ObservableObject {
     // Editor Settings
     @AppStorage("lastEditorText") var lastEditorText: String = ""
     @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
-    @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.control.rawValue)
+    @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @AppStorage("editorPosition") private var storedEditorPosition: String = "disabled"
     @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
 
@@ -96,7 +96,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
 
     // Action Click Settings (modifier required to trigger item action by click)
-    @AppStorage("actionClickModifiers") var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
+    @AppStorage("actionClickModifiers") var actionClickModifiers = Int(NSEvent.ModifierFlags.option.rawValue)
     
     // Localization
     @AppStorage("appLanguage") private var storedAppLanguage = LanguageOption.system.rawValue

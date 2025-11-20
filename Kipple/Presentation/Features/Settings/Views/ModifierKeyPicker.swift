@@ -26,9 +26,6 @@ struct ModifierKeyPicker: View {
             Button(optionLabel) {
                 selection = Int(NSEvent.ModifierFlags.option.rawValue)
             }
-            Button(controlLabel) {
-                selection = Int(NSEvent.ModifierFlags.control.rawValue)
-            }
             Button(shiftLabel) {
                 selection = Int(NSEvent.ModifierFlags.shift.rawValue)
             }
@@ -52,7 +49,6 @@ struct ModifierKeyPicker: View {
         var parts: [String] = []
         if modifierFlags.contains(.command) { parts.append(commandLabel) }
         if modifierFlags.contains(.option) { parts.append(optionLabel) }
-        if modifierFlags.contains(.control) { parts.append(controlLabel) }
         if modifierFlags.contains(.shift) { parts.append(shiftLabel) }
         if parts.isEmpty { return noneLabel }
         return parts.joined(separator: " + ")
@@ -61,6 +57,5 @@ struct ModifierKeyPicker: View {
     private var noneLabel: String { String(localized: "None") }
     private var commandLabel: String { String(localized: "⌘ Command") }
     private var optionLabel: String { String(localized: "⌥ Option") }
-    private var controlLabel: String { String(localized: "⌃ Control") }
     private var shiftLabel: String { String(localized: "⇧ Shift") }
 }
