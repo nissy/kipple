@@ -14,7 +14,8 @@ final class AutoPasteController {
     static let shared = AutoPasteController()
 
     private var pendingWorkItem: DispatchWorkItem?
-    private let defaultDelay: TimeInterval = 0.15
+    // 知覚遅延を抑えるためディレイを短縮
+    private let defaultDelay: TimeInterval = 0.05
 
     private init() {}
 
