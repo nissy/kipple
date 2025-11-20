@@ -49,31 +49,45 @@ final class CategoryClassifier {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 4 else { return false }
 
-        if trimmed.contains(" ") || trimmed.contains("\n") || trimmed.contains("@") {
+        if trimmed.contains(" ") || trimmed.contains("\n") {
             return false
         }
 
         let lowercased = trimmed.lowercased()
 
-        if lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://") ||
-            lowercased.hasPrefix("ftp://") || lowercased.hasPrefix("file://") {
-            if let url = URL(string: trimmed), url.scheme != nil {
-                return true
-            }
-        }
-
         if Self.excludedFileExtensions.contains(where: { lowercased.hasSuffix($0) }) {
             return false
         }
 
-        let nsText = trimmed as NSString
-        let range = NSRange(location: 0, length: nsText.length)
-        guard let detector = Self.urlDetector,
-              let match = detector.firstMatch(in: trimmed, options: [], range: range) else {
-            return false
+        // 明示的なスキーム付きの場合のみ URL として許容するスキームを限定
+        if trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
+           let url = URL(string: trimmed),
+           let scheme = url.scheme?.lowercased() {
+
+            switch scheme {
+            case "http", "https", "ftp":
+                if let host = url.host, !host.isEmpty { return true }
+            case "file":
+                if !url.path.isEmpty { return true }
+            default:
+                return false  // カスタムスキームや mailto は URL カテゴリにしない
+            }
         }
 
-        return match.resultType == .link && match.range == range
+        // スキームなしだがリンク形状（ドメインのみ等）の場合
+        let nsText = trimmed as NSString
+        let range = NSRange(location: 0, length: nsText.length)
+        if let detector = Self.urlDetector,
+           let match = detector.firstMatch(in: trimmed, options: [], range: range),
+           match.resultType == .link,
+           match.range == range,
+           let scheme = match.url?.scheme?.lowercased() {
+
+            // detector が付与したデフォルトスキーム (http/https) だけ URL とみなす
+            return ["http", "https"].contains(scheme)
+        }
+
+        return false
     }
 }
 
