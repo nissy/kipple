@@ -55,10 +55,6 @@ final class CategoryClassifier {
 
         let lowercased = trimmed.lowercased()
 
-        if Self.excludedFileExtensions.contains(where: { lowercased.hasSuffix($0) }) {
-            return false
-        }
-
         // 明示的なスキーム付きの場合のみ URL として許容するスキームを限定
         if trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
            let url = URL(string: trimmed),
@@ -72,6 +68,11 @@ final class CategoryClassifier {
             default:
                 return false  // カスタムスキームや mailto は URL カテゴリにしない
             }
+        }
+
+        // スキームがない場合はファイル名などの凡ミスを除外
+        if Self.excludedFileExtensions.contains(where: { lowercased.hasSuffix($0) }) {
+            return false
         }
 
         // スキームなしだがリンク形状（ドメインのみ等）の場合
