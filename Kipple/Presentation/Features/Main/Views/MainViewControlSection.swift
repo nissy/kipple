@@ -18,11 +18,11 @@ struct MainViewControlSection: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            copySplitButton
-
             Spacer()
-
-            clearButton
+            HStack(spacing: 6) {
+                clearButton
+                copySplitButton
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 6)
@@ -32,9 +32,9 @@ struct MainViewControlSection: View {
     private var clearButton: some View {
         Button(action: onClear) {
             buttonLabel(
-                title: "Clear",
                 systemImage: "trash",
-                shortcut: getClearShortcutKeyDisplay()
+                shortcut: getClearShortcutKeyDisplay(),
+                accessibilityLabel: "Clear"
             )
             .foregroundColor(.white)
             .padding(.horizontal, horizontalPadding)
@@ -55,9 +55,9 @@ struct MainViewControlSection: View {
         HStack(spacing: 0) {
             Button(action: onCopy) {
                 buttonLabel(
-                    title: "Copy",
                     systemImage: "doc.on.doc",
-                    shortcut: getShortcutKeyDisplay()
+                    shortcut: getShortcutKeyDisplay(),
+                    accessibilityLabel: "Copy"
                 )
                 .padding(.horizontal, horizontalPadding)
                 .frame(height: buttonHeight)
@@ -102,20 +102,17 @@ struct MainViewControlSection: View {
         .contentShape(Rectangle())
     }
 
-    private func buttonLabel(title: String, systemImage: String, shortcut: String) -> some View {
+    private func buttonLabel(systemImage: String, shortcut: String, accessibilityLabel: LocalizedStringKey) -> some View {
         HStack(spacing: 4) {
-            Label {
-                Text(verbatim: title)
-                    .font(.system(size: 11, weight: .semibold))
-            } icon: {
-                Image(systemName: systemImage)
-                    .font(.system(size: 11, weight: .regular))
-            }
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .regular))
 
             if !shortcut.isEmpty {
                 shortcutBadge(shortcut)
             }
         }
+        .accessibilityElement()
+        .accessibilityLabel(Text(accessibilityLabel))
     }
 
     private func shortcutBadge(_ text: String) -> some View {
