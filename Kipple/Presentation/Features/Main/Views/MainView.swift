@@ -499,11 +499,11 @@ extension MainView {
             MainViewEditorSection(
                 editorText: $viewModel.editorText,
                 isAlwaysOnTop: $isAlwaysOnTop,
-                onToggleAlwaysOnTop: toggleAlwaysOnTop
+                onToggleAlwaysOnTop: toggleAlwaysOnTop,
+                onClear: clearAction
             )
             MainViewControlSection(
                 onCopy: confirmAction,
-                onClear: clearAction,
                 onSplitCopy: splitEditorIntoHistory
             )
         }

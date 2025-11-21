@@ -9,7 +9,6 @@ import SwiftUI
 
 struct MainViewControlSection: View {
     let onCopy: () -> Void
-    let onClear: () -> Void
     let onSplitCopy: () -> Void
     @ObservedObject private var appSettings = AppSettings.shared
 
@@ -18,37 +17,14 @@ struct MainViewControlSection: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Spacer()
             HStack(spacing: 6) {
-                clearButton
                 copySplitButton
             }
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
-    }
-
-    private var clearButton: some View {
-        Button(action: onClear) {
-            buttonLabel(
-                systemImage: "trash",
-                shortcut: getClearShortcutKeyDisplay(),
-                accessibilityLabel: "Clear"
-            )
-            .foregroundColor(.white)
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: buttonHeight)
-            .background(clearButtonBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
-        .contentShape(Rectangle())
     }
 
     private var copySplitButton: some View {
@@ -136,17 +112,6 @@ struct MainViewControlSection: View {
         )
     }
 
-    private var clearButtonBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(NSColor.systemRed),
-                Color(NSColor.systemRed).opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     private func getShortcutKeyDisplay() -> String {
         if appSettings.editorCopyHotkeyKeyCode == 0 || appSettings.editorCopyHotkeyModifierFlags == 0 {
             return ""
@@ -179,25 +144,5 @@ struct MainViewControlSection: View {
         ]
         if keyCode == 0 { return nil }
         return keyMap[keyCode]
-    }
-
-    private func getClearShortcutKeyDisplay() -> String {
-        if appSettings.editorClearHotkeyKeyCode == 0 || appSettings.editorClearHotkeyModifierFlags == 0 {
-            return ""
-        }
-
-        let modifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorClearHotkeyModifierFlags))
-        var parts: [String] = []
-
-        if modifiers.contains(.control) { parts.append("⌃") }
-        if modifiers.contains(.option) { parts.append("⌥") }
-        if modifiers.contains(.shift) { parts.append("⇧") }
-        if modifiers.contains(.command) { parts.append("⌘") }
-
-        if let keyChar = keyCodeToString(UInt16(appSettings.editorClearHotkeyKeyCode)) {
-            parts.append(keyChar)
-        }
-
-        return parts.joined()
     }
 }
