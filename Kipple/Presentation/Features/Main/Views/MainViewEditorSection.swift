@@ -15,7 +15,7 @@ struct MainViewEditorSection: View {
     @State private var scrollOffset: CGFloat = 0
     @ObservedObject private var fontManager = FontManager.shared
     @State private var hoveredClearButton = false
-    private let clearButtonInset: CGFloat = 32
+    private let clearButtonInset: CGFloat = 20
     
     var body: some View {
         VStack(spacing: 0) {
@@ -53,8 +53,8 @@ struct MainViewEditorSection: View {
                 .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
-        .padding(.trailing, 14)
-        .padding(.bottom, 12)
+        .padding(.trailing, 8)
+        .padding(.bottom, 6)
         .help(Text("Clear editor"))
         .onHover { hovering in
             hoveredClearButton = hovering
