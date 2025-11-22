@@ -504,7 +504,8 @@ extension MainView {
             )
             MainViewControlSection(
                 onCopy: confirmAction,
-                onSplitCopy: splitEditorIntoHistory
+                onSplitCopy: splitEditorIntoHistory,
+                onTrim: trimAction
             )
         }
         .id(editorRefreshID)

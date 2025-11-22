@@ -13,12 +13,15 @@ struct CopiedNotificationView: View {
     
     enum NotificationType {
         case copied
+        case trimmed
         case pinLimitReached
         
         var icon: String {
             switch self {
             case .copied:
                 return "checkmark.circle.fill"
+            case .trimmed:
+                return "scissors"
             case .pinLimitReached:
                 return "exclamationmark.triangle.fill"
             }
@@ -28,6 +31,8 @@ struct CopiedNotificationView: View {
             switch self {
             case .copied:
                 return "Copied"
+            case .trimmed:
+                return "Trimmed"
             case .pinLimitReached:
                 return "Pin limit reached"
             }
@@ -37,6 +42,8 @@ struct CopiedNotificationView: View {
             switch self {
             case .copied:
                 return Color(NSColor.controlAccentColor)
+            case .trimmed:
+                return Color.green
             case .pinLimitReached:
                 return Color.orange
             }

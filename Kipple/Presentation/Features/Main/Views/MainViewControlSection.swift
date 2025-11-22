@@ -10,6 +10,7 @@ import SwiftUI
 struct MainViewControlSection: View {
     let onCopy: () -> Void
     let onSplitCopy: () -> Void
+    let onTrim: () -> Void
     @ObservedObject private var appSettings = AppSettings.shared
 
     private let buttonHeight: CGFloat = 30
@@ -18,6 +19,7 @@ struct MainViewControlSection: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
+                trimButton
                 copySplitButton
             }
             Spacer()
@@ -25,6 +27,28 @@ struct MainViewControlSection: View {
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
+    }
+
+    private var trimButton: some View {
+        Button(action: onTrim) {
+            buttonLabel(
+                systemImage: "scissors",
+                shortcut: "",
+                accessibilityLabel: "Trim"
+            )
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: buttonHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .foregroundColor(.white)
+        .background(trimButtonColor)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
     }
 
     private var copySplitButton: some View {
@@ -110,6 +134,10 @@ struct MainViewControlSection: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+    
+    private var trimButtonColor: Color {
+        Color.green
     }
 
     private func getShortcutKeyDisplay() -> String {

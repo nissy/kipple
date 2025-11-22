@@ -330,6 +330,25 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             UserDefaults.standard.removeObject(forKey: "lastEditorText")
         }
     }
+
+    @discardableResult
+    func trimEditor() -> Bool {
+        let trimmedLines = editorText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        let leadingTrimmed = trimmedLines.drop { $0.isEmpty }
+        let trailingTrimmed = leadingTrimmed
+            .reversed()
+            .drop { $0.isEmpty }
+            .reversed()
+
+        let normalizedText = trailingTrimmed.joined(separator: "\n")
+        guard normalizedText != editorText else { return false }
+
+        editorText = normalizedText
+        return true
+    }
     
     func clearEditor() {
         editorText = ""
