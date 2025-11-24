@@ -49,9 +49,7 @@ struct HistoryListView: View {
                         isQueuePreviewed: queueSelectionPreview.contains(item.id),
                         isScrollLocked: isScrollLocked,
                         onTap: {
-                            withAnimation(.spring(response: 0.3)) {
-                                onSelectItem(item)
-                            }
+                            onSelectItem(item)
                         },
                         onTogglePin: {
                             onTogglePin(item)

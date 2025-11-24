@@ -18,8 +18,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private let state = ClipboardState()
     private var lastEventTime = Date()
     private var lastChangeCount = 0
-    private var currentInterval: TimeInterval = 0.5
-    private let minInterval: TimeInterval = 0.5
+    // ポーリング間隔（アクティブ時は短めにして遅延を減らす）
+    private var currentInterval: TimeInterval = 0.3
+    private let minInterval: TimeInterval = 0.2
     private let maxInterval: TimeInterval = 1.0
     private var maxHistoryItems = 300  // Default value, will be updated from AppSettings
     private var isMonitoringFlag = false

@@ -192,11 +192,35 @@ struct ClipItem: Identifiable, Codable, Equatable {
     // 最初に解釈可能なURIスキームURLを返す（mailto自動付与はしない）
     private func resolveURISchemeURL() -> URL? {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        // 先頭にスキームがある場合
-        if trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil,
-           let url = URL(string: trimmed) {
-            return url
+        guard !trimmed.isEmpty else { return nil }
+
+        // スキーム付きのみ判定（先頭にスキームがないものは対象外）
+        guard trimmed.range(of: "^[A-Za-z][A-Za-z0-9+.-]*:", options: .regularExpression) != nil else {
+            return nil
         }
-        return nil
+
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased() else {
+            return nil
+        }
+
+        // スキーム別の最低限検証
+        switch scheme {
+        case "http", "https", "ftp":
+            guard let host = url.host, !host.isEmpty else { return nil }
+        case "mailto":
+            // mailto:foo@example.com のようにローカル部を含む必要がある
+            let address = URLComponents(url: url, resolvingAgainstBaseURL: false)?.path ?? ""
+            guard address.contains("@"), address.split(separator: "@").count == 2 else { return nil }
+        default:
+            break
+        }
+
+        // macOS 13+ ではハンドラ有無を確認できる。登録されていないカスタムスキームは弾く。
+        if NSWorkspace.shared.urlForApplication(toOpen: url) == nil {
+            return nil
+        }
+
+        return url
     }
 }

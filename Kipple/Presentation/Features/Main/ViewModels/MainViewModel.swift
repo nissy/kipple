@@ -330,6 +330,25 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             UserDefaults.standard.removeObject(forKey: "lastEditorText")
         }
     }
+
+    @discardableResult
+    func trimEditor() -> Bool {
+        let trimmedLines = editorText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        let leadingTrimmed = trimmedLines.drop { $0.isEmpty }
+        let trailingTrimmed = leadingTrimmed
+            .reversed()
+            .drop { $0.isEmpty }
+            .reversed()
+
+        let normalizedText = trailingTrimmed.joined(separator: "\n")
+        guard normalizedText != editorText else { return false }
+
+        editorText = normalizedText
+        return true
+    }
     
     func clearEditor() {
         editorText = ""
@@ -377,7 +396,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 設定された修飾キーを取得
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
-        let rawValue = UserDefaults.standard.integer(forKey: "editorInsertModifiers")
+        // @AppStorageのデフォルト値（Control）が効くようにAppSettings経由で取得する
+        let rawValue = appSettings.editorInsertModifiers
         return NSEvent.ModifierFlags(rawValue: UInt(rawValue))
     }
     
@@ -398,9 +418,21 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             insertToEditor(content: item.content)
         } else {
             clipboardService.recopyFromHistory(item)
-            resetFiltersAfterCopy()
-            clearQueueAfterManualCopyIfNeeded()
+            finalizeHistorySelection()
         }
+    }
+
+    func selectHistoryItemAndWait(_ item: ClipItem, forceInsert: Bool = false) async {
+        if forceInsert || shouldInsertToEditor() {
+            insertToEditor(content: item.content)
+            return
+        }
+        if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
+            await asyncService.recopyFromHistoryAndWait(item)
+        } else {
+            clipboardService.recopyFromHistory(item)
+        }
+        finalizeHistorySelection()
     }
     
     /// エディタパネルが閉じている場合に再表示
@@ -475,6 +507,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         isFilterMutating = false
         guard didMutate else { return }
         updateFilteredItems(clipboardService.history, animated: true)
+    }
+
+    private func finalizeHistorySelection() {
+        resetFiltersAfterCopy()
+        clearQueueAfterManualCopyIfNeeded()
     }
 
     // MARK: - Paste Queue Management

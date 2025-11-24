@@ -97,6 +97,11 @@ struct MainView: View {
 }
 
 extension MainView {
+    /// 履歴コピー後に前面アプリへフォーカスを戻す
+    func reactivatePreviousAppAfterCopy() {
+        onReactivatePreviousApp?()
+    }
+
     func showQuitConfirmationAlert() {
         requestPreventAutoClose(.quitConfirmation)
         DispatchQueue.main.async {
@@ -125,33 +130,43 @@ extension MainView {
         }
 
         if viewModel.shouldInsertToEditor() {
-            viewModel.insertToEditor(content: item.content)
-            // エディタ挿入の場合はウィンドウを閉じない
-        } else {
-            viewModel.selectHistoryItem(item)
-            historyCopyScrollRequest = HistoryCopyScrollRequest()
-            historyHoverResetRequest = HistoryHoverResetRequest()
+            viewModel.selectHistoryItem(item, forceInsert: true)
+            return
+        }
 
-            let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
-            let shouldAutoPaste = wantsAutoPaste && AutoPasteController.shared.canAutoPaste()
+        historyCopyScrollRequest = HistoryCopyScrollRequest()
+        historyHoverResetRequest = HistoryHoverResetRequest()
 
-            if shouldAutoPaste {
+        let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
+        let shouldAutoPaste = wantsAutoPaste && AutoPasteController.shared.canAutoPaste()
+
+        if shouldAutoPaste {
+            Task { @MainActor in
+                await viewModel.selectHistoryItemAndWait(item)
                 if !isAlwaysOnTop {
                     onClose?()
                 }
                 onReactivatePreviousApp?()
                 AutoPasteController.shared.schedulePaste()
-                return
+            }
+            return
+        }
+
+        Task { @MainActor in
+            let needsNotification = isAlwaysOnTop
+            if !isAlwaysOnTop {
+                onClose?()
             }
 
+            await viewModel.selectHistoryItemAndWait(item)
+
+            // Always return focus to前面アプリ（ピン留め中でも復帰）
+            reactivatePreviousAppAfterCopy()
+
             // コピー時の処理
-            if isAlwaysOnTop {
+            if needsNotification {
                 // Always on Topが有効な場合のみ通知を表示
                 showCopiedNotification(.copied)
-            } else {
-                // Always on Topが無効の場合は即座にウィンドウを閉じる
-                onClose?()
-                onReactivatePreviousApp?()
             }
         }
     }
@@ -484,12 +499,13 @@ extension MainView {
             MainViewEditorSection(
                 editorText: $viewModel.editorText,
                 isAlwaysOnTop: $isAlwaysOnTop,
-                onToggleAlwaysOnTop: toggleAlwaysOnTop
+                onToggleAlwaysOnTop: toggleAlwaysOnTop,
+                onClear: clearAction
             )
             MainViewControlSection(
                 onCopy: confirmAction,
-                onClear: clearAction,
-                onSplitCopy: splitEditorIntoHistory
+                onSplitCopy: splitEditorIntoHistory,
+                onTrim: trimAction
             )
         }
         .id(editorRefreshID)

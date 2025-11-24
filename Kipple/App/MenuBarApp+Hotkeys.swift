@@ -6,6 +6,7 @@ import ApplicationServices
 extension MenuBarApp {
     @objc func handleHotkeyNotification() {
         Task { @MainActor in
+            windowManager.rememberFrontmostAppForRestore()
             windowManager.openMainWindow()
         }
     }
@@ -81,10 +82,7 @@ extension MenuBarApp {
             guard screenPermissionGranted else {
                 Logger.shared.warning("Screen Text Capture blocked: screen recording permission not granted.")
                 windowManager.openSettings(tab: .permission)
-
-                if CGPreflightScreenCaptureAccess() {
-                    ScreenRecordingPermissionOpener.openSystemSettings()
-                }
+                ScreenRecordingPermissionOpener.openSystemSettings()
                 return
             }
 

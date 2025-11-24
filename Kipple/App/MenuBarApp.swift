@@ -122,7 +122,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     private func refreshLocalizedStrings() {
         guard !Self.isTestEnvironment else { return }
         if let button = statusBarItem?.button {
-            button.toolTip = localizedMenuString("Kipple - Clipboard Manager")
+            button.toolTip = nil
             if let image = NSImage(
                 systemSymbolName: "doc.on.clipboard",
                 accessibilityDescription: localizedMenuString("Kipple")
@@ -151,7 +151,7 @@ final class MenuBarApp: NSObject, ObservableObject {
                 button.imagePosition = .imageOnly
             }
 
-            button.toolTip = localizedMenuString("Kipple - Clipboard Manager")
+            button.toolTip = nil
             button.target = self
             button.action = #selector(openMainWindow)
             // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
@@ -182,6 +182,8 @@ final class MenuBarApp: NSObject, ObservableObject {
     @objc func openMainWindow() {
         let animationStyle = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
         if !NSApp.isActive {
+            // NSApp.activate前に現在の前面アプリを記録（メニューバー起動でも復帰先を保持）
+            windowManager.rememberFrontmostAppForRestore()
             if animationStyle != "none" {
                 // 旧位置の自動再表示を防ぐため、先に不可視化
                 windowManager.prepareForActivationBeforeOpen()
