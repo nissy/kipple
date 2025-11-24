@@ -19,8 +19,8 @@ struct MainViewControlSection: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                trimButton
                 copySplitButton
+                trimButton
             }
             Spacer()
         }
