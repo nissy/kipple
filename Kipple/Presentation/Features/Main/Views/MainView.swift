@@ -134,7 +134,6 @@ extension MainView {
             return
         }
 
-        historyCopyScrollRequest = HistoryCopyScrollRequest()
         historyHoverResetRequest = HistoryHoverResetRequest()
 
         let wantsAutoPaste = appSettings.historySelectPaste && !viewModel.isQueueModeActive
@@ -273,6 +272,12 @@ extension MainView {
         ) { _ in
             // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mainWindowDidHide)) { _ in
+            if historyCopyScrollRequest == nil {
+                historyCopyScrollRequest = HistoryCopyScrollRequest()
+            }
+            historyHoverResetRequest = HistoryHoverResetRequest()
         }
         .onChange(of: appSettings.editorPosition) { newValue in
             if lastKnownEditorPosition == "disabled", newValue != "disabled" {

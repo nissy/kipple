@@ -12,6 +12,7 @@ import Combine
 final class HistoryActionKeyMonitor: ObservableObject {
     @Published private(set) var isActionKeyActive = false
 
+    private let allowedModifiers: NSEvent.ModifierFlags = [.command, .option]
     private var flagsMonitor: EventMonitorToken?
     private var settingsCancellable: AnyCancellable?
     private var activationObserver: EventMonitorToken?
@@ -67,7 +68,10 @@ final class HistoryActionKeyMonitor: ObservableObject {
 
     private func updateRequiredModifiers() {
         let modifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.actionClickModifiers))
-        requiredModifiers = modifiers.intersection(.deviceIndependentFlagsMask)
+        let normalized = modifiers
+            .intersection(.deviceIndependentFlagsMask)
+            .intersection(allowedModifiers)
+        requiredModifiers = normalized
         if requiredModifiers.isEmpty {
             isActionKeyActive = false
         }

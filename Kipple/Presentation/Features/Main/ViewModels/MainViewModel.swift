@@ -398,7 +398,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
         // @AppStorageのデフォルト値（Control）が効くようにAppSettings経由で取得する
         let rawValue = appSettings.editorInsertModifiers
+        let allowed: NSEvent.ModifierFlags = [.command, .option]
         return NSEvent.ModifierFlags(rawValue: UInt(rawValue))
+            .intersection(allowed)
     }
     
     /// 現在の修飾キーがエディタ挿入用かチェック

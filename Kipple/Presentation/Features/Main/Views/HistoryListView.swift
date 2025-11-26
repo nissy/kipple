@@ -119,9 +119,7 @@ struct HistoryListView: View {
         guard let topID = history.first?.id else { return }
 
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                proxy.scrollTo(topID, anchor: .top)
-            }
+            proxy.scrollTo(topID, anchor: .top)
         }
     }
 
