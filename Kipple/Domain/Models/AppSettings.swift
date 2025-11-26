@@ -92,7 +92,7 @@ final class AppSettings: ObservableObject {
     }
 
     // Auto-Clear Settings
-    @AppStorage("enableAutoClear") var enableAutoClear: Bool = true
+    @AppStorage("enableAutoClear") var enableAutoClear: Bool = false
     @AppStorage("autoClearInterval") var autoClearInterval: Int = 10 // in minutes
 
     // Action Click Settings (modifier required to trigger item action by click)

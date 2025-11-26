@@ -14,7 +14,7 @@ struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
     @AppStorage("maxPinnedItems") private var maxPinnedItems = 50
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
-    @AppStorage("enableAutoClear") private var enableAutoClear = true
+    @AppStorage("enableAutoClear") private var enableAutoClear = false
     @AppStorage("autoClearInterval") private var autoClearInterval = 10
     @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @AppStorage("historySelectPaste") private var historySelectPaste = false
