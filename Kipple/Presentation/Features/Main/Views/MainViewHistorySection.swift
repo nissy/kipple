@@ -18,6 +18,7 @@ struct MainViewHistorySection: View {
     let onSelectItem: (ClipItem) -> Void
     let onOpenItem: ((ClipItem) -> Void)?
     let onInsertToEditor: ((ClipItem) -> Void)?
+    let onSplitEditorIntoHistory: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     let onCategoryFilter: ((ClipItemCategory) -> Void)?
@@ -56,6 +57,7 @@ struct MainViewHistorySection: View {
         onSelectItem: @escaping (ClipItem) -> Void,
         onOpenItem: ((ClipItem) -> Void)? = nil,
         onInsertToEditor: ((ClipItem) -> Void)? = nil,
+        onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
         onTogglePin: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
         onCategoryFilter: ((ClipItemCategory) -> Void)?,
@@ -89,6 +91,7 @@ struct MainViewHistorySection: View {
         self.onSelectItem = onSelectItem
         self.onOpenItem = onOpenItem
         self.onInsertToEditor = onInsertToEditor
+        self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onCategoryFilter = onCategoryFilter
@@ -143,6 +146,7 @@ struct MainViewHistorySection: View {
                 onOpenCategoryManager: onOpenCategoryManager,
                 onOpenItem: onOpenItem,
                 onInsertToEditor: onInsertToEditor,
+                onSplitEditorIntoHistory: onSplitEditorIntoHistory,
                 onLoadMore: onLoadMore,
                 hasMoreItems: hasMoreItems,
                 isLoadingMore: isLoadingMore,

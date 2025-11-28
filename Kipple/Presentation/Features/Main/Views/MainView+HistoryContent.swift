@@ -49,6 +49,9 @@ extension MainView {
             onInsertToEditor: { item in
                 viewModel.selectHistoryItem(item, forceInsert: true)
             },
+            onSplitEditorIntoHistory: { item in
+                splitHistoryItemIntoLines(item)
+            },
             onTogglePin: { item in
                 let wasPinned = item.isPinned
                 let newState = viewModel.togglePinSync(for: item)

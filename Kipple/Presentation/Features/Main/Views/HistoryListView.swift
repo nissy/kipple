@@ -16,6 +16,7 @@ struct HistoryListView: View {
     let onOpenCategoryManager: (() -> Void)?
     let onOpenItem: ((ClipItem) -> Void)?
     let onInsertToEditor: ((ClipItem) -> Void)?
+    let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
@@ -71,6 +72,7 @@ struct HistoryListView: View {
                         onInsertToEditor: onInsertToEditor.map { handler in
                             { handler(item) }
                         },
+                        onSplitEditorIntoHistory: onSplitEditorIntoHistory,
                         hoverResetSignal: hoverResetSignal
                     )
                     .frame(height: 32)

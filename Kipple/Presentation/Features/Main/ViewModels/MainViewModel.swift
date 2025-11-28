@@ -357,23 +357,17 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     @discardableResult
     func splitEditorLinesIntoHistory() async -> Int {
-        let components = editorText
-            .components(separatedBy: CharacterSet.newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        guard !components.isEmpty else { return 0 }
-
-        let addedItems = await clipboardService.addEditorItems(components)
-
-        if let first = addedItems.first {
-            clipboardService.recopyFromHistory(first)
+        let count = await splitLinesIntoHistory(editorText)
+        if count > 0 {
+            editorText = ""
+            UserDefaults.standard.removeObject(forKey: "lastEditorText")
         }
+        return count
+    }
 
-        editorText = ""
-        UserDefaults.standard.removeObject(forKey: "lastEditorText")
-
-        return addedItems.count
+    @discardableResult
+    func splitHistoryItemIntoHistory(_ item: ClipItem) async -> Int {
+        await splitLinesIntoHistory(item.content)
     }
     
     // These are now async methods above, keeping for backward compatibility
@@ -392,6 +386,25 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         ensureEditorPanelVisible()
         // 同期的に処理（非同期は不要）
         editorText = content
+    }
+
+    // MARK: - Private helpers
+
+    private func splitLinesIntoHistory(_ text: String) async -> Int {
+        let components = text
+            .components(separatedBy: CharacterSet.newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !components.isEmpty else { return 0 }
+
+        let addedItems = await clipboardService.addEditorItems(components)
+
+        if let first = addedItems.first {
+            clipboardService.recopyFromHistory(first)
+        }
+
+        return addedItems.count
     }
     
     /// 設定された修飾キーを取得
