@@ -17,6 +17,7 @@ class MainViewModelTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        UserDefaults.standard.removeObject(forKey: "lastEditorText")
         mockClipboardService = MockClipboardService()
         viewModel = MainViewModel(clipboardService: mockClipboardService)
     }
@@ -24,6 +25,7 @@ class MainViewModelTests: XCTestCase {
     override func tearDown() {
         viewModel = nil
         mockClipboardService = nil
+        UserDefaults.standard.removeObject(forKey: "lastEditorText")
         super.tearDown()
     }
 
@@ -104,6 +106,54 @@ class MainViewModelTests: XCTestCase {
         // Then
         // insertToEditorは既存の内容を置き換える（クリアしてから挿入）
         XCTAssertEqual(viewModel.editorText, "New content")
+    }
+
+    // MARK: - Split Lines Tests
+
+    func testSplitHistoryItemIntoHistoryAddsLinesAndRecopiesFirst() async {
+        // Given
+        let item = ClipItem(content: "line1\n \nline2\nline3\n")
+
+        // When
+        let count = await viewModel.splitHistoryItemIntoHistory(item)
+
+        // Then
+        XCTAssertEqual(count, 3)
+        XCTAssertEqual(mockClipboardService.addEditorItemsCallCount, 1)
+        XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["line1", "line2", "line3"])
+        XCTAssertEqual(mockClipboardService.recopyFromHistoryCallCount, 1)
+        XCTAssertEqual(mockClipboardService.lastRecopiedItem?.content, "line1")
+    }
+
+    func testSplitHistoryItemIntoHistoryIgnoresEmptyContent() async {
+        // Given
+        let item = ClipItem(content: "  \n \n")
+
+        // When
+        let count = await viewModel.splitHistoryItemIntoHistory(item)
+
+        // Then
+        XCTAssertEqual(count, 0)
+        XCTAssertEqual(mockClipboardService.addEditorItemsCallCount, 0)
+        XCTAssertNil(mockClipboardService.lastAddEditorItemsInput)
+        XCTAssertEqual(mockClipboardService.recopyFromHistoryCallCount, 0)
+        XCTAssertNil(mockClipboardService.lastRecopiedItem)
+    }
+
+    func testSplitEditorLinesIntoHistoryClearsEditorAndUserDefaults() async {
+        // Given
+        viewModel.editorText = "first\nsecond"
+        UserDefaults.standard.set(viewModel.editorText, forKey: "lastEditorText")
+
+        // When
+        let count = await viewModel.splitEditorLinesIntoHistory()
+
+        // Then
+        XCTAssertEqual(count, 2)
+        XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["first", "second"])
+        XCTAssertEqual(mockClipboardService.recopyFromHistoryCallCount, 1)
+        XCTAssertEqual(viewModel.editorText, "")
+        XCTAssertNil(UserDefaults.standard.string(forKey: "lastEditorText"))
     }
     
     // MARK: - Pin Tests

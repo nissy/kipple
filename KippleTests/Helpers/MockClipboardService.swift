@@ -37,6 +37,9 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
     var resumeAutoClearCalled = false
     private(set) var isAutoClearPaused = false
     var recopyFromHistoryAndWaitCallCount = 0
+    var recopyFromHistoryCallCount = 0
+    var addEditorItemsCallCount = 0
+    var lastAddEditorItemsInput: [String]?
 
     func startMonitoring() {
         isMonitoringActive = true
@@ -74,9 +77,12 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
 
     @discardableResult
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
+        addEditorItemsCallCount += 1
         let sanitized = contents
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+
+        lastAddEditorItemsInput = sanitized
 
         guard !sanitized.isEmpty else { return [] }
 
@@ -100,6 +106,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
     }
 
     func recopyFromHistory(_ item: ClipItem) {
+        recopyFromHistoryCallCount += 1
         lastRecopiedItem = item
 
         var updatedItem = item
@@ -198,6 +205,9 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         lastCopiedContent = nil
         lastCopiedFromEditor = nil
         lastRecopiedItem = nil
+        lastAddEditorItemsInput = nil
+        addEditorItemsCallCount = 0
+        recopyFromHistoryCallCount = 0
         copyToClipboardCalled = false
         fromEditor = nil
         togglePinCalled = false

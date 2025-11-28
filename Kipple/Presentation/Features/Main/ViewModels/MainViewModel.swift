@@ -83,6 +83,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var expectedQueueHeadID: UUID?
     private let appSettings = AppSettings.shared
     private var latestHistorySnapshot: [ClipItem] = []
+    private static let newlineSet = CharacterSet.newlines
 
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
@@ -392,7 +393,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     private func splitLinesIntoHistory(_ text: String) async -> Int {
         let components = text
-            .components(separatedBy: CharacterSet.newlines)
+            .components(separatedBy: Self.newlineSet)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
