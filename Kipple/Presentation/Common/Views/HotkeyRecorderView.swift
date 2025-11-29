@@ -139,7 +139,7 @@ struct HotkeyRecorderField: View {
             .cornerRadius(4)
         }
         .background(KeyEventHandler(isRecording: $isRecording, keyCode: $keyCode, modifierFlags: $modifierFlags))
-        .onChange(of: isRecording) { recording in
+        .onChange(of: isRecording) { _, recording in
             if !recording {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ResumeGlobalHotkeyCapture"),

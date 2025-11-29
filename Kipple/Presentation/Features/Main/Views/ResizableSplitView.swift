@@ -123,7 +123,7 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
                 apply(metrics)
                 applyResetIfNeeded(totalHeight: totalHeight)
             }
-            .onChange(of: geometry.size) { newSize in
+            .onChange(of: geometry.size) { _, newSize in
                 let totalHeight = Double(newSize.height)
                 lastGeometryHeight = totalHeight
                 let proposed = preferredProposedTop(totalHeight: totalHeight)
@@ -132,10 +132,10 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
                 applyResetIfNeeded(totalHeight: totalHeight)
             }
         }
-        .onChange(of: topHeight) { newValue in
+        .onChange(of: topHeight) { _, newValue in
             appliedTopHeight = newValue
         }
-        .onChange(of: resetConfiguration) { _ in
+        .onChange(of: resetConfiguration) { _, _ in
             applyResetIfNeeded(totalHeight: lastGeometryHeight)
         }
     }

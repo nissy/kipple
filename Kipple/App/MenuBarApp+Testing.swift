@@ -6,7 +6,7 @@ extension MenuBarApp {
     }
 
     func isClipboardMonitoring() async -> Bool {
-        if #available(macOS 13.0, *), let modernService = clipboardService as? ModernClipboardServiceAdapter {
+        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
             return await modernService.isMonitoring()
         }
         return true

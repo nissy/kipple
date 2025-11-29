@@ -216,7 +216,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
             break
         }
 
-        // macOS 13+ ではハンドラ有無を確認できる。登録されていないカスタムスキームは弾く。
+        // ハンドラが登録されていないカスタムスキームは弾く。
         if NSWorkspace.shared.urlForApplication(toOpen: url) == nil {
             return nil
         }

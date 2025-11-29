@@ -23,6 +23,7 @@ extension Notification.Name {
     static let showCopiedNotification = Notification.Name("showCopiedNotification")
     static let mainWindowDidBecomeKey = Notification.Name("KippleMainWindowDidBecomeKey")
     static let mainWindowDidResignKey = Notification.Name("KippleMainWindowDidResignKey")
+    static let mainWindowDidHide = Notification.Name("KippleMainWindowDidHide")
 }
 
 @MainActor
@@ -296,6 +297,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         exitQueueModeIfNeededBeforeAutoHide()
         window.orderOut(nil)
         HistoryPopoverManager.shared.forceClose()
+        NotificationCenter.default.post(name: .mainWindowDidHide, object: nil)
     }
 
     private func setPreventAutoClose(_ flag: Bool) {
@@ -724,9 +726,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.titlebarAppearsTransparent = false
             window.standardWindowButton(.miniaturizeButton)?.isHidden = true
             window.standardWindowButton(.zoomButton)?.isHidden = true
-            if #available(macOS 11.0, *) {
-                window.toolbarStyle = .preference
-            }
+            window.toolbarStyle = .preference
 
             let coordinator = SettingsToolbarController(viewModel: viewModel)
             coordinator.attach(to: window)
@@ -897,6 +897,7 @@ extension WindowManager {
                 window.orderOut(nil)
                 // 付随のポップオーバーも確実に閉じる
                 HistoryPopoverManager.shared.forceClose()
+                NotificationCenter.default.post(name: .mainWindowDidHide, object: nil)
             }
         } else {
             // keep window open when always on top

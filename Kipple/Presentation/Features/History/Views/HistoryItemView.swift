@@ -25,6 +25,7 @@ struct HistoryItemView: View {
     let historyFont: Font
     let onOpenItem: (() -> Void)?
     let onInsertToEditor: (() -> Void)?
+    let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let hoverResetSignal: UUID
     private let displayContent: String
 
@@ -52,6 +53,7 @@ struct HistoryItemView: View {
         historyFont: Font,
         onOpenItem: (() -> Void)?,
         onInsertToEditor: (() -> Void)?,
+        onSplitEditorIntoHistory: ((ClipItem) -> Void)?,
         hoverResetSignal: UUID
     ) {
         self.item = item
@@ -69,6 +71,7 @@ struct HistoryItemView: View {
         self.historyFont = historyFont
         self.onOpenItem = onOpenItem
         self.onInsertToEditor = onInsertToEditor
+        self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.hoverResetSignal = hoverResetSignal
         self.displayContent = HistoryItemView.makeDisplayContent(from: item.content)
     }
@@ -91,10 +94,10 @@ struct HistoryItemView: View {
                 baseView
             }
         }
-        .onChange(of: hoverResetSignal) { _ in
+        .onChange(of: hoverResetSignal) { _, _ in
             resetHoverState()
         }
-        .onChange(of: isScrollLocked) { locked in
+        .onChange(of: isScrollLocked) { _, locked in
             if locked {
                 if isHovered {
                     isHovered = false
@@ -419,7 +422,7 @@ private extension HistoryItemView {
     }
 
     var hasContextMenuActions: Bool {
-        (item.isActionable && onOpenItem != nil) || onInsertToEditor != nil
+        (item.isActionable && onOpenItem != nil) || onInsertToEditor != nil || onSplitEditorIntoHistory != nil
     }
 
     @ViewBuilder
@@ -438,6 +441,22 @@ private extension HistoryItemView {
                 onInsertToEditor()
             } label: {
                 Label(insertMenuTitle, systemImage: "square.and.pencil")
+            }
+        }
+        if onSplitEditorIntoHistory != nil,
+           item.isActionable && onOpenItem != nil || onInsertToEditor != nil {
+            Divider()
+        }
+        if let onSplitEditorIntoHistory {
+            Button {
+                closePopover()
+                onSplitEditorIntoHistory(item)
+            } label: {
+                Label {
+                    Text("editor.splitCopy.menu")
+                } icon: {
+                    Image(systemName: "text.badge.plus")
+                }
             }
         }
     }

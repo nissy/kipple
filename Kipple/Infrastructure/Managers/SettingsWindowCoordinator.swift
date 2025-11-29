@@ -170,9 +170,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         guard let window else { return }
         let settingsTitle = appSettings.localizedString("Settings", comment: "Settings window title")
         window.title = settingsTitle
-        if #available(macOS 11.0, *) {
-            window.subtitle = ""
-        }
+        window.subtitle = ""
     }
 }
 

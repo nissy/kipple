@@ -15,8 +15,8 @@ final class TextCaptureHotkeyManager {
     static let keyCodeDefaultsKey = "textCaptureHotkeyKeyCode"
     static let modifierDefaultsKey = "textCaptureHotkeyModifierFlags"
 
-    private let defaultKeyCode: UInt16 = 17 // T key
-    private let defaultModifiers: NSEvent.ModifierFlags = [.command, .shift]
+    private let defaultKeyCode: UInt16 = 8 // C key
+    private let defaultModifiers: NSEvent.ModifierFlags = [.control, .shift]
 
     private static let hotKeySignature: OSType = 0x4B505443 // 'KPTC'
     private static var hotKeyEventHandler: EventHandlerRef?

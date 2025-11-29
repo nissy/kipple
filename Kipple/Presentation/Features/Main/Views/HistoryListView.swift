@@ -16,6 +16,7 @@ struct HistoryListView: View {
     let onOpenCategoryManager: (() -> Void)?
     let onOpenItem: ((ClipItem) -> Void)?
     let onInsertToEditor: ((ClipItem) -> Void)?
+    let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
@@ -71,6 +72,7 @@ struct HistoryListView: View {
                         onInsertToEditor: onInsertToEditor.map { handler in
                             { handler(item) }
                         },
+                        onSplitEditorIntoHistory: onSplitEditorIntoHistory,
                         hoverResetSignal: hoverResetSignal
                     )
                     .frame(height: 32)
@@ -97,13 +99,13 @@ struct HistoryListView: View {
             ScrollLockObserver(isLocked: $isScrollLocked)
                 .allowsHitTesting(false)
         }
-        .onChange(of: copyScrollRequest?.id) { _ in
+        .onChange(of: copyScrollRequest?.id) { _, _ in
             handleCopyScrollRequest(with: proxy)
         }
-        .onChange(of: hoverResetRequest?.id) { _ in
+        .onChange(of: hoverResetRequest?.id) { _, _ in
             handleHoverResetRequest()
         }
-        .onChange(of: isScrollLocked) { locked in
+        .onChange(of: isScrollLocked) { _, locked in
             if locked {
                 hoverCoordinator.clearHover()
             }
@@ -119,9 +121,7 @@ struct HistoryListView: View {
         guard let topID = history.first?.id else { return }
 
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                proxy.scrollTo(topID, anchor: .top)
-            }
+            proxy.scrollTo(topID, anchor: .top)
         }
     }
 

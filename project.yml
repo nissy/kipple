@@ -2,7 +2,7 @@ name: Kipple
 options:
   bundleIdPrefix: com.nissy
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "14.0"
   createIntermediateGroups: true
   groupSortPosition: bottom
   developmentLanguage: en
@@ -13,8 +13,8 @@ options:
 settings:
   base:
     DEVELOPMENT_TEAM: R7LKF73J2W
-    MARKETING_VERSION: 2.1.4
-    CURRENT_PROJECT_VERSION: 2
+    MARKETING_VERSION: 2.1.5
+    CURRENT_PROJECT_VERSION: 1
     PRODUCT_NAME: Kipple
     MACOSX_DEPLOYMENT_TARGET: 14.0
     SWIFT_VERSION: 6.2

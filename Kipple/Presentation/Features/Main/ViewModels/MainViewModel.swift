@@ -83,6 +83,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var expectedQueueHeadID: UUID?
     private let appSettings = AppSettings.shared
     private var latestHistorySnapshot: [ClipItem] = []
+    private static let newlineSet = CharacterSet.newlines
 
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
@@ -357,23 +358,17 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     @discardableResult
     func splitEditorLinesIntoHistory() async -> Int {
-        let components = editorText
-            .components(separatedBy: CharacterSet.newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        guard !components.isEmpty else { return 0 }
-
-        let addedItems = await clipboardService.addEditorItems(components)
-
-        if let first = addedItems.first {
-            clipboardService.recopyFromHistory(first)
+        let count = await splitLinesIntoHistory(editorText)
+        if count > 0 {
+            editorText = ""
+            UserDefaults.standard.removeObject(forKey: "lastEditorText")
         }
+        return count
+    }
 
-        editorText = ""
-        UserDefaults.standard.removeObject(forKey: "lastEditorText")
-
-        return addedItems.count
+    @discardableResult
+    func splitHistoryItemIntoHistory(_ item: ClipItem) async -> Int {
+        await splitLinesIntoHistory(item.content)
     }
     
     // These are now async methods above, keeping for backward compatibility
@@ -393,12 +388,33 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         // 同期的に処理（非同期は不要）
         editorText = content
     }
+
+    // MARK: - Private helpers
+
+    private func splitLinesIntoHistory(_ text: String) async -> Int {
+        let components = text
+            .components(separatedBy: Self.newlineSet)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !components.isEmpty else { return 0 }
+
+        let addedItems = await clipboardService.addEditorItems(components)
+
+        if let first = addedItems.first {
+            clipboardService.recopyFromHistory(first)
+        }
+
+        return addedItems.count
+    }
     
     /// 設定された修飾キーを取得
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
         // @AppStorageのデフォルト値（Control）が効くようにAppSettings経由で取得する
         let rawValue = appSettings.editorInsertModifiers
+        let allowed: NSEvent.ModifierFlags = [.command, .option]
         return NSEvent.ModifierFlags(rawValue: UInt(rawValue))
+            .intersection(allowed)
     }
     
     /// 現在の修飾キーがエディタ挿入用かチェック
