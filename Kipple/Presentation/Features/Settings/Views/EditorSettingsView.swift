@@ -53,8 +53,8 @@ struct EditorSettingsView: View {
                             keyCode: $tempCopyKeyCode,
                             modifierFlags: $tempCopyModifierFlags
                         )
-                        .onChange(of: tempCopyKeyCode) { _ in updateCopyHotkey() }
-                        .onChange(of: tempCopyModifierFlags) { _ in updateCopyHotkey() }
+                        .onChange(of: tempCopyKeyCode) { _, _ in updateCopyHotkey() }
+                        .onChange(of: tempCopyModifierFlags) { _, _ in updateCopyHotkey() }
                     }
                 }
                 // Editor Clear Hotkey
@@ -64,8 +64,8 @@ struct EditorSettingsView: View {
                             keyCode: $tempClearKeyCode,
                             modifierFlags: $tempClearModifierFlags
                         )
-                        .onChange(of: tempClearKeyCode) { _ in updateClearHotkey() }
-                        .onChange(of: tempClearModifierFlags) { _ in updateClearHotkey() }
+                        .onChange(of: tempClearKeyCode) { _, _ in updateClearHotkey() }
+                        .onChange(of: tempClearModifierFlags) { _, _ in updateClearHotkey() }
                     }
                 }
 

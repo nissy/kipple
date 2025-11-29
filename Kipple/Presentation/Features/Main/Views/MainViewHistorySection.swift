@@ -154,7 +154,7 @@ struct MainViewHistorySection: View {
                 hoverResetRequest: $hoverResetRequest
             )
         }
-        .onChange(of: searchText) { newValue in
+        .onChange(of: searchText) { _, newValue in
             // 検索テキストの変更をデバウンス（パフォーマンス最適化）
             searchCancellable?.cancel()
             searchCancellable = Just(newValue)

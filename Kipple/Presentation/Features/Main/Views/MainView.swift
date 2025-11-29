@@ -279,7 +279,7 @@ extension MainView {
             }
             historyHoverResetRequest = HistoryHoverResetRequest()
         }
-        .onChange(of: appSettings.editorPosition) { newValue in
+        .onChange(of: appSettings.editorPosition) { _, newValue in
             if lastKnownEditorPosition == "disabled", newValue != "disabled" {
                 editorHeightResetID = UUID()
             }

@@ -35,7 +35,7 @@ struct GeneralSettingsView: View {
             tempModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(hotkeyModifierFlags))
             selectedLanguage = appSettings.appLanguage
         }
-        .onChange(of: selectedLanguage) { newValue in
+        .onChange(of: selectedLanguage) { _, newValue in
             appSettings.appLanguage = newValue
         }
     }
@@ -62,7 +62,7 @@ struct GeneralSettingsView: View {
                 label: "Launch at login",
                 isOn: $autoLaunchAtLogin
             )
-            .onChange(of: autoLaunchAtLogin) { newValue in
+            .onChange(of: autoLaunchAtLogin) { _, newValue in
                 LaunchAtLogin.shared.isEnabled = newValue
             }
         }
@@ -75,8 +75,8 @@ struct GeneralSettingsView: View {
                     keyCode: $tempKeyCode,
                     modifierFlags: $tempModifierFlags
                 )
-                .onChange(of: tempKeyCode) { _ in updateHotkey() }
-                .onChange(of: tempModifierFlags) { _ in updateHotkey() }
+                .onChange(of: tempKeyCode) { _, _ in updateHotkey() }
+                .onChange(of: tempModifierFlags) { _, _ in updateHotkey() }
             }
         }
     }

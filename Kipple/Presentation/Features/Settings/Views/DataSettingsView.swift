@@ -60,7 +60,7 @@ struct DataSettingsView: View {
                 // Auto-Clear Settings Section
                 SettingsGroup("Auto Clipboard Clear") {
                     SettingsRow(label: "Enable Auto Clipboard Clear", isOn: $enableAutoClear)
-                        .onChange(of: enableAutoClear) { _ in
+                        .onChange(of: enableAutoClear) { _, _ in
                             updateAutoClearConfiguration()
                         }
                     
@@ -95,7 +95,7 @@ struct DataSettingsView: View {
                             .disabled(!enableAutoClear)
                         }
                     }
-                    .onChange(of: autoClearInterval) { _ in
+                    .onChange(of: autoClearInterval) { _, _ in
                         updateAutoClearConfiguration()
                     }
                 }
@@ -114,7 +114,7 @@ struct DataSettingsView: View {
                             )
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 80)
-                            .onChange(of: maxHistoryItems) { newValue in
+                            .onChange(of: maxHistoryItems) { _, newValue in
                                 updateHistoryLimit(newValue)
                             }
 
@@ -369,8 +369,8 @@ private struct ScreenTextCaptureSettingsView: View {
                         modifierFlags: $tempCaptureModifierFlags
                     )
                     .disabled(!hasScreenCapturePermission)
-                    .onChange(of: tempCaptureKeyCode) { _ in updateCaptureHotkey() }
-                    .onChange(of: tempCaptureModifierFlags) { _ in updateCaptureHotkey() }
+                    .onChange(of: tempCaptureKeyCode) { _, _ in updateCaptureHotkey() }
+                    .onChange(of: tempCaptureModifierFlags) { _, _ in updateCaptureHotkey() }
 
                     if let captureHotkeyErrorKey {
                         Text(captureHotkeyErrorKey)

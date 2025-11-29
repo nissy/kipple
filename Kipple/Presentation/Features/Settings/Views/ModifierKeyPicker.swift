@@ -39,7 +39,7 @@ struct ModifierKeyPicker: View {
             .cornerRadius(4)
         }
         .onAppear(perform: normalizeSelection)
-        .onChange(of: selection) { _ in
+        .onChange(of: selection) { _, _ in
             normalizeSelection()
         }
     }

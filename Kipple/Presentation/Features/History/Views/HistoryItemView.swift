@@ -94,10 +94,10 @@ struct HistoryItemView: View {
                 baseView
             }
         }
-        .onChange(of: hoverResetSignal) { _ in
+        .onChange(of: hoverResetSignal) { _, _ in
             resetHoverState()
         }
-        .onChange(of: isScrollLocked) { locked in
+        .onChange(of: isScrollLocked) { _, locked in
             if locked {
                 if isHovered {
                     isHovered = false

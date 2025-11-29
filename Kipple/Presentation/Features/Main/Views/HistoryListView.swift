@@ -99,13 +99,13 @@ struct HistoryListView: View {
             ScrollLockObserver(isLocked: $isScrollLocked)
                 .allowsHitTesting(false)
         }
-        .onChange(of: copyScrollRequest?.id) { _ in
+        .onChange(of: copyScrollRequest?.id) { _, _ in
             handleCopyScrollRequest(with: proxy)
         }
-        .onChange(of: hoverResetRequest?.id) { _ in
+        .onChange(of: hoverResetRequest?.id) { _, _ in
             handleHoverResetRequest()
         }
-        .onChange(of: isScrollLocked) { locked in
+        .onChange(of: isScrollLocked) { _, locked in
             if locked {
                 hoverCoordinator.clearHover()
             }
