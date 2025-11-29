@@ -41,7 +41,7 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 - Configurable history size
 
 ## Requirements
-- macOS 13.0 or later
+- macOS 14.0 or later
 
 ## Privacy
 - All data stays on your Mac

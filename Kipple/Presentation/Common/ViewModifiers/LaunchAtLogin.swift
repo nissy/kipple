@@ -15,60 +15,42 @@ final class LaunchAtLogin {
     private init() {}
     
     var isEnabled: Bool {
-        get {
-            // macOS 13.0以降のAPI
-            if #available(macOS 13.0, *) {
-                return SMAppService.mainApp.status == .enabled
-            } else {
-                // Fallback for older versions
-                return UserDefaults.standard.bool(forKey: "autoLaunchAtLogin")
-            }
-        }
-        set {
-            setEnabled(newValue)
-        }
+        get { SMAppService.mainApp.status == .enabled }
+        set { setEnabled(newValue) }
     }
     
     func setEnabled(_ enabled: Bool) {
-        if #available(macOS 13.0, *) {
-            do {
-                if enabled {
-                    if SMAppService.mainApp.status == .enabled {
-                        return
-                    }
-                    
-                    try SMAppService.mainApp.register()
-                } else {
-                    if SMAppService.mainApp.status != .enabled {
-                        return
-                    }
-                    
-                    try SMAppService.mainApp.unregister()
+        do {
+            if enabled {
+                if SMAppService.mainApp.status == .enabled {
+                    return
                 }
-                
-                // 設定を同期
-                UserDefaults.standard.set(enabled, forKey: "autoLaunchAtLogin")
-            } catch {
-                let action = enabled ? "enable" : "disable"
-                Logger.shared.error("Failed to \(action) launch at login: \(error.localizedDescription)")
-                
-                // エラーの詳細をユーザーに通知
-                NotificationCenter.default.post(
-                    name: NSNotification.Name("LaunchAtLoginError"),
-                    object: nil,
-                    userInfo: ["error": error.localizedDescription]
-                )
+
+                try SMAppService.mainApp.register()
+            } else {
+                if SMAppService.mainApp.status != .enabled {
+                    return
+                }
+
+                try SMAppService.mainApp.unregister()
             }
-        } else {
-            // Fallback for older versions
-            Logger.shared.warning("Launch at login requires macOS 13.0 or later")
+
+            // 設定を同期
             UserDefaults.standard.set(enabled, forKey: "autoLaunchAtLogin")
+        } catch {
+            let action = enabled ? "enable" : "disable"
+            Logger.shared.error("Failed to \(action) launch at login: \(error.localizedDescription)")
+
+            // エラーの詳細をユーザーに通知
+            NotificationCenter.default.post(
+                name: NSNotification.Name("LaunchAtLoginError"),
+                object: nil,
+                userInfo: ["error": error.localizedDescription]
+            )
         }
     }
     
     func checkStatus() {
-        if #available(macOS 13.0, *) {
-            _ = SMAppService.mainApp.status
-        }
+        _ = SMAppService.mainApp.status
     }
 }

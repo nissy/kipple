@@ -726,9 +726,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.titlebarAppearsTransparent = false
             window.standardWindowButton(.miniaturizeButton)?.isHidden = true
             window.standardWindowButton(.zoomButton)?.isHidden = true
-            if #available(macOS 11.0, *) {
-                window.toolbarStyle = .preference
-            }
+            window.toolbarStyle = .preference
 
             let coordinator = SettingsToolbarController(viewModel: viewModel)
             coordinator.attach(to: window)
