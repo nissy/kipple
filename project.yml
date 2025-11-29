@@ -2,7 +2,7 @@ name: Kipple
 options:
   bundleIdPrefix: com.nissy
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "14.0"
   createIntermediateGroups: true
   groupSortPosition: bottom
   developmentLanguage: en
