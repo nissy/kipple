@@ -132,6 +132,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         preventAutoClose = true
         capturePreviousAppForFocusReturn()
         syncTitleBarQueueState()
+        NSApp.activate(ignoringOtherApps: true)
 
         if let existingWindow = mainWindow {
             reopenExistingWindow(existingWindow)
@@ -177,6 +178,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.setFrame(frame, display: true, animate: false)
                 if !window.isKeyWindow {
                     bringWindowToFrontWithoutSystemAnimation(window) {
+                        window.orderFrontRegardless()
                         window.makeKeyAndOrderFront(nil)
                     }
                 }
@@ -397,25 +399,36 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // カーソルが存在するスクリーンを優先（複数ディスプレイ対応）
         let screens = NSScreen.screens
         let targetScreen = screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
-        let screenFrame = targetScreen?.frame ?? NSRect.zero
+        let screenFrame = targetScreen?.visibleFrame ?? targetScreen?.frame ?? NSRect.zero
+        return Self.constrainedWindowOrigin(
+            mouseLocation: mouseLocation,
+            windowSize: windowSize,
+            screenFrame: screenFrame
+        )
+    }
 
+    nonisolated static func constrainedWindowOrigin(
+        mouseLocation: NSPoint,
+        windowSize: NSSize,
+        screenFrame: NSRect
+    ) -> NSPoint {
+        let padding: CGFloat = 10
         var windowOrigin = NSPoint(
-            x: mouseLocation.x + 10,
-            y: mouseLocation.y - windowSize.height - 10
+            x: mouseLocation.x + padding,
+            y: mouseLocation.y - windowSize.height - padding
         )
 
-        if windowOrigin.x + windowSize.width > screenFrame.maxX {
-            windowOrigin.x = screenFrame.maxX - windowSize.width - 10
+        let minX = screenFrame.minX + padding
+        let maxX = max(minX, screenFrame.maxX - windowSize.width - padding)
+        windowOrigin.x = min(max(windowOrigin.x, minX), maxX)
+
+        let minY = screenFrame.minY + padding
+        let maxY = max(minY, screenFrame.maxY - windowSize.height - padding)
+        if windowOrigin.y < minY {
+            windowOrigin.y = mouseLocation.y + padding
         }
-        if windowOrigin.x < screenFrame.minX {
-            windowOrigin.x = screenFrame.minX + 10
-        }
-        if windowOrigin.y < screenFrame.minY {
-            windowOrigin.y = screenFrame.minY + 10
-        }
-        if windowOrigin.y + windowSize.height > screenFrame.maxY {
-            windowOrigin.y = mouseLocation.y + 10
-        }
+        windowOrigin.y = min(max(windowOrigin.y, minY), maxY)
+
         return windowOrigin
     }
 

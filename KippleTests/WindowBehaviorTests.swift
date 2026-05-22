@@ -11,6 +11,7 @@
 
 import XCTest
 import AppKit
+@testable import Kipple
 
 final class WindowBehaviorTests: XCTestCase {
     
@@ -194,5 +195,39 @@ final class WindowBehaviorTests: XCTestCase {
         
         XCTAssertEqual(savedWidth, 500)
         XCTAssertEqual(savedHeight, 700)
+    }
+
+    func testWindowOriginStaysInsideVisibleFrameNearTopEdge() {
+        let screenFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let windowSize = NSSize(width: 420, height: 600)
+        let mouseLocation = NSPoint(x: 700, y: 890)
+
+        let origin = WindowManager.constrainedWindowOrigin(
+            mouseLocation: mouseLocation,
+            windowSize: windowSize,
+            screenFrame: screenFrame
+        )
+
+        XCTAssertGreaterThanOrEqual(origin.x, screenFrame.minX)
+        XCTAssertLessThanOrEqual(origin.x + windowSize.width, screenFrame.maxX)
+        XCTAssertGreaterThanOrEqual(origin.y, screenFrame.minY)
+        XCTAssertLessThanOrEqual(origin.y + windowSize.height, screenFrame.maxY)
+    }
+
+    func testWindowOriginStaysInsideOffsetScreenFrame() {
+        let screenFrame = NSRect(x: -1280, y: 120, width: 1280, height: 720)
+        let windowSize = NSSize(width: 420, height: 600)
+        let mouseLocation = NSPoint(x: -30, y: 800)
+
+        let origin = WindowManager.constrainedWindowOrigin(
+            mouseLocation: mouseLocation,
+            windowSize: windowSize,
+            screenFrame: screenFrame
+        )
+
+        XCTAssertGreaterThanOrEqual(origin.x, screenFrame.minX)
+        XCTAssertLessThanOrEqual(origin.x + windowSize.width, screenFrame.maxX)
+        XCTAssertGreaterThanOrEqual(origin.y, screenFrame.minY)
+        XCTAssertLessThanOrEqual(origin.y + windowSize.height, screenFrame.maxY)
     }
 }

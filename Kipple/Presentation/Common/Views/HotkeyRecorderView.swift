@@ -147,6 +147,15 @@ struct HotkeyRecorderField: View {
                 )
             }
         }
+        .onDisappear {
+            if isRecording {
+                isRecording = false
+            }
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+                object: nil
+            )
+        }
     }
 }
 
