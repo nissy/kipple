@@ -76,10 +76,7 @@ extension MainView {
             },
             onOpenCategoryManager: { presentCategoryManager() },
             selectedCategory: $viewModel.selectedCategory,
-            initialSearchText: viewModel.searchText,
-            onSearchTextChanged: { text in
-                viewModel.searchText = text
-            },
+            searchText: $viewModel.searchText,
             onLoadMore: { item in
                 viewModel.loadMoreHistoryIfNeeded(currentItem: item)
             },

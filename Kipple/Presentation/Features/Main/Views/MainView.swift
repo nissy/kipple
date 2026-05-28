@@ -153,11 +153,11 @@ extension MainView {
 
         Task { @MainActor in
             let needsNotification = isAlwaysOnTop
+            await viewModel.selectHistoryItemAndWait(item)
+
             if !isAlwaysOnTop {
                 onClose?()
             }
-
-            await viewModel.selectHistoryItemAndWait(item)
 
             // Always return focus to前面アプリ（ピン留め中でも復帰）
             reactivatePreviousAppAfterCopy()
