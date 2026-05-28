@@ -153,14 +153,22 @@ extension MainView {
 
         Task { @MainActor in
             let needsNotification = isAlwaysOnTop
-            await viewModel.selectHistoryItemAndWait(item)
 
+            // ウインドウを先に閉じて snappy なクローズ体感を確保
             if !isAlwaysOnTop {
                 onClose?()
             }
 
-            // Always return focus to前面アプリ（ピン留め中でも復帰）
+            // pasteboard 書き込みは focus 復帰前に確定させる（即 paste で古い内容を貼らないように）
+            await viewModel.selectHistoryItemAwaitingPasteboard(item)
+
+            // pasteboard 反映後に前面アプリへフォーカス復帰
             reactivatePreviousAppAfterCopy()
+
+            // history 再同期は表示整合用なので別 Task で（クローズ体感最優先）
+            Task { @MainActor in
+                await viewModel.finalizeRecopyRefresh()
+            }
 
             // コピー時の処理
             if needsNotification {

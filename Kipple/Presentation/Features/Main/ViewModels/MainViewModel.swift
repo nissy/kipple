@@ -40,7 +40,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var pinnedHistory: [ClipItem] = []
     @Published var searchText: String = "" {
         didSet {
-            applyFilters()
+            applyFilters(animated: false)
         }
     }
     @Published var showOnlyURLs: Bool = false
@@ -117,7 +117,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             .store(in: &cancellables)
         
         subscribeToClipboardService()
-        
+
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
         // 注: UserDefaultsの変更通知は特定のキーを識別できないため、
         // debounceのみで処理頻度を制限
@@ -203,12 +203,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         loadHistory()
     }
 
-    private func applyFilters() {
+    private func applyFilters(animated: Bool = true) {
         guard !isFilterMutating else { return }
-        updateFilteredItems(clipboardService.history, animated: true)
+        updateFilteredItems(clipboardService.history, animated: animated)
     }
 
-    // swiftlint:disable:next function_body_length
+    // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
         latestHistorySnapshot = items
         updateCurrentClipboardItemID(using: items)
@@ -236,36 +236,34 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if noFiltersActive {
             filtered = items
         } else {
+            // 安価な判定（Bool/UUID 比較）で早期 return し、最後に expensive な
+            // localizedCaseInsensitiveContains を評価して総コストを下げる
             filtered = items.filter { item in
-                let matchesSearch: Bool = {
-                    guard hasSearchQuery else { return true }
+                if requirePinnedOnly && !item.isPinned {
+                    return false
+                }
+                if let userCatId = selectedUserCategory {
+                    if userCatId == noneCategoryId {
+                        if let assignedId = item.userCategoryId, assignedId != userCatId {
+                            return false
+                        }
+                    } else if item.userCategoryId != userCatId {
+                        return false
+                    }
+                }
+                if filterByURLCategory || requireURLsOnly {
+                    if !itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) {
+                        return false
+                    }
+                }
+                if hasSearchQuery {
                     let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
                     let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
-                    return matchesContent || matchesSourceApp
-                }()
-
-                let matchesUserCategory: Bool = {
-                    guard let userCatId = selectedUserCategory else { return true }
-                    if userCatId == noneCategoryId {
-                        if let assignedId = item.userCategoryId {
-                            return assignedId == userCatId
-                        }
-                        return true
+                    if !matchesContent && !matchesSourceApp {
+                        return false
                     }
-                    return item.userCategoryId == userCatId
-                }()
-
-                let needsURLMembership = filterByURLCategory || requireURLsOnly
-                let isURLItem = needsURLMembership ? itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) : true
-                let matchesURLCategory = !filterByURLCategory || isURLItem
-                let matchesURLsOnly = !requireURLsOnly || isURLItem
-                let matchesPinned = !requirePinnedOnly || item.isPinned
-
-                return matchesSearch &&
-                    matchesUserCategory &&
-                    matchesURLCategory &&
-                    matchesURLsOnly &&
-                    matchesPinned
+                }
+                return true
             }
         }
 
@@ -450,6 +448,29 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
         finalizeHistorySelection()
     }
+
+    /// pasteboard 書き込み完了までだけ待機。history 再同期は finalizeRecopyRefresh() を別途呼ぶ
+    func selectHistoryItemAwaitingPasteboard(_ item: ClipItem, forceInsert: Bool = false) async {
+        if forceInsert || shouldInsertToEditor() {
+            insertToEditor(content: item.content)
+            return
+        }
+        if let adapter = clipboardService as? ModernClipboardServiceAdapter {
+            await adapter.recopyFromHistoryAwaitingPasteboard(item)
+        } else if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
+            await asyncService.recopyFromHistoryAndWait(item)
+        } else {
+            clipboardService.recopyFromHistory(item)
+        }
+        finalizeHistorySelection()
+    }
+
+    /// selectHistoryItemAwaitingPasteboard 後の history 再同期。window close 後の別 Task で呼ぶ
+    func finalizeRecopyRefresh() async {
+        if let adapter = clipboardService as? ModernClipboardServiceAdapter {
+            await adapter.finalizeRecopyRefresh()
+        }
+    }
     
     /// エディタパネルが閉じている場合に再表示
     private func ensureEditorPanelVisible() {
@@ -522,7 +543,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         isFilterMutating = false
         guard didMutate else { return }
-        updateFilteredItems(clipboardService.history, animated: true)
+        updateFilteredItems(clipboardService.history, animated: false)
     }
 
     private func finalizeHistorySelection() {

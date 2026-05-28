@@ -321,6 +321,17 @@ extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
         await refreshHistory()
     }
 
+    /// pasteboard 書き込みのみ待機する軽量版。history 再同期は後段で finalizeRecopyRefresh() を呼ぶこと
+    func recopyFromHistoryAwaitingPasteboard(_ item: ClipItem) async {
+        prepareForRecopy(of: item)
+        await modernService.recopyFromHistory(item)
+    }
+
+    /// recopyFromHistoryAwaitingPasteboard 後の history 再同期
+    func finalizeRecopyRefresh() async {
+        await refreshHistory()
+    }
+
     private func prepareForRecopy(of item: ClipItem) {
         pendingClipboardContent = item.content
         currentClipboardContent = item.content
