@@ -8,6 +8,10 @@
 import AppKit
 import QuartzCore
 
+private enum SelectionOverlayKey {
+    static let escape: UInt16 = 53
+}
+
 @MainActor
 protocol ScreenSelectionOverlayControlling: AnyObject {
     func present()
@@ -25,6 +29,7 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
     private var isActive = false
     private var cursorPushed = false
     private var cursorRefreshTasks: [Task<Void, Never>] = []
+    private var keyDownMonitor: Any?
 
     init(onSelection: @escaping SelectionHandler, onCancel: @escaping CancelHandler) {
         self.onSelection = onSelection
@@ -45,6 +50,7 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
 
         refreshOverlayCursor(flash: true)
         scheduleCursorRefreshes()
+        installKeyDownMonitor()
     }
 
     func cancel() {
@@ -54,6 +60,7 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
     }
 
     private func closeAllWindows() {
+        removeKeyDownMonitor()
         cancelCursorRefreshes()
         overlayWindows.forEach { window in
             window.selectionDelegate = nil
@@ -145,6 +152,22 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
         }
 
         return dx * dx + dy * dy
+    }
+
+    private func installKeyDownMonitor() {
+        guard keyDownMonitor == nil else { return }
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == SelectionOverlayKey.escape else { return event }
+            self?.cancel()
+            return nil
+        }
+    }
+
+    private func removeKeyDownMonitor() {
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+            self.keyDownMonitor = nil
+        }
     }
 }
 
@@ -239,7 +262,7 @@ private final class SelectionOverlayWindow: NSWindow {
 
     override func keyDown(with event: NSEvent) {
         // ESCキーでキャンセル
-        if event.keyCode == 53 {
+        if event.keyCode == SelectionOverlayKey.escape {
             selectionDelegate?.selectionOverlayWindowDidCancel(self)
             return
         }
