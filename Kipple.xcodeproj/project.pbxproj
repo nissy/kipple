@@ -89,7 +89,6 @@
 		7B8972EDF365BC4BC7D5A6F7 /* ModernClipboardServiceInitialLoadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E709953D569676F69301025F /* ModernClipboardServiceInitialLoadTests.swift */; };
 		7D21F2708879F96FABBF693F /* Localizable.stringsdict in Resources */ = {isa = PBXBuildFile; fileRef = 47C920569402BF9A18A9313C /* Localizable.stringsdict */; };
 		7EE694319BB60EF09524CC65 /* TogglePinSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032B8315C1F7DFED645AAFD5 /* TogglePinSyncTests.swift */; };
-		839478319087D74271D807FB /* PerfTracer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E668A56F8AB24C12857B93A9 /* PerfTracer.swift */; };
 		8579983D8274D0739D4303EB /* SimpleLineNumberRulerViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B5E5249A9419B3E8AF410F /* SimpleLineNumberRulerViewTests.swift */; };
 		8611D0D8B61C3EFD2A7127C2 /* ClipItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8AECFC0197258F5CABC3C31 /* ClipItem.swift */; };
 		86996318823139ECAB61B80D /* MockClipboardService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE27F632B10A5817688AA5E /* MockClipboardService.swift */; };
@@ -358,7 +357,6 @@
 		E522102080E9938FBB8FA69D /* SettingsRestorationExampleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRestorationExampleTests.swift; sourceTree = "<group>"; };
 		E5778807D1EE8AD4AF29AB95 /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
 		E5E8F672B5F8DCE4239D1494 /* SimpleLineNumberRulerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberRulerView.swift; sourceTree = "<group>"; };
-		E668A56F8AB24C12857B93A9 /* PerfTracer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfTracer.swift; sourceTree = "<group>"; };
 		E709953D569676F69301025F /* ModernClipboardServiceInitialLoadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceInitialLoadTests.swift; sourceTree = "<group>"; };
 		E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarApp.swift; sourceTree = "<group>"; };
 		E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowCoordinator.swift; sourceTree = "<group>"; };
@@ -533,7 +531,6 @@
 			children = (
 				AF072F45BDF85E6C67D65531 /* CategoryClassifierCache.swift */,
 				8D7DCFE250A4461B1535CAD1 /* FontNameMappings.swift */,
-				E668A56F8AB24C12857B93A9 /* PerfTracer.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -1146,7 +1143,6 @@
 				4550283FA1F4FA3B9CD5465E /* ModifierKeyPicker.swift in Sources */,
 				17954A7E29CEBEBA3F9F533A /* PasteCommandMonitor.swift in Sources */,
 				7B2ED209942FC3A472396FF0 /* PasteboardProviding.swift in Sources */,
-				839478319087D74271D807FB /* PerfTracer.swift in Sources */,
 				9E095EEA3349C139D0C2EBA1 /* PermissionsSettingsView.swift in Sources */,
 				B9DD76EBB1EFEDA6E574E1D4 /* RepositoryProvider.swift in Sources */,
 				59A504619C472F5D87041F38 /* ResizableSplitView.swift in Sources */,

@@ -280,11 +280,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     func recopyFromHistory(_ item: ClipItem) async {
-        PerfTracer.event("modernRecopy.start")
         // Set flags BEFORE updating clipboard to prevent race condition
         await state.setInternalCopy(true)
         await state.setFromEditor(item.isFromEditor ?? false)
-        PerfTracer.event("modernRecopy.flagsSet")
 
         // Preserve all metadata from the original item but update timestamp
         var newItem = item
@@ -307,21 +305,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Trim history to max size
         trimHistory()
-        PerfTracer.event("modernRecopy.historyMutated", extra: ["n": history.count])
 
         // Trigger save
         saveSubject.send(history)
-        PerfTracer.event("modernRecopy.saveSent")
 
         // Copy to system clipboard - NSPasteboard is thread-safe (macOS 10.7+).
         // MainActor.run を挟むと SwiftUI / AppKit が忙しい時に hop 待ちで 100ms 級の遅延が出るので避ける
-        PerfTracer.event("modernRecopy.pasteboardWrite.start")
         let newChangeCount = Self.writeStringToPasteboard(item.content)
-        PerfTracer.event("modernRecopy.pasteboardWrite.end")
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
-        PerfTracer.event("modernRecopy.end")
     }
 
     func clearSystemClipboard() async {

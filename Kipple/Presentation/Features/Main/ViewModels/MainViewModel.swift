@@ -233,8 +233,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
-        PerfTracer.event("updateFilteredItems.start", extra: ["n": items.count, "search": searchText.count])
-        defer { PerfTracer.event("updateFilteredItems.end") }
         latestHistorySnapshot = items
         updateCurrentClipboardItemID(using: items)
 
