@@ -105,8 +105,9 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     onOpenItem: nil,
                     onInsertToEditor: nil,
                     onSplitEditorIntoHistory: nil,
-                    hoverResetSignal: UUID()
-                ).environmentObject(HistoryHoverCoordinator())
+                    hoverResetSignal: UUID(),
+                    hoverCoordinator: HistoryHoverCoordinator()
+                )
             }
         }
 

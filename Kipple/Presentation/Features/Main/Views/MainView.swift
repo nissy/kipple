@@ -4,6 +4,7 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
+// swiftlint:disable file_length
 import SwiftUI
 import AppKit
 import Combine
@@ -141,6 +142,7 @@ extension MainView {
 
         if shouldAutoPaste {
             Task { @MainActor in
+                viewModel.cancelPendingSearchFilter()
                 await viewModel.selectHistoryItemAndWait(item)
                 if !isAlwaysOnTop {
                     onClose?()
@@ -151,30 +153,33 @@ extension MainView {
             return
         }
 
+        PerfTracer.event("copy.select.start")
+        let needsNotification = isAlwaysOnTop
+        // 直前 typing の検索 coalesce を確実に潰す
+        viewModel.cancelPendingSearchFilter()
+        // 先にウインドウを閉じる。orderOut は MainActor を ~100ms 占有するが、
+        // focus 復帰スケジュール (asyncAfter 0.05s) は orderOut と並行で timer が走るため、
+        // 両方を最速化できる
+        if !isAlwaysOnTop {
+            onClose?()
+        }
+        // focus 復帰を await の前にスケジュール。pasteboard 書き込みは actor 内 ~0.5ms で完了
+        // するので、reactivate.fire (orderOut MainActor 解放後 + 50ms) 時点では確実に確定済み
+        reactivatePreviousAppAfterCopy()
+
         Task { @MainActor in
-            let needsNotification = isAlwaysOnTop
-
-            // ウインドウを先に閉じて snappy なクローズ体感を確保
-            if !isAlwaysOnTop {
-                onClose?()
-            }
-
-            // pasteboard 書き込みは focus 復帰前に確定させる（即 paste で古い内容を貼らないように）
             await viewModel.selectHistoryItemAwaitingPasteboard(item)
-
-            // pasteboard 反映後に前面アプリへフォーカス復帰
-            reactivatePreviousAppAfterCopy()
-
-            // history 再同期は表示整合用なので別 Task で（クローズ体感最優先）
+            PerfTracer.event("afterAwait")
+            // history 再同期は focus 復帰が完全に終わってから (200ms 後) 実行し、
+            // SwiftUI @Published cascade による focus 競合余地を抑える
             Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 200_000_000)
                 await viewModel.finalizeRecopyRefresh()
             }
-
-            // コピー時の処理
             if needsNotification {
-                // Always on Topが有効な場合のみ通知を表示
                 showCopiedNotification(.copied)
             }
+            PerfTracer.event("copy.select.end")
         }
     }
 
@@ -281,11 +286,23 @@ extension MainView {
             // 履歴セクションのみを更新（デバウンスを長くしてパフォーマンス向上）
             historyRefreshID = UUID()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: NSNotification.Name("io.kipple.test.selectTopHistory.internal")
+            )
+        ) { _ in
+            // 自動テスト用: history の先頭を選択してコピー経路を起動
+            if let top = viewModel.history.first {
+                handleItemSelection(top)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .mainWindowDidHide)) { _ in
+            PerfTracer.event("hideObserver.MainView.start")
             if historyCopyScrollRequest == nil {
                 historyCopyScrollRequest = HistoryCopyScrollRequest()
             }
             historyHoverResetRequest = HistoryHoverResetRequest()
+            PerfTracer.event("hideObserver.MainView.end")
         }
         .onChange(of: appSettings.editorPosition) { _, newValue in
             if lastKnownEditorPosition == "disabled", newValue != "disabled" {

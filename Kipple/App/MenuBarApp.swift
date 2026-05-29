@@ -95,6 +95,13 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Set the application delegate synchronously (required)
         NSApplication.shared.delegate = self
 
+        PerfTracer.event("app.launched", extra: ["traceEnabled": PerfTracer.isEnabled])
+
+        // KIPPLE_PERF_TRACE=1 時のみ、外部からの自動テストトリガを受け付ける
+        if PerfTracer.isEnabled {
+            setupAutomationHooks()
+        }
+
         // 初回クリック取りこぼし対策: ステータスバーは同期セットアップ
         self.setupMenuBar()
 
@@ -135,6 +142,45 @@ final class MenuBarApp: NSObject, ObservableObject {
         }
     }
     
+    /// KIPPLE_PERF_TRACE=1 のときだけ有効化される、外部からの自動テスト用フック。
+    /// `osascript -e 'tell application "System Events" to ...'` 経由で
+    /// `NSDistributedNotificationCenter` 経由で各操作を起こせるようにする。
+    private func setupAutomationHooks() {
+        let center = DistributedNotificationCenter.default()
+        // suspend されてもキューせず即配信させる
+        center.addObserver(
+            self,
+            selector: #selector(handleTestOpenMain),
+            name: Notification.Name("io.kipple.test.openMain"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+        center.addObserver(
+            self,
+            selector: #selector(handleTestSelectTop),
+            name: Notification.Name("io.kipple.test.selectTopHistory"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+    }
+
+    @objc private func handleTestOpenMain() {
+        PerfTracer.event("test.openMain.received")
+        Task { @MainActor [weak self] in
+            self?.openMainWindow()
+        }
+    }
+
+    @objc private func handleTestSelectTop() {
+        PerfTracer.event("test.selectTopHistory.received")
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("io.kipple.test.selectTopHistory.internal"),
+                object: nil
+            )
+        }
+    }
+
     private func setupMenuBar() {
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 

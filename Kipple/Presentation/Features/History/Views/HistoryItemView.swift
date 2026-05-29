@@ -27,10 +27,9 @@ struct HistoryItemView: View {
     let onInsertToEditor: (() -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let hoverResetSignal: UUID
+    let hoverCoordinator: HistoryHoverCoordinator
     private let displayContent: String
 
-    @ObservedObject private var appSettings = AppSettings.shared
-    @EnvironmentObject private var hoverCoordinator: HistoryHoverCoordinator
     @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
@@ -54,7 +53,8 @@ struct HistoryItemView: View {
         onOpenItem: (() -> Void)?,
         onInsertToEditor: (() -> Void)?,
         onSplitEditorIntoHistory: ((ClipItem) -> Void)?,
-        hoverResetSignal: UUID
+        hoverResetSignal: UUID,
+        hoverCoordinator: HistoryHoverCoordinator
     ) {
         self.item = item
         self.isSelected = isSelected
@@ -73,6 +73,7 @@ struct HistoryItemView: View {
         self.onInsertToEditor = onInsertToEditor
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.hoverResetSignal = hoverResetSignal
+        self.hoverCoordinator = hoverCoordinator
         self.displayContent = HistoryItemView.makeDisplayContent(from: item.content)
     }
 
@@ -307,14 +308,14 @@ struct HistoryItemView: View {
     }
 
     private var pinHelpText: String {
-        appSettings.localizedString(
+        AppSettings.shared.localizedString(
             item.isPinned ? "Unpin item" : "Pin item",
             comment: "Tooltip for toggling pin state in history list"
         )
     }
 
     private var deleteHelpText: String {
-        appSettings.localizedString(
+        AppSettings.shared.localizedString(
             "Delete item",
             comment: "Tooltip for deleting a history item"
         )
@@ -396,14 +397,14 @@ struct HistoryItemView: View {
     }
 
     var openMenuTitle: String {
-        appSettings.localizedString(
+        AppSettings.shared.localizedString(
             "Open",
             comment: "Context menu item to open a history entry"
         )
     }
 
     var insertMenuTitle: String {
-        appSettings.localizedString(
+        AppSettings.shared.localizedString(
             "Insert into Editor",
             comment: "Context menu item to insert history entry into the editor"
         )

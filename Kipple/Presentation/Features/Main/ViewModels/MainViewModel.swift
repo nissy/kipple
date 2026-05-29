@@ -40,9 +40,13 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var pinnedHistory: [ClipItem] = []
     @Published var searchText: String = "" {
         didSet {
-            applyFilters(animated: false)
+            // resetFiltersAfterCopy 等のフィルタ一括変更中は coalesce を schedule しない
+            // （schedule すると close 後に遅延発火して focus 復帰と競合する）
+            guard !isFilterMutating else { return }
+            scheduleSearchFilterCoalesce()
         }
     }
+    private var searchCoalesceTask: Task<Void, Never>?
     @Published var showOnlyURLs: Bool = false
     @Published var showOnlyPinned: Bool = false {
         didSet {
@@ -208,8 +212,29 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         updateFilteredItems(clipboardService.history, animated: animated)
     }
 
+    /// コピー開始時に呼ぶ。pending な検索 coalesce を確実に潰す
+    /// （onClose 後に await が yield する間、満了済み task が走るのを防ぐ）
+    func cancelPendingSearchFilter() {
+        searchCoalesceTask?.cancel()
+        searchCoalesceTask = nil
+    }
+
+    /// 検索入力の連続変化を 50ms で coalescing。コピー後の reset で cancel される必要があるため
+    /// Task-based debounce で実装（Combine だと cancel しにくく、window close 後に発火して focus 競合を起こす）
+    private func scheduleSearchFilterCoalesce() {
+        searchCoalesceTask?.cancel()
+        searchCoalesceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !Task.isCancelled else { return }
+            guard let self, !self.isFilterMutating else { return }
+            self.applyFilters(animated: false)
+        }
+    }
+
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
+        PerfTracer.event("updateFilteredItems.start", extra: ["n": items.count, "search": searchText.count])
+        defer { PerfTracer.event("updateFilteredItems.end") }
         latestHistorySnapshot = items
         updateCurrentClipboardItemID(using: items)
 
@@ -513,6 +538,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func resetFiltersAfterCopy() {
+        // window close 後に発火して focus 復帰と競合しないよう、検索 coalesce を必ず cancel
+        searchCoalesceTask?.cancel()
+        searchCoalesceTask = nil
+
         isFilterMutating = true
         var didMutate = false
 
@@ -544,6 +573,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         isFilterMutating = false
         guard didMutate else { return }
         updateFilteredItems(clipboardService.history, animated: false)
+        // window close 後に発火して focus 復帰と競合しないよう、検索 coalesce を確実に cancel
+        searchCoalesceTask?.cancel()
     }
 
     private func finalizeHistorySelection() {

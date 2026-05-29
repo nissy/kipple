@@ -111,6 +111,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
     init(
         lastActiveAppTracker: LastActiveAppTracking,
+        // orderOut が MainActor を ~100ms 占有する間に pasteboard 書き込みが完走するための
+        // safety buffer。0 にすると orderOut 直後の MainActor 解放時に reactivate と pasteboard が
+        // 競合し、即 paste で古い内容を貼るリスクが出る
         appReactivationDelay: TimeInterval = 0.05
     ) {
         self.lastActiveAppTracker = lastActiveAppTracker
@@ -127,6 +130,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     @MainActor
     func openMainWindow() {
+        PerfTracer.event("openMainWindow.start")
         cancelPendingAppReactivation()
         isOpening = true
         preventAutoClose = true
@@ -136,10 +140,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         if let existingWindow = mainWindow {
             reopenExistingWindow(existingWindow)
+            PerfTracer.event("openMainWindow.end", extra: ["path": "reopen"])
             return
         }
 
         openNewWindow()
+        PerfTracer.event("openMainWindow.end", extra: ["path": "new"])
     }
 
     private func reopenExistingWindow(_ window: NSWindow) {
@@ -296,10 +302,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
     private func hideMainWindowWithoutDestroying() {
         guard let window = mainWindow, window.isVisible else { return }
+        PerfTracer.event("hide.start")
         exitQueueModeIfNeededBeforeAutoHide()
+        PerfTracer.event("hide.orderOut.start")
         window.orderOut(nil)
+        PerfTracer.event("hide.orderOut.end")
         HistoryPopoverManager.shared.forceClose()
+        PerfTracer.event("hide.popoverClose.end")
         NotificationCenter.default.post(name: .mainWindowDidHide, object: nil)
+        PerfTracer.event("hide.end")
     }
 
     private func setPreventAutoClose(_ flag: Bool) {
@@ -465,6 +476,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func reactivatePreviousAppIfPossible() {
+        PerfTracer.event("reactivate.schedule")
         guard let target = appToRestoreAfterClose else {
             lastActiveAppTracker.activateLastTrackedAppIfAvailable()
             return
@@ -473,6 +485,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         pendingAppReactivation?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            PerfTracer.event("reactivate.fire", extra: ["target": target.bundleId ?? "nil"])
             self.pendingAppReactivation = nil
             let didActivate = self.activateAppInfoIfPossible(target)
 
@@ -485,15 +498,19 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func activateAppInfoIfPossible(_ info: LastActiveAppTracker.AppInfo) -> Bool {
+        // .activateAllWindows は「全ウインドウを前面」指定で、複数ウインドウアプリだと
+        // 期待しない (前回 key じゃない) ウインドウまで前面に出るケースが報告されている。
+        // default ([]) なら main/key window のみ復帰され、ユーザーが直前に使っていた
+        // ウインドウが key に戻りやすい
         if info.pid != 0,
            let running = NSRunningApplication(processIdentifier: info.pid) {
-            running.activate(options: [.activateAllWindows])
+            running.activate(options: [])
             return true
         }
         if let bundleId = info.bundleId {
             let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
             if let app = apps.first {
-                app.activate(options: [.activateAllWindows])
+                app.activate(options: [])
                 return true
             }
         }
@@ -859,9 +876,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func focusOnEditor() {
         guard let window = mainWindow else { return }
-        
+        PerfTracer.event("focusOnEditor.start")
         // ウィンドウ内のNSTextViewを検索してフォーカスを設定
         findAndFocusTextView(in: window.contentView)
+        PerfTracer.event("focusOnEditor.end")
     }
     
     private func findAndFocusTextView(in view: NSView?) {
@@ -890,6 +908,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
 // MARK: - NSWindowDelegate
 extension WindowManager {
     func windowDidBecomeKey(_ notification: Notification) {
+        PerfTracer.event("windowDidBecomeKey")
         capturePreviousAppForFocusReturn()
         NotificationCenter.default.post(name: .mainWindowDidBecomeKey, object: nil)
     }

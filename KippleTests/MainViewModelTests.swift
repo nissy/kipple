@@ -353,13 +353,15 @@ class MainViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.hasMoreHistory)
     }
 
-    func testSearchDisablesPagination() {
+    func testSearchDisablesPagination() async {
         // Given
         mockClipboardService.history = (1...30).map { ClipItem(content: "Item \($0)") }
         viewModel.loadHistory()
 
         // When
         viewModel.searchText = "Item 2"
+        // searchText の変更は MainViewModel 内で 50ms coalescing されるため、フィルタ適用を待つ
+        try? await Task.sleep(nanoseconds: 150_000_000)
 
         // Then
         XCTAssertFalse(viewModel.hasMoreHistory)

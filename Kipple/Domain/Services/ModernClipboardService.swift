@@ -231,16 +231,22 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         )
         addToHistory(item)
 
-        // Copy to system clipboard
-        let newChangeCount = await MainActor.run {
+        // Copy to system clipboard (NSPasteboard は thread-safe、MainActor hop 不要)
+        let newChangeCount = Self.writeStringToPasteboard(content)
+
+        // Record the expected changeCount for this internal operation
+        await state.setExpectedChangeCount(newChangeCount)
+    }
+
+    /// NSPasteboard へ文字列を書き込む共通ヘルパー。スレッドフリー。
+    /// MainActor.run を経由しないことで、SwiftUI/AppKit が忙しい時の hop 待ち遅延を回避する。
+    private static func writeStringToPasteboard(_ content: String) -> Int {
+        autoreleasepool {
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(content, forType: .string)
             return pasteboard.changeCount
         }
-
-        // Record the expected changeCount for this internal operation
-        await state.setExpectedChangeCount(newChangeCount)
     }
 
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
@@ -274,9 +280,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     func recopyFromHistory(_ item: ClipItem) async {
+        PerfTracer.event("modernRecopy.start")
         // Set flags BEFORE updating clipboard to prevent race condition
         await state.setInternalCopy(true)
         await state.setFromEditor(item.isFromEditor ?? false)
+        PerfTracer.event("modernRecopy.flagsSet")
 
         // Preserve all metadata from the original item but update timestamp
         var newItem = item
@@ -299,20 +307,21 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Trim history to max size
         trimHistory()
+        PerfTracer.event("modernRecopy.historyMutated", extra: ["n": history.count])
 
         // Trigger save
         saveSubject.send(history)
+        PerfTracer.event("modernRecopy.saveSent")
 
-        // Copy to system clipboard
-        let newChangeCount = await MainActor.run {
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(item.content, forType: .string)
-            return pasteboard.changeCount
-        }
+        // Copy to system clipboard - NSPasteboard is thread-safe (macOS 10.7+).
+        // MainActor.run を挟むと SwiftUI / AppKit が忙しい時に hop 待ちで 100ms 級の遅延が出るので避ける
+        PerfTracer.event("modernRecopy.pasteboardWrite.start")
+        let newChangeCount = Self.writeStringToPasteboard(item.content)
+        PerfTracer.event("modernRecopy.pasteboardWrite.end")
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
+        PerfTracer.event("modernRecopy.end")
     }
 
     func clearSystemClipboard() async {

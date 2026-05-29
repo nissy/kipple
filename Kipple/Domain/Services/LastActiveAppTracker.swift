@@ -158,7 +158,8 @@ final class LastActiveAppTracker {
     }
 
     private func activate(_ app: NSRunningApplication) {
-        app.activate(options: [.activateAllWindows])
+        // default ([]) なら main/key window のみ復帰され、ユーザー直前のウインドウが key に戻りやすい
+        app.activate(options: [])
     }
 }
 @MainActor
