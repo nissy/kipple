@@ -30,12 +30,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     @Published var editorText: String {
         didSet {
-            // パフォーマンス最適化：デバウンスを使用して保存処理を遅延
-            saveDebouncer.send(editorText)
+            guard !isApplyingClipboardContentToEditor else { return }
+            scheduleLiveEditorClipboardWrite(editorText)
         }
     }
-    
-    private let saveDebouncer = PassthroughSubject<String, Never>()
     
     let clipboardService: any ClipboardServiceProtocol
     private let pasteMonitor: any PasteCommandMonitoring
@@ -95,8 +93,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var pendingShiftSelection: [ClipItem] = []
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
-    private let appSettings = AppSettings.shared
     private var latestHistorySnapshot: [ClipItem] = []
+    private var liveEditorWriteTask: Task<Void, Never>?
+    private var isApplyingClipboardContentToEditor = false
     private static let newlineSet = CharacterSet.newlines
 
     init(
@@ -106,29 +105,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         screenCapturePermissionCheck: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }
     ) {
         self.pageSize = max(1, pageSize)
-        // 保存されたエディタテキストを読み込む（なければ空文字）
-        self.editorText = UserDefaults.standard.string(forKey: "lastEditorText") ?? ""
-        // Use provided service or get default service
-        if let service = clipboardService {
-            self.clipboardService = service
-        } else {
-            // Fallback to default service
-            self.clipboardService = ClipboardServiceProvider.resolve()
-        }
+        let resolvedService = clipboardService ?? ClipboardServiceProvider.resolve()
+        self.clipboardService = resolvedService
+        self.editorText = resolvedService.currentClipboardContent ?? ""
         self.pasteMonitor = pasteMonitor
         self.screenCapturePermissionCheck = screenCapturePermissionCheck
-
-        // デバウンスされた保存処理を設定
-        saveDebouncer
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .sink { [weak self] text in
-                if !text.isEmpty {
-                    UserDefaults.standard.set(text, forKey: "lastEditorText")
-                } else {
-                    UserDefaults.standard.removeObject(forKey: "lastEditorText")
-                }
-            }
-            .store(in: &cancellables)
         
         subscribeToClipboardService()
 
@@ -146,7 +127,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         // 初回読み込み
         updateFilteredItems(self.clipboardService.history)
-        currentClipboardContent = self.clipboardService.currentClipboardContent
+        currentClipboardContent = resolvedService.currentClipboardContent
     }
 
     private func subscribeToClipboardService() {
@@ -176,7 +157,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         service.$currentClipboardContent
             .sink { [weak self] content in
-                self?.currentClipboardContent = content
+                self?.applyClipboardContentToEditor(content)
             }
             .store(in: &serviceCancellables)
 
@@ -194,6 +175,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     func copyToClipboard(_ item: ClipItem) {
         clipboardService.copyToClipboard(item.content, fromEditor: false)
+        applyClipboardContentToEditor(item.content)
         resetFiltersAfterCopy()
         clearQueueAfterManualCopyIfNeeded()
     }
@@ -378,12 +360,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func copyEditor() {
-        if !editorText.isEmpty {
-            clipboardService.copyToClipboard(editorText, fromEditor: true)
-            // コピー後にテキストをクリア
-            editorText = ""
-            UserDefaults.standard.removeObject(forKey: "lastEditorText")
-        }
+        liveEditorWriteTask?.cancel()
+        writeEditorTextToClipboardOnly(editorText)
     }
 
     @discardableResult
@@ -406,18 +384,42 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     
     func clearEditor() {
+        liveEditorWriteTask?.cancel()
+        isApplyingClipboardContentToEditor = true
         editorText = ""
-        UserDefaults.standard.removeObject(forKey: "lastEditorText")
+        isApplyingClipboardContentToEditor = false
+        writeEditorTextToClipboardOnly("")
+    }
+
+    private func scheduleLiveEditorClipboardWrite(_ text: String) {
+        liveEditorWriteTask?.cancel()
+        liveEditorWriteTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            self?.writeEditorTextToClipboardOnly(text)
+        }
+    }
+
+    private func writeEditorTextToClipboardOnly(_ text: String) {
+        clipboardService.writeToClipboardOnly(text)
+        currentClipboardContent = text.isEmpty ? nil : text
+    }
+
+    private func applyClipboardContentToEditor(_ content: String?) {
+        liveEditorWriteTask?.cancel()
+        currentClipboardContent = content
+        let text = content ?? ""
+        guard editorText != text else { return }
+
+        isApplyingClipboardContentToEditor = true
+        editorText = text
+        isApplyingClipboardContentToEditor = false
     }
 
     @discardableResult
-    func splitEditorLinesIntoHistory() async -> Int {
-        let count = await splitLinesIntoHistory(editorText)
-        if count > 0 {
-            editorText = ""
-            UserDefaults.standard.removeObject(forKey: "lastEditorText")
-        }
-        return count
+    func saveEditorToHistory() async -> Int {
+        let items = await clipboardService.addEditorItems([editorText])
+        return items.count
     }
 
     @discardableResult
@@ -434,13 +436,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         clipboardService.deleteItem(item)
     }
 
-    // MARK: - Editor Insert Functions
-    
-    /// エディタに内容を挿入（既存内容をクリア）
     func insertToEditor(content: String) {
-        ensureEditorPanelVisible()
-        // 同期的に処理（非同期は不要）
-        editorText = content
+        applyClipboardContentToEditor(content)
+        writeEditorTextToClipboardOnly(content)
     }
 
     // MARK: - Private helpers
@@ -464,53 +462,33 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     /// 設定された修飾キーを取得
     func getEditorInsertModifiers() -> NSEvent.ModifierFlags {
-        // @AppStorageのデフォルト値（Control）が効くようにAppSettings経由で取得する
-        let rawValue = appSettings.editorInsertModifiers
-        let allowed: NSEvent.ModifierFlags = [.command, .option]
-        return NSEvent.ModifierFlags(rawValue: UInt(rawValue))
-            .intersection(allowed)
+        []
     }
     
     /// 現在の修飾キーがエディタ挿入用かチェック
     func shouldInsertToEditor() -> Bool {
-        let requiredModifiers = getEditorInsertModifiers()
-        // None(=0) のときは無効
-        if requiredModifiers.isEmpty { return false }
-        let normalizedRequired = requiredModifiers.intersection(.deviceIndependentFlagsMask)
-        let currentModifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        // 必要な修飾キーがすべて押されているかチェック
-        return currentModifiers.contains(normalizedRequired)
+        false
     }
     
     /// 履歴アイテム選択（修飾キー検出対応）
-    func selectHistoryItem(_ item: ClipItem, forceInsert: Bool = false) {
-        if forceInsert || shouldInsertToEditor() {
-            insertToEditor(content: item.content)
-        } else {
-            clipboardService.recopyFromHistory(item)
-            finalizeHistorySelection()
-        }
+    func selectHistoryItem(_ item: ClipItem, forceInsert _: Bool = false) {
+        clipboardService.recopyFromHistory(item)
+        applyClipboardContentToEditor(item.content)
+        finalizeHistorySelection()
     }
 
-    func selectHistoryItemAndWait(_ item: ClipItem, forceInsert: Bool = false) async {
-        if forceInsert || shouldInsertToEditor() {
-            insertToEditor(content: item.content)
-            return
-        }
+    func selectHistoryItemAndWait(_ item: ClipItem, forceInsert _: Bool = false) async {
         if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
             await asyncService.recopyFromHistoryAndWait(item)
         } else {
             clipboardService.recopyFromHistory(item)
         }
+        applyClipboardContentToEditor(item.content)
         finalizeHistorySelection()
     }
 
     /// pasteboard 書き込み完了までだけ待機。history 再同期は finalizeRecopyRefresh() を別途呼ぶ
-    func selectHistoryItemAwaitingPasteboard(_ item: ClipItem, forceInsert: Bool = false) async {
-        if forceInsert || shouldInsertToEditor() {
-            insertToEditor(content: item.content)
-            return
-        }
+    func selectHistoryItemAwaitingPasteboard(_ item: ClipItem, forceInsert _: Bool = false) async {
         if let adapter = clipboardService as? ModernClipboardServiceAdapter {
             await adapter.recopyFromHistoryAwaitingPasteboard(item)
         } else if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
@@ -518,6 +496,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         } else {
             clipboardService.recopyFromHistory(item)
         }
+        applyClipboardContentToEditor(item.content)
         finalizeHistorySelection()
     }
 
@@ -526,13 +505,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if let adapter = clipboardService as? ModernClipboardServiceAdapter {
             await adapter.finalizeRecopyRefresh()
         }
-    }
-    
-    /// エディタパネルが閉じている場合に再表示
-    private func ensureEditorPanelVisible() {
-        guard appSettings.editorPosition == "disabled" else { return }
-        let targetPosition = appSettings.editorPositionLastEnabled
-        appSettings.editorPosition = targetPosition.isEmpty ? "bottom" : targetPosition
     }
     
     /// カテゴリフィルタの切り替え
@@ -883,6 +855,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         expectedQueueHeadID = nextItem.id
         clipboardService.recopyFromHistory(nextItem)
+        applyClipboardContentToEditor(nextItem.content)
     }
 }
 

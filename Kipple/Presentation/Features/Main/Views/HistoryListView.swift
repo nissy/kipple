@@ -15,7 +15,6 @@ struct HistoryListView: View {
     let onChangeUserCategory: ((ClipItem, UUID?) -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let onOpenItem: ((ClipItem) -> Void)?
-    let onInsertToEditor: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
@@ -67,9 +66,6 @@ struct HistoryListView: View {
                         onOpenCategoryManager: onOpenCategoryManager,
                         historyFont: historyFont,
                         onOpenItem: onOpenItem.map { handler in
-                            { handler(item) }
-                        },
-                        onInsertToEditor: onInsertToEditor.map { handler in
                             { handler(item) }
                         },
                         onSplitEditorIntoHistory: onSplitEditorIntoHistory,

@@ -63,6 +63,20 @@ final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(clipboardValue, content)
     }
 
+    func testWriteToClipboardOnlyDoesNotAddHistory() async {
+        // Given
+        let content = "Live editor only"
+
+        // When
+        await service.writeToClipboardOnly(content)
+
+        // Then
+        let clipboardValue = await MainActor.run { NSPasteboard.general.string(forType: .string) }
+        let history = await service.getHistory()
+        XCTAssertEqual(clipboardValue, content)
+        XCTAssertTrue(history.isEmpty)
+    }
+
     func testAddToHistory() async {
         // Given
         let content1 = "First item"
@@ -486,6 +500,10 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
     func copyToClipboard(_ content: String, fromEditor: Bool) async {
         let item = ClipItem(content: content, isFromEditor: fromEditor)
         history.insert(item, at: 0)
+    }
+
+    func writeToClipboardOnly(_ content: String) async {
+        _ = content
     }
 
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {

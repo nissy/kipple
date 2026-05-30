@@ -19,9 +19,6 @@ final class AppSettings: ObservableObject {
     @AppStorage("historySectionHeight") var historySectionHeight: Double = 300
     
     // Editor Settings
-    @AppStorage("lastEditorText") var lastEditorText: String = ""
-    @AppStorage("editorInsertMode") var editorInsertMode: Bool = false
-    @AppStorage("editorInsertModifiers") var editorInsertModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @AppStorage("editorPosition") private var storedEditorPosition: String = "disabled"
     @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
 
@@ -82,7 +79,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("hotkeyKeyCode") var hotkeyKeyCode: Int = 0  // None by default
     @AppStorage("hotkeyModifierFlags") var hotkeyModifierFlags: Int = 0  // None by default
     
-    // Editor Copy Hotkey Settings (always enabled)
+    // Editor Save Hotkey Settings (always enabled)
     @AppStorage("editorCopyHotkeyKeyCode") var editorCopyHotkeyKeyCode: Int = 1  // S key
     @AppStorage("editorCopyHotkeyModifierFlags") var editorCopyHotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
@@ -185,10 +182,7 @@ final class AppSettings: ObservableObject {
         static let windowAnimation = "windowAnimation"
         static let editorSectionHeight = "editorSectionHeight"
         static let historySectionHeight = "historySectionHeight"
-        static let lastEditorText = "lastEditorText"
-        static let editorInsertMode = "editorInsertMode"
         static let editorPosition = "editorPosition"
-        static let editorInsertModifiers = "editorInsertModifiers"
         static let maxHistoryItems = "maxHistoryItems"
         static let maxPinnedItems = "maxPinnedItems"
         static let autoPinRepeatedCopyEnabled = "autoPinRepeatedCopyEnabled"

@@ -51,10 +51,11 @@
 "Delete category" = "カテゴリを削除";
 "Delete item" = "項目を削除";
 "Editor Clear" = "エディタのクリア";
-"Editor Copy" = "エディタのコピー";
+"Editor Save" = "エディタの保存";
 "Editor Font" = "エディタのフォント";
-"Editor History Insert" = "エディタ履歴挿入";
 "editor.splitCopy.menu" = "行分割して履歴に追加";
+"editor.saveToHistory" = "履歴に保存";
+"Save" = "Save";
 "Editor Position" = "エディタの位置";
 "External Source" = "外部アプリ";
 "English" = "英語";
@@ -143,7 +144,6 @@
 "SettingsTitleFormat" = "%1$@ %2$@";
 "Settings…" = "設定…";
 "Shortcut is ready to use. Hold the selected modifiers and key to capture text." = "グローバルホットキーの準備ができました。どこでも選択した修飾キーとキーを押し続けてテキストを取得します。";
-"Insert into Editor" = "エディタに挿入";
 "Show in filter" = "フィルタに表示";
 "Fallback font" = "フォールバックフォント";
 "Slide" = "スライド";

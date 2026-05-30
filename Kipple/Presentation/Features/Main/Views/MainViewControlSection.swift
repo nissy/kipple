@@ -8,8 +8,7 @@
 import SwiftUI
 
 struct MainViewControlSection: View {
-    let onCopy: () -> Void
-    let onSplitCopy: () -> Void
+    let onSave: () -> Void
     let onTrim: () -> Void
     @ObservedObject private var appSettings = AppSettings.shared
 
@@ -19,7 +18,7 @@ struct MainViewControlSection: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                copySplitButton
+                saveButton
                 trimButton
             }
             Spacer()
@@ -51,61 +50,43 @@ struct MainViewControlSection: View {
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
     }
 
-    private var copySplitButton: some View {
-        HStack(spacing: 0) {
-            Button(action: onCopy) {
-                buttonLabel(
-                    systemImage: "doc.on.doc",
-                    shortcut: getShortcutKeyDisplay(),
-                    accessibilityLabel: "Copy"
-                )
-                .padding(.horizontal, horizontalPadding)
-                .frame(height: buttonHeight)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            Rectangle()
-                .fill(Color.white.opacity(0.25))
-                .frame(width: 1, height: buttonHeight - 12)
-                .padding(.vertical, 6)
-                .allowsHitTesting(false)
-
-            Menu {
-                Button(action: onSplitCopy) {
-                    Label {
-                        Text("editor.splitCopy.menu")
-                    } icon: {
-                        Image(systemName: "text.badge.plus")
-                    }
-                }
-            } label: {
-                Image(systemName: "chevron.down")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Color.white)
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 32, height: buttonHeight)
-                    .contentShape(Rectangle())
-            }
-            .menuStyle(BorderlessButtonMenuStyle())
-            .menuIndicator(.hidden)
-            .buttonStyle(PlainButtonStyle())
+    private var saveButton: some View {
+        Button(action: onSave) {
+            buttonLabel(
+                systemImage: "tray.and.arrow.down",
+                title: "Save",
+                shortcut: getShortcutKeyDisplay(),
+                accessibilityLabel: "Save"
+            )
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: buttonHeight)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(PlainButtonStyle())
         .foregroundColor(.white)
-        .background(splitButtonBackground)
+        .background(primaryButtonBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
-        .contentShape(Rectangle())
     }
 
-    private func buttonLabel(systemImage: String, shortcut: String, accessibilityLabel: LocalizedStringKey) -> some View {
+    private func buttonLabel(
+        systemImage: String,
+        title: LocalizedStringKey? = nil,
+        shortcut: String,
+        accessibilityLabel: LocalizedStringKey
+    ) -> some View {
         HStack(spacing: 4) {
             Image(systemName: systemImage)
                 .font(.system(size: 11, weight: .regular))
+
+            if let title {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+            }
 
             if !shortcut.isEmpty {
                 shortcutBadge(shortcut)
@@ -125,7 +106,7 @@ struct MainViewControlSection: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
-    private var splitButtonBackground: LinearGradient {
+    private var primaryButtonBackground: LinearGradient {
         LinearGradient(
             colors: [
                 Color.accentColor,

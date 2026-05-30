@@ -63,6 +63,19 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         XCTAssertEqual(adapter.currentClipboardContent, content)
     }
 
+    func testWriteToClipboardOnlyDoesNotRefreshHistory() async {
+        // Given
+        let content = "Adapter live editor content"
+
+        // When
+        adapter.writeToClipboardOnly(content)
+        try? await Task.sleep(for: .milliseconds(200))
+
+        // Then
+        XCTAssertTrue(adapter.history.isEmpty)
+        XCTAssertEqual(adapter.currentClipboardContent, content)
+    }
+
     func testHistoryPublisherUpdates() async {
         // Given
         let expectation = XCTestExpectation(description: "History updated")

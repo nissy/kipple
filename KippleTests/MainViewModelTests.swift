@@ -46,14 +46,17 @@ class MainViewModelTests: XCTestCase {
         // Given
         let testText = "Test Copy Content"
         viewModel.editorText = testText
+        let initialHistoryCount = mockClipboardService.history.count
 
         // When
         viewModel.copyEditor()
 
         // Then
         XCTAssertEqual(mockClipboardService.lastCopiedContent, testText)
-        XCTAssertTrue(mockClipboardService.copyToClipboardCalled)
-        XCTAssertTrue(mockClipboardService.fromEditor ?? false)
+        XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
+        XCTAssertEqual(mockClipboardService.history.count, initialHistoryCount)
+        XCTAssertEqual(viewModel.editorText, testText)
     }
 
     func testClearEditor() {
@@ -65,6 +68,19 @@ class MainViewModelTests: XCTestCase {
 
         // Then
         XCTAssertEqual(viewModel.editorText, "")
+        XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertNil(mockClipboardService.currentClipboardContent)
+    }
+
+    func testEditorTextDebouncedWriteToClipboardOnly() async {
+        // When
+        viewModel.editorText = "Live edited"
+        try? await Task.sleep(nanoseconds: 400_000_000)
+
+        // Then
+        XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertEqual(mockClipboardService.lastCopiedContent, "Live edited")
+        XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
     }
 
     // MARK: - History Selection Tests
@@ -78,21 +94,13 @@ class MainViewModelTests: XCTestCase {
 
         // Then
         XCTAssertEqual(mockClipboardService.lastRecopiedItem?.content, item.content)
+        XCTAssertEqual(viewModel.editorText, item.content)
     }
 
-    // MARK: - Editor Insert Tests
+    // MARK: - Deprecated Editor Insert Tests
 
     func testShouldInsertToEditor() {
-        // Given
-        let userDefaults = UserDefaults.standard
-        userDefaults.set(Int(NSEvent.ModifierFlags.shift.rawValue), forKey: "editorInsertModifiers")
-
-        // When: エディタ挿入モードが有効な場合
-        // 注: 実際のNSEventはテストで作成できないため、この部分は統合テストで確認
-
-        // Then
-        // メソッドが存在することを確認
-        _ = viewModel.shouldInsertToEditor()
+        XCTAssertFalse(viewModel.shouldInsertToEditor())
     }
 
     func testInsertToEditor() {
@@ -140,20 +148,18 @@ class MainViewModelTests: XCTestCase {
         XCTAssertNil(mockClipboardService.lastRecopiedItem)
     }
 
-    func testSplitEditorLinesIntoHistoryClearsEditorAndUserDefaults() async {
+    func testSaveEditorToHistoryAddsSingleItemWithoutClearingEditor() async {
         // Given
         viewModel.editorText = "first\nsecond"
-        UserDefaults.standard.set(viewModel.editorText, forKey: "lastEditorText")
 
         // When
-        let count = await viewModel.splitEditorLinesIntoHistory()
+        let count = await viewModel.saveEditorToHistory()
 
         // Then
-        XCTAssertEqual(count, 2)
-        XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["first", "second"])
-        XCTAssertEqual(mockClipboardService.recopyFromHistoryCallCount, 1)
-        XCTAssertEqual(viewModel.editorText, "")
-        XCTAssertNil(UserDefaults.standard.string(forKey: "lastEditorText"))
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["first\nsecond"])
+        XCTAssertEqual(mockClipboardService.recopyFromHistoryCallCount, 0)
+        XCTAssertEqual(viewModel.editorText, "first\nsecond")
     }
     
     // MARK: - Pin Tests

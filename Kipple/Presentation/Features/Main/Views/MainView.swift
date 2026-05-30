@@ -4,7 +4,6 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
-// swiftlint:disable file_length
 import SwiftUI
 import AppKit
 import Combine
@@ -127,11 +126,6 @@ extension MainView {
         if viewModel.canUsePasteQueue,
            viewModel.isQueueModeActive {
             viewModel.handleQueueSelection(for: item, modifiers: modifiers)
-            return
-        }
-
-        if viewModel.shouldInsertToEditor() {
-            viewModel.selectHistoryItem(item, forceInsert: true)
             return
         }
 
@@ -326,7 +320,7 @@ extension MainView {
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let copyModifiers = NSEvent.ModifierFlags(
+                let saveModifiers = NSEvent.ModifierFlags(
                     rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)
                 )
                     .intersection(.deviceIndependentFlagsMask)
@@ -335,11 +329,11 @@ extension MainView {
                 )
                     .intersection(.deviceIndependentFlagsMask)
 
-                // Editor Copy Hotkey (always enabled)
+                // Editor Save Hotkey (always enabled)
                 if appSettings.editorCopyHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
-                   eventModifiers == copyModifiers {
-                    confirmAction()
+                   eventModifiers == saveModifiers {
+                    saveEditorToHistory()
                     return nil
                 }
 
@@ -518,8 +512,7 @@ extension MainView {
                 onClear: clearAction
             )
             MainViewControlSection(
-                onCopy: confirmAction,
-                onSplitCopy: splitEditorIntoHistory,
+                onSave: saveEditorToHistory,
                 onTrim: trimAction
             )
         }

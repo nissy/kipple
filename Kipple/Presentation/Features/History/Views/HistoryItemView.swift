@@ -24,7 +24,6 @@ struct HistoryItemView: View {
     let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
     let onOpenItem: (() -> Void)?
-    let onInsertToEditor: (() -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let hoverResetSignal: UUID
     let hoverCoordinator: HistoryHoverCoordinator
@@ -51,7 +50,6 @@ struct HistoryItemView: View {
         onOpenCategoryManager: (() -> Void)?,
         historyFont: Font,
         onOpenItem: (() -> Void)?,
-        onInsertToEditor: (() -> Void)?,
         onSplitEditorIntoHistory: ((ClipItem) -> Void)?,
         hoverResetSignal: UUID,
         hoverCoordinator: HistoryHoverCoordinator
@@ -70,7 +68,6 @@ struct HistoryItemView: View {
         self.onOpenCategoryManager = onOpenCategoryManager
         self.historyFont = historyFont
         self.onOpenItem = onOpenItem
-        self.onInsertToEditor = onInsertToEditor
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.hoverResetSignal = hoverResetSignal
         self.hoverCoordinator = hoverCoordinator
@@ -402,13 +399,6 @@ struct HistoryItemView: View {
             comment: "Context menu item to open a history entry"
         )
     }
-
-    var insertMenuTitle: String {
-        AppSettings.shared.localizedString(
-            "Insert into Editor",
-            comment: "Context menu item to insert history entry into the editor"
-        )
-    }
 }
 
 // MARK: - Action helpers
@@ -423,7 +413,7 @@ private extension HistoryItemView {
     }
 
     var hasContextMenuActions: Bool {
-        (item.isActionable && onOpenItem != nil) || onInsertToEditor != nil || onSplitEditorIntoHistory != nil
+        (item.isActionable && onOpenItem != nil) || onSplitEditorIntoHistory != nil
     }
 
     @ViewBuilder
@@ -436,16 +426,8 @@ private extension HistoryItemView {
                 Label(openMenuTitle, systemImage: "arrow.up.right.square")
             }
         }
-        if let onInsertToEditor {
-            Button {
-                closePopover()
-                onInsertToEditor()
-            } label: {
-                Label(insertMenuTitle, systemImage: "square.and.pencil")
-            }
-        }
         if onSplitEditorIntoHistory != nil,
-           item.isActionable && onOpenItem != nil || onInsertToEditor != nil {
+           item.isActionable && onOpenItem != nil {
             Divider()
         }
         if let onSplitEditorIntoHistory {

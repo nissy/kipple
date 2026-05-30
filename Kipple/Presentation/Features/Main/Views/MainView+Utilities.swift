@@ -14,23 +14,18 @@ extension MainView {
         appSettings.editorPosition != "disabled"
     }
 
-    func confirmAction() {
-        viewModel.copyEditor()
-        showCopiedNotification(.copied)
+    func saveEditorToHistory() {
+        Task { @MainActor in
+            let insertedCount = await viewModel.saveEditorToHistory()
+            if insertedCount > 0 {
+                showCopiedNotification(.copied)
+            }
+        }
     }
 
     func trimAction() {
         if viewModel.trimEditor() {
             showCopiedNotification(.trimmed)
-        }
-    }
-
-    func splitEditorIntoHistory() {
-        Task { @MainActor in
-            let insertedCount = await viewModel.splitEditorLinesIntoHistory()
-            if insertedCount > 0 {
-                showCopiedNotification(.copied)
-            }
         }
     }
 

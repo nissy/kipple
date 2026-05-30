@@ -15,7 +15,6 @@ extension ModernClipboardService {
             AppSettings.shared.autoPinRepeatedCopyEnabled = true
             AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
             AppSettings.shared.autoPinRepeatedCopyCount = 3
-            UserDefaults.standard.set(false, forKey: "enableEditorInsert")
         }
 
         await ModernClipboardServiceAdapter.shared.resetAdapterStateForTesting()

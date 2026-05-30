@@ -276,6 +276,25 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await state.setExpectedChangeCount(newChangeCount)
     }
 
+    func writeToClipboardOnly(_ content: String) async {
+        await state.setInternalCopy(true)
+        await state.setFromEditor(true)
+
+        let newChangeCount: Int
+        if content.isEmpty {
+            newChangeCount = autoreleasepool {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                return pasteboard.changeCount
+            }
+        } else {
+            newChangeCount = Self.writeStringToPasteboard(content)
+        }
+
+        await state.setExpectedChangeCount(newChangeCount)
+        updateLastChangeCount(newChangeCount)
+    }
+
     /// NSPasteboard へ文字列を書き込む共通ヘルパー。
     /// MainActor.run を経由せず、SwiftUI/AppKit が忙しい時の hop 待ち遅延を回避する。
     private static func writeStringToPasteboard(_ content: String) -> Int {

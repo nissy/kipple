@@ -103,7 +103,6 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     onOpenCategoryManager: {},
                     historyFont: .system(size: 13),
                     onOpenItem: nil,
-                    onInsertToEditor: nil,
                     onSplitEditorIntoHistory: nil,
                     hoverResetSignal: UUID(),
                     hoverCoordinator: HistoryHoverCoordinator()

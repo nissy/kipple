@@ -26,6 +26,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
 
     // Additional test properties
     var copyToClipboardCalled = false
+    var writeToClipboardOnlyCalled = false
     var fromEditor: Bool?
     var togglePinCalled = false
     var lastToggledItem: ClipItem?
@@ -73,6 +74,12 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         history.insert(item, at: 0)
         currentClipboardContent = content
         onHistoryChanged?(item)
+    }
+
+    func writeToClipboardOnly(_ content: String) {
+        writeToClipboardOnlyCalled = true
+        lastCopiedContent = content
+        currentClipboardContent = content.isEmpty ? nil : content
     }
 
     @discardableResult
@@ -209,6 +216,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         addEditorItemsCallCount = 0
         recopyFromHistoryCallCount = 0
         copyToClipboardCalled = false
+        writeToClipboardOnlyCalled = false
         fromEditor = nil
         togglePinCalled = false
         lastToggledItem = nil

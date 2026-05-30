@@ -10,7 +10,6 @@ import AppKit
 
 struct EditorSettingsView: View {
     @ObservedObject private var appSettings = AppSettings.shared
-    @AppStorage("editorInsertModifiers") private var editorInsertModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @State private var tempCopyKeyCode: UInt16 = 6  // Z key
     @State private var tempCopyModifierFlags: NSEvent.ModifierFlags = [.command, .shift]
     @State private var tempClearKeyCode: UInt16 = 7  // X key
@@ -46,8 +45,8 @@ struct EditorSettingsView: View {
                         .frame(width: 150)
                     }
                 }
-                // Editor Copy Hotkey
-                SettingsGroup("Editor Copy") {
+                // Editor Save Hotkey
+                SettingsGroup("Editor Save") {
                     SettingsRow(label: "Hotkey") {
                         HotkeyRecorderField(
                             keyCode: $tempCopyKeyCode,
@@ -66,17 +65,6 @@ struct EditorSettingsView: View {
                         )
                         .onChange(of: tempClearKeyCode) { _, _ in updateClearHotkey() }
                         .onChange(of: tempClearModifierFlags) { _, _ in updateClearHotkey() }
-                    }
-                }
-
-                // Editor Insert
-                SettingsGroup("Editor History Insert") {
-                    SettingsRow(
-                        label: "Modified click",
-                        description: "Use modifier + click"
-                    ) {
-                        ModifierKeyPicker(selection: $editorInsertModifiers)
-                            .frame(width: 120)
                     }
                 }
             }

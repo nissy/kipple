@@ -70,6 +70,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
+    func writeToClipboardOnly(_ content: String) {
+        pendingClipboardContent = content
+        currentClipboardContent = content.isEmpty ? nil : content
+        if content.isEmpty {
+            stopAutoClearTimer()
+        } else {
+            restartAutoClearTimerIfNeeded()
+        }
+
+        Task {
+            await modernService.writeToClipboardOnly(content)
+        }
+    }
+
     @discardableResult
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         let items = await modernService.addEditorItems(contents)
