@@ -211,9 +211,11 @@ final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
 
         let inactiveInterval = await service.getCurrentInterval()
 
-        // Then - Interval should adjust based on activity
-        XCTAssertGreaterThanOrEqual(activeInterval, 0.5)
-        XCTAssertLessThanOrEqual(inactiveInterval, 1.0)
+        // Then - Interval should stay within the tuned polling bounds
+        XCTAssertGreaterThanOrEqual(activeInterval, 0.08)
+        XCTAssertLessThanOrEqual(activeInterval, 0.25)
+        XCTAssertGreaterThanOrEqual(inactiveInterval, 0.08)
+        XCTAssertLessThanOrEqual(inactiveInterval, 0.25)
     }
 
     func testFromEditorFlag() async {

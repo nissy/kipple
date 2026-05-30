@@ -11,11 +11,13 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         try await super.setUp()
         // Create new adapter for each test
         adapter = ModernClipboardServiceAdapter.shared
+        await ModernClipboardService.shared.resetForTesting()
         // Clear history before each test
         await adapter.clearHistory(keepPinned: false)
     }
 
     override func tearDown() async throws {
+        adapter.stopAutoClearTimer()
         cancellables.removeAll()
         adapter = nil
         try await super.tearDown()
@@ -221,8 +223,8 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         adapter.startAutoClearTimer(minutes: 0) // Use 0 for immediate clear in test
         adapter.autoClearRemainingTime = 1 // Set to 1 second for testing
 
-        // Wait for timer to expire
-        try? await Task.sleep(for: .seconds(2))
+        // Wait for timer to expire and for the nested clear task to finish.
+        try? await Task.sleep(for: .milliseconds(2_500))
 
         // Then - Auto-clear should have been triggered
         // Note: The auto-clear implementation may not actually clear history in test environment

@@ -52,8 +52,8 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
         let initialInterval = await service.getCurrentInterval()
 
         // Then
-        XCTAssertGreaterThanOrEqual(initialInterval, 0.5)
-        XCTAssertLessThanOrEqual(initialInterval, 1.0)
+        XCTAssertGreaterThanOrEqual(initialInterval, 0.08)
+        XCTAssertLessThanOrEqual(initialInterval, 0.25)
     }
 
     // MARK: - Clipboard Operations Tests

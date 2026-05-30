@@ -262,15 +262,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         )
         addToHistory(item)
 
-        // Copy to system clipboard (NSPasteboard は thread-safe、MainActor hop 不要)
+        // Copy to system clipboard. Writes stay off MainActor to avoid hop delays.
         let newChangeCount = Self.writeStringToPasteboard(content)
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
     }
 
-    /// NSPasteboard へ文字列を書き込む共通ヘルパー。スレッドフリー。
-    /// MainActor.run を経由しないことで、SwiftUI/AppKit が忙しい時の hop 待ち遅延を回避する。
+    /// NSPasteboard へ文字列を書き込む共通ヘルパー。
+    /// MainActor.run を経由せず、SwiftUI/AppKit が忙しい時の hop 待ち遅延を回避する。
     private static func writeStringToPasteboard(_ content: String) -> Int {
         autoreleasepool {
             let pasteboard = NSPasteboard.general
@@ -280,6 +280,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
     }
 
+    @MainActor
     private static func readStringFromPasteboard() -> String? {
         autoreleasepool {
             NSPasteboard.general.string(forType: .string)
@@ -473,7 +474,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func getCurrentClipboardContent() async -> String? {
         // Return actual system clipboard content, not history
-        Self.readStringFromPasteboard()
+        await Self.readStringFromPasteboard()
     }
 
     func getCurrentInterval() async -> TimeInterval {
@@ -647,7 +648,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func fetchClipboardItem() async -> ClipItem? {
-        guard let content = Self.readStringFromPasteboard(),
+        guard let content = await Self.readStringFromPasteboard(),
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             if await state.getInternalCopy() {
                 return nil
