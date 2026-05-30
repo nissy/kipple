@@ -19,6 +19,15 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         case queueToggle
     }
 
+    private struct PaginationFilterState: Equatable {
+        let searchText: String
+        let showOnlyURLs: Bool
+        let showOnlyPinned: Bool
+        let selectedCategory: ClipItemCategory?
+        let selectedUserCategoryId: UUID?
+        let isPinnedFilterActive: Bool
+    }
+
     @Published var editorText: String {
         didSet {
             // パフォーマンス最適化：デバウンスを使用して保存処理を遅延
@@ -79,6 +88,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var lastQueueAnchorID: UUID?
     private var shouldResetAnchorOnNextShiftSelection = false
     private var filteredOrderingSnapshot: [ClipItem] = []
+    private var lastPaginationFilterState: PaginationFilterState?
     private var isFilterMutating = false
     private var isPasteMonitorActive = false
     private var isShiftSelecting = false
@@ -292,7 +302,17 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         let queueOrdered = applyQueueOrdering(to: filtered)
         let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
-        let newCurrentHistoryLimit = shouldPaginate ? min(pageSize, queueOrdered.count) : queueOrdered.count
+        let paginationFilterState = PaginationFilterState(
+            searchText: searchText,
+            showOnlyURLs: showOnlyURLs,
+            showOnlyPinned: showOnlyPinned,
+            selectedCategory: selectedCategory,
+            selectedUserCategoryId: selectedUserCategoryId,
+            isPinnedFilterActive: isPinnedFilterActive
+        )
+        let shouldResetPagination = lastPaginationFilterState != paginationFilterState || currentHistoryLimit == 0
+        let visibleLimit = shouldResetPagination ? pageSize : max(pageSize, currentHistoryLimit)
+        let newCurrentHistoryLimit = shouldPaginate ? min(visibleLimit, queueOrdered.count) : queueOrdered.count
         let newHistory = Array(queueOrdered.prefix(newCurrentHistoryLimit))
         let newHasMoreHistory = newHistory.count < queueOrdered.count
         let newPinnedItems = isPinnedFilterActive ? queueOrdered : []
@@ -303,6 +323,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             filteredOrderingSnapshot = queueOrdered
             filteredHistory = queueOrdered
             currentHistoryLimit = newCurrentHistoryLimit
+            lastPaginationFilterState = paginationFilterState
             history = newHistory
             hasMoreHistory = newHasMoreHistory
             pinnedItems = newPinnedItems
