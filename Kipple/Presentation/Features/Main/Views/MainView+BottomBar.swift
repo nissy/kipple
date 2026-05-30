@@ -11,55 +11,9 @@ import AppKit
 extension MainView {
     var bottomBarContent: some View {
         HStack(alignment: .center, spacing: 12) {
-            if let currentContent = viewModel.currentClipboardContent {
-                HStack(alignment: .center, spacing: 8) {
-                    if AppSettings.shared.enableAutoClear,
-                       let remainingTime = viewModel.autoClearRemainingTime {
-                        HStack(spacing: 6) {
-                            Image(systemName: "timer")
-                                .font(MainViewMetrics.BottomBar.autoClearIconFont)
-                                .foregroundColor(.secondary)
-
-                            Text(formatRemainingTime(remainingTime))
-                                .font(MainViewMetrics.BottomBar.autoClearTimerFont)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-                            .frame(height: 16)
-                            .padding(.horizontal, 4)
-                    }
-
-                    Image(systemName: "doc.on.clipboard")
-                        .font(MainViewMetrics.BottomBar.clipboardIconFont)
-                        .foregroundColor(.secondary)
-
-                    Text(currentContent)
-                        .font(.custom(fontManager.historyFont.fontName, size: 11))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Button(action: {
-                        clearSystemClipboard()
-                    }, label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(MainViewMetrics.BottomBar.clearIconFont)
-                            .foregroundColor(.secondary.opacity(0.6))
-                            .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
-                    })
-                    .buttonStyle(PlainButtonStyle())
-                    .help(Text("Clear clipboard"))
-                    .onHover { hovering in
-                        hoveredClearButton = hovering
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.1))
-                )
+            if AppSettings.shared.enableAutoClear,
+               let remainingTime = viewModel.autoClearRemainingTime {
+                autoClearCountdown(remainingTime)
             }
 
             Spacer()
@@ -104,6 +58,35 @@ extension MainView {
 }
 
 private extension MainView {
+    func autoClearCountdown(_ remainingTime: TimeInterval) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "timer")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            Text(formatRemainingTime(remainingTime))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color.accentColor.opacity(0.1))
+        )
+    }
+
+    func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
+        let minutes = Int(timeInterval) / 60
+        let seconds = Int(timeInterval) % 60
+
+        if minutes > 0 {
+            return String(format: "%02d:%02d", minutes, seconds)
+        } else {
+            return String(format: "00:%02d", seconds)
+        }
+    }
+
     func bottomBarActionButton(
         systemName: String,
         helpKey: LocalizedStringKey,

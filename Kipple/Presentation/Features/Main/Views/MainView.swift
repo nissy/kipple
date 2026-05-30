@@ -27,7 +27,6 @@ struct MainView: View {
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject var appSettings = AppSettings.shared
-    @ObservedObject var fontManager = FontManager.shared
     @ObservedObject var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
@@ -35,7 +34,6 @@ struct MainView: View {
     @State var historyRefreshID = UUID()
     @State var historyCopyScrollRequest: HistoryCopyScrollRequest?
     @State var historyHoverResetRequest: HistoryHoverResetRequest?
-    @State var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
     @State private var modifierMonitor: Any?
