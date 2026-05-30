@@ -35,9 +35,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var serviceCancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
-    @Published var pinnedItems: [ClipItem] = []
-    @Published var filteredHistory: [ClipItem] = []
-    @Published var pinnedHistory: [ClipItem] = []
+    var pinnedItems: [ClipItem] = []
+    var filteredHistory: [ClipItem] = []
+    var pinnedHistory: [ClipItem] = []
     @Published var searchText: String = "" {
         didSet {
             // resetFiltersAfterCopy 等のフィルタ一括変更中は coalesce を schedule しない
@@ -63,7 +63,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String? {
         didSet {
-            updateCurrentClipboardItemID(using: latestHistorySnapshot)
+            updateCurrentClipboardItemID()
         }
     }
     @Published private(set) var currentClipboardItemID: UUID?
@@ -233,8 +233,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
-        latestHistorySnapshot = items
-        updateCurrentClipboardItemID(using: items)
+        rebuildHistoryLookups(using: items)
+        updateCurrentClipboardItemID()
 
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
@@ -317,7 +317,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
 
-    private func updateCurrentClipboardItemID(using items: [ClipItem]) {
+    private func rebuildHistoryLookups(using items: [ClipItem]) {
+        latestHistorySnapshot = items
+    }
+
+    private func updateCurrentClipboardItemID() {
         guard let currentContent = currentClipboardContent,
               !currentContent.isEmpty else {
             if currentClipboardItemID != nil {
@@ -325,7 +329,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
             return
         }
-        let matchedID = items.first { $0.content == currentContent }?.id
+        let matchedID = latestHistorySnapshot.first { $0.content == currentContent }?.id
         if currentClipboardItemID != matchedID {
             currentClipboardItemID = matchedID
         }

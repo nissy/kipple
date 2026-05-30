@@ -19,6 +19,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private nonisolated(unsafe) var autoClearTimer: Timer?
     private var pendingClipboardContent: String?
     private var autoClearPausedByQueue = false
+    private var lastKnownHistoryRevision: UInt64?
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -247,14 +248,15 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     private func refreshHistory() async {
         let previousClipboardContent = currentClipboardContent
-        let newHistory = await modernService.getHistory()
+        let newRevision = await modernService.getHistoryRevision()
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
-        // Only update if history actually changed (comparing IDs and pinned states)
-        let historyChanged = historiesDiffer(lhs: history, rhs: newHistory)
+        let historyChanged = lastKnownHistoryRevision != newRevision
 
         if historyChanged {
+            let newHistory = await modernService.getHistory()
             history = newHistory
+            lastKnownHistoryRevision = newRevision
 
             // Call the history changed callback if set
             if let firstItem = newHistory.first {
@@ -288,6 +290,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         autoClearRemainingTime = nil
         pendingClipboardContent = nil
         autoClearPausedByQueue = false
+        lastKnownHistoryRevision = nil
 
         // Ensure we are in sync with the service after it resets.
         await refreshHistory()
@@ -299,15 +302,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         Task { [weak self] in
             guard let self else { return }
             await self.refreshHistory()
-        }
-    }
-    private func historiesDiffer(lhs: [ClipItem], rhs: [ClipItem]) -> Bool {
-        guard lhs.count == rhs.count else { return true }
-        return zip(lhs, rhs).contains { left, right in
-            left.id != right.id ||
-            left.isPinned != right.isPinned ||
-            left.timestamp != right.timestamp ||
-            left.userCategoryId != right.userCategoryId
         }
     }
 }
