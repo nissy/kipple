@@ -19,6 +19,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private nonisolated(unsafe) var autoClearTimer: Timer?
     private var pendingClipboardContent: String?
     private var autoClearPausedByQueue = false
+    private var lastKnownHistoryRevision: UInt64?
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -247,14 +248,28 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     private func refreshHistory() async {
         let previousClipboardContent = currentClipboardContent
-        let newHistory = await modernService.getHistory()
+        let newRevision = await modernService.getHistoryRevision()
         let newCurrentContent = await modernService.getCurrentClipboardContent()
 
-        // Only update if history actually changed (comparing IDs and pinned states)
-        let historyChanged = historiesDiffer(lhs: history, rhs: newHistory)
+        let historyChanged = lastKnownHistoryRevision != newRevision
 
         if historyChanged {
+            PerformanceTrace.event("adapter_refresh_started", revision: newRevision)
+            let newHistory = await modernService.getHistory()
+            PerformanceTrace.event(
+                "adapter_history_will_publish",
+                content: newHistory.first?.content,
+                revision: newRevision,
+                count: newHistory.count
+            )
             history = newHistory
+            lastKnownHistoryRevision = newRevision
+            PerformanceTrace.event(
+                "adapter_history_did_publish",
+                content: newHistory.first?.content,
+                revision: newRevision,
+                count: newHistory.count
+            )
 
             // Call the history changed callback if set
             if let firstItem = newHistory.first {
@@ -288,6 +303,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         autoClearRemainingTime = nil
         pendingClipboardContent = nil
         autoClearPausedByQueue = false
+        lastKnownHistoryRevision = nil
 
         // Ensure we are in sync with the service after it resets.
         await refreshHistory()
@@ -301,15 +317,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             await self.refreshHistory()
         }
     }
-    private func historiesDiffer(lhs: [ClipItem], rhs: [ClipItem]) -> Bool {
-        guard lhs.count == rhs.count else { return true }
-        return zip(lhs, rhs).contains { left, right in
-            left.id != right.id ||
-            left.isPinned != right.isPinned ||
-            left.timestamp != right.timestamp ||
-            left.userCategoryId != right.userCategoryId
-        }
-    }
 }
 
 // MARK: - Extensions for Compatibility
@@ -318,6 +325,17 @@ extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     func recopyFromHistoryAndWait(_ item: ClipItem) async {
         prepareForRecopy(of: item)
         await modernService.recopyFromHistory(item)
+        await refreshHistory()
+    }
+
+    /// pasteboard 書き込みのみ待機する軽量版。history 再同期は後段で finalizeRecopyRefresh() を呼ぶこと
+    func recopyFromHistoryAwaitingPasteboard(_ item: ClipItem) async {
+        prepareForRecopy(of: item)
+        await modernService.recopyFromHistory(item)
+    }
+
+    /// recopyFromHistoryAwaitingPasteboard 後の history 再同期
+    func finalizeRecopyRefresh() async {
         await refreshHistory()
     }
 

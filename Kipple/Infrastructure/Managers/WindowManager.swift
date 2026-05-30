@@ -111,6 +111,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
     init(
         lastActiveAppTracker: LastActiveAppTracking,
+        // orderOut が MainActor を ~100ms 占有する間に pasteboard 書き込みが完走するための
+        // safety buffer。0 にすると orderOut 直後の MainActor 解放時に reactivate と pasteboard が
+        // 競合し、即 paste で古い内容を貼るリスクが出る
         appReactivationDelay: TimeInterval = 0.05
     ) {
         self.lastActiveAppTracker = lastActiveAppTracker
@@ -132,6 +135,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         preventAutoClose = true
         capturePreviousAppForFocusReturn()
         syncTitleBarQueueState()
+        NSApp.activate(ignoringOtherApps: true)
 
         if let existingWindow = mainWindow {
             reopenExistingWindow(existingWindow)
@@ -177,6 +181,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.setFrame(frame, display: true, animate: false)
                 if !window.isKeyWindow {
                     bringWindowToFrontWithoutSystemAnimation(window) {
+                        window.orderFrontRegardless()
                         window.makeKeyAndOrderFront(nil)
                     }
                 }
@@ -397,25 +402,36 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // カーソルが存在するスクリーンを優先（複数ディスプレイ対応）
         let screens = NSScreen.screens
         let targetScreen = screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.main
-        let screenFrame = targetScreen?.frame ?? NSRect.zero
+        let screenFrame = targetScreen?.visibleFrame ?? targetScreen?.frame ?? NSRect.zero
+        return Self.constrainedWindowOrigin(
+            mouseLocation: mouseLocation,
+            windowSize: windowSize,
+            screenFrame: screenFrame
+        )
+    }
 
+    nonisolated static func constrainedWindowOrigin(
+        mouseLocation: NSPoint,
+        windowSize: NSSize,
+        screenFrame: NSRect
+    ) -> NSPoint {
+        let padding: CGFloat = 10
         var windowOrigin = NSPoint(
-            x: mouseLocation.x + 10,
-            y: mouseLocation.y - windowSize.height - 10
+            x: mouseLocation.x + padding,
+            y: mouseLocation.y - windowSize.height - padding
         )
 
-        if windowOrigin.x + windowSize.width > screenFrame.maxX {
-            windowOrigin.x = screenFrame.maxX - windowSize.width - 10
+        let minX = screenFrame.minX + padding
+        let maxX = max(minX, screenFrame.maxX - windowSize.width - padding)
+        windowOrigin.x = min(max(windowOrigin.x, minX), maxX)
+
+        let minY = screenFrame.minY + padding
+        let maxY = max(minY, screenFrame.maxY - windowSize.height - padding)
+        if windowOrigin.y < minY {
+            windowOrigin.y = mouseLocation.y + padding
         }
-        if windowOrigin.x < screenFrame.minX {
-            windowOrigin.x = screenFrame.minX + 10
-        }
-        if windowOrigin.y < screenFrame.minY {
-            windowOrigin.y = screenFrame.minY + 10
-        }
-        if windowOrigin.y + windowSize.height > screenFrame.maxY {
-            windowOrigin.y = mouseLocation.y + 10
-        }
+        windowOrigin.y = min(max(windowOrigin.y, minY), maxY)
+
         return windowOrigin
     }
 
@@ -472,15 +488,19 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
 
     private func activateAppInfoIfPossible(_ info: LastActiveAppTracker.AppInfo) -> Bool {
+        // .activateAllWindows は「全ウインドウを前面」指定で、複数ウインドウアプリだと
+        // 期待しない (前回 key じゃない) ウインドウまで前面に出るケースが報告されている。
+        // default ([]) なら main/key window のみ復帰され、ユーザーが直前に使っていた
+        // ウインドウが key に戻りやすい
         if info.pid != 0,
            let running = NSRunningApplication(processIdentifier: info.pid) {
-            running.activate(options: [.activateAllWindows])
+            running.activate(options: [])
             return true
         }
         if let bundleId = info.bundleId {
             let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
             if let app = apps.first {
-                app.activate(options: [.activateAllWindows])
+                app.activate(options: [])
                 return true
             }
         }
@@ -846,7 +866,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func focusOnEditor() {
         guard let window = mainWindow else { return }
-        
         // ウィンドウ内のNSTextViewを検索してフォーカスを設定
         findAndFocusTextView(in: window.contentView)
     }

@@ -19,6 +19,7 @@ final class SimplifiedHotkeyManager {
     private var startGeneration: UInt64 = 0
     private var hasInputMonitoringPermission = false
     private var hotKeyRef: EventHotKeyRef?
+    private var isHotKeyRegistered = false
     @MainActor private static var hotKeyEventHandler: EventHandlerRef?
     private static let hotKeySignature: OSType = 0x4B50484B // 'KPHK'
     private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -138,6 +139,10 @@ final class SimplifiedHotkeyManager {
                 return
             }
 
+            if self.isRunningTests {
+                self.isHotKeyRegistered = true
+            }
+
             // Try to add global monitor (requires Input Monitoring permission)
             self.globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 self?.handleKeyEvent(event)
@@ -163,10 +168,12 @@ final class SimplifiedHotkeyManager {
     }
 
     private func stopMonitoring() {
+        startGeneration &+= 1
         if let hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
         }
+        isHotKeyRegistered = false
         if let monitor = globalEventMonitor {
             NSEvent.removeMonitor(monitor)
             globalEventMonitor = nil
@@ -201,22 +208,41 @@ final class SimplifiedHotkeyManager {
     private func registerHotKey() -> Bool {
         // Do not register for empty/cleared values
         guard keyCode != 0, !modifiers.isEmpty else { return false }
-        installHotKeyHandlerIfNeeded()
+        guard installHotKeyHandlerIfNeeded() else {
+            Logger.shared.error("Main hotkey handler could not be installed.")
+            return false
+        }
 
-        var id = EventHotKeyID(signature: SimplifiedHotkeyManager.hotKeySignature, id: 1)
+        let id = EventHotKeyID(signature: SimplifiedHotkeyManager.hotKeySignature, id: 1)
         let status = RegisterEventHotKey(UInt32(keyCode), carbonFlags(from: modifiers), id, GetEventDispatcherTarget(), 0, &hotKeyRef)
         if status != noErr {
             hotKeyRef = nil
+            isHotKeyRegistered = false
             return false
         }
+        isHotKeyRegistered = true
         return true
     }
 
     @MainActor
-    private func installHotKeyHandlerIfNeeded() {
-        guard SimplifiedHotkeyManager.hotKeyEventHandler == nil else { return }
+    private func installHotKeyHandlerIfNeeded() -> Bool {
+        guard SimplifiedHotkeyManager.hotKeyEventHandler == nil else { return true }
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetEventDispatcherTarget(), SimplifiedHotkeyManager.hotKeyEventCallback, 1, &eventType, nil, &SimplifiedHotkeyManager.hotKeyEventHandler)
+        let status = InstallEventHandler(
+            GetEventDispatcherTarget(),
+            SimplifiedHotkeyManager.hotKeyEventCallback,
+            1,
+            &eventType,
+            nil,
+            &SimplifiedHotkeyManager.hotKeyEventHandler
+        )
+
+        if status != noErr {
+            SimplifiedHotkeyManager.hotKeyEventHandler = nil
+            return false
+        }
+
+        return true
     }
 
     private func carbonFlags(from flags: NSEvent.ModifierFlags) -> UInt32 {
@@ -228,9 +254,45 @@ final class SimplifiedHotkeyManager {
         return carbon
     }
 
-    private static let hotKeyEventCallback: EventHandlerUPP = { _, _, _ in
+    private func handleCarbonHotKey(with identifier: UInt32) {
+        guard identifier == 1 else { return }
+        guard isHotKeyRegistered else { return }
+        guard keyCode != 0, !modifiers.isEmpty else { return }
         SimplifiedHotkeyManager.scheduleToggleNotification()
+    }
+
+    private static func processCarbonHotKeyEvent(signature: OSType, identifier: UInt32) -> OSStatus {
+        guard signature == SimplifiedHotkeyManager.hotKeySignature, identifier == 1 else {
+            return OSStatus(eventNotHandledErr)
+        }
+
+        Task { @MainActor in
+            SimplifiedHotkeyManager.shared.handleCarbonHotKey(with: identifier)
+        }
+
         return noErr
+    }
+
+    private static let hotKeyEventCallback: EventHandlerUPP = { _, event, _ in
+        var hotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            event,
+            UInt32(kEventParamDirectObject),
+            UInt32(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+
+        guard status == noErr else {
+            return OSStatus(eventNotHandledErr)
+        }
+
+        return SimplifiedHotkeyManager.processCarbonHotKeyEvent(
+            signature: hotKeyID.signature,
+            identifier: hotKeyID.id
+        )
     }
 
     private func loadSettings() {
@@ -343,4 +405,14 @@ final class SimplifiedHotkeyManager {
         default: return "?"
         }
     }
+
+    #if DEBUG
+    func debug_processCarbonHotKeyEvent(signature: OSType, identifier: UInt32) -> OSStatus {
+        SimplifiedHotkeyManager.processCarbonHotKeyEvent(signature: signature, identifier: identifier)
+    }
+
+    var debugIsHotKeyRegistered: Bool {
+        isHotKeyRegistered
+    }
+    #endif
 }

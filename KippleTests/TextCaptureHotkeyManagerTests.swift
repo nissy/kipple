@@ -123,4 +123,50 @@ final class TextCaptureHotkeyManagerTests: XCTestCase {
 
         wait(for: [expectation], timeout: 0.5)
     }
+
+    func testSuspendNotificationPreventsCarbonTrigger() async throws {
+        let inverted = expectation(description: "Suspended hotkey should not trigger")
+        inverted.isInverted = true
+
+        manager.onHotkeyTriggered = {
+            inverted.fulfill()
+        }
+
+        XCTAssertTrue(manager.applyHotKey(keyCode: 17, modifiers: [.command, .shift]))
+        NotificationCenter.default.post(
+            name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+            object: nil
+        )
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B505443, identifier: 1) // 'KPTC'
+        XCTAssertEqual(status, noErr)
+
+        await fulfillment(of: [inverted], timeout: 0.1)
+    }
+
+    func testResumeNotificationRestoresCarbonTrigger() async throws {
+        let expectation = expectation(description: "Resumed hotkey should trigger")
+
+        manager.onHotkeyTriggered = {
+            expectation.fulfill()
+        }
+
+        XCTAssertTrue(manager.applyHotKey(keyCode: 17, modifiers: [.command, .shift]))
+        NotificationCenter.default.post(
+            name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+            object: nil
+        )
+        try await Task.sleep(nanoseconds: 20_000_000)
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+            object: nil
+        )
+        try await Task.sleep(nanoseconds: 20_000_000)
+
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B505443, identifier: 1) // 'KPTC'
+        XCTAssertEqual(status, noErr)
+
+        await fulfillment(of: [expectation], timeout: 0.5)
+    }
 }

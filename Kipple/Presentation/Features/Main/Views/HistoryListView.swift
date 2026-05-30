@@ -73,7 +73,8 @@ struct HistoryListView: View {
                             { handler(item) }
                         },
                         onSplitEditorIntoHistory: onSplitEditorIntoHistory,
-                        hoverResetSignal: hoverResetSignal
+                        hoverResetSignal: hoverResetSignal,
+                        hoverCoordinator: hoverCoordinator
                     )
                     .frame(height: 32)
                     .transition(.opacity)
@@ -111,7 +112,6 @@ struct HistoryListView: View {
             }
         }
         }
-        .environmentObject(hoverCoordinator)
         .environmentObject(actionKeyMonitor)
     }
 

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Combine
 
 struct MainViewHistorySection: View {
     let history: [ClipItem]
@@ -26,7 +25,7 @@ struct MainViewHistorySection: View {
     let onChangeUserCategory: ((ClipItem, UUID?) -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     @Binding var selectedCategory: ClipItemCategory?
-    let onSearchTextChanged: (String) -> Void
+    @Binding var searchText: String
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
@@ -43,9 +42,6 @@ struct MainViewHistorySection: View {
     let canToggleQueueLoop: Bool
     let onToggleQueueLoop: () -> Void
     @ObservedObject private var fontManager = FontManager.shared
-
-    @State private var searchText: String
-    @State private var searchCancellable: AnyCancellable?
 
     init(
         history: [ClipItem],
@@ -64,8 +60,7 @@ struct MainViewHistorySection: View {
         onChangeUserCategory: ((ClipItem, UUID?) -> Void)? = nil,
         onOpenCategoryManager: (() -> Void)? = nil,
         selectedCategory: Binding<ClipItemCategory?>,
-        initialSearchText: String,
-        onSearchTextChanged: @escaping (String) -> Void,
+        searchText: Binding<String>,
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
         isLoadingMore: Bool,
@@ -98,7 +93,7 @@ struct MainViewHistorySection: View {
         self.onChangeUserCategory = onChangeUserCategory
         self.onOpenCategoryManager = onOpenCategoryManager
         self._selectedCategory = selectedCategory
-        self.onSearchTextChanged = onSearchTextChanged
+        self._searchText = searchText
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
         self.isLoadingMore = isLoadingMore
@@ -114,7 +109,6 @@ struct MainViewHistorySection: View {
         self.isQueueLoopActive = isQueueLoopActive
         self.canToggleQueueLoop = canToggleQueueLoop
         self.onToggleQueueLoop = onToggleQueueLoop
-        _searchText = State(initialValue: initialSearchText)
     }
 
     var body: some View {
@@ -153,18 +147,6 @@ struct MainViewHistorySection: View {
                 copyScrollRequest: $copyScrollRequest,
                 hoverResetRequest: $hoverResetRequest
             )
-        }
-        .onChange(of: searchText) { _, newValue in
-            // 検索テキストの変更をデバウンス（パフォーマンス最適化）
-            searchCancellable?.cancel()
-            searchCancellable = Just(newValue)
-                .delay(for: .milliseconds(300), scheduler: RunLoop.main)
-                .sink { value in
-                    onSearchTextChanged(value)
-                }
-        }
-        .onAppear {
-            onSearchTextChanged(searchText)
         }
     }
 

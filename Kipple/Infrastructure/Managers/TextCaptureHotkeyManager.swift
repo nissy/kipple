@@ -26,6 +26,9 @@ final class TextCaptureHotkeyManager {
     private var currentKeyCode: UInt16 = 0
     private var currentModifiers: NSEvent.ModifierFlags = []
     private var hotKeyRef: EventHotKeyRef?
+    private var isHotKeyRegistered = false
+    private nonisolated(unsafe) var suspendObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var resumeObserver: NSObjectProtocol?
 
     var onHotkeyTriggered: (() -> Void)?
 
@@ -37,6 +40,7 @@ final class TextCaptureHotkeyManager {
     private init(isRunningTests: Bool = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil) {
         self.isRunningTests = isRunningTests
         loadInitialHotkey()
+        setupNotificationObservers()
     }
 
     @discardableResult
@@ -83,6 +87,7 @@ final class TextCaptureHotkeyManager {
         }
 
         if isRunningTests {
+            isHotKeyRegistered = true
             return true
         }
 
@@ -113,6 +118,7 @@ final class TextCaptureHotkeyManager {
         }
 
         hotKeyRef = registeredRef
+        isHotKeyRegistered = true
         return true
     }
 
@@ -121,6 +127,7 @@ final class TextCaptureHotkeyManager {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil
         }
+        isHotKeyRegistered = false
     }
 
     private func loadInitialHotkey() {
@@ -184,7 +191,36 @@ final class TextCaptureHotkeyManager {
 
     private func handleCarbonHotKey(with identifier: UInt32) {
         guard identifier == 1 else { return }
+        guard isHotKeyRegistered else { return }
         triggerHotkey()
+    }
+
+    private func restartMonitoringIfNeeded() {
+        guard currentKeyCode != 0, !currentModifiers.isEmpty else { return }
+        stopMonitoring()
+        _ = startMonitoring()
+    }
+
+    private func setupNotificationObservers() {
+        suspendObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.stopMonitoring()
+            }
+        }
+
+        resumeObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.restartMonitoringIfNeeded()
+            }
+        }
     }
 
     private static func processCarbonHotKeyEvent(signature: OSType, identifier: UInt32) -> OSStatus {

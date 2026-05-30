@@ -147,6 +147,15 @@ struct HotkeyRecorderField: View {
                 )
             }
         }
+        .onDisappear {
+            if isRecording {
+                isRecording = false
+            }
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
+                object: nil
+            )
+        }
     }
 }
 
@@ -167,6 +176,11 @@ struct KeyEventHandler: NSViewRepresentable {
             }
             return false
         }
+        view.onFocusLost = {
+            if isRecording {
+                isRecording = false
+            }
+        }
         return view
     }
     
@@ -179,19 +193,41 @@ struct KeyEventHandler: NSViewRepresentable {
 
 final class KeyCaptureView: NSView {
     var onKeyDown: ((NSEvent) -> Bool)?
+    var onFocusLost: (() -> Void)?
     var isActive = false {
         didSet {
             if isActive {
                 window?.makeFirstResponder(self)
                 installLocalMonitor()
+                installFocusObservers()
             } else {
                 removeLocalMonitor()
+                removeFocusObservers()
             }
         }
     }
     private var localMonitor: Any?
+    private var windowResignObserver: NSObjectProtocol?
+    private var appResignObserver: NSObjectProtocol?
     
     override var acceptsFirstResponder: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if isActive {
+            window?.makeFirstResponder(self)
+            installLocalMonitor()
+            installFocusObservers()
+        }
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let didResign = super.resignFirstResponder()
+        if didResign {
+            finishRecordingIfFocusLost()
+        }
+        return didResign
+    }
     
     override func keyDown(with event: NSEvent) {
         if onKeyDown?(event) ?? false {
@@ -218,7 +254,46 @@ final class KeyCaptureView: NSView {
         }
     }
 
+    private func installFocusObservers() {
+        removeFocusObservers()
+
+        if let window {
+            windowResignObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.finishRecordingIfFocusLost()
+            }
+        }
+
+        appResignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.finishRecordingIfFocusLost()
+        }
+    }
+
+    private func removeFocusObservers() {
+        if let observer = windowResignObserver {
+            NotificationCenter.default.removeObserver(observer)
+            windowResignObserver = nil
+        }
+        if let observer = appResignObserver {
+            NotificationCenter.default.removeObserver(observer)
+            appResignObserver = nil
+        }
+    }
+
+    private func finishRecordingIfFocusLost() {
+        guard isActive else { return }
+        onFocusLost?()
+    }
+
     deinit {
         removeLocalMonitor()
+        removeFocusObservers()
     }
 }

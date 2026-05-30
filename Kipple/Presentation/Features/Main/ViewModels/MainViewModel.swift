@@ -19,6 +19,15 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         case queueToggle
     }
 
+    private struct PaginationFilterState: Equatable {
+        let searchText: String
+        let showOnlyURLs: Bool
+        let showOnlyPinned: Bool
+        let selectedCategory: ClipItemCategory?
+        let selectedUserCategoryId: UUID?
+        let isPinnedFilterActive: Bool
+    }
+
     @Published var editorText: String {
         didSet {
             // パフォーマンス最適化：デバウンスを使用して保存処理を遅延
@@ -35,14 +44,18 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var serviceCancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
-    @Published var pinnedItems: [ClipItem] = []
-    @Published var filteredHistory: [ClipItem] = []
-    @Published var pinnedHistory: [ClipItem] = []
+    var pinnedItems: [ClipItem] = []
+    var filteredHistory: [ClipItem] = []
+    var pinnedHistory: [ClipItem] = []
     @Published var searchText: String = "" {
         didSet {
-            applyFilters()
+            // resetFiltersAfterCopy 等のフィルタ一括変更中は coalesce を schedule しない
+            // （schedule すると close 後に遅延発火して focus 復帰と競合する）
+            guard !isFilterMutating else { return }
+            scheduleSearchFilterCoalesce()
         }
     }
+    private var searchCoalesceTask: Task<Void, Never>?
     @Published var showOnlyURLs: Bool = false
     @Published var showOnlyPinned: Bool = false {
         didSet {
@@ -59,7 +72,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String? {
         didSet {
-            updateCurrentClipboardItemID(using: latestHistorySnapshot)
+            updateCurrentClipboardItemID()
         }
     }
     @Published private(set) var currentClipboardItemID: UUID?
@@ -75,6 +88,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var lastQueueAnchorID: UUID?
     private var shouldResetAnchorOnNextShiftSelection = false
     private var filteredOrderingSnapshot: [ClipItem] = []
+    private var lastPaginationFilterState: PaginationFilterState?
     private var isFilterMutating = false
     private var isPasteMonitorActive = false
     private var isShiftSelecting = false
@@ -117,7 +131,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             .store(in: &cancellables)
         
         subscribeToClipboardService()
-        
+
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
         // 注: UserDefaultsの変更通知は特定のキーを識別できないため、
         // debounceのみで処理頻度を制限
@@ -203,15 +217,36 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         loadHistory()
     }
 
-    private func applyFilters() {
+    private func applyFilters(animated: Bool = true) {
         guard !isFilterMutating else { return }
-        updateFilteredItems(clipboardService.history, animated: true)
+        updateFilteredItems(clipboardService.history, animated: animated)
     }
 
-    // swiftlint:disable:next function_body_length
+    /// コピー開始時に呼ぶ。pending な検索 coalesce を確実に潰す
+    /// （onClose 後に await が yield する間、満了済み task が走るのを防ぐ）
+    func cancelPendingSearchFilter() {
+        searchCoalesceTask?.cancel()
+        searchCoalesceTask = nil
+    }
+
+    /// 検索入力の連続変化を 50ms で coalescing。コピー後の reset で cancel される必要があるため
+    /// Task-based debounce で実装（Combine だと cancel しにくく、window close 後に発火して focus 競合を起こす）
+    private func scheduleSearchFilterCoalesce() {
+        searchCoalesceTask?.cancel()
+        searchCoalesceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            guard !Task.isCancelled else { return }
+            guard let self, !self.isFilterMutating else { return }
+            self.applyFilters(animated: false)
+        }
+    }
+
+    // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
-        latestHistorySnapshot = items
-        updateCurrentClipboardItemID(using: items)
+        let tracedContent = items.first?.content
+        PerformanceTrace.event("viewmodel_update_started", content: tracedContent, count: items.count)
+        rebuildHistoryLookups(using: items)
+        updateCurrentClipboardItemID()
 
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
@@ -236,42 +271,50 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if noFiltersActive {
             filtered = items
         } else {
+            // 安価な判定（Bool/UUID 比較）で早期 return し、最後に expensive な
+            // localizedCaseInsensitiveContains を評価して総コストを下げる
             filtered = items.filter { item in
-                let matchesSearch: Bool = {
-                    guard hasSearchQuery else { return true }
+                if requirePinnedOnly && !item.isPinned {
+                    return false
+                }
+                if let userCatId = selectedUserCategory {
+                    if userCatId == noneCategoryId {
+                        if let assignedId = item.userCategoryId, assignedId != userCatId {
+                            return false
+                        }
+                    } else if item.userCategoryId != userCatId {
+                        return false
+                    }
+                }
+                if filterByURLCategory || requireURLsOnly {
+                    if !itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) {
+                        return false
+                    }
+                }
+                if hasSearchQuery {
                     let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
                     let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
-                    return matchesContent || matchesSourceApp
-                }()
-
-                let matchesUserCategory: Bool = {
-                    guard let userCatId = selectedUserCategory else { return true }
-                    if userCatId == noneCategoryId {
-                        if let assignedId = item.userCategoryId {
-                            return assignedId == userCatId
-                        }
-                        return true
+                    if !matchesContent && !matchesSourceApp {
+                        return false
                     }
-                    return item.userCategoryId == userCatId
-                }()
-
-                let needsURLMembership = filterByURLCategory || requireURLsOnly
-                let isURLItem = needsURLMembership ? itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) : true
-                let matchesURLCategory = !filterByURLCategory || isURLItem
-                let matchesURLsOnly = !requireURLsOnly || isURLItem
-                let matchesPinned = !requirePinnedOnly || item.isPinned
-
-                return matchesSearch &&
-                    matchesUserCategory &&
-                    matchesURLCategory &&
-                    matchesURLsOnly &&
-                    matchesPinned
+                }
+                return true
             }
         }
 
         let queueOrdered = applyQueueOrdering(to: filtered)
         let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
-        let newCurrentHistoryLimit = shouldPaginate ? min(pageSize, queueOrdered.count) : queueOrdered.count
+        let paginationFilterState = PaginationFilterState(
+            searchText: searchText,
+            showOnlyURLs: showOnlyURLs,
+            showOnlyPinned: showOnlyPinned,
+            selectedCategory: selectedCategory,
+            selectedUserCategoryId: selectedUserCategoryId,
+            isPinnedFilterActive: isPinnedFilterActive
+        )
+        let shouldResetPagination = lastPaginationFilterState != paginationFilterState || currentHistoryLimit == 0
+        let visibleLimit = shouldResetPagination ? pageSize : max(pageSize, currentHistoryLimit)
+        let newCurrentHistoryLimit = shouldPaginate ? min(visibleLimit, queueOrdered.count) : queueOrdered.count
         let newHistory = Array(queueOrdered.prefix(newCurrentHistoryLimit))
         let newHasMoreHistory = newHistory.count < queueOrdered.count
         let newPinnedItems = isPinnedFilterActive ? queueOrdered : []
@@ -282,9 +325,16 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             filteredOrderingSnapshot = queueOrdered
             filteredHistory = queueOrdered
             currentHistoryLimit = newCurrentHistoryLimit
+            lastPaginationFilterState = paginationFilterState
             history = newHistory
             hasMoreHistory = newHasMoreHistory
             pinnedItems = newPinnedItems
+            PerformanceTrace.event(
+                "viewmodel_history_published",
+                content: newHistory.first?.content,
+                count: newHistory.count,
+                details: ["filtered": "\(queueOrdered.count)"]
+            )
         }
 
         let shouldAnimate = animated && newHistory.count <= filterAnimationThreshold
@@ -296,7 +346,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
 
-    private func updateCurrentClipboardItemID(using items: [ClipItem]) {
+    private func rebuildHistoryLookups(using items: [ClipItem]) {
+        latestHistorySnapshot = items
+    }
+
+    private func updateCurrentClipboardItemID() {
         guard let currentContent = currentClipboardContent,
               !currentContent.isEmpty else {
             if currentClipboardItemID != nil {
@@ -304,7 +358,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
             return
         }
-        let matchedID = items.first { $0.content == currentContent }?.id
+        let matchedID = latestHistorySnapshot.first { $0.content == currentContent }?.id
         if currentClipboardItemID != matchedID {
             currentClipboardItemID = matchedID
         }
@@ -450,6 +504,29 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
         finalizeHistorySelection()
     }
+
+    /// pasteboard 書き込み完了までだけ待機。history 再同期は finalizeRecopyRefresh() を別途呼ぶ
+    func selectHistoryItemAwaitingPasteboard(_ item: ClipItem, forceInsert: Bool = false) async {
+        if forceInsert || shouldInsertToEditor() {
+            insertToEditor(content: item.content)
+            return
+        }
+        if let adapter = clipboardService as? ModernClipboardServiceAdapter {
+            await adapter.recopyFromHistoryAwaitingPasteboard(item)
+        } else if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
+            await asyncService.recopyFromHistoryAndWait(item)
+        } else {
+            clipboardService.recopyFromHistory(item)
+        }
+        finalizeHistorySelection()
+    }
+
+    /// selectHistoryItemAwaitingPasteboard 後の history 再同期。window close 後の別 Task で呼ぶ
+    func finalizeRecopyRefresh() async {
+        if let adapter = clipboardService as? ModernClipboardServiceAdapter {
+            await adapter.finalizeRecopyRefresh()
+        }
+    }
     
     /// エディタパネルが閉じている場合に再表示
     private func ensureEditorPanelVisible() {
@@ -492,6 +569,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func resetFiltersAfterCopy() {
+        // window close 後に発火して focus 復帰と競合しないよう、検索 coalesce を必ず cancel
+        searchCoalesceTask?.cancel()
+        searchCoalesceTask = nil
+
         isFilterMutating = true
         var didMutate = false
 
@@ -522,7 +603,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         isFilterMutating = false
         guard didMutate else { return }
-        updateFilteredItems(clipboardService.history, animated: true)
+        updateFilteredItems(clipboardService.history, animated: false)
+        // window close 後に発火して focus 復帰と競合しないよう、検索 coalesce を確実に cancel
+        searchCoalesceTask?.cancel()
     }
 
     private func finalizeHistorySelection() {

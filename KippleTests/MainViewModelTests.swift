@@ -249,6 +249,26 @@ class MainViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.hasMoreHistory)
     }
 
+    func testHistoryRefreshPreservesLoadedPageCount() {
+        // Given
+        var items = (1...120).map { ClipItem(content: "Item \($0)") }
+        mockClipboardService.history = items
+        viewModel.loadHistory()
+        if let lastVisible = viewModel.history.last {
+            viewModel.loadMoreHistoryIfNeeded(currentItem: lastVisible)
+        }
+        XCTAssertEqual(viewModel.history.count, 100)
+
+        // When: ピン/カテゴリ変更など、フィルタ条件は変わらない履歴更新
+        items[79].isPinned = true
+        mockClipboardService.history = items
+        viewModel.updateFilteredItems(mockClipboardService.history)
+
+        // Then: スクロールで読み込んだ件数を先頭ページへ戻さない
+        XCTAssertEqual(viewModel.history.count, 100)
+        XCTAssertTrue(viewModel.history.contains { $0.id == items[79].id })
+    }
+
     func testCurrentClipboardItemIDMatchesHistoryContent() {
         // Given
         let items = [
@@ -353,13 +373,15 @@ class MainViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.hasMoreHistory)
     }
 
-    func testSearchDisablesPagination() {
+    func testSearchDisablesPagination() async {
         // Given
         mockClipboardService.history = (1...30).map { ClipItem(content: "Item \($0)") }
         viewModel.loadHistory()
 
         // When
         viewModel.searchText = "Item 2"
+        // searchText の変更は MainViewModel 内で 50ms coalescing されるため、フィルタ適用を待つ
+        try? await Task.sleep(nanoseconds: 150_000_000)
 
         // Then
         XCTAssertFalse(viewModel.hasMoreHistory)

@@ -19,9 +19,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var lastEventTime = Date()
     private var lastChangeCount = 0
     // ポーリング間隔（アクティブ時は短めにして遅延を減らす）
-    private var currentInterval: TimeInterval = 0.3
-    private let minInterval: TimeInterval = 0.2
-    private let maxInterval: TimeInterval = 1.0
+    private var currentInterval: TimeInterval = 0.12
+    private let minInterval: TimeInterval = 0.08
+    private let maxInterval: TimeInterval = 0.25
     private var maxHistoryItems = 300  // Default value, will be updated from AppSettings
     private var isMonitoringFlag = false
 
@@ -31,6 +31,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var saveCancellable: AnyCancellable?
     private var persistedSnapshot: [UUID: ClipItem] = [:]
     private var snapshotNeedsPriming = false
+    private var historyRevision: UInt64 = 0
+    private var itemIDByContent: [String: UUID] = [:]
 
     // MARK: - Singleton
 
@@ -61,13 +63,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private func initializeRepository() async {
         let repository = await RepositoryProvider.resolve()
-        await setRepository(repository)
+        setRepository(repository)
     }
 
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
         persistedSnapshot = [:]
         snapshotNeedsPriming = false
+        itemIDByContent = [:]
     }
 
     private func setupSavePipeline() {
@@ -89,6 +92,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             history = pinnedItems
 
             if !pinnedItems.isEmpty {
+                rebuildContentLookup()
+                markHistoryChanged()
                 notifyHistoryObservers()
             }
 
@@ -116,10 +121,20 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             }
 
             history = combinedItems
+            let loadedIDs = Set(combinedItems.map(\.id))
             let wasTrimmed = trimHistory()
+            rebuildContentLookup()
+            markHistoryChanged()
 
-            snapshotNeedsPriming = true
-            saveSubject.send(history)
+            if wasTrimmed {
+                let retainedIDs = Set(history.map(\.id))
+                let removedIDs = loadedIDs.subtracting(retainedIDs)
+                if !removedIDs.isEmpty {
+                    try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
+                }
+            }
+            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
+            snapshotNeedsPriming = false
             notifyHistoryObservers()
         } catch {
             Logger.shared.error("Failed to load history: \(error)")
@@ -139,7 +154,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private func persistHistoryDiff(_ items: [ClipItem]) async {
         guard let repository = repository else { return }
 
-        if snapshotNeedsPriming || persistedSnapshot.isEmpty {
+        if snapshotNeedsPriming {
             persistedSnapshot = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
             snapshotNeedsPriming = false
             return
@@ -158,14 +173,26 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             return nil
         }
         let removedIDs = previousSnapshot.keys.filter { currentSnapshot[$0] == nil }
+        let tracedContent = inserted.first?.content ?? updated.first?.content
 
         do {
+            PerformanceTrace.event(
+                "history_save_started",
+                content: tracedContent,
+                count: items.count,
+                details: [
+                    "inserted": "\(inserted.count)",
+                    "updated": "\(updated.count)",
+                    "removed": "\(removedIDs.count)"
+                ]
+            )
             try await repository.applyChanges(
                 inserted: inserted,
                 updated: updated,
                 removed: removedIDs
             )
             persistedSnapshot = currentSnapshot
+            PerformanceTrace.event("history_save_finished", content: tracedContent, count: items.count)
         } catch {
             Logger.shared.error("Failed to persist history diff: \(error)")
         }
@@ -175,6 +202,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func getHistory() async -> [ClipItem] {
         history
+    }
+
+    func getHistoryRevision() async -> UInt64 {
+        historyRevision
     }
 
     func startMonitoring() async {
@@ -231,16 +262,35 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         )
         addToHistory(item)
 
-        // Copy to system clipboard
-        let newChangeCount = await MainActor.run {
+        // Copy to system clipboard. Writes stay off MainActor to avoid hop delays.
+        let newChangeCount = Self.writeStringToPasteboard(content)
+
+        // Record the expected changeCount for this internal operation
+        await state.setExpectedChangeCount(newChangeCount)
+    }
+
+    /// NSPasteboard へ文字列を書き込む共通ヘルパー。
+    /// MainActor.run を経由せず、SwiftUI/AppKit が忙しい時の hop 待ち遅延を回避する。
+    private static func writeStringToPasteboard(_ content: String) -> Int {
+        autoreleasepool {
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(content, forType: .string)
             return pasteboard.changeCount
         }
+    }
 
-        // Record the expected changeCount for this internal operation
-        await state.setExpectedChangeCount(newChangeCount)
+    @MainActor
+    private static func readStringFromPasteboard() -> String? {
+        autoreleasepool {
+            NSPasteboard.general.string(forType: .string)
+        }
+    }
+
+    private static func currentPasteboardChangeCount() -> Int {
+        autoreleasepool {
+            NSPasteboard.general.changeCount
+        }
     }
 
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
@@ -287,7 +337,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             let existingItem = history.remove(at: existingIndex)
             if existingItem.isPinned { newItem.isPinned = true }
             newItem.userCategoryId = existingItem.userCategoryId
-        } else if let duplicateIndex = history.firstIndex(where: { $0.content == item.content }) {
+        } else if let duplicateIndex = indexOfExistingContent(item.content) {
             // Preserve pin state and user category from any remaining duplicate content
             let existingItem = history.remove(at: duplicateIndex)
             if existingItem.isPinned { newItem.isPinned = true }
@@ -298,25 +348,25 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         history.insert(newItem, at: 0)
 
         // Trim history to max size
-        trimHistory()
+        if trimHistory() {
+            rebuildContentLookup()
+        }
+        itemIDByContent[newItem.content] = newItem.id
 
         // Trigger save
+        markHistoryChanged()
         saveSubject.send(history)
 
-        // Copy to system clipboard
-        let newChangeCount = await MainActor.run {
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(item.content, forType: .string)
-            return pasteboard.changeCount
-        }
+        // Copy to system clipboard - NSPasteboard is thread-safe (macOS 10.7+).
+        // MainActor.run を挟むと SwiftUI / AppKit が忙しい時に hop 待ちで 100ms 級の遅延が出るので避ける
+        let newChangeCount = Self.writeStringToPasteboard(item.content)
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
     }
 
     func clearSystemClipboard() async {
-        let newChangeCount = await MainActor.run { () -> Int in
+        let newChangeCount = autoreleasepool { () -> Int in
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             return pasteboard.changeCount
@@ -333,10 +383,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func clearAllHistory() async {
         let pinnedItems = history.filter { $0.isPinned }
         history = pinnedItems
-
-        // No hash cleanup needed - we don't use hash-based duplicate detection
+        rebuildContentLookup()
 
         // Save updated history to repository
+        markHistoryChanged()
         saveSubject.send(history)
         notifyHistoryObservers()
     }
@@ -347,10 +397,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         } else {
             history.removeAll()
         }
-
-        // No hash cleanup needed - we don't use hash-based duplicate detection
+        rebuildContentLookup()
 
         // Save updated history
+        markHistoryChanged()
         saveSubject.send(history)
         notifyHistoryObservers()
     }
@@ -377,6 +427,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             let isPinned = history[index].isPinned
 
             // Trigger save
+            markHistoryChanged()
             saveSubject.send(history)
             notifyHistoryObservers()
 
@@ -387,10 +438,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func deleteItem(_ item: ClipItem) async {
         history.removeAll { $0.id == item.id }
-
-        // No hash cleanup needed - we don't use hash-based duplicate detection
+        rebuildContentLookup()
 
         // Trigger save
+        markHistoryChanged()
         saveSubject.send(history)
         notifyHistoryObservers()
     }
@@ -402,8 +453,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             // Content change is allowed - no special handling needed
 
             history[index] = item
+            rebuildContentLookup()
 
             // Trigger save
+            markHistoryChanged()
             saveSubject.send(history)
             notifyHistoryObservers()
         }
@@ -421,9 +474,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func getCurrentClipboardContent() async -> String? {
         // Return actual system clipboard content, not history
-        await MainActor.run {
-            NSPasteboard.general.string(forType: .string)
-        }
+        await Self.readStringFromPasteboard()
     }
 
     func getCurrentInterval() async -> TimeInterval {
@@ -433,6 +484,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func setMaxHistoryItems(_ max: Int) async {
         maxHistoryItems = max
         if trimHistory() {
+            rebuildContentLookup()
+            markHistoryChanged()
             saveSubject.send(history)
             notifyHistoryObservers()
         }
@@ -479,31 +532,51 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func checkClipboard() async {
-        let changeCount = await MainActor.run {
-            NSPasteboard.general.changeCount
-        }
+        let changeCount = Self.currentPasteboardChangeCount()
 
         guard changeCount != lastChangeCount else { return }
 
         if await shouldSkipChange(for: changeCount) { return }
 
+        let detectedAt = PerformanceTrace.nowMicros()
         lastChangeCount = changeCount
 
         // Get clipboard content
+        let fetchStartedAt = PerformanceTrace.nowMicros()
         guard let item = await fetchClipboardItem() else { return }
+        PerformanceTrace.event(
+            "pasteboard_change_detected",
+            atMicros: detectedAt,
+            content: item.content,
+            details: ["changeCount": "\(changeCount)"]
+        )
+        PerformanceTrace.event(
+            "clipboard_item_fetched",
+            content: item.content,
+            details: ["fetchStartedAt": "\(fetchStartedAt)"]
+        )
 
         // Always add to history - addToHistory handles duplicates by moving them to top
         addToHistory(item)
         lastEventTime = Date()
+        currentInterval = minInterval
 
         // Reset flags
         await state.setFromEditor(false)
     }
 
     private func addToHistory(_ item: ClipItem) {
+        let updateStartedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event(
+            "history_update_started",
+            atMicros: updateStartedAt,
+            content: item.content,
+            count: history.count
+        )
+
         // Check if an item with same content exists and preserve its pin state
         var newItem = item
-        if let existingIndex = history.firstIndex(where: { $0.content == item.content }) {
+        if let existingIndex = indexOfExistingContent(item.content) {
             let existingItem = history[existingIndex]
             // Preserve pin state and user-assigned category from existing item
             if existingItem.isPinned { newItem.isPinned = true }
@@ -516,11 +589,27 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         history.insert(newItem, at: 0)
 
         // Trim history to max size
-        _ = trimHistory()
+        if trimHistory() {
+            rebuildContentLookup()
+        }
+        itemIDByContent[newItem.content] = newItem.id
 
         // Trigger save
+        markHistoryChanged()
+        PerformanceTrace.event(
+            "history_update_finished",
+            content: newItem.content,
+            revision: historyRevision,
+            count: history.count
+        )
         saveSubject.send(history)
-        notifyHistoryObservers()
+        PerformanceTrace.event(
+            "history_save_enqueued",
+            content: newItem.content,
+            revision: historyRevision,
+            count: history.count
+        )
+        notifyHistoryObservers(content: newItem.content)
     }
 
     private func shouldSkipChange(for changeCount: Int) async -> Bool {
@@ -559,9 +648,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func fetchClipboardItem() async -> ClipItem? {
-        guard let content = await MainActor.run(body: {
-            NSPasteboard.general.string(forType: .string)
-        }), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let content = await Self.readStringFromPasteboard(),
+              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             if await state.getInternalCopy() {
                 return nil
             }
@@ -732,10 +820,32 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return false
     }
 
-    private func notifyHistoryObservers() {
+    private func notifyHistoryObservers(content: String? = nil) {
         Task { @MainActor in
+            PerformanceTrace.event("history_notification_posted", content: content)
             NotificationCenter.default.post(name: .modernClipboardHistoryDidChange, object: nil)
         }
+    }
+
+    private func markHistoryChanged() {
+        historyRevision &+= 1
+    }
+
+    private func rebuildContentLookup() {
+        var lookup: [String: UUID] = [:]
+        lookup.reserveCapacity(history.count)
+        for item in history where lookup[item.content] == nil {
+            lookup[item.content] = item.id
+        }
+        itemIDByContent = lookup
+    }
+
+    private func indexOfExistingContent(_ content: String) -> Int? {
+        if let existingID = itemIDByContent[content],
+           let existingIndex = history.firstIndex(where: { $0.id == existingID }) {
+            return existingIndex
+        }
+        return history.firstIndex { $0.content == content }
     }
 
     // MARK: - App Tracking

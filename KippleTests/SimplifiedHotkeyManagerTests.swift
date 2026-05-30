@@ -1,5 +1,6 @@
 import XCTest
 import Combine
+import Carbon
 @testable import Kipple
 
 @MainActor
@@ -93,6 +94,74 @@ final class SimplifiedHotkeyManagerTests: XCTestCase {
 
         // Then
         await fulfillment(of: [expectation], timeout: 1.0)
+    }
+
+    func testCarbonHandlerIgnoresForeignSignature() async throws {
+        let inverted = XCTestExpectation(description: "Foreign signature should not trigger")
+        inverted.isInverted = true
+
+        NotificationCenter.default.publisher(for: NSNotification.Name("toggleMainWindow"))
+            .sink { _ in
+                inverted.fulfill()
+            }
+            .store(in: &cancellables)
+
+        manager.setEnabled(true)
+        manager.setHotkey(keyCode: 46, modifiers: [.control, .option])
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B505443, identifier: 1) // 'KPTC'
+
+        XCTAssertEqual(status, OSStatus(eventNotHandledErr))
+        await fulfillment(of: [inverted], timeout: 0.1)
+    }
+
+    func testCarbonHandlerIgnoresUnexpectedIdentifier() async throws {
+        let inverted = XCTestExpectation(description: "Unexpected identifier should not trigger")
+        inverted.isInverted = true
+
+        NotificationCenter.default.publisher(for: NSNotification.Name("toggleMainWindow"))
+            .sink { _ in
+                inverted.fulfill()
+            }
+            .store(in: &cancellables)
+
+        manager.setEnabled(true)
+        manager.setHotkey(keyCode: 46, modifiers: [.control, .option])
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B50484B, identifier: 2) // 'KPHK'
+
+        XCTAssertEqual(status, OSStatus(eventNotHandledErr))
+        await fulfillment(of: [inverted], timeout: 0.1)
+    }
+
+    func testCarbonHandlerTriggersForOwnSignatureAndIdentifier() async throws {
+        let expectation = XCTestExpectation(description: "Main hotkey triggered via Carbon handler")
+
+        NotificationCenter.default.publisher(for: NSNotification.Name("toggleMainWindow"))
+            .sink { _ in
+                expectation.fulfill()
+            }
+            .store(in: &cancellables)
+
+        manager.setEnabled(true)
+        manager.setHotkey(keyCode: 46, modifiers: [.control, .option])
+        try await Task.sleep(nanoseconds: 20_000_000)
+        let status = manager.debug_processCarbonHotKeyEvent(signature: 0x4B50484B, identifier: 1) // 'KPHK'
+
+        XCTAssertEqual(status, noErr)
+        await fulfillment(of: [expectation], timeout: 0.5)
+    }
+
+    func testSuspendInvalidatesPendingRegistration() async throws {
+        manager.setEnabled(true)
+        manager.setHotkey(keyCode: 46, modifiers: [.control, .option])
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
+            object: nil
+        )
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertFalse(manager.debugIsHotKeyRegistered)
     }
 
     func testSettingsPersistence() {

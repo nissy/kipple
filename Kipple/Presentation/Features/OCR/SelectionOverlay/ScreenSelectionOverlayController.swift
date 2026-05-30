@@ -8,6 +8,10 @@
 import AppKit
 import QuartzCore
 
+private enum SelectionOverlayKey {
+    static let escape: UInt16 = 53
+}
+
 @MainActor
 protocol ScreenSelectionOverlayControlling: AnyObject {
     func present()
@@ -24,6 +28,8 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
     private let onCancel: CancelHandler
     private var isActive = false
     private var cursorPushed = false
+    private var cursorRefreshTasks: [Task<Void, Never>] = []
+    private var keyDownMonitor: Any?
 
     init(onSelection: @escaping SelectionHandler, onCancel: @escaping CancelHandler) {
         self.onSelection = onSelection
@@ -42,25 +48,9 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
             return window
         }
 
-        // マウス位置と同じ画面のウィンドウをキーにして即時にカーソルを切り替える
-        let mouseLocation = NSEvent.mouseLocation
-        let activeWindow = overlayWindows.first { window in
-            guard let frame = window.screen?.frame else { return false }
-            return frame.contains(mouseLocation)
-        }
-
-        if let activeWindow {
-            activeWindow.makeKeyAndOrderFront(nil)
-            activeWindow.flashCursorHighlight(at: mouseLocation)
-        } else if let firstWindow = overlayWindows.first {
-            firstWindow.makeKeyAndOrderFront(nil)
-        }
-
-        if !cursorPushed {
-            NSCursor.crosshair.push()
-            cursorPushed = true
-        }
-        NSCursor.crosshair.set()
+        refreshOverlayCursor(flash: true)
+        scheduleCursorRefreshes()
+        installKeyDownMonitor()
     }
 
     func cancel() {
@@ -70,17 +60,114 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
     }
 
     private func closeAllWindows() {
+        isActive = false
+        removeKeyDownMonitor()
+        cancelCursorRefreshes()
         overlayWindows.forEach { window in
             window.selectionDelegate = nil
+            window.disableCursorEnforcement()
             window.orderOut(nil)
             window.close()
         }
         overlayWindows.removeAll()
-        isActive = false
 
         if cursorPushed {
             NSCursor.pop()
             cursorPushed = false
+        }
+    }
+
+    private func refreshOverlayCursor(flash: Bool) {
+        guard isActive else { return }
+
+        let mouseLocation = NSEvent.mouseLocation
+        if let activeWindow = overlayWindow(containingOrNearest: mouseLocation) {
+            activeWindow.makeKeyAndOrderFront(nil)
+            if flash {
+                activeWindow.flashCursorHighlight(at: mouseLocation)
+            }
+        } else if let firstWindow = overlayWindows.first {
+            firstWindow.makeKeyAndOrderFront(nil)
+        }
+
+        overlayWindows.forEach { window in
+            window.enforceCrosshairCursor()
+        }
+
+        if !cursorPushed {
+            NSCursor.crosshair.push()
+            cursorPushed = true
+        }
+        NSCursor.crosshair.set()
+    }
+
+    private func scheduleCursorRefreshes() {
+        cancelCursorRefreshes()
+        let delays: [UInt64] = [20_000_000, 80_000_000, 180_000_000]
+        cursorRefreshTasks = delays.map { delay in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: delay)
+                guard !Task.isCancelled else { return }
+                self?.refreshOverlayCursor(flash: false)
+            }
+        }
+    }
+
+    private func cancelCursorRefreshes() {
+        cursorRefreshTasks.forEach { $0.cancel() }
+        cursorRefreshTasks.removeAll()
+    }
+
+    private func overlayWindow(containingOrNearest point: NSPoint) -> SelectionOverlayWindow? {
+        if let containing = overlayWindows.first(where: { window in
+            guard let frame = window.screen?.frame else { return false }
+            return frame.insetBy(dx: -1, dy: -1).contains(point)
+        }) {
+            return containing
+        }
+
+        return overlayWindows.min { lhs, rhs in
+            distanceSquared(from: point, to: lhs.screen?.frame) < distanceSquared(from: point, to: rhs.screen?.frame)
+        }
+    }
+
+    private func distanceSquared(from point: NSPoint, to frame: NSRect?) -> CGFloat {
+        guard let frame else { return .greatestFiniteMagnitude }
+
+        let dx: CGFloat
+        if point.x < frame.minX {
+            dx = frame.minX - point.x
+        } else if point.x > frame.maxX {
+            dx = point.x - frame.maxX
+        } else {
+            dx = 0
+        }
+
+        let dy: CGFloat
+        if point.y < frame.minY {
+            dy = frame.minY - point.y
+        } else if point.y > frame.maxY {
+            dy = point.y - frame.maxY
+        } else {
+            dy = 0
+        }
+
+        return dx * dx + dy * dy
+    }
+
+    private func installKeyDownMonitor() {
+        guard keyDownMonitor == nil else { return }
+        keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == SelectionOverlayKey.escape else { return event }
+            self?.cancel()
+            return nil
+        }
+    }
+
+    private func removeKeyDownMonitor() {
+        if let keyDownMonitor {
+            NSEvent.removeMonitor(keyDownMonitor)
+            self.keyDownMonitor = nil
         }
     }
 }
@@ -162,12 +249,25 @@ private final class SelectionOverlayWindow: NSWindow {
         overlayView.flashCursorHighlight(at: localPoint)
     }
 
+    func enforceCrosshairCursor() {
+        overlayView.enforceCrosshairCursor()
+    }
+
+    func disableCursorEnforcement() {
+        overlayView.disableCursorEnforcement()
+    }
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    override func becomeKey() {
+        super.becomeKey()
+        enforceCrosshairCursor()
+    }
+
     override func keyDown(with event: NSEvent) {
         // ESCキーでキャンセル
-        if event.keyCode == 53 {
+        if event.keyCode == SelectionOverlayKey.escape {
             selectionDelegate?.selectionOverlayWindowDidCancel(self)
             return
         }
@@ -180,6 +280,7 @@ private final class SelectionOverlayWindow: NSWindow {
 private final class SelectionOverlayView: NSView {
     var selectionHandler: ((NSRect) -> Void)?
     var cancelHandler: (() -> Void)?
+    private var shouldEnforceCursor = true
 
     private var startPoint: NSPoint?
     private var currentPoint: NSPoint?
@@ -205,6 +306,22 @@ private final class SelectionOverlayView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        enforceCrosshairCursor()
+    }
+
+    func enforceCrosshairCursor() {
+        guard shouldEnforceCursor else { return }
+        window?.invalidateCursorRects(for: self)
+        NSCursor.crosshair.set()
+    }
+
+    func disableCursorEnforcement() {
+        shouldEnforceCursor = false
+        discardTrackingArea()
+    }
 
     func flashCursorHighlight(at point: NSPoint) {
         guard let layer else { return }
@@ -263,9 +380,8 @@ private final class SelectionOverlayView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        if let area = trackingArea {
-            removeTrackingArea(area)
-        }
+        discardTrackingArea()
+        guard shouldEnforceCursor else { return }
         let options: NSTrackingArea.Options = [.activeAlways, .mouseEnteredAndExited, .mouseMoved, .inVisibleRect, .cursorUpdate]
         let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(area)
@@ -274,10 +390,22 @@ private final class SelectionOverlayView: NSView {
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        guard shouldEnforceCursor else { return }
         addCursorRect(bounds, cursor: .crosshair)
     }
 
     override func cursorUpdate(with event: NSEvent) {
+        guard shouldEnforceCursor else { return }
+        NSCursor.crosshair.set()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard shouldEnforceCursor else { return }
+        NSCursor.crosshair.set()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        guard shouldEnforceCursor else { return }
         NSCursor.crosshair.set()
     }
 
@@ -331,7 +459,7 @@ private final class SelectionOverlayView: NSView {
         startPoint = convert(event.locationInWindow, from: nil)
         currentPoint = startPoint
         selectionRect = NSRect(origin: startPoint ?? .zero, size: .zero)
-        NSCursor.crosshair.set()
+        enforceCrosshairCursor()
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -339,7 +467,7 @@ private final class SelectionOverlayView: NSView {
         currentPoint = convert(event.locationInWindow, from: nil)
         guard let currentPoint else { return }
         selectionRect = rect(from: start, to: currentPoint)
-        NSCursor.crosshair.set()
+        enforceCrosshairCursor()
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -377,5 +505,12 @@ private final class SelectionOverlayView: NSView {
     private func configureLayer() {
         wantsLayer = true
         layer?.masksToBounds = false
+    }
+
+    private func discardTrackingArea() {
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+            self.trackingArea = nil
+        }
     }
 }

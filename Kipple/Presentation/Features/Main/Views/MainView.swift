@@ -4,6 +4,7 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
+// swiftlint:disable file_length
 import SwiftUI
 import AppKit
 import Combine
@@ -141,6 +142,7 @@ extension MainView {
 
         if shouldAutoPaste {
             Task { @MainActor in
+                viewModel.cancelPendingSearchFilter()
                 await viewModel.selectHistoryItemAndWait(item)
                 if !isAlwaysOnTop {
                     onClose?()
@@ -151,20 +153,28 @@ extension MainView {
             return
         }
 
+        let needsNotification = isAlwaysOnTop
+        // 直前 typing の検索 coalesce を確実に潰す
+        viewModel.cancelPendingSearchFilter()
+        // 先にウインドウを閉じる。orderOut は MainActor を ~100ms 占有するが、
+        // focus 復帰スケジュール (asyncAfter 0.05s) は orderOut と並行で timer が走るため、
+        // 両方を最速化できる
+        if !isAlwaysOnTop {
+            onClose?()
+        }
+        // focus 復帰を await の前にスケジュール。pasteboard 書き込みは actor 内 ~0.5ms で完了
+        // するので、reactivate.fire (orderOut MainActor 解放後 + 50ms) 時点では確実に確定済み
+        reactivatePreviousAppAfterCopy()
+
         Task { @MainActor in
-            let needsNotification = isAlwaysOnTop
-            if !isAlwaysOnTop {
-                onClose?()
+            await viewModel.selectHistoryItemAwaitingPasteboard(item)
+            // history 再同期は focus 復帰が完全に終わってから (200ms 後) 実行し、
+            // SwiftUI @Published cascade による focus 競合余地を抑える
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                await viewModel.finalizeRecopyRefresh()
             }
-
-            await viewModel.selectHistoryItemAndWait(item)
-
-            // Always return focus to前面アプリ（ピン留め中でも復帰）
-            reactivatePreviousAppAfterCopy()
-
-            // コピー時の処理
             if needsNotification {
-                // Always on Topが有効な場合のみ通知を表示
                 showCopiedNotification(.copied)
             }
         }
