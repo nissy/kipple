@@ -243,6 +243,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
+        let tracedContent = items.first?.content
+        PerformanceTrace.event("viewmodel_update_started", content: tracedContent, count: items.count)
         rebuildHistoryLookups(using: items)
         updateCurrentClipboardItemID()
 
@@ -327,6 +329,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             history = newHistory
             hasMoreHistory = newHasMoreHistory
             pinnedItems = newPinnedItems
+            PerformanceTrace.event(
+                "viewmodel_history_published",
+                content: newHistory.first?.content,
+                count: newHistory.count,
+                details: ["filtered": "\(queueOrdered.count)"]
+            )
         }
 
         let shouldAnimate = animated && newHistory.count <= filterAnimationThreshold

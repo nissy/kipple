@@ -21,7 +21,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // ポーリング間隔（アクティブ時は短めにして遅延を減らす）
     private var currentInterval: TimeInterval = 0.12
     private let minInterval: TimeInterval = 0.08
-    private let maxInterval: TimeInterval = 0.5
+    private let maxInterval: TimeInterval = 0.25
     private var maxHistoryItems = 300  // Default value, will be updated from AppSettings
     private var isMonitoringFlag = false
 
@@ -173,14 +173,26 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             return nil
         }
         let removedIDs = previousSnapshot.keys.filter { currentSnapshot[$0] == nil }
+        let tracedContent = inserted.first?.content ?? updated.first?.content
 
         do {
+            PerformanceTrace.event(
+                "history_save_started",
+                content: tracedContent,
+                count: items.count,
+                details: [
+                    "inserted": "\(inserted.count)",
+                    "updated": "\(updated.count)",
+                    "removed": "\(removedIDs.count)"
+                ]
+            )
             try await repository.applyChanges(
                 inserted: inserted,
                 updated: updated,
                 removed: removedIDs
             )
             persistedSnapshot = currentSnapshot
+            PerformanceTrace.event("history_save_finished", content: tracedContent, count: items.count)
         } catch {
             Logger.shared.error("Failed to persist history diff: \(error)")
         }
@@ -525,20 +537,42 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         if await shouldSkipChange(for: changeCount) { return }
 
+        let detectedAt = PerformanceTrace.nowMicros()
         lastChangeCount = changeCount
 
         // Get clipboard content
+        let fetchStartedAt = PerformanceTrace.nowMicros()
         guard let item = await fetchClipboardItem() else { return }
+        PerformanceTrace.event(
+            "pasteboard_change_detected",
+            atMicros: detectedAt,
+            content: item.content,
+            details: ["changeCount": "\(changeCount)"]
+        )
+        PerformanceTrace.event(
+            "clipboard_item_fetched",
+            content: item.content,
+            details: ["fetchStartedAt": "\(fetchStartedAt)"]
+        )
 
         // Always add to history - addToHistory handles duplicates by moving them to top
         addToHistory(item)
         lastEventTime = Date()
+        currentInterval = minInterval
 
         // Reset flags
         await state.setFromEditor(false)
     }
 
     private func addToHistory(_ item: ClipItem) {
+        let updateStartedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event(
+            "history_update_started",
+            atMicros: updateStartedAt,
+            content: item.content,
+            count: history.count
+        )
+
         // Check if an item with same content exists and preserve its pin state
         var newItem = item
         if let existingIndex = indexOfExistingContent(item.content) {
@@ -561,8 +595,20 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Trigger save
         markHistoryChanged()
+        PerformanceTrace.event(
+            "history_update_finished",
+            content: newItem.content,
+            revision: historyRevision,
+            count: history.count
+        )
         saveSubject.send(history)
-        notifyHistoryObservers()
+        PerformanceTrace.event(
+            "history_save_enqueued",
+            content: newItem.content,
+            revision: historyRevision,
+            count: history.count
+        )
+        notifyHistoryObservers(content: newItem.content)
     }
 
     private func shouldSkipChange(for changeCount: Int) async -> Bool {
@@ -773,8 +819,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return false
     }
 
-    private func notifyHistoryObservers() {
+    private func notifyHistoryObservers(content: String? = nil) {
         Task { @MainActor in
+            PerformanceTrace.event("history_notification_posted", content: content)
             NotificationCenter.default.post(name: .modernClipboardHistoryDidChange, object: nil)
         }
     }

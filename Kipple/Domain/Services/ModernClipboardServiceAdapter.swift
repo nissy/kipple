@@ -254,9 +254,22 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         let historyChanged = lastKnownHistoryRevision != newRevision
 
         if historyChanged {
+            PerformanceTrace.event("adapter_refresh_started", revision: newRevision)
             let newHistory = await modernService.getHistory()
+            PerformanceTrace.event(
+                "adapter_history_will_publish",
+                content: newHistory.first?.content,
+                revision: newRevision,
+                count: newHistory.count
+            )
             history = newHistory
             lastKnownHistoryRevision = newRevision
+            PerformanceTrace.event(
+                "adapter_history_did_publish",
+                content: newHistory.first?.content,
+                revision: newRevision,
+                count: newHistory.count
+            )
 
             // Call the history changed callback if set
             if let firstItem = newHistory.first {
