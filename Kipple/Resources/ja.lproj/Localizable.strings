@@ -15,6 +15,7 @@
 "Add Fallback Font" = "フォールバックフォントを追加";
 "Add Font" = "フォントを追加";
 "Auto Clipboard Clear" = "クリップボード自動消去";
+"Auto Pin" = "自動ピン留め";
 "Bottom" = "下";
 "Built-in categories cannot be deleted" = "標準カテゴリは削除できません";
 "Cancel" = "キャンセル";
@@ -40,6 +41,12 @@
 "Maximum pinned items" = "ピン留めの最大件数";
 "Clear history" = "履歴を削除";
 "Remove all clipboard history items (pinned items stay)" = "クリップボード履歴をすべて削除します（ピン留めは残ります）";
+"Enable Auto Pin" = "自動ピン留めを有効化";
+"Automatically pin repeated external copies." = "外部アプリで連続コピーした項目を自動でピン留めします。";
+"Repeated copy window" = "連続コピーの判定時間";
+"Pin an item when the same text is copied repeatedly within this time." = "この時間内に同じテキストを連続コピーしたらピン留めします。";
+"Repeated copy count" = "連続コピー回数";
+"History recopy actions are not counted." = "履歴アイテムの再コピーはカウントしません。";
 "Delete" = "削除";
 "Delete category" = "カテゴリを削除";
 "Delete item" = "項目を削除";
@@ -174,6 +181,8 @@
 "history.clear.pinnedPreserved" = "ピン留め %d 件は残ります。";
 "history.clear.success" = "履歴から %d 件を削除しました。";
 "minutes" = "分";
+"seconds" = "秒";
+"copies" = "回";
 "pt" = "pt";
 "© 2025 Kipple" = "© 2025 Kipple";
 "⇧ Shift" = "⇧ Shift";

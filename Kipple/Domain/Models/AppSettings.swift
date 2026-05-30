@@ -50,6 +50,32 @@ final class AppSettings: ObservableObject {
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
     @AppStorage("maxPinnedItems") var maxPinnedItems = 50
     @AppStorage("historySelectPaste") var historySelectPaste = false
+    @AppStorage("autoPinRepeatedCopyEnabled") var autoPinRepeatedCopyEnabled = true
+
+    @AppStorage("autoPinRepeatedCopyIntervalSeconds")
+    private var storedAutoPinRepeatedCopyIntervalSeconds = 5
+    @AppStorage("autoPinRepeatedCopyCount")
+    private var storedAutoPinRepeatedCopyCount = 3
+
+    var autoPinRepeatedCopyIntervalSeconds: Int {
+        get { Self.clamp(storedAutoPinRepeatedCopyIntervalSeconds, min: 3, max: 10) }
+        set {
+            let clamped = Self.clamp(newValue, min: 3, max: 10)
+            guard storedAutoPinRepeatedCopyIntervalSeconds != clamped else { return }
+            objectWillChange.send()
+            storedAutoPinRepeatedCopyIntervalSeconds = clamped
+        }
+    }
+
+    var autoPinRepeatedCopyCount: Int {
+        get { Self.clamp(storedAutoPinRepeatedCopyCount, min: 3, max: 20) }
+        set {
+            let clamped = Self.clamp(newValue, min: 3, max: 20)
+            guard storedAutoPinRepeatedCopyCount != clamped else { return }
+            objectWillChange.send()
+            storedAutoPinRepeatedCopyCount = clamped
+        }
+    }
     
     // Hotkey Settings
     @AppStorage("enableHotkey") var enableHotkey: Bool = false  // デフォルトで無効
@@ -147,6 +173,10 @@ final class AppSettings: ObservableObject {
             historySelectPaste = false
         }
     }
+
+    private static func clamp(_ value: Int, min lowerBound: Int, max upperBound: Int) -> Int {
+        Swift.max(lowerBound, Swift.min(upperBound, value))
+    }
     
     // Settings Keys for consistency
     struct Keys {
@@ -161,6 +191,9 @@ final class AppSettings: ObservableObject {
         static let editorInsertModifiers = "editorInsertModifiers"
         static let maxHistoryItems = "maxHistoryItems"
         static let maxPinnedItems = "maxPinnedItems"
+        static let autoPinRepeatedCopyEnabled = "autoPinRepeatedCopyEnabled"
+        static let autoPinRepeatedCopyIntervalSeconds = "autoPinRepeatedCopyIntervalSeconds"
+        static let autoPinRepeatedCopyCount = "autoPinRepeatedCopyCount"
         static let enableHotkey = "enableHotkey"
         static let hotkeyKeyCode = "hotkeyKeyCode"
         static let hotkeyModifierFlags = "hotkeyModifierFlags"

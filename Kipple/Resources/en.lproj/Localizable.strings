@@ -15,6 +15,7 @@
 "Add Fallback Font" = "Add Fallback Font";
 "Add Font" = "Add Font";
 "Auto Clipboard Clear" = "Auto Clipboard Clear";
+"Auto Pin" = "Auto Pin";
 "Bottom" = "Bottom";
 "Built-in categories cannot be deleted" = "Built-in categories cannot be deleted";
 "Cancel" = "Cancel";
@@ -40,6 +41,12 @@
 "Maximum pinned items" = "Maximum pinned items";
 "Clear history" = "Clear history";
 "Remove all clipboard history items (pinned items stay)" = "Remove all clipboard history items (pinned items stay)";
+"Enable Auto Pin" = "Enable Auto Pin";
+"Automatically pin repeated external copies." = "Automatically pin repeated external copies.";
+"Repeated copy window" = "Repeated copy window";
+"Pin an item when the same text is copied repeatedly within this time." = "Pin an item when the same text is copied repeatedly within this time.";
+"Repeated copy count" = "Repeated copy count";
+"History recopy actions are not counted." = "History recopy actions are not counted.";
 "Delete" = "Delete";
 "Delete category" = "Delete category";
 "Delete item" = "Delete item";
@@ -174,6 +181,8 @@
 "history.clear.pinnedPreserved" = "%d pinned items will remain.";
 "history.clear.success" = "Deleted %d items from history.";
 "minutes" = "minutes";
+"seconds" = "seconds";
+"copies" = "copies";
 "pt" = "pt";
 "© 2025 Kipple" = "© 2025 Kipple";
 "⇧ Shift" = "⇧ Shift";

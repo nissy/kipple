@@ -31,6 +31,7 @@
 		1AD90183D200D3474E6F4F72 /* KippleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68AE691F1C10B06D450798F8 /* KippleApp.swift */; };
 		1B31E79BB06D60A45DAA6B22 /* ClipboardItemPopoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D702246E28B36A993E8DA2 /* ClipboardItemPopoverTests.swift */; };
 		1B822DA356144C13851F6995 /* TextRecognitionServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = D44138ED69D85A15DE70E6B1 /* TextRecognitionServiceProtocol.swift */; };
+		1C11991E12991872E97CE5A9 /* AutoPinSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2FB380E7244A02795ADCB17 /* AutoPinSettingsView.swift */; };
 		1C47AD62906E6AEA7116C89E /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF0A9EA04C6D3DCB72F6EA5 /* HotkeyRecorderView.swift */; };
 		1DF7E8C1106493040EB3A0AD /* SwiftDataRepositoryComprehensiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB0F2C9F3E7E841B7C707C6 /* SwiftDataRepositoryComprehensiveTests.swift */; };
 		20C367DB3064914202E02EFC /* UserCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704FBF789F27F0E1F5DA71F8 /* UserCategory.swift */; };
@@ -308,6 +309,7 @@
 		9E12EDD1DC3948006995C1E5 /* WindowFocusReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowFocusReturnTests.swift; sourceTree = "<group>"; };
 		A0ED818B8D1B98408B17D834 /* ClipboardMonitoringDuplicateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitoringDuplicateTests.swift; sourceTree = "<group>"; };
 		A1EF33FDC2171B34E560EF64 /* MenuBarApp+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarApp+Testing.swift"; sourceTree = "<group>"; };
+		A2FB380E7244A02795ADCB17 /* AutoPinSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoPinSettingsView.swift; sourceTree = "<group>"; };
 		A3635D451D2C85F5060AE4BE /* DuplicateRecopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateRecopyTests.swift; sourceTree = "<group>"; };
 		A37EA352932E46C425A5EE57 /* ClearClipboardSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearClipboardSyncTests.swift; sourceTree = "<group>"; };
 		A582C8A5F8898B8901CAFA50 /* Kipple.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kipple.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -593,6 +595,7 @@
 		6031EAA5A332229B227A5611 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A2FB380E7244A02795ADCB17 /* AutoPinSettingsView.swift */,
 				74ED56E8888BBC7EF54BB602 /* ClipboardFontSettingsView.swift */,
 				7077BB0F24641D773661D25B /* DataSettingsView.swift */,
 				44469F027281459864B47E6B /* EditorSettingsView.swift */,
@@ -1102,6 +1105,7 @@
 				ECF960991E35A8A70CF5093F /* AboutView.swift in Sources */,
 				91675D34939D0309CDB56412 /* AppSettings.swift in Sources */,
 				A088458E665C2820A1C03D53 /* AutoPasteController.swift in Sources */,
+				1C11991E12991872E97CE5A9 /* AutoPinSettingsView.swift in Sources */,
 				5EF8C1590662867113127642 /* ButtonStyles.swift in Sources */,
 				08881D0C932D78C6BA98D607 /* CategoryClassifier.swift in Sources */,
 				38541710930127A075D18A53 /* CategoryClassifierCache.swift in Sources */,

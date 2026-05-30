@@ -56,6 +56,8 @@ struct DataSettingsView: View {
                         ManageCategoriesButton()
                     }
                 }
+
+                AutoPinSettingsView()
                 
                 // Auto-Clear Settings Section
                 SettingsGroup("Auto Clipboard Clear") {
