@@ -296,6 +296,9 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             if newCurrentContent == pending {
                 currentClipboardContent = pending
                 pendingClipboardContent = nil
+            } else if newCurrentContent != previousClipboardContent {
+                currentClipboardContent = newCurrentContent
+                pendingClipboardContent = nil
             }
         } else if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent

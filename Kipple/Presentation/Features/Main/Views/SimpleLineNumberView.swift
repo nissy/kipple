@@ -21,7 +21,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
     }
     
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
+        let scrollView = makeScrollView()
         
         guard let textView = scrollView.documentView as? NSTextView else {
             return scrollView
@@ -60,6 +60,26 @@ struct SimpleLineNumberView: NSViewRepresentable {
         context.coordinator.paragraphStyle = paragraphStyle
         context.coordinator.setupNotifications()
         
+        return scrollView
+    }
+
+    private func makeScrollView() -> NSScrollView {
+        let scrollView = NSScrollView()
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        )
+
+        textStorage.addLayoutManager(layoutManager)
+        layoutManager.addTextContainer(textContainer)
+
+        let textView = LiveEditorTextView(
+            frame: NSRect(origin: .zero, size: NSSize(width: 100, height: 100)),
+            textContainer: textContainer
+        )
+
+        scrollView.documentView = textView
         return scrollView
     }
     

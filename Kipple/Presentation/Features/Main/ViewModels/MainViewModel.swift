@@ -385,6 +385,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     func clearEditor() {
         liveEditorWriteTask?.cancel()
+        LiveEditorTextView.clearLocalClipboard()
         isApplyingClipboardContentToEditor = true
         editorText = ""
         isApplyingClipboardContentToEditor = false
@@ -411,6 +412,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let text = content ?? ""
         guard editorText != text else { return }
 
+        LiveEditorTextView.clearLocalClipboard()
         isApplyingClipboardContentToEditor = true
         editorText = text
         isApplyingClipboardContentToEditor = false

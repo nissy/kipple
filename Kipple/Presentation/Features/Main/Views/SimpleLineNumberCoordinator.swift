@@ -134,7 +134,7 @@ final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, NSLayoutM
         // デフォルトの動作を維持
         return true
     }
-    
+
     // MARK: - NSLayoutManagerDelegate
     
     func layoutManager(

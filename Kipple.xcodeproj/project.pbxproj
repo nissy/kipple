@@ -183,6 +183,7 @@
 		FD2257A01775EBF6AFBFF297 /* TestUserDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03132BE081C4F4DD5B430EB3 /* TestUserDefaults.swift */; };
 		FE559C2AA720A6221F37680D /* SettingsBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E7D33E5F9472C2A229901F /* SettingsBackupTests.swift */; };
 		FF29198CDF33EB1A631FBABA /* ClearAllHistoryBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B56AB0D9DA2210397B15B7A /* ClearAllHistoryBehaviorTests.swift */; };
+		FFDF5D4379A11B78FED99803 /* LiveEditorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68BDF7D672828E174C6979C3 /* LiveEditorTextView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -267,6 +268,7 @@
 		67BF4F2A209B66F653AED625 /* LastActiveAppTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastActiveAppTracker.swift; sourceTree = "<group>"; };
 		6805FAF51BA5FFDDC8167C46 /* ModernClipboardServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceProtocol.swift; sourceTree = "<group>"; };
 		68AE691F1C10B06D450798F8 /* KippleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KippleApp.swift; sourceTree = "<group>"; };
+		68BDF7D672828E174C6979C3 /* LiveEditorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEditorTextView.swift; sourceTree = "<group>"; };
 		697EBB69F4BEBE93D9865E28 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6AE27F632B10A5817688AA5E /* MockClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockClipboardService.swift; sourceTree = "<group>"; };
 		6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearButtonRegressionTest.swift; sourceTree = "<group>"; };
@@ -864,6 +866,7 @@
 			children = (
 				3A09DA616DE838519C325D3A /* CopiedNotificationView.swift */,
 				48420E5048DC095008EB41EF /* HistoryListView.swift */,
+				68BDF7D672828E174C6979C3 /* LiveEditorTextView.swift */,
 				54FE442129DA6DBFA679C63C /* MainView.swift */,
 				F06D6CD2CB34C53BE15740E6 /* MainView+BottomBar.swift */,
 				007C7037738330372CC30B6B /* MainView+Filters.swift */,
@@ -1135,6 +1138,7 @@
 				1AD90183D200D3474E6F4F72 /* KippleApp.swift in Sources */,
 				224A0B5AE732714A9A33A1FE /* LastActiveAppTracker.swift in Sources */,
 				0A4AB5ED9A6E60E627A0EE50 /* LaunchAtLogin.swift in Sources */,
+				FFDF5D4379A11B78FED99803 /* LiveEditorTextView.swift in Sources */,
 				04C2C232AE6342045AEAD4F9 /* Logger.swift in Sources */,
 				E42A2105915BB2935893CD32 /* MainView+BottomBar.swift in Sources */,
 				93C1F00AC796BCBED5FE4AD1 /* MainView+Filters.swift in Sources */,
