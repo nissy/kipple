@@ -136,8 +136,10 @@ private struct SettingsToolbarButton: View {
                     )
 
                 Text(tab.localizedTitleKey)
-                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 11, weight: .regular))
                     .foregroundColor(labelColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .padding(.horizontal, 5)
             .padding(.vertical, 2)

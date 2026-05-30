@@ -261,7 +261,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             kind: determineKind(for: content, isFromEditor: fromEditor),
             sourceApp: fromEditor ? "Kipple" : metadata.appName,
             windowTitle: fromEditor
-                ? "Quick Editor"
+                ? "Live Editor"
                 : metadata.windowTitle,
             bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
@@ -334,7 +334,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 content: content,
                 kind: determineKind(for: content, isFromEditor: true),
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true
@@ -765,7 +765,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             kind: determineKind(for: content, isFromEditor: isFromEditor),
             sourceApp: isFromEditor ? "Kipple" : metadata.appName,
             windowTitle: isFromEditor
-                ? "Quick Editor"
+                ? "Live Editor"
                 : metadata.windowTitle,
             bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,

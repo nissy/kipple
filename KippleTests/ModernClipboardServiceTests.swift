@@ -517,7 +517,7 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
             ClipItem(
                 content: $0,
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true

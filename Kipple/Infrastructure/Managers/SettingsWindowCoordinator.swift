@@ -136,7 +136,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     }
 
     func refreshLocalization() {
-        guard let window else { return }
+        guard window != nil else { return }
         toolbar.items.forEach { item in
             guard let tab = SettingsViewModel.Tab(toolbarIdentifier: item.itemIdentifier) else { return }
             let title = appSettings.localizedString(tab.titleKey, comment: "Settings tab title")

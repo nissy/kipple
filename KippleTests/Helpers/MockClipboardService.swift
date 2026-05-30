@@ -62,7 +62,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
             item = ClipItem(
                 content: content,
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true
@@ -97,7 +97,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
             ClipItem(
                 content: content,
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true

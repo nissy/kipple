@@ -183,8 +183,8 @@ struct ClipboardItemPopover: View {
     }
 
     private func localizedWindowTitle(_ title: String) -> String {
-        if title == "Quick Editor" {
-            return String(localized: "Quick Editor")
+        if title == "Quick Editor" || title == "Live Editor" {
+            return String(localized: "Live Editor")
         }
         return title
     }

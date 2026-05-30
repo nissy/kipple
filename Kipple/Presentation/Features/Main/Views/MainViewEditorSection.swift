@@ -55,7 +55,7 @@ struct MainViewEditorSection: View {
         .buttonStyle(PlainButtonStyle())
         .padding(.trailing, 8)
         .padding(.bottom, 6)
-        .help(Text("Clear editor"))
+        .help(Text("Clear live editor"))
         .onHover { hovering in
             hoveredClearButton = hovering
         }
