@@ -17,13 +17,10 @@ struct MainViewControlSection: View {
     private let horizontalPadding: CGFloat = 10
 
     var body: some View {
-        HStack(spacing: 12) {
-            modeToggle
-
-            HStack(spacing: 6) {
-                saveButton
-                trimButton
-            }
+        HStack(spacing: 6) {
+            editModeButton
+            saveButton
+            trimButton
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -31,14 +28,26 @@ struct MainViewControlSection: View {
         .padding(.bottom, 2)
     }
 
-    private var modeToggle: some View {
-        Picker("", selection: $editorMode) {
-            Text("editor.mode.display").tag(MainViewModel.ClipboardEditorMode.display)
-            Text("editor.mode.editing").tag(MainViewModel.ClipboardEditorMode.editing)
+    private var editModeButton: some View {
+        Button(action: toggleEditorMode) {
+            Text(editModeButtonTitle)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, horizontalPadding)
+                .frame(minWidth: 64, minHeight: buttonHeight)
+                .contentShape(Rectangle())
         }
-        .pickerStyle(.segmented)
-        .frame(width: 112, height: buttonHeight)
-        .labelsHidden()
+        .accessibilityLabel(Text(editModeButtonTitle))
+        .buttonStyle(PlainButtonStyle())
+        .foregroundColor(.white)
+        .background(editModeButtonBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(editModeButtonBorder, lineWidth: 1)
+        )
+        .shadow(color: editModeButtonShadow, radius: 4, y: 2)
     }
 
     private var trimButton: some View {
@@ -99,6 +108,8 @@ struct MainViewControlSection: View {
             if let title {
                 Text(title)
                     .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
             if !shortcut.isEmpty {
@@ -129,9 +140,48 @@ struct MainViewControlSection: View {
             endPoint: .bottomTrailing
         )
     }
+
+    private var isEditing: Bool {
+        editorMode == .editing
+    }
+
+    private var editModeButtonTitle: LocalizedStringKey {
+        isEditing ? "editor.mode.editingActive" : "editor.mode.startEditing"
+    }
+
+    private var editModeButtonBackground: LinearGradient {
+        if isEditing {
+            return dangerButtonBackground
+        }
+
+        return primaryButtonBackground
+    }
+
+    private var editModeButtonBorder: Color {
+        Color.white.opacity(0.15)
+    }
+
+    private var editModeButtonShadow: Color {
+        Color.black.opacity(0.12)
+    }
+
+    private var dangerButtonBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.red,
+                Color.red.opacity(0.85)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
     
     private var trimButtonColor: Color {
         Color.green
+    }
+
+    private func toggleEditorMode() {
+        editorMode = isEditing ? .display : .editing
     }
 
     private func getShortcutKeyDisplay() -> String {

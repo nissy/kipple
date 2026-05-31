@@ -57,6 +57,8 @@
 "editor.saveToHistory" = "履歴に保存";
 "editor.mode.display" = "表示";
 "editor.mode.editing" = "編集";
+"editor.mode.startEditing" = "編集する";
+"editor.mode.editingActive" = "編集中";
 "Save" = "Save";
 "Editor Position" = "ライブエディタの位置";
 "External Source" = "外部アプリ";
