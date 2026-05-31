@@ -14,6 +14,10 @@ extension MainView {
         appSettings.editorPosition != "disabled"
     }
 
+    var clipboardEditorModeBinding: Binding<MainViewModel.ClipboardEditorMode> {
+        Binding(get: { viewModel.clipboardEditorMode }, set: { viewModel.setClipboardEditorMode($0) })
+    }
+
     func saveEditorToHistory() {
         Task { @MainActor in
             let insertedCount = await viewModel.saveEditorToHistory()

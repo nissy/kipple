@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct MainViewControlSection: View {
+    @Binding var editorMode: MainViewModel.ClipboardEditorMode
     let onSave: () -> Void
     let onTrim: () -> Void
     @ObservedObject private var appSettings = AppSettings.shared
@@ -17,6 +18,8 @@ struct MainViewControlSection: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            modeToggle
+
             HStack(spacing: 6) {
                 saveButton
                 trimButton
@@ -26,6 +29,16 @@ struct MainViewControlSection: View {
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
+    }
+
+    private var modeToggle: some View {
+        Picker("", selection: $editorMode) {
+            Text("editor.mode.display").tag(MainViewModel.ClipboardEditorMode.display)
+            Text("editor.mode.editing").tag(MainViewModel.ClipboardEditorMode.editing)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 112, height: buttonHeight)
+        .labelsHidden()
     }
 
     private var trimButton: some View {
@@ -54,9 +67,9 @@ struct MainViewControlSection: View {
         Button(action: onSave) {
             buttonLabel(
                 systemImage: "tray.and.arrow.down",
-                title: "Save",
+                title: "editor.saveToHistory",
                 shortcut: getShortcutKeyDisplay(),
-                accessibilityLabel: "Save"
+                accessibilityLabel: "editor.saveToHistory"
             )
             .padding(.horizontal, horizontalPadding)
             .frame(height: buttonHeight)

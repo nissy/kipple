@@ -10,24 +10,41 @@ import SwiftUI
 struct MainViewEditorSection: View {
     @Binding var editorText: String
     @Binding var isAlwaysOnTop: Bool
+    let isEditing: Bool
     let onToggleAlwaysOnTop: () -> Void
+    let onBeginEditing: () -> Void
+    let onCommitEditing: () -> Void
     let onClear: () -> Void
     @State private var scrollOffset: CGFloat = 0
     @ObservedObject private var fontManager = FontManager.shared
     @State private var hoveredClearButton = false
     private let clearButtonInset: CGFloat = 20
+    private var displayModeBackgroundColor: NSColor {
+        NSColor(calibratedWhite: 250.0 / 255.0, alpha: 1.0)
+    }
+    private var editorShadowColor: Color {
+        isEditing ? Color.black.opacity(0.08) : Color.clear
+    }
+    private var editorBackgroundColor: Color {
+        isEditing
+            ? Color(NSColor.textBackgroundColor)
+            : Color(displayModeBackgroundColor)
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             // エディタコンテンツ
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(NSColor.textBackgroundColor))
-                    .shadow(color: Color.black.opacity(0.08), radius: 8, y: 4)
+                    .fill(editorBackgroundColor)
+                    .shadow(color: editorShadowColor, radius: isEditing ? 8 : 0, y: isEditing ? 4 : 0)
                 
                 SimpleLineNumberView(
                     text: $editorText,
-                    font: fontManager.editorFont
+                    font: fontManager.editorFont,
+                    isEditable: isEditing,
+                    onDoubleClick: onBeginEditing,
+                    onEscape: onCommitEditing
                 ) { offset in
                     scrollOffset = offset
                 }

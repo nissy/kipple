@@ -10,6 +10,11 @@ import AppKit
 final class SimpleLineNumberRulerView: NSRulerView {
     weak var textView: NSTextView?
     var fixedLineHeight: CGFloat = 20
+    var backgroundColor: NSColor = .controlBackgroundColor {
+        didSet {
+            needsDisplay = true
+        }
+    }
 
     private var lastSelectedLine: Int = 1
     var cachedLineCount: Int = 0

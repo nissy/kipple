@@ -12,12 +12,25 @@ import AppKit
 struct SimpleLineNumberView: NSViewRepresentable {
     @Binding var text: String
     let font: NSFont
+    let isEditable: Bool
+    let onDoubleClick: (() -> Void)?
+    let onEscape: (() -> Void)?
     let onScrollChange: ((CGFloat) -> Void)?
     
     typealias Coordinator = SimpleLineNumberCoordinator
     
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
+    }
+
+    private var editorBackgroundColor: NSColor {
+        isEditable
+            ? NSColor.textBackgroundColor
+            : displayModeBackgroundColor
+    }
+
+    private var displayModeBackgroundColor: NSColor {
+        NSColor(calibratedWhite: 250.0 / 255.0, alpha: 1.0)
     }
     
     func makeNSView(context: Context) -> NSScrollView {
@@ -46,10 +59,12 @@ struct SimpleLineNumberView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
+        applyEditorBackground(to: scrollView, textView: textView)
         
         // カスタムルーラービューを設定
         let lineNumberView = SimpleLineNumberRulerView(textView: textView)
         lineNumberView.fixedLineHeight = lineHeight // 固定行高を渡す
+        lineNumberView.backgroundColor = editorBackgroundColor
         scrollView.verticalRulerView = lineNumberView
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = true
@@ -84,7 +99,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
     }
     
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else { return }
+        guard let textView = scrollView.documentView as? LiveEditorTextView else { return }
         
         // テキストが変更された場合のみ更新（IME入力中は除く）
         if textView.string != text && !textView.hasMarkedText() {
@@ -123,6 +138,11 @@ struct SimpleLineNumberView: NSViewRepresentable {
             
             updateLineNumberView(scrollView: scrollView, lineHeight: lineHeight)
         }
+
+        textView.isEditable = isEditable
+        applyEditorBackground(to: scrollView, textView: textView)
+        textView.onDisplayModeDoubleClick = onDoubleClick
+        textView.onEscape = onEscape
     }
     
     nonisolated func createParagraphStyle(lineHeight: CGFloat) -> NSMutableParagraphStyle {
@@ -170,7 +190,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.delegate = context.coordinator
         textView.font = font
         // テキストの設定は段落スタイル適用後に移動
-        textView.isEditable = true
+        textView.isEditable = isEditable
         textView.isSelectable = true
         textView.isRichText = false
         textView.importsGraphics = false
@@ -181,7 +201,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextCompletionEnabled = false
         textView.smartInsertDeleteEnabled = false
-        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.backgroundColor = editorBackgroundColor
         textView.textColor = NSColor.labelColor
         
         // CotEditorから学んだ重要な設定
@@ -215,6 +235,24 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.autoresizingMask = .width
+
+        if let liveTextView = textView as? LiveEditorTextView {
+            liveTextView.onDisplayModeDoubleClick = onDoubleClick
+            liveTextView.onEscape = onEscape
+        }
+    }
+
+    private func applyEditorBackground(to scrollView: NSScrollView, textView: NSTextView) {
+        let backgroundColor = editorBackgroundColor
+        textView.drawsBackground = true
+        textView.backgroundColor = backgroundColor
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = backgroundColor
+        scrollView.contentView.backgroundColor = backgroundColor
+
+        if let rulerView = scrollView.verticalRulerView as? SimpleLineNumberRulerView {
+            rulerView.backgroundColor = backgroundColor
+        }
     }
     
     private func setupParagraphStyle(textView: NSTextView, paragraphStyle: NSParagraphStyle) {

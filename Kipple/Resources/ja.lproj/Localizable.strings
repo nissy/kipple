@@ -55,6 +55,8 @@
 "Editor Font" = "ライブエディタのフォント";
 "editor.splitCopy.menu" = "行分割して履歴に追加";
 "editor.saveToHistory" = "履歴に保存";
+"editor.mode.display" = "表示";
+"editor.mode.editing" = "編集";
 "Save" = "Save";
 "Editor Position" = "ライブエディタの位置";
 "External Source" = "外部アプリ";

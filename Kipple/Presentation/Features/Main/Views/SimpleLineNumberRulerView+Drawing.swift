@@ -23,7 +23,9 @@ extension SimpleLineNumberRulerView {
         let fullText = textView.string as NSString
 
         if fullText.length == 0 {
-            drawEmptyTextHighlight(textView: textView)
+            if textView.isEditable {
+                drawEmptyTextHighlight(textView: textView)
+            }
             drawEmptyTextLineNumber(
                 textView: textView,
                 layoutManager: layoutManager,
@@ -34,17 +36,10 @@ extension SimpleLineNumberRulerView {
             return
         }
 
-        let selectedRange = textView.selectedRange()
-        let selectedLineNumber = calculateSelectedLineNumber(
-            fullText: fullText,
-            selectedRange: selectedRange
-        )
-
-        drawSelectedLineBackground(
+        drawEditableSelectionHighlight(
             textView: textView,
             layoutManager: layoutManager,
-            fullText: fullText,
-            selectedLineNumber: selectedLineNumber
+            fullText: fullText
         )
 
         let drawingContext = LineNumberDrawingContext(
@@ -69,8 +64,29 @@ extension SimpleLineNumberRulerView {
     }
 
     func drawBackground(in rect: NSRect) {
-        NSColor.controlBackgroundColor.withAlphaComponent(0.5).set()
+        backgroundColor.set()
         rect.fill()
+    }
+
+    func drawEditableSelectionHighlight(
+        textView: NSTextView,
+        layoutManager: NSLayoutManager,
+        fullText: NSString
+    ) {
+        guard textView.isEditable else { return }
+
+        let selectedRange = textView.selectedRange()
+        let selectedLineNumber = calculateSelectedLineNumber(
+            fullText: fullText,
+            selectedRange: selectedRange
+        )
+
+        drawSelectedLineBackground(
+            textView: textView,
+            layoutManager: layoutManager,
+            fullText: fullText,
+            selectedLineNumber: selectedLineNumber
+        )
     }
 
     func drawBorder(in rect: NSRect) {

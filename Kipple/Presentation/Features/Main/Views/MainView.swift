@@ -506,10 +506,14 @@ extension MainView {
             MainViewEditorSection(
                 editorText: $viewModel.editorText,
                 isAlwaysOnTop: $isAlwaysOnTop,
+                isEditing: viewModel.clipboardEditorMode == .editing,
                 onToggleAlwaysOnTop: toggleAlwaysOnTop,
+                onBeginEditing: viewModel.beginClipboardEditing,
+                onCommitEditing: viewModel.commitClipboardEditor,
                 onClear: clearAction
             )
             MainViewControlSection(
+                editorMode: clipboardEditorModeBinding,
                 onSave: saveEditorToHistory,
                 onTrim: trimAction
             )

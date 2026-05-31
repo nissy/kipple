@@ -73,32 +73,43 @@ class MainViewModelTests: XCTestCase {
         XCTAssertNil(mockClipboardService.currentClipboardContent)
     }
 
-    func testEditorTextDebouncedWriteToClipboardOnly() async {
+    func testEditorTextDoesNotWriteWhileEditing() async {
         // When
+        viewModel.beginClipboardEditing()
         viewModel.editorText = "Live edited"
         try? await Task.sleep(nanoseconds: 400_000_000)
 
         // Then
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertNil(mockClipboardService.lastCopiedContent)
+        XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
+    }
+
+    func testSwitchingToDisplayWritesEditedTextToClipboardOnly() {
+        // When
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "Live edited"
+        viewModel.setClipboardEditorMode(.display)
+
+        // Then
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
         XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
         XCTAssertEqual(mockClipboardService.lastCopiedContent, "Live edited")
         XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
     }
 
-    func testEditorTextDebouncedWriteCancelsWhenSystemClipboardChanges() async {
+    func testHistorySelectionDoesNotOverwriteEditorWhileEditing() {
         // Given
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("Before edit", forType: .string)
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "Draft"
+        let item = ClipItem(content: "History Item")
 
         // When
-        viewModel.editorText = "Live edited"
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("External copy", forType: .string)
-        try? await Task.sleep(nanoseconds: 350_000_000)
+        viewModel.selectHistoryItem(item)
 
         // Then
-        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
-        XCTAssertNil(mockClipboardService.lastCopiedContent)
+        XCTAssertEqual(viewModel.editorText, "Draft")
+        XCTAssertEqual(viewModel.currentClipboardContent, "History Item")
     }
 
     // MARK: - History Selection Tests
@@ -178,6 +189,22 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["first\nsecond"])
         XCTAssertEqual(mockClipboardService.recopyFromHistoryCallCount, 0)
         XCTAssertEqual(viewModel.editorText, "first\nsecond")
+    }
+
+    func testSaveEditorToHistoryCommitsEditingTextToClipboard() async {
+        // Given
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "edited history"
+
+        // When
+        let count = await viewModel.saveEditorToHistory()
+
+        // Then
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+        XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertEqual(mockClipboardService.lastCopiedContent, "edited history")
+        XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["edited history"])
     }
     
     // MARK: - Pin Tests

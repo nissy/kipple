@@ -55,6 +55,8 @@
 "Editor Font" = "Live Editor Font";
 "editor.splitCopy.menu" = "Split lines and add to history";
 "editor.saveToHistory" = "Save to History";
+"editor.mode.display" = "Display";
+"editor.mode.editing" = "Edit";
 "Save" = "Save";
 "Editor Position" = "Live Editor Position";
 "External Source" = "External Source";

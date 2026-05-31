@@ -14,6 +14,11 @@ import AppKit
 // swiftlint:disable type_body_length file_length
 @MainActor
 final class MainViewModel: ObservableObject, MainViewModelProtocol {
+    enum ClipboardEditorMode: Hashable {
+        case display
+        case editing
+    }
+
     enum PasteMode {
         case clipboard
         case queueOnce
@@ -29,12 +34,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let isPinnedFilterActive: Bool
     }
 
-    @Published var editorText: String {
-        didSet {
-            guard !isApplyingClipboardContentToEditor else { return }
-            scheduleLiveEditorClipboardWrite(editorText)
-        }
-    }
+    @Published var editorText: String
     
     let clipboardService: any ClipboardServiceProtocol
     private let pasteMonitor: any PasteCommandMonitoring
@@ -67,6 +67,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published private(set) var pasteMode: PasteMode = .clipboard
     @Published private(set) var pasteQueue: [UUID] = []
     @Published private(set) var queueSelectionPreview: Set<UUID> = []
+    @Published private(set) var clipboardEditorMode: ClipboardEditorMode = .display
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String? {
@@ -95,8 +96,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
     private var latestHistorySnapshot: [ClipItem] = []
-    private var liveEditorWriteTask: Task<Void, Never>?
-    private var isApplyingClipboardContentToEditor = false
     private static let newlineSet = CharacterSet.newlines
 
     init(
@@ -361,8 +360,27 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func copyEditor() {
-        liveEditorWriteTask?.cancel()
         writeEditorTextToClipboardOnly(editorText)
+    }
+
+    func setClipboardEditorMode(_ mode: ClipboardEditorMode) {
+        guard clipboardEditorMode != mode else { return }
+
+        switch mode {
+        case .display:
+            commitClipboardEditor()
+        case .editing:
+            clipboardEditorMode = .editing
+        }
+    }
+
+    func beginClipboardEditing() {
+        setClipboardEditorMode(.editing)
+    }
+
+    func commitClipboardEditor() {
+        writeEditorTextToClipboardOnly(editorText)
+        clipboardEditorMode = .display
     }
 
     @discardableResult
@@ -385,22 +403,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     
     func clearEditor() {
-        liveEditorWriteTask?.cancel()
-        LiveEditorTextView.clearLocalClipboard()
-        isApplyingClipboardContentToEditor = true
         editorText = ""
-        isApplyingClipboardContentToEditor = false
-        writeEditorTextToClipboardOnly("")
-    }
-
-    private func scheduleLiveEditorClipboardWrite(_ text: String) {
-        liveEditorWriteTask?.cancel()
-        let scheduledPasteboardChangeCount = NSPasteboard.general.changeCount
-        liveEditorWriteTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard !Task.isCancelled else { return }
-            guard NSPasteboard.general.changeCount == scheduledPasteboardChangeCount else { return }
-            self?.writeEditorTextToClipboardOnly(text)
+        if clipboardEditorMode == .display {
+            writeEditorTextToClipboardOnly("")
         }
     }
 
@@ -410,19 +415,20 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func applyClipboardContentToEditor(_ content: String?) {
-        liveEditorWriteTask?.cancel()
         currentClipboardContent = content
+        guard clipboardEditorMode == .display else { return }
+
         let text = content ?? ""
         guard editorText != text else { return }
 
-        LiveEditorTextView.clearLocalClipboard()
-        isApplyingClipboardContentToEditor = true
         editorText = text
-        isApplyingClipboardContentToEditor = false
     }
 
     @discardableResult
     func saveEditorToHistory() async -> Int {
+        if clipboardEditorMode == .editing {
+            commitClipboardEditor()
+        }
         let items = await clipboardService.addEditorItems([editorText])
         return items.count
     }
