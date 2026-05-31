@@ -59,6 +59,7 @@
 "editor.mode.editing" = "Edit";
 "editor.mode.startEditing" = "Edit";
 "editor.mode.editingActive" = "Editing";
+"editor.mode.finishEditing" = "Finish Editing";
 "Save" = "Save";
 "Editor Position" = "Live Editor Position";
 "External Source" = "External Source";

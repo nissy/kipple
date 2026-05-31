@@ -59,6 +59,7 @@
 "editor.mode.editing" = "編集";
 "editor.mode.startEditing" = "編集する";
 "editor.mode.editingActive" = "編集中";
+"editor.mode.finishEditing" = "編集を終了";
 "Save" = "Save";
 "Editor Position" = "ライブエディタの位置";
 "External Source" = "外部アプリ";

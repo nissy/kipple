@@ -30,10 +30,16 @@ struct MainViewControlSection: View {
 
     private var editModeButton: some View {
         Button(action: toggleEditorMode) {
-            Text(editModeButtonTitle)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+            HStack(spacing: 4) {
+                Text(editModeButtonTitle)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                if !editModeShortcut.isEmpty {
+                    shortcutBadge(editModeShortcut)
+                }
+            }
                 .padding(.horizontal, horizontalPadding)
                 .frame(minWidth: 64, minHeight: buttonHeight)
                 .contentShape(Rectangle())
@@ -74,12 +80,7 @@ struct MainViewControlSection: View {
 
     private var saveButton: some View {
         Button(action: onSave) {
-            buttonLabel(
-                systemImage: "tray.and.arrow.down",
-                title: "editor.saveToHistory",
-                shortcut: getShortcutKeyDisplay(),
-                accessibilityLabel: "editor.saveToHistory"
-            )
+            saveButtonLabel
             .padding(.horizontal, horizontalPadding)
             .frame(height: buttonHeight)
             .contentShape(Rectangle())
@@ -93,6 +94,22 @@ struct MainViewControlSection: View {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
+    }
+
+    private var saveButtonLabel: some View {
+        HStack(spacing: 4) {
+            Text("editor.saveToHistory")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            let shortcut = getShortcutKeyDisplay()
+            if !shortcut.isEmpty {
+                shortcutBadge(shortcut)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(Text("editor.saveToHistory"))
     }
 
     private func buttonLabel(
@@ -146,7 +163,11 @@ struct MainViewControlSection: View {
     }
 
     private var editModeButtonTitle: LocalizedStringKey {
-        isEditing ? "editor.mode.editingActive" : "editor.mode.startEditing"
+        isEditing ? "editor.mode.finishEditing" : "editor.mode.startEditing"
+    }
+
+    private var editModeShortcut: String {
+        isEditing ? "ESC" : ""
     }
 
     private var editModeButtonBackground: LinearGradient {
