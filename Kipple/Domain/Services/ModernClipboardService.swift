@@ -267,13 +267,13 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
             isFromEditor: fromEditor
         )
-        addToHistory(item)
-
         // Copy to system clipboard. Writes stay off MainActor to avoid hop delays.
         let newChangeCount = Self.writeStringToPasteboard(content)
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
+
+        addToHistory(item)
     }
 
     func writeToClipboardOnly(_ content: String) async {

@@ -14,10 +14,7 @@ extension SimpleLineNumberRulerView {
         }
 
         if selectedRange.location == fullText.length && fullText.length > 0 && fullText.hasSuffix("\n") {
-            if cachedTextLength == fullText.length {
-                return cachedLineCount
-            }
-            return SimpleLineNumberRulerView.countLines(in: fullText)
+            return cachedLineCount(for: fullText)
         }
 
         return SimpleLineNumberRulerView.countLines(
@@ -43,10 +40,9 @@ extension SimpleLineNumberRulerView {
             forBoundingRect: visibleRect,
             in: textContainer
         )
-        let startLocation = max(0, visibleGlyphRange.location - 1000)
-        let extendedGlyphRange = NSRange(
-            location: startLocation,
-            length: layoutManager.numberOfGlyphs - startLocation
+        let extendedGlyphRange = extendedVisibleGlyphRange(
+            layoutManager: layoutManager,
+            visibleGlyphRange: visibleGlyphRange
         )
         let containerOrigin = textView.textContainerOrigin
 
@@ -165,8 +161,7 @@ extension SimpleLineNumberRulerView {
     ) {
         guard fullText.length > 0 && fullText.hasSuffix("\n") else { return }
 
-        let totalLineCount = fullText.components(separatedBy: "\n").count
-        let lastLineNumber = totalLineCount
+        let lastLineNumber = cachedLineCount(for: fullText)
 
         guard selectedLineNumber == lastLineNumber else { return }
 

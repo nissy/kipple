@@ -19,10 +19,9 @@ extension SimpleLineNumberRulerView {
             forBoundingRect: visibleRect,
             in: context.textContainer
         )
-        let startLocation = max(0, visibleGlyphRange.location - 1000)
-        let extendedGlyphRange = NSRange(
-            location: startLocation,
-            length: context.layoutManager.numberOfGlyphs - startLocation
+        let extendedGlyphRange = extendedVisibleGlyphRange(
+            layoutManager: context.layoutManager,
+            visibleGlyphRange: visibleGlyphRange
         )
 
         let initialLineNumber = extendedGlyphRange.location > 0 ?
@@ -44,9 +43,6 @@ extension SimpleLineNumberRulerView {
             context: context,
             options: options
         )
-
-        cachedTextLength = context.fullText.length
-        cachedLineCount = Self.countLines(in: context.fullText)
     }
 
     private func enumerateLineFragmentsForNumbers(

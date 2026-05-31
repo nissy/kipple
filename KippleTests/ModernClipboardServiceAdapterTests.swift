@@ -267,6 +267,7 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
 
         adapter.copyToClipboard("Initial", fromEditor: false)
         XCTAssertEqual(adapter.autoClearRemainingTime, 60)
+        try? await Task.sleep(for: .milliseconds(200))
 
         adapter.startAutoClearTimer(minutes: 0)
         try? await Task.sleep(for: .seconds(1))

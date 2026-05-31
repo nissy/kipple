@@ -292,6 +292,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
 
         // Update current clipboard content if changed
+        var shouldRestartAutoClear = false
         if let pending = pendingClipboardContent {
             if newCurrentContent == pending {
                 currentClipboardContent = pending
@@ -299,13 +300,15 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             } else if newCurrentContent != previousClipboardContent {
                 currentClipboardContent = newCurrentContent
                 pendingClipboardContent = nil
+                shouldRestartAutoClear = true
             }
         } else if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent
+            shouldRestartAutoClear = true
         }
 
-        if let updatedContent = currentClipboardContent,
-           updatedContent != previousClipboardContent,
+        if shouldRestartAutoClear,
+           let updatedContent = currentClipboardContent,
            !updatedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             restartAutoClearTimerIfNeeded()
         }

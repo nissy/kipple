@@ -4,6 +4,7 @@ enum PerformanceTrace {
     private static let queue = DispatchQueue(label: "com.nissy.Kipple.performanceTrace")
     private static let flagURL = URL(fileURLWithPath: "/tmp/kipple-enable-perf-trace")
     static let fileURL = URL(fileURLWithPath: "/tmp/kipple-perf-trace.jsonl")
+    private static let maxContentLength = 200
 
     static var isEnabled: Bool {
         #if DEBUG
@@ -34,7 +35,7 @@ enum PerformanceTrace {
         ]
 
         if let content {
-            fields.append(("content", jsonString(content)))
+            fields.append(("content", jsonString(truncatedContent(content))))
         }
         if let revision {
             fields.append(("revision", String(revision)))
@@ -66,6 +67,11 @@ enum PerformanceTrace {
         defer { try? handle.close() }
         _ = try? handle.seekToEnd()
         try? handle.write(contentsOf: data)
+    }
+
+    private static func truncatedContent(_ content: String) -> String {
+        guard content.count > maxContentLength else { return content }
+        return String(content.prefix(maxContentLength)) + "…"
     }
 
     private static func jsonString(_ value: String) -> String {

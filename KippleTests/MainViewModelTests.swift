@@ -8,6 +8,7 @@
 import XCTest
 import SwiftUI
 import Combine
+import AppKit
 @testable import Kipple
 
 @MainActor
@@ -81,6 +82,23 @@ class MainViewModelTests: XCTestCase {
         XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
         XCTAssertEqual(mockClipboardService.lastCopiedContent, "Live edited")
         XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
+    }
+
+    func testEditorTextDebouncedWriteCancelsWhenSystemClipboardChanges() async {
+        // Given
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("Before edit", forType: .string)
+
+        // When
+        viewModel.editorText = "Live edited"
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("External copy", forType: .string)
+        try? await Task.sleep(nanoseconds: 350_000_000)
+
+        // Then
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertNil(mockClipboardService.lastCopiedContent)
     }
 
     // MARK: - History Selection Tests

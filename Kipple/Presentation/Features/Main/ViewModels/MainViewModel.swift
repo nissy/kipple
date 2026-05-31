@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import CoreGraphics
 import Combine
+import AppKit
 
 // swiftlint:disable type_body_length file_length
 @MainActor
@@ -394,9 +395,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     private func scheduleLiveEditorClipboardWrite(_ text: String) {
         liveEditorWriteTask?.cancel()
+        let scheduledPasteboardChangeCount = NSPasteboard.general.changeCount
         liveEditorWriteTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
+            guard NSPasteboard.general.changeCount == scheduledPasteboardChangeCount else { return }
             self?.writeEditorTextToClipboardOnly(text)
         }
     }
