@@ -112,6 +112,44 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
         XCTAssertEqual(pinnedInFinal.count, 6,
                        "Pinned items must be preserved after trimming")
     }
+
+    func testInitialLoadKeepsTimestampOrderWithPinnedItems() async throws {
+        // Given
+        AppSettings.shared.maxHistoryItems = 10
+        AppSettings.shared.maxPinnedItems = 10
+        await service.setMaxHistoryItems(10)
+
+        let now = Date()
+        var newest = ClipItem(content: "Newest unpinned")
+        newest.timestamp = now
+
+        var pinnedMiddle = ClipItem(content: "Pinned middle")
+        pinnedMiddle.timestamp = now.addingTimeInterval(-10)
+        pinnedMiddle.isPinned = true
+
+        var recent = ClipItem(content: "Recent unpinned")
+        recent.timestamp = now.addingTimeInterval(-20)
+
+        var pinnedOld = ClipItem(content: "Pinned old")
+        pinnedOld.timestamp = now.addingTimeInterval(-30)
+        pinnedOld.isPinned = true
+
+        await repository.configure(
+            items: [pinnedOld, newest, pinnedMiddle, recent],
+            loadDelay: 0
+        )
+
+        // When
+        await service.loadHistoryFromRepository()
+
+        // Then
+        let history = await service.getHistory()
+        XCTAssertEqual(
+            history.map(\.content),
+            ["Newest unpinned", "Pinned middle", "Recent unpinned", "Pinned old"],
+            "Initial load should not move pinned items above newer unpinned items"
+        )
+    }
 }
 
 actor MockClipboardRepository: ClipboardRepositoryProtocol {

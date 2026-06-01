@@ -109,22 +109,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             async let allItemsTask = repository.load(limit: fetchLimit)
             let loadedItems = try await allItemsTask
 
-            let pinnedIDSet = Set(pinnedItems.map { $0.id })
             let loadedByID = Dictionary(uniqueKeysWithValues: loadedItems.map { ($0.id, $0) })
 
-            var combinedItems: [ClipItem] = []
-            combinedItems.reserveCapacity(loadedItems.count + pinnedItems.count)
+            var combinedByID = loadedByID
 
             for pinned in pinnedItems {
-                if let refreshed = loadedByID[pinned.id] {
-                    combinedItems.append(refreshed)
-                } else {
-                    combinedItems.append(pinned)
-                }
+                combinedByID[pinned.id] = loadedByID[pinned.id] ?? pinned
             }
 
-            for item in loadedItems where !pinnedIDSet.contains(item.id) {
-                combinedItems.append(item)
+            let combinedItems = combinedByID.values.sorted {
+                $0.timestamp > $1.timestamp
             }
 
             history = combinedItems
