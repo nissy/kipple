@@ -32,6 +32,12 @@ struct SimpleLineNumberView: NSViewRepresentable {
     private var displayModeBackgroundColor: NSColor {
         NSColor(calibratedWhite: 250.0 / 255.0, alpha: 1.0)
     }
+
+    private var editorTextColor: NSColor {
+        isEditable
+            ? NSColor.labelColor
+            : NSColor.secondaryLabelColor
+    }
     
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = makeScrollView()
@@ -141,6 +147,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
 
         textView.isEditable = isEditable
         applyEditorBackground(to: scrollView, textView: textView)
+        applyEditorTextColor(to: textView)
         textView.onDisplayModeDoubleClick = onDoubleClick
         textView.onEscape = onEscape
     }
@@ -169,7 +176,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
             let fullRange = NSRange(location: 0, length: text.count)
             attributedString.addAttribute(.font, value: font, range: fullRange)
             attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
-            attributedString.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
+            attributedString.addAttribute(.foregroundColor, value: editorTextColor, range: fullRange)
             textView.textStorage?.setAttributedString(attributedString)
         }
         
@@ -177,7 +184,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.typingAttributes = [
             .font: font,
             .paragraphStyle: paragraphStyle,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: editorTextColor
         ]
         
         // テキストコンテナの最小サイズを維持
@@ -202,7 +209,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.smartInsertDeleteEnabled = false
         textView.backgroundColor = editorBackgroundColor
-        textView.textColor = NSColor.labelColor
+        textView.textColor = editorTextColor
         
         // CotEditorから学んだ重要な設定
         textView.layoutManager?.usesFontLeading = false
@@ -254,6 +261,24 @@ struct SimpleLineNumberView: NSViewRepresentable {
             rulerView.backgroundColor = backgroundColor
         }
     }
+
+    private func applyEditorTextColor(to textView: NSTextView) {
+        let textColor = editorTextColor
+        textView.textColor = textColor
+        textView.typingAttributes[.foregroundColor] = textColor
+
+        guard !textView.hasMarkedText(),
+              let textStorage = textView.textStorage,
+              textStorage.length > 0 else {
+            return
+        }
+
+        textStorage.addAttribute(
+            .foregroundColor,
+            value: textColor,
+            range: NSRange(location: 0, length: textStorage.length)
+        )
+    }
     
     private func setupParagraphStyle(textView: NSTextView, paragraphStyle: NSParagraphStyle) {
         textView.defaultParagraphStyle = paragraphStyle
@@ -262,7 +287,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.typingAttributes = [
             .font: font,
             .paragraphStyle: paragraphStyle,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: editorTextColor
         ]
         
         // 既存のテキストへの適用は削除（makeNSViewで属性付き文字列として設定するため）
