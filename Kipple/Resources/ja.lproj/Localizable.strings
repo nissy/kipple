@@ -14,7 +14,6 @@
 "Add" = "追加";
 "Add Fallback Font" = "フォールバックフォントを追加";
 "Add Font" = "フォントを追加";
-"Auto Clipboard Clear" = "クリップボード自動消去";
 "Auto Pin" = "自動ピン留め";
 "Bottom" = "下";
 "Built-in categories cannot be deleted" = "標準カテゴリは削除できません";
@@ -35,8 +34,6 @@
 "Data Management" = "データ管理";
 "Modified click" = "修飾キー付きクリック";
 "Use modifier + click" = "修飾キーとクリックを使います";
-"Enable Auto Clipboard Clear" = "クリップボード自動消去を有効化";
-"Clear interval" = "消去間隔";
 "Maximum history items" = "履歴の最大件数";
 "Maximum pinned items" = "ピン留めの最大件数";
 "Clear history" = "履歴を削除";
@@ -60,6 +57,8 @@
 "editor.mode.startEditing" = "編集する";
 "editor.mode.editingActive" = "編集中";
 "editor.mode.finishEditing" = "編集を終了";
+"editor.status.livePreview" = "現在のクリップボード";
+"editor.status.editing" = "未反映のクリップボード";
 "Save" = "Save";
 "Editor Position" = "ライブエディタの位置";
 "External Source" = "外部アプリ";

@@ -152,13 +152,13 @@ final class ModernClipboardHashResetTests: XCTestCase {
         }
     }
 
-    /// Test auto-clear scenario
-    func testDuplicateDetectionAfterAutoClear() async throws {
+    /// Test clear-history scenario
+    func testDuplicateDetectionAfterClearHistory() async throws {
         // Given: Add content
-        let testContent = "Auto-clear test content"
+        let testContent = "Clear-history test content"
         await service.copyToClipboard(testContent, fromEditor: false)
 
-        // Simulate auto-clear keeping pinned (as auto-clear does)
+        // Simulate clearing history while keeping pinned items
         await service.clearHistory(keepPinned: true)
 
         // Then: Should be able to add the same content again

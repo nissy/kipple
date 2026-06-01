@@ -11,11 +11,6 @@ import AppKit
 extension MainView {
     var bottomBarContent: some View {
         HStack(alignment: .center, spacing: 12) {
-            if AppSettings.shared.enableAutoClear,
-               let remainingTime = viewModel.autoClearRemainingTime {
-                autoClearCountdown(remainingTime)
-            }
-
             Spacer()
 
             HStack(alignment: .center, spacing: 10) {
@@ -58,35 +53,6 @@ extension MainView {
 }
 
 private extension MainView {
-    func autoClearCountdown(_ remainingTime: TimeInterval) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "timer")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-
-            Text(formatRemainingTime(remainingTime))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color.accentColor.opacity(0.1))
-        )
-    }
-
-    func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
-        let seconds = Int(timeInterval) % 60
-
-        if minutes > 0 {
-            return String(format: "%02d:%02d", minutes, seconds)
-        } else {
-            return String(format: "00:%02d", seconds)
-        }
-    }
-
     func bottomBarActionButton(
         systemName: String,
         helpKey: LocalizedStringKey,

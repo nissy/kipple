@@ -295,16 +295,6 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
     }
 
-    func testToggleQueueModePausesAndResumesAutoClear() {
-        viewModel.toggleQueueMode()
-
-        XCTAssertTrue(mockService.pauseAutoClearCalled)
-
-        viewModel.toggleQueueMode()
-
-        XCTAssertTrue(mockService.resumeAutoClearCalled)
-    }
-
     func testExternalCopyWhileQueueModeActiveResetsQueue() {
         let items = Array(mockService.history.prefix(2))
 
@@ -315,7 +305,6 @@ final class PasteQueueModeTests: XCTestCase {
 
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
-        XCTAssertTrue(mockService.resumeAutoClearCalled)
     }
 
     func testPasteCommandAdvancesQueueInQueueMode() async {
@@ -355,7 +344,6 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertFalse(pasteMonitor.isMonitoring)
-        XCTAssertTrue(mockService.resumeAutoClearCalled)
     }
 
     func testPasteCommandUntilQueueEmptiesStopsMonitoring() async {
@@ -382,7 +370,7 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.history.prefix(2).map(\.id), [items[2].id, items[0].id])
     }
 
-    func testQueueOnceCompletionClearsClipboardAndResumesAutoClear() async {
+    func testQueueOnceCompletionClearsClipboard() async {
         let items = Array(mockService.history.prefix(2))
 
         viewModel.toggleQueueMode()
@@ -397,7 +385,6 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
         XCTAssertNil(mockService.currentClipboardContent)
-        XCTAssertTrue(mockService.resumeAutoClearCalled)
     }
 
     func testManualCopyClearsQueueAndReturnsToClipboardMode() {
@@ -410,7 +397,6 @@ final class PasteQueueModeTests: XCTestCase {
 
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
-        XCTAssertTrue(mockService.resumeAutoClearCalled)
     }
     func testShiftSelectionMixedQueueAndNewItemsRemovesQueuedOnes() {
         let items = Array(mockService.history.prefix(4))

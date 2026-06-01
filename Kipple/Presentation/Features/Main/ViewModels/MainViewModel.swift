@@ -78,9 +78,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     @Published private(set) var currentClipboardItemID: UUID?
 
-    // 自動消去タイマーの残り時間
-    @Published var autoClearRemainingTime: TimeInterval?
-
     // ページネーション関連
     @Published private(set) var hasMoreHistory: Bool = false
     @Published private(set) var isLoadingMoreHistory: Bool = false
@@ -159,12 +156,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         service.$currentClipboardContent
             .sink { [weak self] content in
                 self?.applyClipboardContentToEditor(content)
-            }
-            .store(in: &serviceCancellables)
-
-        service.$autoClearRemainingTime
-            .sink { [weak self] remainingTime in
-                self?.autoClearRemainingTime = remainingTime
             }
             .store(in: &serviceCancellables)
     }
@@ -749,7 +740,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if isQueueModeActive {
             resetPasteQueue()
         } else {
-            pauseAutoClearIfNeeded()
             pasteMode = .queueOnce
             updateFilteredItems(clipboardService.history)
         }
@@ -777,7 +767,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         stopPasteMonitoring()
         pendingShiftSelection = []
         queueSelectionPreview = []
-        resumeAutoClearIfNeeded()
         updateFilteredItems(clipboardService.history)
     }
 
@@ -991,14 +980,6 @@ extension MainViewModel {
         let newIDs = orderedIDs.filter { !initialSet.contains($0) }
         previewQueue.append(contentsOf: newIDs)
         return previewQueue
-    }
-
-    private func pauseAutoClearIfNeeded() {
-        (clipboardService as? QueueAutoClearControlling)?.pauseAutoClearForQueue()
-    }
-
-    private func resumeAutoClearIfNeeded() {
-        (clipboardService as? QueueAutoClearControlling)?.resumeAutoClearAfterQueue()
     }
 
     private func clearQueueAfterManualCopyIfNeeded() {

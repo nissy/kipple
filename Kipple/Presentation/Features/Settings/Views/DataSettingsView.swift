@@ -14,8 +14,6 @@ struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
     @AppStorage("maxPinnedItems") private var maxPinnedItems = 50
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
-    @AppStorage("enableAutoClear") private var enableAutoClear = false
-    @AppStorage("autoClearInterval") private var autoClearInterval = 10
     @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @AppStorage("historySelectPaste") private var historySelectPaste = false
     @State private var showClearHistoryAlert = false
@@ -58,49 +56,6 @@ struct DataSettingsView: View {
                 }
 
                 AutoPinSettingsView()
-                
-                // Auto-Clear Settings Section
-                SettingsGroup("Auto Clipboard Clear") {
-                    SettingsRow(label: "Enable Auto Clipboard Clear", isOn: $enableAutoClear)
-                        .onChange(of: enableAutoClear) { _, _ in
-                            updateAutoClearConfiguration()
-                        }
-                    
-                    SettingsRow(label: "Clear interval") {
-                        HStack {
-                            TextField(
-                                "",
-                                value: Binding(
-                                    get: { Double(autoClearInterval) },
-                                    set: { autoClearInterval = Int(max(1, min(1440, $0))) }
-                                ),
-                                formatter: makeNumberFormatter(minimum: 1, maximum: 1440)
-                            )
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 80)
-                            .disabled(!enableAutoClear)
-
-                            Text("minutes")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-
-                            Stepper(
-                                "",
-                                value: Binding(
-                                    get: { Double(autoClearInterval) },
-                                    set: { autoClearInterval = Int($0) }
-                                ),
-                                in: 1...1440,
-                                step: 1
-                            )
-                            .labelsHidden()
-                            .disabled(!enableAutoClear)
-                        }
-                    }
-                    .onChange(of: autoClearInterval) { _, _ in
-                        updateAutoClearConfiguration()
-                    }
-                }
                 
                 // Storage Limits Section
                 SettingsGroup("Storage Limits") {
@@ -221,9 +176,6 @@ struct DataSettingsView: View {
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
-        .task {
-            updateAutoClearConfiguration()
-        }
         .alert("Clear Clipboard History?", isPresented: $showClearHistoryAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Clear History", role: .destructive) {
@@ -274,17 +226,6 @@ struct DataSettingsView: View {
         formatter.generatesDecimalNumbers = false
         formatter.allowsFloats = false
         return formatter
-    }
-
-    private func updateAutoClearConfiguration() {
-        if let modernService = clipboardService as? ModernClipboardServiceAdapter {
-            Task { @MainActor in
-                modernService.stopAutoClearTimer()
-                if enableAutoClear {
-                    modernService.startAutoClearTimer(minutes: autoClearInterval)
-                }
-            }
-        }
     }
 
     private func localizedHistoryCountMessage(_ count: Int) -> String {

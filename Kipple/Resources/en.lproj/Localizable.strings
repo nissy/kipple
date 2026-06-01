@@ -14,7 +14,6 @@
 "Add" = "Add";
 "Add Fallback Font" = "Add Fallback Font";
 "Add Font" = "Add Font";
-"Auto Clipboard Clear" = "Auto Clipboard Clear";
 "Auto Pin" = "Auto Pin";
 "Bottom" = "Bottom";
 "Built-in categories cannot be deleted" = "Built-in categories cannot be deleted";
@@ -35,8 +34,6 @@
 "Data Management" = "Data Management";
 "Modified click" = "Modified click";
 "Use modifier + click" = "Use modifier + click";
-"Enable Auto Clipboard Clear" = "Enable Auto Clipboard Clear";
-"Clear interval" = "Clear interval";
 "Maximum history items" = "Maximum history items";
 "Maximum pinned items" = "Maximum pinned items";
 "Clear history" = "Clear history";
@@ -60,6 +57,8 @@
 "editor.mode.startEditing" = "Edit";
 "editor.mode.editingActive" = "Editing";
 "editor.mode.finishEditing" = "Finish Editing";
+"editor.status.livePreview" = "Current Clipboard";
+"editor.status.editing" = "Unapplied Clipboard";
 "Save" = "Save";
 "Editor Position" = "Live Editor Position";
 "External Source" = "External Source";

@@ -33,6 +33,8 @@ struct MainViewEditorSection: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            editorStatusLabel
+
             // エディタコンテンツ
             ZStack(alignment: .bottomTrailing) {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -60,6 +62,19 @@ struct MainViewEditorSection: View {
         .onReceive(NotificationCenter.default.publisher(for: .editorFontSettingsChanged)) { _ in
             // フォント設定が変更されたときにビューを更新
         }
+    }
+
+    private var editorStatusLabel: some View {
+        HStack {
+            Text(isEditing ? "editor.status.editing" : "editor.status.livePreview")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(isEditing ? .red.opacity(0.75) : .secondary)
+
+            Spacer()
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
     }
 
     private var clearEditorButton: some View {

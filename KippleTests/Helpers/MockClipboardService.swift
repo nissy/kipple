@@ -9,7 +9,7 @@ import Foundation
 @testable import Kipple
 
 @MainActor
-class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling, ClipboardServiceAsyncRecopying {
+class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecopying {
     var history: [ClipItem] = [] {
         didSet {
             pinnedItems = history.filter { $0.isPinned }
@@ -33,10 +33,6 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
     var deleteItemCalled = false
     var lastDeletedItem: ClipItem?
     var clearAllHistoryCalled = false
-    var autoClearRemainingTime: TimeInterval?
-    var pauseAutoClearCalled = false
-    var resumeAutoClearCalled = false
-    private(set) var isAutoClearPaused = false
     var recopyFromHistoryAndWaitCallCount = 0
     var recopyFromHistoryCallCount = 0
     var addEditorItemsCallCount = 0
@@ -184,16 +180,6 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         // No-op for mock
     }
 
-    func pauseAutoClearForQueue() {
-        pauseAutoClearCalled = true
-        isAutoClearPaused = true
-    }
-
-    func resumeAutoClearAfterQueue() {
-        resumeAutoClearCalled = true
-        isAutoClearPaused = false
-    }
-
     // Helper methods for testing
     func addTestItem(_ content: String, isPinned: Bool = false, sourceApp: String? = nil) {
         var item = ClipItem(content: content, sourceApp: sourceApp)
@@ -224,9 +210,5 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         lastDeletedItem = nil
         recopyFromHistoryAndWaitCallCount = 0
         clearAllHistoryCalled = false
-        autoClearRemainingTime = nil
-        pauseAutoClearCalled = false
-        resumeAutoClearCalled = false
-        isAutoClearPaused = false
     }
 }
