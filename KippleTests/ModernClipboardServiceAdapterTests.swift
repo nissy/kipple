@@ -270,8 +270,7 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         try? await Task.sleep(for: .milliseconds(200))
 
         adapter.startAutoClearTimer(minutes: 0)
-        try? await Task.sleep(for: .seconds(1))
-        XCTAssertNil(adapter.autoClearRemainingTime)
+        await waitForAutoClearRemainingTime(nil)
 
         adapter.copyToClipboard("Restart", fromEditor: false)
         XCTAssertEqual(adapter.autoClearRemainingTime, 60)
@@ -339,5 +338,25 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         XCTAssertEqual(adapter.pinnedItems.count, 1)
         XCTAssertEqual(adapter.unpinnedItems.count, 2)
         XCTAssertEqual(adapter.pinnedItems.first?.content, "Pinned 1")
+    }
+}
+
+private extension ModernClipboardServiceAdapterTests {
+    func waitForAutoClearRemainingTime(
+        _ expectedValue: TimeInterval?,
+        timeout: TimeInterval = 2.5,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if adapter.autoClearRemainingTime == expectedValue {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
+        XCTAssertEqual(adapter.autoClearRemainingTime, expectedValue, file: file, line: line)
     }
 }

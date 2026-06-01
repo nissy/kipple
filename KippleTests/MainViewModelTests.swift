@@ -98,6 +98,58 @@ class MainViewModelTests: XCTestCase {
         XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
     }
 
+    func testWindowHideEndsEditingWithoutWritingWhenUnchanged() {
+        // Given
+        viewModel.editorText = "Original"
+        viewModel.currentClipboardContent = "Original"
+        viewModel.beginClipboardEditing()
+        mockClipboardService.reset()
+
+        // When
+        viewModel.endClipboardEditingIfUnchanged()
+
+        // Then
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+        XCTAssertEqual(viewModel.editorText, "Original")
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
+    }
+
+    func testWindowHideKeepsEditingWhenTextChanged() {
+        // Given
+        viewModel.editorText = "Original"
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "Changed"
+        mockClipboardService.reset()
+
+        // When
+        viewModel.endClipboardEditingIfUnchanged()
+
+        // Then
+        XCTAssertEqual(viewModel.clipboardEditorMode, .editing)
+        XCTAssertEqual(viewModel.editorText, "Changed")
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
+    }
+
+    func testWindowHideAfterExternalCopyEndsUnchangedEditingAndRestoresCurrentClipboardText() {
+        // Given
+        viewModel.editorText = "Original"
+        viewModel.currentClipboardContent = "Original"
+        viewModel.beginClipboardEditing()
+        viewModel.currentClipboardContent = "External"
+        mockClipboardService.reset()
+
+        // When
+        viewModel.endClipboardEditingIfUnchanged()
+
+        // Then
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+        XCTAssertEqual(viewModel.editorText, "External")
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertFalse(mockClipboardService.copyToClipboardCalled)
+    }
+
     func testHistorySelectionDoesNotOverwriteEditorWhileEditing() {
         // Given
         viewModel.beginClipboardEditing()

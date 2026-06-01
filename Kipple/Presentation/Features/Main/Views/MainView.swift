@@ -276,9 +276,8 @@ extension MainView {
             historyRefreshID = UUID()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mainWindowDidHide)) { _ in
-            if historyCopyScrollRequest == nil {
-                historyCopyScrollRequest = HistoryCopyScrollRequest()
-            }
+            viewModel.endClipboardEditingIfUnchanged()
+            if historyCopyScrollRequest == nil { historyCopyScrollRequest = HistoryCopyScrollRequest() }
             historyHoverResetRequest = HistoryHoverResetRequest()
         }
         .onChange(of: appSettings.editorPosition) { _, newValue in

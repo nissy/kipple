@@ -68,6 +68,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published private(set) var pasteQueue: [UUID] = []
     @Published private(set) var queueSelectionPreview: Set<UUID> = []
     @Published private(set) var clipboardEditorMode: ClipboardEditorMode = .display
+    private var clipboardEditingOriginalText: String?
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String? {
@@ -370,6 +371,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         case .display:
             commitClipboardEditor()
         case .editing:
+            clipboardEditingOriginalText = editorText
             clipboardEditorMode = .editing
         }
     }
@@ -381,6 +383,20 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     func commitClipboardEditor() {
         writeEditorTextToClipboardOnly(editorText)
         clipboardEditorMode = .display
+        clipboardEditingOriginalText = nil
+    }
+
+    func endClipboardEditingIfUnchanged() {
+        guard clipboardEditorMode == .editing,
+              clipboardEditingOriginalText == editorText else { return }
+
+        clipboardEditorMode = .display
+        clipboardEditingOriginalText = nil
+
+        let currentText = currentClipboardContent ?? ""
+        if editorText != currentText {
+            editorText = currentText
+        }
     }
 
     @discardableResult

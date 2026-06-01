@@ -318,6 +318,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func resetAdapterStateForTesting() async {
         refreshTask?.cancel()
         refreshTask = nil
+        autoClearTimer?.invalidate()
+        autoClearTimer = nil
         history = []
         currentClipboardContent = nil
         autoClearRemainingTime = nil
