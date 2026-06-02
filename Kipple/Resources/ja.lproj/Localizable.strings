@@ -57,8 +57,11 @@
 "editor.mode.startEditing" = "編集する";
 "editor.mode.editingActive" = "編集中";
 "editor.mode.finishEditing" = "編集を終了";
+"editor.mode.locked" = "編集ロック中";
 "editor.status.livePreview" = "現在のクリップボード";
 "editor.status.editing" = "未反映のクリップボード";
+"editor.status.locked" = "編集ロック中";
+"editor.locked.help" = "連続ペースト中は編集できません";
 "Save" = "Save";
 "Editor Position" = "ライブエディタの位置";
 "External Source" = "外部アプリ";

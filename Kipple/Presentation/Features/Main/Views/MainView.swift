@@ -330,7 +330,7 @@ extension MainView {
                 if appSettings.editorCopyHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
                    eventModifiers == saveModifiers {
-                    saveEditorToHistory()
+                    if !viewModel.isQueueModeActive { saveEditorToHistory() }
                     return nil
                 }
 
@@ -338,7 +338,7 @@ extension MainView {
                 if appSettings.editorClearHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
                    eventModifiers == clearModifiers {
-                    clearAction()
+                    if !viewModel.isQueueModeActive { clearAction() }
                     return nil
                 }
 
@@ -505,14 +505,14 @@ extension MainView {
             MainViewEditorSection(
                 editorText: $viewModel.editorText,
                 isAlwaysOnTop: $isAlwaysOnTop,
-                isEditing: viewModel.clipboardEditorMode == .editing,
+                isEditing: viewModel.clipboardEditorMode == .editing, isLocked: viewModel.isQueueModeActive,
                 onToggleAlwaysOnTop: toggleAlwaysOnTop,
                 onBeginEditing: viewModel.beginClipboardEditing,
                 onCommitEditing: viewModel.commitClipboardEditor,
                 onClear: clearAction
             )
             MainViewControlSection(
-                editorMode: clipboardEditorModeBinding,
+                editorMode: clipboardEditorModeBinding, isEditorLocked: viewModel.isQueueModeActive,
                 onSave: saveEditorToHistory,
                 onTrim: trimAction
             )

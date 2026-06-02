@@ -352,6 +352,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func copyEditor() {
+        guard !isQueueModeActive else { return }
         writeEditorTextToClipboardOnly(editorText)
     }
 
@@ -362,6 +363,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         case .display:
             commitClipboardEditor()
         case .editing:
+            guard !isQueueModeActive else { return }
             clipboardEditingOriginalText = editorText
             clipboardEditorMode = .editing
         }
@@ -372,6 +374,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func commitClipboardEditor() {
+        guard !isQueueModeActive else {
+            discardClipboardEditorChanges()
+            return
+        }
         writeEditorTextToClipboardOnly(editorText)
         clipboardEditorMode = .display
         clipboardEditingOriginalText = nil
@@ -392,6 +398,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     @discardableResult
     func trimEditor() -> Bool {
+        guard !isQueueModeActive else { return false }
         let trimmedLines = editorText
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -410,6 +417,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     
     func clearEditor() {
+        guard !isQueueModeActive else { return }
         editorText = ""
         if clipboardEditorMode == .display {
             writeEditorTextToClipboardOnly("")
@@ -433,6 +441,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     @discardableResult
     func saveEditorToHistory() async -> Int {
+        guard !isQueueModeActive else { return 0 }
         if clipboardEditorMode == .editing {
             commitClipboardEditor()
         }
@@ -740,6 +749,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if isQueueModeActive {
             resetPasteQueue()
         } else {
+            discardClipboardEditorChanges()
             pasteMode = .queueOnce
             updateFilteredItems(clipboardService.history)
         }
@@ -834,6 +844,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if pasteQueue.isEmpty {
             if !wasQueueToggle {
                 await clipboardService.clearSystemClipboard()
+                applyClipboardContentToEditor(nil)
             }
             resetPasteQueue()
             return
@@ -985,6 +996,16 @@ extension MainViewModel {
     private func clearQueueAfterManualCopyIfNeeded() {
         guard isQueueModeActive else { return }
         resetPasteQueue()
+    }
+
+    private func discardClipboardEditorChanges() {
+        clipboardEditorMode = .display
+        clipboardEditingOriginalText = nil
+
+        let currentText = currentClipboardContent ?? ""
+        if editorText != currentText {
+            editorText = currentText
+        }
     }
 
     private func handleExternalHistoryUpdate(newTopID: UUID?) {

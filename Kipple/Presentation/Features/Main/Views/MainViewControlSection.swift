@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MainViewControlSection: View {
     @Binding var editorMode: MainViewModel.ClipboardEditorMode
+    let isEditorLocked: Bool
     let onSave: () -> Void
     let onTrim: () -> Void
     @ObservedObject private var appSettings = AppSettings.shared
@@ -54,6 +55,8 @@ struct MainViewControlSection: View {
                 .stroke(editModeButtonBorder, lineWidth: 1)
         )
         .shadow(color: editModeButtonShadow, radius: 4, y: 2)
+        .disabled(isEditorLocked)
+        .help(Text(editModeButtonHelpText))
     }
 
     private var trimButton: some View {
@@ -76,6 +79,8 @@ struct MainViewControlSection: View {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
+        .disabled(isEditorLocked)
+        .opacity(isEditorLocked ? 0.45 : 1.0)
     }
 
     private var saveButton: some View {
@@ -94,6 +99,8 @@ struct MainViewControlSection: View {
                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
+        .disabled(isEditorLocked)
+        .opacity(isEditorLocked ? 0.45 : 1.0)
     }
 
     private var saveButtonLabel: some View {
@@ -163,7 +170,15 @@ struct MainViewControlSection: View {
     }
 
     private var editModeButtonTitle: LocalizedStringKey {
-        isEditing ? "editor.mode.finishEditing" : "editor.mode.startEditing"
+        if isEditorLocked {
+            return "editor.mode.locked"
+        }
+
+        return isEditing ? "editor.mode.finishEditing" : "editor.mode.startEditing"
+    }
+
+    private var editModeButtonHelpText: LocalizedStringKey {
+        isEditorLocked ? "editor.locked.help" : editModeButtonTitle
     }
 
     private var editModeShortcut: String {
@@ -171,6 +186,10 @@ struct MainViewControlSection: View {
     }
 
     private var editModeButtonBackground: LinearGradient {
+        if isEditorLocked {
+            return lockedButtonBackground
+        }
+
         if isEditing {
             return dangerButtonBackground
         }
@@ -196,12 +215,24 @@ struct MainViewControlSection: View {
             endPoint: .bottomTrailing
         )
     }
+
+    private var lockedButtonBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.secondary.opacity(0.45),
+                Color.secondary.opacity(0.32)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
     
     private var trimButtonColor: Color {
-        Color.green
+        isEditorLocked ? Color.secondary.opacity(0.5) : Color.green
     }
 
     private func toggleEditorMode() {
+        guard !isEditorLocked else { return }
         editorMode = isEditing ? .display : .editing
     }
 

@@ -11,6 +11,7 @@ struct MainViewEditorSection: View {
     @Binding var editorText: String
     @Binding var isAlwaysOnTop: Bool
     let isEditing: Bool
+    let isLocked: Bool
     let onToggleAlwaysOnTop: () -> Void
     let onBeginEditing: () -> Void
     let onCommitEditing: () -> Void
@@ -23,12 +24,15 @@ struct MainViewEditorSection: View {
         NSColor(calibratedWhite: 250.0 / 255.0, alpha: 1.0)
     }
     private var editorShadowColor: Color {
-        isEditing ? Color.black.opacity(0.08) : Color.clear
+        isEditing && !isLocked ? Color.black.opacity(0.08) : Color.clear
     }
     private var editorBackgroundColor: Color {
-        isEditing
+        isEditing && !isLocked
             ? Color(NSColor.textBackgroundColor)
             : Color(displayModeBackgroundColor)
+    }
+    private var isTextEditable: Bool {
+        isEditing && !isLocked
     }
     
     var body: some View {
@@ -44,8 +48,8 @@ struct MainViewEditorSection: View {
                 SimpleLineNumberView(
                     text: $editorText,
                     font: fontManager.editorFont,
-                    isEditable: isEditing,
-                    onDoubleClick: onBeginEditing,
+                    isEditable: isTextEditable,
+                    onDoubleClick: isLocked ? {} : onBeginEditing,
                     onEscape: onCommitEditing
                 ) { offset in
                     scrollOffset = offset
@@ -66,9 +70,9 @@ struct MainViewEditorSection: View {
 
     private var editorStatusLabel: some View {
         HStack {
-            Text(isEditing ? "editor.status.editing" : "editor.status.livePreview")
+            Text(statusText)
                 .font(.caption.weight(.semibold))
-                .foregroundColor(isEditing ? .red.opacity(0.75) : .secondary)
+                .foregroundColor(statusColor)
 
             Spacer()
         }
@@ -77,19 +81,40 @@ struct MainViewEditorSection: View {
         .padding(.bottom, 2)
     }
 
+    private var statusText: LocalizedStringKey {
+        if isLocked {
+            return "editor.status.locked"
+        }
+
+        return isEditing ? "editor.status.editing" : "editor.status.livePreview"
+    }
+
+    private var statusColor: Color {
+        if isLocked {
+            return .secondary
+        }
+
+        return isEditing ? .red.opacity(0.75) : .secondary
+    }
+
     private var clearEditorButton: some View {
         Button(action: onClear) {
             Image(systemName: "xmark.circle.fill")
                 .font(MainViewMetrics.BottomBar.clearIconFont)
-                .foregroundColor(.secondary.opacity(0.6))
-                .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
+                .foregroundColor(.secondary.opacity(isLocked ? 0.25 : 0.6))
+                .scaleEffect(hoveredClearButton && !isLocked ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isLocked)
         .padding(.trailing, 8)
         .padding(.bottom, 6)
-        .help(Text("Clear live editor"))
+        .help(Text(clearHelpText))
         .onHover { hovering in
             hoveredClearButton = hovering
         }
+    }
+
+    private var clearHelpText: LocalizedStringKey {
+        isLocked ? "editor.locked.help" : "Clear live editor"
     }
 }

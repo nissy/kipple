@@ -57,8 +57,11 @@
 "editor.mode.startEditing" = "Edit";
 "editor.mode.editingActive" = "Editing";
 "editor.mode.finishEditing" = "Finish Editing";
+"editor.mode.locked" = "Editing Locked";
 "editor.status.livePreview" = "Current Clipboard";
 "editor.status.editing" = "Unapplied Clipboard";
+"editor.status.locked" = "Editing Locked";
+"editor.locked.help" = "Editing is unavailable during queue paste mode.";
 "Save" = "Save";
 "Editor Position" = "Live Editor Position";
 "External Source" = "External Source";

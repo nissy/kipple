@@ -307,6 +307,51 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
     }
 
+    func testQueueModeLocksLiveEditorAndPreventsClipboardWrites() {
+        let item = mockService.history[0]
+        viewModel.currentClipboardContent = "Clipboard"
+        viewModel.editorText = "Draft"
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "Changed"
+        mockService.writeToClipboardOnlyCalled = false
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: [item], anchor: item)
+
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+        XCTAssertEqual(viewModel.editorText, item.content)
+        XCTAssertFalse(mockService.writeToClipboardOnlyCalled)
+
+        viewModel.beginClipboardEditing()
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+
+        viewModel.editorText = "Manual edit"
+        viewModel.commitClipboardEditor()
+        XCTAssertFalse(mockService.writeToClipboardOnlyCalled)
+        XCTAssertEqual(viewModel.editorText, item.content)
+
+        viewModel.clearEditor()
+        viewModel.copyEditor()
+        XCTAssertFalse(mockService.writeToClipboardOnlyCalled)
+        XCTAssertEqual(mockService.currentClipboardContent, item.content)
+    }
+
+    func testQueueModePreventsLiveEditorSaveAndTrim() async {
+        let item = mockService.history[0]
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: [item], anchor: item)
+
+        viewModel.editorText = "  Changed  "
+        XCTAssertFalse(viewModel.trimEditor())
+
+        let savedCount = await viewModel.saveEditorToHistory()
+
+        XCTAssertEqual(savedCount, 0)
+        XCTAssertEqual(mockService.addEditorItemsCallCount, 0)
+        XCTAssertEqual(viewModel.editorText, "  Changed  ")
+    }
+
     func testPasteCommandAdvancesQueueInQueueMode() async {
         let items = Array(mockService.history.prefix(2))
         viewModel.toggleQueueMode()
@@ -385,6 +430,23 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
         XCTAssertNil(mockService.currentClipboardContent)
+    }
+
+    func testQueueOnceCompletionClearsLiveEditorDisplay() async {
+        let items = Array(mockService.history.prefix(1))
+
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.first)
+
+        XCTAssertEqual(viewModel.editorText, items[0].content)
+
+        pasteMonitor.simulatePasteCommand()
+        await Task.yield()
+
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+        XCTAssertEqual(viewModel.editorText, "")
+        XCTAssertNil(viewModel.currentClipboardContent)
     }
 
     func testManualCopyClearsQueueAndReturnsToClipboardMode() {
