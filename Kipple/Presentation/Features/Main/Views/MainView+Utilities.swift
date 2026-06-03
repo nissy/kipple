@@ -33,6 +33,15 @@ extension MainView {
         }
     }
 
+    func formatAction(_ format: ClipboardTextFormat) {
+        switch viewModel.formatEditor(as: format) {
+        case .formatted:
+            showCopiedNotification(.formatted)
+        case .failed(let message):
+            showCopiedNotification(.formatFailed(message))
+        }
+    }
+
     func splitHistoryItemIntoLines(_ item: ClipItem) {
         Task { @MainActor in
             let insertedCount = await viewModel.splitHistoryItemIntoHistory(item)

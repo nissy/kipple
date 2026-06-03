@@ -10,18 +10,22 @@ import SwiftUI
 struct MainViewControlSection: View {
     @Binding var editorMode: MainViewModel.ClipboardEditorMode
     let isEditorLocked: Bool
+    let canSave: Bool
     let onSave: () -> Void
     let onTrim: () -> Void
+    let onFormat: (ClipboardTextFormat) -> Void
     @ObservedObject private var appSettings = AppSettings.shared
 
     private let buttonHeight: CGFloat = 30
     private let horizontalPadding: CGFloat = 10
+    private let trimButtonWidth: CGFloat = 40
+    private let formatMenuButtonWidth: CGFloat = 32
 
     var body: some View {
         HStack(spacing: 6) {
             editModeButton
             saveButton
-            trimButton
+            formatMenu
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -59,28 +63,66 @@ struct MainViewControlSection: View {
         .help(Text(editModeButtonHelpText))
     }
 
-    private var trimButton: some View {
-        Button(action: onTrim) {
-            buttonLabel(
-                systemImage: "scissors",
-                shortcut: "",
-                accessibilityLabel: "Trim"
-            )
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: buttonHeight)
-            .contentShape(Rectangle())
+    private var formatMenu: some View {
+        HStack(spacing: 0) {
+            Button(action: trim) {
+                HStack(spacing: 4) {
+                    Image(systemName: "scissors")
+                        .font(.system(size: 11, weight: .regular))
+                }
+                .padding(.horizontal, horizontalPadding)
+                .frame(width: trimButtonWidth, height: buttonHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel(Text("editor.trim"))
+
+            Rectangle()
+                .fill(formatButtonSeparatorColor)
+                .frame(width: 1, height: buttonHeight - 12)
+                .padding(.vertical, 6)
+                .allowsHitTesting(false)
+
+            Menu {
+                Button(action: { format(.json) }, label: {
+                    Label {
+                        Text("editor.format.json")
+                    } icon: {
+                        Image(systemName: "curlybraces")
+                    }
+                })
+
+                Button(action: { format(.yaml) }, label: {
+                    Label {
+                        Text("editor.format.yaml")
+                    } icon: {
+                        Image(systemName: "list.bullet.rectangle")
+                    }
+                })
+            } label: {
+                Image(systemName: "chevron.down")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(formatButtonForegroundColor)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: formatMenuButtonWidth, height: buttonHeight)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(BorderlessButtonMenuStyle())
+            .menuIndicator(.hidden)
+            .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel(Text("editor.format"))
         }
-        .buttonStyle(PlainButtonStyle())
-        .foregroundColor(.white)
-        .background(trimButtonColor)
+        .foregroundColor(formatButtonForegroundColor)
+        .background(formatButtonBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                .stroke(formatButtonBorderColor, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
-        .disabled(isEditorLocked)
-        .opacity(isEditorLocked ? 0.45 : 1.0)
+        .shadow(color: formatButtonShadowColor, radius: 4, y: 2)
+        .disabled(isFormatDisabled)
+        .contentShape(Rectangle())
+        .help(Text(formatButtonHelpText))
     }
 
     private var saveButton: some View {
@@ -91,16 +133,16 @@ struct MainViewControlSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-        .foregroundColor(.white)
-        .background(primaryButtonBackground)
+        .foregroundColor(saveButtonForegroundColor)
+        .background(saveButtonBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                .stroke(saveButtonBorderColor, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
-        .disabled(isEditorLocked)
-        .opacity(isEditorLocked ? 0.45 : 1.0)
+        .shadow(color: saveButtonShadowColor, radius: 4, y: 2)
+        .disabled(isSaveDisabled)
+        .help(Text(saveButtonHelpText))
     }
 
     private var saveButtonLabel: some View {
@@ -169,6 +211,14 @@ struct MainViewControlSection: View {
         editorMode == .editing
     }
 
+    private var isFormatDisabled: Bool {
+        isEditorLocked || !isEditing
+    }
+
+    private var isSaveDisabled: Bool {
+        isEditorLocked || !canSave
+    }
+
     private var editModeButtonTitle: LocalizedStringKey {
         if isEditorLocked {
             return "editor.mode.locked"
@@ -226,14 +276,102 @@ struct MainViewControlSection: View {
             endPoint: .bottomTrailing
         )
     }
+
+    private var disabledButtonBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(NSColor.controlBackgroundColor).opacity(0.88),
+                Color(NSColor.controlBackgroundColor).opacity(0.72)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var saveButtonBackground: LinearGradient {
+        isSaveDisabled ? disabledButtonBackground : primaryButtonBackground
+    }
+
+    private var saveButtonForegroundColor: Color {
+        isSaveDisabled ? Color.secondary.opacity(0.62) : Color.white
+    }
+
+    private var saveButtonBorderColor: Color {
+        isSaveDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+    }
+
+    private var saveButtonShadowColor: Color {
+        isSaveDisabled ? Color.clear : Color.black.opacity(0.12)
+    }
+
+    private var saveButtonHelpText: LocalizedStringKey {
+        if isEditorLocked {
+            return "editor.locked.help"
+        }
+
+        if !canSave {
+            return "editor.saveToHistory.noChanges"
+        }
+
+        return "editor.saveToHistory"
+    }
     
-    private var trimButtonColor: Color {
-        isEditorLocked ? Color.secondary.opacity(0.5) : Color.green
+    private var formatButtonBackground: LinearGradient {
+        if isFormatDisabled {
+            return disabledButtonBackground
+        }
+
+        return LinearGradient(
+            colors: [
+                Color.green,
+                Color.green.opacity(0.85)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var formatButtonForegroundColor: Color {
+        isFormatDisabled ? Color.secondary.opacity(0.62) : Color.white
+    }
+
+    private var formatButtonBorderColor: Color {
+        isFormatDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+    }
+
+    private var formatButtonSeparatorColor: Color {
+        isFormatDisabled ? Color.secondary.opacity(0.16) : Color.white.opacity(0.25)
+    }
+
+    private var formatButtonShadowColor: Color {
+        isFormatDisabled ? Color.clear : Color.black.opacity(0.12)
     }
 
     private func toggleEditorMode() {
         guard !isEditorLocked else { return }
         editorMode = isEditing ? .display : .editing
+    }
+
+    private var formatButtonHelpText: LocalizedStringKey {
+        if isEditorLocked {
+            return "editor.locked.help"
+        }
+
+        if !isEditing {
+            return "editor.editTools.requiresEditing"
+        }
+
+        return "editor.editTools.help"
+    }
+
+    private func trim() {
+        guard !isFormatDisabled else { return }
+        onTrim()
+    }
+
+    private func format(_ textFormat: ClipboardTextFormat) {
+        guard !isFormatDisabled else { return }
+        onFormat(textFormat)
     }
 
     private func getShortcutKeyDisplay() -> String {

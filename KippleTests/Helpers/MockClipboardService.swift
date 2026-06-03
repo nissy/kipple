@@ -82,7 +82,6 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         addEditorItemsCallCount += 1
         let sanitized = contents
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
         lastAddEditorItemsInput = sanitized

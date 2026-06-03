@@ -25,6 +25,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         case queueToggle
     }
 
+    enum EditorFormatResult: Equatable {
+        case formatted
+        case failed(String)
+    }
+
     private struct PaginationFilterState: Equatable {
         let searchText: String
         let showOnlyURLs: Bool
@@ -69,6 +74,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published private(set) var queueSelectionPreview: Set<UUID> = []
     @Published private(set) var clipboardEditorMode: ClipboardEditorMode = .display
     private var clipboardEditingOriginalText: String?
+    private var editorSaveBaselineText: String?
+    private var editorClipboardOnlyWriteText: String?
     
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String? {
@@ -77,6 +84,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
     @Published private(set) var currentClipboardItemID: UUID?
+
+    var canSaveEditorToHistory: Bool {
+        guard let content = editorHistorySaveContent else { return false }
+        return content != historySaveContent(editorSaveBaselineText)
+    }
 
     // ページネーション関連
     @Published private(set) var hasMoreHistory: Bool = false
@@ -106,6 +118,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let resolvedService = clipboardService ?? ClipboardServiceProvider.resolve()
         self.clipboardService = resolvedService
         self.editorText = resolvedService.currentClipboardContent ?? ""
+        self.editorSaveBaselineText = resolvedService.currentClipboardContent
         self.pasteMonitor = pasteMonitor
         self.screenCapturePermissionCheck = screenCapturePermissionCheck
         
@@ -399,21 +412,41 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @discardableResult
     func trimEditor() -> Bool {
         guard !isQueueModeActive else { return false }
-        let trimmedLines = editorText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-        let leadingTrimmed = trimmedLines.drop { $0.isEmpty }
-        let trailingTrimmed = leadingTrimmed
-            .reversed()
-            .drop { $0.isEmpty }
-            .reversed()
-
-        let normalizedText = trailingTrimmed.joined(separator: "\n")
+        let normalizedText = editorText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard normalizedText != editorText else { return false }
 
         editorText = normalizedText
         return true
+    }
+
+    @discardableResult
+    func formatEditor(as format: ClipboardTextFormat) -> EditorFormatResult {
+        guard !isQueueModeActive else {
+            return .failed(NSLocalizedString("editor.locked.help", comment: "Editor locked format failure"))
+        }
+
+        guard clipboardEditorMode == .editing else {
+            return .failed(
+                NSLocalizedString("editor.format.requiresEditing", comment: "Format requires editing mode")
+            )
+        }
+
+        do {
+            let formattedText = try ClipboardTextFormatter.format(editorText, as: format)
+            guard formattedText != editorText else { return .formatted }
+            editorText = formattedText
+            return .formatted
+        } catch let error as ClipboardTextFormatter.FormatError {
+            return .failed(formatFailureMessage(format: format, detail: error.detail))
+        } catch {
+            return .failed(formatFailureMessage(format: format, detail: error.localizedDescription))
+        }
+    }
+
+    private func formatFailureMessage(format: ClipboardTextFormat, detail: String) -> String {
+        let formatName = format.localizedName
+        let messageFormat = NSLocalizedString("editor.format.error.invalid", comment: "Format failure with detail")
+        return String(format: messageFormat, formatName, detail)
     }
     
     func clearEditor() {
@@ -425,12 +458,20 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func writeEditorTextToClipboardOnly(_ text: String) {
+        editorClipboardOnlyWriteText = text
         clipboardService.writeToClipboardOnly(text)
         currentClipboardContent = text.isEmpty ? nil : text
     }
 
     private func applyClipboardContentToEditor(_ content: String?) {
         currentClipboardContent = content
+        if editorClipboardOnlyWriteText == (content ?? "") {
+            // Clipboard-only writes from the live editor can be published more than once by the adapter.
+            // Keep the save baseline unchanged until a different clipboard value arrives.
+        } else {
+            editorClipboardOnlyWriteText = nil
+            editorSaveBaselineText = content
+        }
         guard clipboardEditorMode == .display else { return }
 
         let text = content ?? ""
@@ -442,11 +483,25 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @discardableResult
     func saveEditorToHistory() async -> Int {
         guard !isQueueModeActive else { return 0 }
+        guard canSaveEditorToHistory else { return 0 }
         if clipboardEditorMode == .editing {
             commitClipboardEditor()
         }
         let items = await clipboardService.addEditorItems([editorText])
+        if !items.isEmpty {
+            editorSaveBaselineText = editorText
+            editorClipboardOnlyWriteText = nil
+        }
         return items.count
+    }
+
+    private var editorHistorySaveContent: String? {
+        historySaveContent(editorText)
+    }
+
+    private func historySaveContent(_ text: String?) -> String? {
+        guard let text, !text.isEmpty else { return nil }
+        return text
     }
 
     @discardableResult

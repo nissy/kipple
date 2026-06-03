@@ -513,8 +513,9 @@ extension MainView {
             )
             MainViewControlSection(
                 editorMode: clipboardEditorModeBinding, isEditorLocked: viewModel.isQueueModeActive,
-                onSave: saveEditorToHistory,
-                onTrim: trimAction
+                canSave: viewModel.canSaveEditorToHistory,
+                onSave: saveEditorToHistory, onTrim: trimAction,
+                onFormat: formatAction
             )
         }
         .id(editorRefreshID)

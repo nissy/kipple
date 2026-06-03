@@ -315,7 +315,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         let sanitized = contents
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
         guard !sanitized.isEmpty else { return [] }

@@ -336,7 +336,7 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(mockService.currentClipboardContent, item.content)
     }
 
-    func testQueueModePreventsLiveEditorSaveAndTrim() async {
+    func testQueueModePreventsLiveEditorSaveTrimAndFormat() async {
         let item = mockService.history[0]
 
         viewModel.toggleQueueMode()
@@ -344,6 +344,9 @@ final class PasteQueueModeTests: XCTestCase {
 
         viewModel.editorText = "  Changed  "
         XCTAssertFalse(viewModel.trimEditor())
+        guard case .failed = viewModel.formatEditor(as: .json) else {
+            return XCTFail("Expected format failure while queue mode is active")
+        }
 
         let savedCount = await viewModel.saveEditorToHistory()
 

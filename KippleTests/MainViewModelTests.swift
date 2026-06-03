@@ -73,6 +73,30 @@ class MainViewModelTests: XCTestCase {
         XCTAssertNil(mockClipboardService.currentClipboardContent)
     }
 
+    func testTrimEditorRemovesOnlyOuterWhitespaceAndNewlines() {
+        // Given
+        viewModel.editorText = "\n  aaa  \n  bbb  \n\n  ccc  \n"
+
+        // When
+        let didTrim = viewModel.trimEditor()
+
+        // Then
+        XCTAssertTrue(didTrim)
+        XCTAssertEqual(viewModel.editorText, "aaa  \n  bbb  \n\n  ccc")
+    }
+
+    func testTrimEditorReturnsFalseWhenNoOuterWhitespaceExists() {
+        // Given
+        viewModel.editorText = "aaa  \n  bbb"
+
+        // When
+        let didTrim = viewModel.trimEditor()
+
+        // Then
+        XCTAssertFalse(didTrim)
+        XCTAssertEqual(viewModel.editorText, "aaa  \n  bbb")
+    }
+
     func testEditorTextDoesNotWriteWhileEditing() async {
         // When
         viewModel.beginClipboardEditing()
@@ -257,6 +281,98 @@ class MainViewModelTests: XCTestCase {
         XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
         XCTAssertEqual(mockClipboardService.lastCopiedContent, "edited history")
         XCTAssertEqual(mockClipboardService.lastAddEditorItemsInput, ["edited history"])
+    }
+
+    func testFormatEditorFormatsJSONWhileEditing() {
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "{\"name\":\"Kipple\"}"
+
+        let didFormat = viewModel.formatEditor(as: .json)
+
+        XCTAssertEqual(didFormat, .formatted)
+        XCTAssertEqual(viewModel.clipboardEditorMode, .editing)
+        XCTAssertEqual(
+            viewModel.editorText,
+            """
+            {
+              "name" : "Kipple"
+            }
+
+            """
+        )
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+    }
+
+    func testFormatEditorDoesNotFormatInDisplayMode() {
+        viewModel.setClipboardEditorMode(.display)
+        viewModel.editorText = "{\"name\":\"Kipple\"}"
+
+        let didFormat = viewModel.formatEditor(as: .json)
+
+        guard case .failed(let message) = didFormat else {
+            return XCTFail("Expected format failure in display mode")
+        }
+        XCTAssertTrue(message.contains("編集") || message.contains("editing"))
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+        XCTAssertEqual(viewModel.editorText, "{\"name\":\"Kipple\"}")
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+    }
+
+    func testFormatEditorKeepsTextForInvalidJSON() {
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "{invalid"
+
+        let didFormat = viewModel.formatEditor(as: .json)
+
+        guard case .failed(let message) = didFormat else {
+            return XCTFail("Expected format failure")
+        }
+        XCTAssertTrue(message.contains("JSON"))
+        XCTAssertEqual(viewModel.clipboardEditorMode, .editing)
+        XCTAssertEqual(viewModel.editorText, "{invalid")
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+    }
+
+    func testFormatEditorFormatsYAMLWhileEditing() {
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "name: Kipple\nenabled: true\n"
+
+        let didFormat = viewModel.formatEditor(as: .yaml)
+
+        XCTAssertEqual(didFormat, .formatted)
+        XCTAssertEqual(viewModel.clipboardEditorMode, .editing)
+        XCTAssertTrue(viewModel.editorText.contains("name: Kipple"))
+        XCTAssertTrue(viewModel.editorText.contains("enabled: true"))
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+    }
+
+    func testFormatEditorKeepsEditingModeAndTextForInvalidYAML() {
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "name: ["
+
+        let didFormat = viewModel.formatEditor(as: .yaml)
+
+        guard case .failed(let message) = didFormat else {
+            return XCTFail("Expected format failure")
+        }
+        XCTAssertTrue(message.contains("YAML"))
+        XCTAssertEqual(viewModel.clipboardEditorMode, .editing)
+        XCTAssertEqual(viewModel.editorText, "name: [")
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+    }
+
+    func testFormattedEditorTextWritesToClipboardOnlyWhenEditingEnds() {
+        viewModel.beginClipboardEditing()
+        viewModel.editorText = "{\"name\":\"Kipple\"}"
+
+        XCTAssertEqual(viewModel.formatEditor(as: .json), .formatted)
+        XCTAssertFalse(mockClipboardService.writeToClipboardOnlyCalled)
+
+        viewModel.commitClipboardEditor()
+
+        XCTAssertEqual(viewModel.clipboardEditorMode, .display)
+        XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
+        XCTAssertEqual(mockClipboardService.lastCopiedContent, viewModel.editorText)
     }
     
     // MARK: - Pin Tests
