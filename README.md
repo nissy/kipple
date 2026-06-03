@@ -6,7 +6,7 @@ A powerful clipboard manager for macOS with smart editing capabilities.
 
 ## Key Features
 
-<img width="784" height="849" src="https://github.com/user-attachments/assets/75173e80-61de-46b9-84ff-0e894a3a0525" />
+<img width="755" height="775" src="https://github.com/user-attachments/assets/4c4e2b1f-8055-43d8-82f6-25496d6975df" />
 
 ## Installation
 1. Download the latest release from the [Releases](https://github.com/nissy/kipple/releases)
