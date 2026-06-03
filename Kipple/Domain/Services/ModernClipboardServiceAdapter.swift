@@ -5,20 +5,17 @@ import AppKit
 
 /// Adapter to bridge ModernClipboardService (Actor) with existing ClipboardServiceProtocol
 @MainActor
-final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServiceProtocol, QueueAutoClearControlling {
+final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServiceProtocol {
     // MARK: - Published Properties
 
     @Published var history: [ClipItem] = []
     @Published var currentClipboardContent: String?
-    @Published var autoClearRemainingTime: TimeInterval?
 
     // MARK: - Properties
 
     private let modernService = ModernClipboardService.shared
     private var refreshTask: Task<Void, Never>?
-    private nonisolated(unsafe) var autoClearTimer: Timer?
     private var pendingClipboardContent: String?
-    private var autoClearPausedByQueue = false
     private var lastKnownHistoryRevision: UInt64?
 
     // ClipboardServiceProtocol requirement
@@ -42,7 +39,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     deinit {
         refreshTask?.cancel()
-        autoClearTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -63,10 +59,18 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func copyToClipboard(_ content: String, fromEditor: Bool) {
         pendingClipboardContent = content
         currentClipboardContent = content
-        restartAutoClearTimerIfNeeded()
         Task {
             await modernService.copyToClipboard(content, fromEditor: fromEditor)
             await refreshHistory()
+        }
+    }
+
+    func writeToClipboardOnly(_ content: String) {
+        pendingClipboardContent = content
+        currentClipboardContent = content.isEmpty ? nil : content
+
+        Task {
+            await modernService.writeToClipboardOnly(content)
         }
     }
 
@@ -89,7 +93,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await modernService.clearSystemClipboard()
         pendingClipboardContent = nil
         currentClipboardContent = nil
-        stopAutoClearTimer()
         await refreshHistory()
     }
 
@@ -191,50 +194,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await modernService.searchHistory(query: query)
     }
 
-    // MARK: - Auto Clear Timer
-
-    func startAutoClearTimer(minutes: Int) {
-        autoClearTimer?.invalidate()
-        autoClearRemainingTime = TimeInterval(minutes * 60)
-
-        autoClearTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self else { return }
-                if let remaining = self.autoClearRemainingTime {
-                    self.autoClearRemainingTime = max(0, remaining - 1)
-                    if remaining <= 0 {
-                        self.autoClearRemainingTime = nil
-                        // Clear only system clipboard, not history (matches legacy behavior)
-                        Task { @MainActor [weak self] in
-                            guard let self else { return }
-                            await self.performAutoClear()
-                            self.stopAutoClearTimer()
-                        }
-                    }
-                }
-            }
-        }
-        }
-
-    func stopAutoClearTimer(resetRemaining: Bool = true) {
-        autoClearTimer?.invalidate()
-        autoClearTimer = nil
-        if resetRemaining || autoClearPausedByQueue {
-            autoClearRemainingTime = nil
-        }
-    }
-
     // MARK: - Private Methods
-
-    /// Clear only the system clipboard, preserving history (matches legacy behavior)
-    internal func performAutoClear() async {
-        // Check if current clipboard content is text
-        guard NSPasteboard.general.string(forType: .string) != nil else {
-            return
-        }
-
-        await clearSystemClipboard()
-    }
 
     private func startPeriodicRefresh() {
         let interval: TimeInterval = 5.0
@@ -282,15 +242,12 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             if newCurrentContent == pending {
                 currentClipboardContent = pending
                 pendingClipboardContent = nil
+            } else if newCurrentContent != previousClipboardContent {
+                currentClipboardContent = newCurrentContent
+                pendingClipboardContent = nil
             }
         } else if currentClipboardContent != newCurrentContent {
             currentClipboardContent = newCurrentContent
-        }
-
-        if let updatedContent = currentClipboardContent,
-           updatedContent != previousClipboardContent,
-           !updatedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            restartAutoClearTimerIfNeeded()
         }
     }
 
@@ -300,9 +257,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         refreshTask = nil
         history = []
         currentClipboardContent = nil
-        autoClearRemainingTime = nil
         pendingClipboardContent = nil
-        autoClearPausedByQueue = false
         lastKnownHistoryRevision = nil
 
         // Ensure we are in sync with the service after it resets.
@@ -342,7 +297,6 @@ extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     private func prepareForRecopy(of item: ClipItem) {
         pendingClipboardContent = item.content
         currentClipboardContent = item.content
-        restartAutoClearTimerIfNeeded()
     }
 
     /// Get pinned items from history
@@ -364,40 +318,5 @@ extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     func setMaxHistoryItems(_ max: Int) async {
         await modernService.setMaxHistoryItems(max)
         await refreshHistory()
-    }
-
-    func pauseAutoClearForQueue() {
-        guard !autoClearPausedByQueue else { return }
-        guard AppSettings.shared.enableAutoClear else { return }
-        autoClearPausedByQueue = true
-        stopAutoClearTimer(resetRemaining: false)
-    }
-
-    func resumeAutoClearAfterQueue() {
-        guard autoClearPausedByQueue else { return }
-        autoClearPausedByQueue = false
-        restartAutoClearTimerIfNeeded()
-    }
-}
-
-private extension ModernClipboardServiceAdapter {
-    func restartAutoClearTimerIfNeeded() {
-        if autoClearPausedByQueue {
-            stopAutoClearTimer(resetRemaining: false)
-            return
-        }
-        let settings = AppSettings.shared
-        guard settings.enableAutoClear else {
-            stopAutoClearTimer()
-            return
-        }
-
-        let interval = settings.autoClearInterval
-        guard interval > 0 else {
-            stopAutoClearTimer()
-            return
-        }
-
-        startAutoClearTimer(minutes: interval)
     }
 }

@@ -18,10 +18,7 @@ enum MainViewMetrics {
     enum BottomBar {
         static let buttonSize: CGFloat = 30
         static let iconFont: Font = .system(size: 12, weight: .medium)
-        static let clipboardIconFont: Font = .system(size: 11)
         static let clearIconFont: Font = .system(size: 12)
-        static let autoClearIconFont: Font = .system(size: 11)
-        static let autoClearTimerFont: Font = .system(size: 11, design: .monospaced)
     }
 
     enum HistoryFilterMenu {

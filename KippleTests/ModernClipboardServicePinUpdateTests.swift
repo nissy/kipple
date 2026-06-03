@@ -148,7 +148,7 @@ final class ModernClipboardServicePinUpdateTests: XCTestCase {
         }
 
         XCTAssertEqual(item.sourceApp, "Kipple")
-        XCTAssertEqual(item.windowTitle, "Quick Editor")
+        XCTAssertEqual(item.windowTitle, "Live Editor")
         XCTAssertTrue(item.isFromEditor ?? false)
     }
 }

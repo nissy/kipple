@@ -13,7 +13,7 @@ options:
 settings:
   base:
     DEVELOPMENT_TEAM: R7LKF73J2W
-    MARKETING_VERSION: 2.1.5
+    MARKETING_VERSION: 2.1.7
     CURRENT_PROJECT_VERSION: 1
     PRODUCT_NAME: Kipple
     MACOSX_DEPLOYMENT_TARGET: 14.0
@@ -21,6 +21,11 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
     COMBINE_HIDPI_IMAGES: YES
+
+packages:
+  Yams:
+    url: https://github.com/jpsim/Yams.git
+    from: 6.2.2
 
 targets:
   Kipple:
@@ -60,6 +65,7 @@ targets:
           OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
     dependencies:
       - sdk: libsqlite3.tbd
+      - package: Yams
     preBuildScripts: []
     postBuildScripts: []
 

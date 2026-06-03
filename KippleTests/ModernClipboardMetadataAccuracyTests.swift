@@ -48,7 +48,7 @@ final class ModernClipboardMetadataAccuracyTests: XCTestCase {
             return
         }
         XCTAssertEqual(editorItem.sourceApp, "Kipple", "Editor copy should have Kipple as source")
-        XCTAssertEqual(editorItem.windowTitle, "Quick Editor", "Editor copy should have Quick Editor as window")
+        XCTAssertEqual(editorItem.windowTitle, "Live Editor", "Editor copy should have Live Editor as window")
         XCTAssertTrue(editorItem.isFromEditor ?? false, "Should be marked as from editor")
 
         // When: Simulate external copy (this would normally come from another app)
@@ -69,8 +69,8 @@ final class ModernClipboardMetadataAccuracyTests: XCTestCase {
         if let externalItem = externalItem {
             XCTAssertNotEqual(externalItem.sourceApp, "Kipple",
                              "External copy should not have Kipple as source")
-            XCTAssertNotEqual(externalItem.windowTitle, "Quick Editor",
-                             "External copy should not have Quick Editor as window")
+            XCTAssertNotEqual(externalItem.windowTitle, "Live Editor",
+                             "External copy should not have Live Editor as window")
             XCTAssertFalse(externalItem.isFromEditor ?? true,
                           "External copy should not be marked as from editor")
         }

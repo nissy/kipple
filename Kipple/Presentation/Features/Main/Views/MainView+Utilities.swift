@@ -14,9 +14,17 @@ extension MainView {
         appSettings.editorPosition != "disabled"
     }
 
-    func confirmAction() {
-        viewModel.copyEditor()
-        showCopiedNotification(.copied)
+    var clipboardEditorModeBinding: Binding<MainViewModel.ClipboardEditorMode> {
+        Binding(get: { viewModel.clipboardEditorMode }, set: { viewModel.setClipboardEditorMode($0) })
+    }
+
+    func saveEditorToHistory() {
+        Task { @MainActor in
+            let insertedCount = await viewModel.saveEditorToHistory()
+            if insertedCount > 0 {
+                showCopiedNotification(.copied)
+            }
+        }
     }
 
     func trimAction() {
@@ -25,12 +33,12 @@ extension MainView {
         }
     }
 
-    func splitEditorIntoHistory() {
-        Task { @MainActor in
-            let insertedCount = await viewModel.splitEditorLinesIntoHistory()
-            if insertedCount > 0 {
-                showCopiedNotification(.copied)
-            }
+    func formatAction(_ format: ClipboardTextFormat) {
+        switch viewModel.formatEditor(as: format) {
+        case .formatted:
+            showCopiedNotification(.formatted)
+        case .failed(let message):
+            showCopiedNotification(.formatFailed(message))
         }
     }
 
@@ -109,23 +117,6 @@ extension MainView {
         }
         copiedHideWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
-    }
-
-    func formatRemainingTime(_ timeInterval: TimeInterval) -> String {
-        let minutes = Int(timeInterval) / 60
-        let seconds = Int(timeInterval) % 60
-
-        if minutes > 0 {
-            return String(format: "%02d:%02d", minutes, seconds)
-        } else {
-            return String(format: "00:%02d", seconds)
-        }
-    }
-
-    func clearSystemClipboard() {
-        Task {
-            await viewModel.clipboardService.clearSystemClipboard()
-        }
     }
 
     func presentCategoryManager() {

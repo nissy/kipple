@@ -139,7 +139,7 @@ final class AppInfoTests: XCTestCase {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             if let item = self.mockClipboardService.history.first(where: { $0.content == testContent }) {
                 XCTAssertEqual(item.sourceApp, "Kipple", "Editor copy should have 'Kipple' as source app")
-                XCTAssertEqual(item.windowTitle, "Quick Editor")
+                XCTAssertEqual(item.windowTitle, "Live Editor")
                 XCTAssertEqual(item.category, .all)
                 XCTAssertTrue(item.isFromEditor ?? false)
                 XCTAssertNotNil(item.bundleIdentifier)

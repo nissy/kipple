@@ -97,7 +97,7 @@ final class MetadataPreservationTests: XCTestCase {
             ClipItem(
                 content: "From Editor",
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true
@@ -132,7 +132,7 @@ final class MetadataPreservationTests: XCTestCase {
         let editorItem = ClipItem(
             content: "Editor Content",
             sourceApp: "Kipple",
-            windowTitle: "Quick Editor",
+            windowTitle: "Live Editor",
             bundleIdentifier: Bundle.main.bundleIdentifier,
             processID: ProcessInfo.processInfo.processIdentifier,
             isFromEditor: true

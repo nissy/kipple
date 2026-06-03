@@ -14,6 +14,8 @@ struct CopiedNotificationView: View {
     enum NotificationType {
         case copied
         case trimmed
+        case formatted
+        case formatFailed(String)
         case pinLimitReached
         
         var icon: String {
@@ -22,6 +24,10 @@ struct CopiedNotificationView: View {
                 return "checkmark.circle.fill"
             case .trimmed:
                 return "scissors"
+            case .formatted:
+                return "text.alignleft"
+            case .formatFailed:
+                return "exclamationmark.triangle.fill"
             case .pinLimitReached:
                 return "exclamationmark.triangle.fill"
             }
@@ -32,7 +38,11 @@ struct CopiedNotificationView: View {
             case .copied:
                 return "Copied"
             case .trimmed:
-                return "Trimmed"
+                return NSLocalizedString("editor.trim.success", comment: "Trim success notification")
+            case .formatted:
+                return NSLocalizedString("editor.format.success", comment: "Format success notification")
+            case .formatFailed(let message):
+                return message
             case .pinLimitReached:
                 return "Pin limit reached"
             }
@@ -40,11 +50,11 @@ struct CopiedNotificationView: View {
         
         var backgroundColor: Color {
             switch self {
-            case .copied:
+            case .copied, .trimmed:
                 return Color(NSColor.controlAccentColor)
-            case .trimmed:
+            case .formatted:
                 return Color.green
-            case .pinLimitReached:
+            case .formatFailed, .pinLimitReached:
                 return Color.orange
             }
         }
@@ -58,6 +68,9 @@ struct CopiedNotificationView: View {
                         .font(MainViewMetrics.Notification.iconFont)
                     Text(notificationType.text)
                         .font(MainViewMetrics.Notification.textFont)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: 320, alignment: .leading)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 10)

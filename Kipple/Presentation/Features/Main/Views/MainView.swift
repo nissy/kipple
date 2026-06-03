@@ -4,7 +4,6 @@
 //
 //  Created by Kipple on 2025/06/28.
 //
-// swiftlint:disable file_length
 import SwiftUI
 import AppKit
 import Combine
@@ -28,7 +27,6 @@ struct MainView: View {
     @AppStorage("editorSectionHeight") private var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") private var historySectionHeight: Double = 300
     @ObservedObject var appSettings = AppSettings.shared
-    @ObservedObject var fontManager = FontManager.shared
     @ObservedObject var userCategoryStore = UserCategoryStore.shared
     
     // パフォーマンス最適化: 部分更新用のID
@@ -36,7 +34,6 @@ struct MainView: View {
     @State var historyRefreshID = UUID()
     @State var historyCopyScrollRequest: HistoryCopyScrollRequest?
     @State var historyHoverResetRequest: HistoryHoverResetRequest?
-    @State var hoveredClearButton = false
     // キーボードイベントモニタ（リーク防止のため保持して明示的に解除）
     @State private var keyDownMonitor: Any?
     @State private var modifierMonitor: Any?
@@ -127,11 +124,6 @@ extension MainView {
         if viewModel.canUsePasteQueue,
            viewModel.isQueueModeActive {
             viewModel.handleQueueSelection(for: item, modifiers: modifiers)
-            return
-        }
-
-        if viewModel.shouldInsertToEditor() {
-            viewModel.selectHistoryItem(item, forceInsert: true)
             return
         }
 
@@ -284,9 +276,8 @@ extension MainView {
             historyRefreshID = UUID()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mainWindowDidHide)) { _ in
-            if historyCopyScrollRequest == nil {
-                historyCopyScrollRequest = HistoryCopyScrollRequest()
-            }
+            viewModel.endClipboardEditingIfUnchanged()
+            if historyCopyScrollRequest == nil { historyCopyScrollRequest = HistoryCopyScrollRequest() }
             historyHoverResetRequest = HistoryHoverResetRequest()
         }
         .onChange(of: appSettings.editorPosition) { _, newValue in
@@ -326,7 +317,7 @@ extension MainView {
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let copyModifiers = NSEvent.ModifierFlags(
+                let saveModifiers = NSEvent.ModifierFlags(
                     rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)
                 )
                     .intersection(.deviceIndependentFlagsMask)
@@ -335,11 +326,11 @@ extension MainView {
                 )
                     .intersection(.deviceIndependentFlagsMask)
 
-                // Editor Copy Hotkey (always enabled)
+                // Editor Save Hotkey (always enabled)
                 if appSettings.editorCopyHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
-                   eventModifiers == copyModifiers {
-                    confirmAction()
+                   eventModifiers == saveModifiers {
+                    if !viewModel.isQueueModeActive { saveEditorToHistory() }
                     return nil
                 }
 
@@ -347,7 +338,7 @@ extension MainView {
                 if appSettings.editorClearHotkeyKeyCode > 0,
                    event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
                    eventModifiers == clearModifiers {
-                    clearAction()
+                    if !viewModel.isQueueModeActive { clearAction() }
                     return nil
                 }
 
@@ -514,13 +505,17 @@ extension MainView {
             MainViewEditorSection(
                 editorText: $viewModel.editorText,
                 isAlwaysOnTop: $isAlwaysOnTop,
+                isEditing: viewModel.clipboardEditorMode == .editing, isLocked: viewModel.isQueueModeActive,
                 onToggleAlwaysOnTop: toggleAlwaysOnTop,
+                onBeginEditing: viewModel.beginClipboardEditing,
+                onCommitEditing: viewModel.commitClipboardEditor,
                 onClear: clearAction
             )
             MainViewControlSection(
-                onCopy: confirmAction,
-                onSplitCopy: splitEditorIntoHistory,
-                onTrim: trimAction
+                editorMode: clipboardEditorModeBinding, isEditorLocked: viewModel.isQueueModeActive,
+                canSave: viewModel.canSaveEditorToHistory,
+                onSave: saveEditorToHistory, onTrim: trimAction,
+                onFormat: formatAction
             )
         }
         .id(editorRefreshID)

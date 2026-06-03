@@ -46,9 +46,6 @@ extension MainView {
                 guard item.isActionable else { return }
                 item.performAction()
             },
-            onInsertToEditor: { item in
-                viewModel.selectHistoryItem(item, forceInsert: true)
-            },
             onSplitEditorIntoHistory: { item in
                 splitHistoryItemIntoLines(item)
             },

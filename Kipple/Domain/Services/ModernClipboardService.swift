@@ -11,6 +11,12 @@ extension Notification.Name {
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
+    private struct AutoPinCopySequence {
+        let content: String
+        let firstCopiedAt: Date
+        var count: Int
+    }
+
     // MARK: - Properties
 
     private var history: [ClipItem] = []
@@ -33,6 +39,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var snapshotNeedsPriming = false
     private var historyRevision: UInt64 = 0
     private var itemIDByContent: [String: UUID] = [:]
+    private var autoPinCopySequence: AutoPinCopySequence?
 
     // MARK: - Singleton
 
@@ -102,22 +109,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             async let allItemsTask = repository.load(limit: fetchLimit)
             let loadedItems = try await allItemsTask
 
-            let pinnedIDSet = Set(pinnedItems.map { $0.id })
             let loadedByID = Dictionary(uniqueKeysWithValues: loadedItems.map { ($0.id, $0) })
 
-            var combinedItems: [ClipItem] = []
-            combinedItems.reserveCapacity(loadedItems.count + pinnedItems.count)
+            var combinedByID = loadedByID
 
             for pinned in pinnedItems {
-                if let refreshed = loadedByID[pinned.id] {
-                    combinedItems.append(refreshed)
-                } else {
-                    combinedItems.append(pinned)
-                }
+                combinedByID[pinned.id] = loadedByID[pinned.id] ?? pinned
             }
 
-            for item in loadedItems where !pinnedIDSet.contains(item.id) {
-                combinedItems.append(item)
+            let combinedItems = combinedByID.values.sorted {
+                $0.timestamp > $1.timestamp
             }
 
             history = combinedItems
@@ -254,19 +255,38 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             kind: determineKind(for: content, isFromEditor: fromEditor),
             sourceApp: fromEditor ? "Kipple" : metadata.appName,
             windowTitle: fromEditor
-                ? "Quick Editor"
+                ? "Live Editor"
                 : metadata.windowTitle,
             bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
             isFromEditor: fromEditor
         )
-        addToHistory(item)
-
         // Copy to system clipboard. Writes stay off MainActor to avoid hop delays.
         let newChangeCount = Self.writeStringToPasteboard(content)
 
         // Record the expected changeCount for this internal operation
         await state.setExpectedChangeCount(newChangeCount)
+
+        addToHistory(item)
+    }
+
+    func writeToClipboardOnly(_ content: String) async {
+        await state.setInternalCopy(true)
+        await state.setFromEditor(true)
+
+        let newChangeCount: Int
+        if content.isEmpty {
+            newChangeCount = autoreleasepool {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                return pasteboard.changeCount
+            }
+        } else {
+            newChangeCount = Self.writeStringToPasteboard(content)
+        }
+
+        await state.setExpectedChangeCount(newChangeCount)
+        updateLastChangeCount(newChangeCount)
     }
 
     /// NSPasteboard へ文字列を書き込む共通ヘルパー。
@@ -295,7 +315,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         let sanitized = contents
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
         guard !sanitized.isEmpty else { return [] }
@@ -308,7 +327,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 content: content,
                 kind: determineKind(for: content, isFromEditor: true),
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true
@@ -383,6 +402,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func clearAllHistory() async {
         let pinnedItems = history.filter { $0.isPinned }
         history = pinnedItems
+        autoPinCopySequence = nil
         rebuildContentLookup()
 
         // Save updated history to repository
@@ -397,6 +417,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         } else {
             history.removeAll()
         }
+        autoPinCopySequence = nil
         rebuildContentLookup()
 
         // Save updated history
@@ -543,7 +564,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Get clipboard content
         let fetchStartedAt = PerformanceTrace.nowMicros()
-        guard let item = await fetchClipboardItem() else { return }
+        guard var item = await fetchClipboardItem() else { return }
         PerformanceTrace.event(
             "pasteboard_change_detected",
             atMicros: detectedAt,
@@ -555,6 +576,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             content: item.content,
             details: ["fetchStartedAt": "\(fetchStartedAt)"]
         )
+
+        if await shouldAutoPinExternalCopy(content: item.content, copiedAt: Date()) {
+            item.isPinned = true
+        }
 
         // Always add to history - addToHistory handles duplicates by moving them to top
         addToHistory(item)
@@ -610,6 +635,66 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             count: history.count
         )
         notifyHistoryObservers(content: newItem.content)
+    }
+
+    private func shouldAutoPinExternalCopy(content: String, copiedAt: Date) async -> Bool {
+        let settings = await MainActor.run {
+            (
+                isEnabled: AppSettings.shared.autoPinRepeatedCopyEnabled,
+                interval: AppSettings.shared.autoPinRepeatedCopyIntervalSeconds,
+                requiredCount: AppSettings.shared.autoPinRepeatedCopyCount,
+                maxPinnedItems: AppSettings.shared.maxPinnedItems
+            )
+        }
+
+        guard settings.isEnabled else {
+            autoPinCopySequence = nil
+            return false
+        }
+
+        let currentSequence: AutoPinCopySequence
+        if let sequence = autoPinCopySequence,
+           sequence.content == content,
+           copiedAt.timeIntervalSince(sequence.firstCopiedAt) <= TimeInterval(settings.interval) {
+            currentSequence = AutoPinCopySequence(
+                content: content,
+                firstCopiedAt: sequence.firstCopiedAt,
+                count: sequence.count + 1
+            )
+        } else {
+            currentSequence = AutoPinCopySequence(
+                content: content,
+                firstCopiedAt: copiedAt,
+                count: 1
+            )
+        }
+
+        guard currentSequence.count >= settings.requiredCount else {
+            autoPinCopySequence = currentSequence
+            return false
+        }
+
+        autoPinCopySequence = nil
+
+        if let existingIndex = indexOfExistingContent(content),
+           history[existingIndex].isPinned {
+            return true
+        }
+
+        let pinnedCount = history.reduce(into: 0) { count, item in
+            if item.isPinned {
+                count += 1
+            }
+        }
+        guard pinnedCount < settings.maxPinnedItems else {
+            Logger.shared.log(
+                "Cannot auto-pin item: Maximum pinned items limit (\(settings.maxPinnedItems)) reached",
+                level: .warning
+            )
+            return false
+        }
+
+        return true
     }
 
     private func shouldSkipChange(for changeCount: Int) async -> Bool {
@@ -673,7 +758,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             kind: determineKind(for: content, isFromEditor: isFromEditor),
             sourceApp: isFromEditor ? "Kipple" : metadata.appName,
             windowTitle: isFromEditor
-                ? "Quick Editor"
+                ? "Live Editor"
                 : metadata.windowTitle,
             bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
@@ -874,6 +959,28 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
 #if DEBUG
 extension ModernClipboardService {
+    func addExternalClipboardItemForTesting(_ content: String, copiedAt: Date = Date()) async {
+        var item = ClipItem(
+            content: content,
+            kind: determineKind(for: content, isFromEditor: false),
+            sourceApp: "External Source",
+            windowTitle: nil,
+            bundleIdentifier: "external.app",
+            processID: -1,
+            isFromEditor: false
+        )
+
+        if await shouldAutoPinExternalCopy(content: item.content, copiedAt: copiedAt) {
+            item.isPinned = true
+        }
+
+        addToHistory(item)
+    }
+
+    func resetAutoPinSequenceForTesting() async {
+        autoPinCopySequence = nil
+    }
+
     func reloadHistoryForTesting() async {
         await initializeRepository()
         await loadHistoryFromRepository()

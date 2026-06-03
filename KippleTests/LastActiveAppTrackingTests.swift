@@ -44,7 +44,7 @@ final class LastActiveAppTrackingTests: XCTestCase {
         let history = await service.getHistory()
         XCTAssertEqual(history.count, 1)
         XCTAssertEqual(history[0].sourceApp, "Kipple")
-        XCTAssertEqual(history[0].windowTitle, "Quick Editor")
+        XCTAssertEqual(history[0].windowTitle, "Live Editor")
         XCTAssertTrue(history[0].isFromEditor ?? false)
     }
     

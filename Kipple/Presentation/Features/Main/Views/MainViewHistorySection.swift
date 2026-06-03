@@ -16,7 +16,6 @@ struct MainViewHistorySection: View {
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
     let onSelectItem: (ClipItem) -> Void
     let onOpenItem: ((ClipItem) -> Void)?
-    let onInsertToEditor: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
@@ -52,7 +51,6 @@ struct MainViewHistorySection: View {
         hoverResetRequest: Binding<HistoryHoverResetRequest?>,
         onSelectItem: @escaping (ClipItem) -> Void,
         onOpenItem: ((ClipItem) -> Void)? = nil,
-        onInsertToEditor: ((ClipItem) -> Void)? = nil,
         onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
         onTogglePin: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
@@ -85,7 +83,6 @@ struct MainViewHistorySection: View {
         self._hoverResetRequest = hoverResetRequest
         self.onSelectItem = onSelectItem
         self.onOpenItem = onOpenItem
-        self.onInsertToEditor = onInsertToEditor
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
@@ -139,7 +136,6 @@ struct MainViewHistorySection: View {
                 onChangeUserCategory: onChangeUserCategory,
                 onOpenCategoryManager: onOpenCategoryManager,
                 onOpenItem: onOpenItem,
-                onInsertToEditor: onInsertToEditor,
                 onSplitEditorIntoHistory: onSplitEditorIntoHistory,
                 onLoadMore: onLoadMore,
                 hasMoreItems: hasMoreItems,

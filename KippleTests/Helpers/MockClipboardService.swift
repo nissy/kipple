@@ -9,7 +9,7 @@ import Foundation
 @testable import Kipple
 
 @MainActor
-class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling, ClipboardServiceAsyncRecopying {
+class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecopying {
     var history: [ClipItem] = [] {
         didSet {
             pinnedItems = history.filter { $0.isPinned }
@@ -26,16 +26,13 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
 
     // Additional test properties
     var copyToClipboardCalled = false
+    var writeToClipboardOnlyCalled = false
     var fromEditor: Bool?
     var togglePinCalled = false
     var lastToggledItem: ClipItem?
     var deleteItemCalled = false
     var lastDeletedItem: ClipItem?
     var clearAllHistoryCalled = false
-    var autoClearRemainingTime: TimeInterval?
-    var pauseAutoClearCalled = false
-    var resumeAutoClearCalled = false
-    private(set) var isAutoClearPaused = false
     var recopyFromHistoryAndWaitCallCount = 0
     var recopyFromHistoryCallCount = 0
     var addEditorItemsCallCount = 0
@@ -61,7 +58,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
             item = ClipItem(
                 content: content,
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true
@@ -75,11 +72,16 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         onHistoryChanged?(item)
     }
 
+    func writeToClipboardOnly(_ content: String) {
+        writeToClipboardOnlyCalled = true
+        lastCopiedContent = content
+        currentClipboardContent = content.isEmpty ? nil : content
+    }
+
     @discardableResult
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         addEditorItemsCallCount += 1
         let sanitized = contents
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
         lastAddEditorItemsInput = sanitized
@@ -90,7 +92,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
             ClipItem(
                 content: content,
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true
@@ -177,16 +179,6 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         // No-op for mock
     }
 
-    func pauseAutoClearForQueue() {
-        pauseAutoClearCalled = true
-        isAutoClearPaused = true
-    }
-
-    func resumeAutoClearAfterQueue() {
-        resumeAutoClearCalled = true
-        isAutoClearPaused = false
-    }
-
     // Helper methods for testing
     func addTestItem(_ content: String, isPinned: Bool = false, sourceApp: String? = nil) {
         var item = ClipItem(content: content, sourceApp: sourceApp)
@@ -209,6 +201,7 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         addEditorItemsCallCount = 0
         recopyFromHistoryCallCount = 0
         copyToClipboardCalled = false
+        writeToClipboardOnlyCalled = false
         fromEditor = nil
         togglePinCalled = false
         lastToggledItem = nil
@@ -216,9 +209,5 @@ class MockClipboardService: ClipboardServiceProtocol, QueueAutoClearControlling,
         lastDeletedItem = nil
         recopyFromHistoryAndWaitCallCount = 0
         clearAllHistoryCalled = false
-        autoClearRemainingTime = nil
-        pauseAutoClearCalled = false
-        resumeAutoClearCalled = false
-        isAutoClearPaused = false
     }
 }

@@ -63,6 +63,20 @@ final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(clipboardValue, content)
     }
 
+    func testWriteToClipboardOnlyDoesNotAddHistory() async {
+        // Given
+        let content = "Live editor only"
+
+        // When
+        await service.writeToClipboardOnly(content)
+
+        // Then
+        let clipboardValue = await MainActor.run { NSPasteboard.general.string(forType: .string) }
+        let history = await service.getHistory()
+        XCTAssertEqual(clipboardValue, content)
+        XCTAssertTrue(history.isEmpty)
+    }
+
     func testAddToHistory() async {
         // Given
         let content1 = "First item"
@@ -119,6 +133,173 @@ final class ModernClipboardServiceTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(isPinned)
         let updatedHistory = await service.getHistory()
         XCTAssertTrue(updatedHistory[0].isPinned)
+    }
+
+    func testExternalRepeatedCopyAutoPinsWithinConfiguredWindow() async {
+        // Given
+        let baseDate = Date()
+        await MainActor.run {
+            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
+            AppSettings.shared.autoPinRepeatedCopyCount = 3
+        }
+
+        // When
+        await service.addExternalClipboardItemForTesting("Repeated text", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Repeated text", copiedAt: baseDate.addingTimeInterval(2))
+        await service.addExternalClipboardItemForTesting("Repeated text", copiedAt: baseDate.addingTimeInterval(4))
+
+        // Then
+        let history = await service.getHistory()
+        XCTAssertEqual(history.count, 1)
+        XCTAssertEqual(history[0].content, "Repeated text")
+        XCTAssertTrue(history[0].isPinned)
+    }
+
+    func testExternalRepeatedCopyDoesNotAutoPinOutsideConfiguredWindow() async {
+        // Given
+        let baseDate = Date()
+        await MainActor.run {
+            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
+            AppSettings.shared.autoPinRepeatedCopyCount = 3
+        }
+
+        // When
+        await service.addExternalClipboardItemForTesting("Slow repeated text", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Slow repeated text", copiedAt: baseDate.addingTimeInterval(6))
+        await service.addExternalClipboardItemForTesting("Slow repeated text", copiedAt: baseDate.addingTimeInterval(7))
+
+        // Then
+        let history = await service.getHistory()
+        XCTAssertEqual(history.count, 1)
+        XCTAssertFalse(history[0].isPinned)
+    }
+
+    func testExternalRepeatedCopyDoesNotAutoPinWhenDisabled() async {
+        // Given
+        let baseDate = Date()
+        await MainActor.run {
+            AppSettings.shared.autoPinRepeatedCopyEnabled = false
+            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
+            AppSettings.shared.autoPinRepeatedCopyCount = 3
+        }
+
+        // When
+        await service.addExternalClipboardItemForTesting("Disabled auto pin", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Disabled auto pin", copiedAt: baseDate.addingTimeInterval(1))
+        await service.addExternalClipboardItemForTesting("Disabled auto pin", copiedAt: baseDate.addingTimeInterval(2))
+
+        // Then
+        let history = await service.getHistory()
+        XCTAssertEqual(history.count, 1)
+        XCTAssertFalse(history[0].isPinned)
+    }
+
+    func testDisablingAutoPinResetsRepeatedCopySequence() async {
+        // Given
+        let baseDate = Date()
+        await service.addExternalClipboardItemForTesting("Reset sequence", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Reset sequence", copiedAt: baseDate.addingTimeInterval(1))
+
+        // When
+        await MainActor.run {
+            AppSettings.shared.autoPinRepeatedCopyEnabled = false
+        }
+        await service.addExternalClipboardItemForTesting("Reset sequence", copiedAt: baseDate.addingTimeInterval(2))
+        await MainActor.run {
+            AppSettings.shared.autoPinRepeatedCopyEnabled = true
+        }
+        await service.addExternalClipboardItemForTesting("Reset sequence", copiedAt: baseDate.addingTimeInterval(3))
+
+        // Then
+        let history = await service.getHistory()
+        XCTAssertEqual(history.count, 1)
+        XCTAssertFalse(history[0].isPinned)
+    }
+
+    func testExternalRepeatedCopyRequiresExactContentMatch() async {
+        // Given
+        let baseDate = Date()
+
+        // When
+        await service.addExternalClipboardItemForTesting("Exact text", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Exact text ", copiedAt: baseDate.addingTimeInterval(1))
+        await service.addExternalClipboardItemForTesting("Exact text", copiedAt: baseDate.addingTimeInterval(2))
+
+        // Then
+        let history = await service.getHistory()
+        XCTAssertEqual(history.count, 2)
+        XCTAssertFalse(history.contains { $0.isPinned })
+    }
+
+    func testExternalRepeatedCopyHonorsConfiguredCopyCount() async {
+        // Given
+        let baseDate = Date()
+        await MainActor.run {
+            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
+            AppSettings.shared.autoPinRepeatedCopyCount = 4
+        }
+
+        // When
+        await service.addExternalClipboardItemForTesting("Four copies", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Four copies", copiedAt: baseDate.addingTimeInterval(1))
+        await service.addExternalClipboardItemForTesting("Four copies", copiedAt: baseDate.addingTimeInterval(2))
+        var history = await service.getHistory()
+
+        // Then
+        XCTAssertFalse(history[0].isPinned)
+
+        // When
+        await service.addExternalClipboardItemForTesting("Four copies", copiedAt: baseDate.addingTimeInterval(3))
+
+        // Then
+        history = await service.getHistory()
+        XCTAssertTrue(history[0].isPinned)
+    }
+
+    func testRecopyFromHistoryDoesNotCountForAutoPin() async {
+        // Given
+        await service.addExternalClipboardItemForTesting("History recopy")
+        var history = await service.getHistory()
+        let item = history[0]
+
+        // When
+        await service.recopyFromHistory(item)
+        history = await service.getHistory()
+        let firstRecopy = history[0]
+        await service.recopyFromHistory(firstRecopy)
+        history = await service.getHistory()
+        let secondRecopy = history[0]
+        await service.recopyFromHistory(secondRecopy)
+
+        // Then
+        history = await service.getHistory()
+        XCTAssertEqual(history.count, 1)
+        XCTAssertFalse(history[0].isPinned)
+    }
+
+    func testExternalRepeatedCopyDoesNotAutoPinWhenPinnedLimitReached() async {
+        // Given
+        let baseDate = Date()
+        await service.addExternalClipboardItemForTesting("Already pinned")
+        var history = await service.getHistory()
+        _ = await service.togglePin(for: history[0])
+
+        await MainActor.run {
+            AppSettings.shared.maxPinnedItems = 1
+            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
+            AppSettings.shared.autoPinRepeatedCopyCount = 3
+        }
+
+        // When
+        await service.addExternalClipboardItemForTesting("Limit target", copiedAt: baseDate)
+        await service.addExternalClipboardItemForTesting("Limit target", copiedAt: baseDate.addingTimeInterval(1))
+        await service.addExternalClipboardItemForTesting("Limit target", copiedAt: baseDate.addingTimeInterval(2))
+
+        // Then
+        history = await service.getHistory()
+        let limitTarget = try? XCTUnwrap(history.first { $0.content == "Limit target" })
+        XCTAssertEqual(history.filter { $0.isPinned }.count, 1)
+        XCTAssertFalse(limitTarget?.isPinned ?? true)
     }
 
     func testDeleteItem() async {
@@ -321,9 +502,12 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
         history.insert(item, at: 0)
     }
 
+    func writeToClipboardOnly(_ content: String) async {
+        _ = content
+    }
+
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         let sanitized = contents
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
         guard !sanitized.isEmpty else { return [] }
@@ -332,7 +516,7 @@ actor ModernClipboardServiceMock: ModernClipboardServiceProtocol {
             ClipItem(
                 content: $0,
                 sourceApp: "Kipple",
-                windowTitle: "Quick Editor",
+                windowTitle: "Live Editor",
                 bundleIdentifier: Bundle.main.bundleIdentifier,
                 processID: ProcessInfo.processInfo.processIdentifier,
                 isFromEditor: true

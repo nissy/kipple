@@ -8,20 +8,24 @@
 import SwiftUI
 
 struct MainViewControlSection: View {
-    let onCopy: () -> Void
-    let onSplitCopy: () -> Void
+    @Binding var editorMode: MainViewModel.ClipboardEditorMode
+    let isEditorLocked: Bool
+    let canSave: Bool
+    let onSave: () -> Void
     let onTrim: () -> Void
+    let onFormat: (ClipboardTextFormat) -> Void
     @ObservedObject private var appSettings = AppSettings.shared
 
     private let buttonHeight: CGFloat = 30
     private let horizontalPadding: CGFloat = 10
+    private let trimButtonWidth: CGFloat = 40
+    private let formatMenuButtonWidth: CGFloat = 32
 
     var body: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 6) {
-                copySplitButton
-                trimButton
-            }
+        HStack(spacing: 6) {
+            editModeButton
+            saveButton
+            formatMenu
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -29,83 +33,150 @@ struct MainViewControlSection: View {
         .padding(.bottom, 2)
     }
 
-    private var trimButton: some View {
-        Button(action: onTrim) {
-            buttonLabel(
-                systemImage: "scissors",
-                shortcut: "",
-                accessibilityLabel: "Trim"
-            )
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: buttonHeight)
-            .contentShape(Rectangle())
+    private var editModeButton: some View {
+        Button(action: toggleEditorMode) {
+            HStack(spacing: 4) {
+                Text(editModeButtonTitle)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                if !editModeShortcut.isEmpty {
+                    shortcutBadge(editModeShortcut)
+                }
+            }
+                .padding(.horizontal, horizontalPadding)
+                .frame(minWidth: 64, minHeight: buttonHeight)
+                .contentShape(Rectangle())
         }
+        .accessibilityLabel(Text(editModeButtonTitle))
         .buttonStyle(PlainButtonStyle())
         .foregroundColor(.white)
-        .background(trimButtonColor)
+        .background(editModeButtonBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                .stroke(editModeButtonBorder, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
+        .shadow(color: editModeButtonShadow, radius: 4, y: 2)
+        .disabled(isEditorLocked)
+        .help(Text(editModeButtonHelpText))
     }
 
-    private var copySplitButton: some View {
+    private var formatMenu: some View {
         HStack(spacing: 0) {
-            Button(action: onCopy) {
-                buttonLabel(
-                    systemImage: "doc.on.doc",
-                    shortcut: getShortcutKeyDisplay(),
-                    accessibilityLabel: "Copy"
-                )
+            Button(action: trim) {
+                HStack(spacing: 4) {
+                    Image(systemName: "scissors")
+                        .font(.system(size: 11, weight: .regular))
+                }
                 .padding(.horizontal, horizontalPadding)
-                .frame(height: buttonHeight)
+                .frame(width: trimButtonWidth, height: buttonHeight)
                 .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel(Text("editor.trim"))
 
             Rectangle()
-                .fill(Color.white.opacity(0.25))
+                .fill(formatButtonSeparatorColor)
                 .frame(width: 1, height: buttonHeight - 12)
                 .padding(.vertical, 6)
                 .allowsHitTesting(false)
 
             Menu {
-                Button(action: onSplitCopy) {
+                Button(action: { format(.json) }, label: {
                     Label {
-                        Text("editor.splitCopy.menu")
+                        Text("editor.format.json")
                     } icon: {
-                        Image(systemName: "text.badge.plus")
+                        Image(systemName: "curlybraces")
                     }
-                }
+                })
+
+                Button(action: { format(.yaml) }, label: {
+                    Label {
+                        Text("editor.format.yaml")
+                    } icon: {
+                        Image(systemName: "list.bullet.rectangle")
+                    }
+                })
             } label: {
                 Image(systemName: "chevron.down")
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(formatButtonForegroundColor)
                     .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 32, height: buttonHeight)
+                    .frame(width: formatMenuButtonWidth, height: buttonHeight)
                     .contentShape(Rectangle())
             }
             .menuStyle(BorderlessButtonMenuStyle())
             .menuIndicator(.hidden)
             .buttonStyle(PlainButtonStyle())
+            .accessibilityLabel(Text("editor.format"))
         }
-        .foregroundColor(.white)
-        .background(splitButtonBackground)
+        .foregroundColor(formatButtonForegroundColor)
+        .background(formatButtonBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                .stroke(formatButtonBorderColor, lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.12), radius: 4, y: 2)
+        .shadow(color: formatButtonShadowColor, radius: 4, y: 2)
+        .disabled(isFormatDisabled)
         .contentShape(Rectangle())
+        .help(Text(formatButtonHelpText))
     }
 
-    private func buttonLabel(systemImage: String, shortcut: String, accessibilityLabel: LocalizedStringKey) -> some View {
+    private var saveButton: some View {
+        Button(action: onSave) {
+            saveButtonLabel
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: buttonHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .foregroundColor(saveButtonForegroundColor)
+        .background(saveButtonBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(saveButtonBorderColor, lineWidth: 1)
+        )
+        .shadow(color: saveButtonShadowColor, radius: 4, y: 2)
+        .disabled(isSaveDisabled)
+        .help(Text(saveButtonHelpText))
+    }
+
+    private var saveButtonLabel: some View {
+        HStack(spacing: 4) {
+            Text("editor.saveToHistory")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+            let shortcut = getShortcutKeyDisplay()
+            if !shortcut.isEmpty {
+                shortcutBadge(shortcut)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(Text("editor.saveToHistory"))
+    }
+
+    private func buttonLabel(
+        systemImage: String,
+        title: LocalizedStringKey? = nil,
+        shortcut: String,
+        accessibilityLabel: LocalizedStringKey
+    ) -> some View {
         HStack(spacing: 4) {
             Image(systemName: systemImage)
                 .font(.system(size: 11, weight: .regular))
+
+            if let title {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
 
             if !shortcut.isEmpty {
                 shortcutBadge(shortcut)
@@ -125,7 +196,7 @@ struct MainViewControlSection: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
-    private var splitButtonBackground: LinearGradient {
+    private var primaryButtonBackground: LinearGradient {
         LinearGradient(
             colors: [
                 Color.accentColor,
@@ -135,9 +206,172 @@ struct MainViewControlSection: View {
             endPoint: .bottomTrailing
         )
     }
+
+    private var isEditing: Bool {
+        editorMode == .editing
+    }
+
+    private var isFormatDisabled: Bool {
+        isEditorLocked || !isEditing
+    }
+
+    private var isSaveDisabled: Bool {
+        isEditorLocked || !canSave
+    }
+
+    private var editModeButtonTitle: LocalizedStringKey {
+        if isEditorLocked {
+            return "editor.mode.locked"
+        }
+
+        return isEditing ? "editor.mode.finishEditing" : "editor.mode.startEditing"
+    }
+
+    private var editModeButtonHelpText: LocalizedStringKey {
+        isEditorLocked ? "editor.locked.help" : editModeButtonTitle
+    }
+
+    private var editModeShortcut: String {
+        isEditing ? "ESC" : ""
+    }
+
+    private var editModeButtonBackground: LinearGradient {
+        if isEditorLocked {
+            return lockedButtonBackground
+        }
+
+        if isEditing {
+            return dangerButtonBackground
+        }
+
+        return primaryButtonBackground
+    }
+
+    private var editModeButtonBorder: Color {
+        Color.white.opacity(0.15)
+    }
+
+    private var editModeButtonShadow: Color {
+        Color.black.opacity(0.12)
+    }
+
+    private var dangerButtonBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.red,
+                Color.red.opacity(0.85)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var lockedButtonBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.secondary.opacity(0.45),
+                Color.secondary.opacity(0.32)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var disabledButtonBackground: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(NSColor.controlBackgroundColor).opacity(0.88),
+                Color(NSColor.controlBackgroundColor).opacity(0.72)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var saveButtonBackground: LinearGradient {
+        isSaveDisabled ? disabledButtonBackground : primaryButtonBackground
+    }
+
+    private var saveButtonForegroundColor: Color {
+        isSaveDisabled ? Color.secondary.opacity(0.62) : Color.white
+    }
+
+    private var saveButtonBorderColor: Color {
+        isSaveDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+    }
+
+    private var saveButtonShadowColor: Color {
+        isSaveDisabled ? Color.clear : Color.black.opacity(0.12)
+    }
+
+    private var saveButtonHelpText: LocalizedStringKey {
+        if isEditorLocked {
+            return "editor.locked.help"
+        }
+
+        if !canSave {
+            return "editor.saveToHistory.noChanges"
+        }
+
+        return "editor.saveToHistory"
+    }
     
-    private var trimButtonColor: Color {
-        Color.green
+    private var formatButtonBackground: LinearGradient {
+        if isFormatDisabled {
+            return disabledButtonBackground
+        }
+
+        return LinearGradient(
+            colors: [
+                Color.green,
+                Color.green.opacity(0.85)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var formatButtonForegroundColor: Color {
+        isFormatDisabled ? Color.secondary.opacity(0.62) : Color.white
+    }
+
+    private var formatButtonBorderColor: Color {
+        isFormatDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+    }
+
+    private var formatButtonSeparatorColor: Color {
+        isFormatDisabled ? Color.secondary.opacity(0.16) : Color.white.opacity(0.25)
+    }
+
+    private var formatButtonShadowColor: Color {
+        isFormatDisabled ? Color.clear : Color.black.opacity(0.12)
+    }
+
+    private func toggleEditorMode() {
+        guard !isEditorLocked else { return }
+        editorMode = isEditing ? .display : .editing
+    }
+
+    private var formatButtonHelpText: LocalizedStringKey {
+        if isEditorLocked {
+            return "editor.locked.help"
+        }
+
+        if !isEditing {
+            return "editor.editTools.requiresEditing"
+        }
+
+        return "editor.editTools.help"
+    }
+
+    private func trim() {
+        guard !isFormatDisabled else { return }
+        onTrim()
+    }
+
+    private func format(_ textFormat: ClipboardTextFormat) {
+        guard !isFormatDisabled else { return }
+        onFormat(textFormat)
     }
 
     private func getShortcutKeyDisplay() -> String {

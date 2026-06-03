@@ -12,14 +12,19 @@ import SwiftUI
 @MainActor
 class ClearButtonRegressionTest: XCTestCase {
     var viewModel: MainViewModel!
+    var mockClipboardService: MockClipboardService!
     
     override func setUp() {
         super.setUp()
-        viewModel = MainViewModel()
+        UserDefaults.standard.removeObject(forKey: "lastEditorText")
+        mockClipboardService = MockClipboardService()
+        viewModel = MainViewModel(clipboardService: mockClipboardService)
     }
     
     override func tearDown() {
         viewModel = nil
+        mockClipboardService = nil
+        UserDefaults.standard.removeObject(forKey: "lastEditorText")
         super.tearDown()
     }
     
@@ -51,27 +56,21 @@ class ClearButtonRegressionTest: XCTestCase {
     }
     
     func testClearEditorPersistence() {
-        // Test that UserDefaults is properly cleared
         let key = "lastEditorText"
-        
-        // Set initial text
+
         viewModel.editorText = "test123"
-        
-        // Wait for debounce to save
         let expectation = XCTestExpectation(description: "Wait for debounce")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             expectation.fulfill()
         }
         wait(for: [expectation], timeout: 1.0)
-        
-        // Verify it was saved
-        XCTAssertNotNil(UserDefaults.standard.string(forKey: key))
-        
-        // Clear editor
+
+        XCTAssertNil(UserDefaults.standard.string(forKey: key))
+
         viewModel.clearEditor()
-        
-        // Verify UserDefaults was cleared
-        XCTAssertNil(UserDefaults.standard.string(forKey: key), "UserDefaults not cleared after clearEditor")
+
+        XCTAssertNil(UserDefaults.standard.string(forKey: key), "Live editor should not persist text")
+        XCTAssertTrue(mockClipboardService.writeToClipboardOnlyCalled)
     }
     
     func testClearButtonBinding() {

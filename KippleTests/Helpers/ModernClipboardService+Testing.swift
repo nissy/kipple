@@ -8,10 +8,13 @@ extension ModernClipboardService {
         await clearAllHistory()
         await clearRepositoryForTesting()
         await setMaxHistoryItems(300)
+        await resetAutoPinSequenceForTesting()
         await MainActor.run {
             AppSettings.shared.maxHistoryItems = 300
             AppSettings.shared.maxPinnedItems = 20
-            UserDefaults.standard.set(false, forKey: "enableEditorInsert")
+            AppSettings.shared.autoPinRepeatedCopyEnabled = true
+            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
+            AppSettings.shared.autoPinRepeatedCopyCount = 3
         }
 
         await ModernClipboardServiceAdapter.shared.resetAdapterStateForTesting()

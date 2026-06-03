@@ -60,6 +60,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var localizationCancellable: AnyCancellable?
     private var pendingAppReactivation: DispatchWorkItem?
     private let appReactivationDelay: TimeInterval
+    private weak var cachedEditorTextView: LiveEditorTextView?
+    private let maxFocusedEditorTailSelectionLength = 10_000
     private var isAlwaysOnTop = false {
         didSet {
             if let window = mainWindow {
@@ -130,6 +132,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     @MainActor
     func openMainWindow() {
+        let startedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event("main_window_open_requested")
         cancelPendingAppReactivation()
         isOpening = true
         preventAutoClose = true
@@ -138,71 +142,104 @@ final class WindowManager: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         if let existingWindow = mainWindow {
-            reopenExistingWindow(existingWindow)
+            reopenExistingWindow(existingWindow, requestedAt: startedAt)
             return
         }
 
-        openNewWindow()
+        openNewWindow(requestedAt: startedAt)
     }
 
-    private func reopenExistingWindow(_ window: NSWindow) {
+    private func reopenExistingWindow(_ window: NSWindow, requestedAt: Int64) {
+        let startedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event(
+            "main_window_reopen_started",
+            details: [
+                "isVisible": "\(window.isVisible)",
+                "sinceRequestUs": "\(startedAt - requestedAt)"
+            ]
+        )
         if window.isMiniaturized { window.deminiaturize(nil) }
 
         let target = computeOriginAtCursor(for: window)
         if !window.isVisible {
-            // None: 非表示→表示でも隠し直さず即位置決定
-            window.setFrameOrigin(target)
-            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
-            applyAnimationBehavior(style: style, to: window)
-            if style == "none" {
-                if !NSApp.isActive {
-                    NSApp.activate(ignoringOtherApps: true)
-                }
-                bringWindowToFrontWithoutSystemAnimation(window) {
-                    window.alphaValue = 1.0
-                    window.orderFrontRegardless()
-                    window.makeKeyAndOrderFront(nil)
-                }
-                DispatchQueue.main.async { [weak self] in
-                    self?.focusOnEditor()
-                }
-            } else {
-                NSApp.activate(ignoringOtherApps: true)
-                window.alphaValue = 0
-                animateWindowOpen(window)
-            }
+            showHiddenExistingWindow(window, at: target, startedAt: startedAt)
         } else {
-            let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
-            applyAnimationBehavior(style: style, to: window)
-            if style == "none" {
-                // None: 可視中は隠さず即座に座標だけ反映（完全ノーアニメ）
-                var frame = window.frame
-                frame.origin = target
-                window.setFrame(frame, display: true, animate: false)
-                if !window.isKeyWindow {
-                    bringWindowToFrontWithoutSystemAnimation(window) {
-                        window.orderFrontRegardless()
-                        window.makeKeyAndOrderFront(nil)
-                    }
-                }
-                DispatchQueue.main.async { [weak self] in
-                    self?.focusOnEditor()
-                }
+            if moveVisibleExistingWindow(window, to: target, startedAt: startedAt) {
                 completeOpen()
                 return
             }
-            // アニメあり: 旧位置を見せないため一旦隠し、選択されたスタイルで再表示
-            window.orderOut(nil)
-            window.setFrameOrigin(target)
-            NSApp.activate(ignoringOtherApps: true)
-            animateWindowOpen(window)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
         }
 
         completeOpen()
     }
 
-    private func openNewWindow() {
+    private func showHiddenExistingWindow(_ window: NSWindow, at target: NSPoint, startedAt: Int64) {
+        // None: 非表示→表示でも隠し直さず即位置決定
+        window.setFrameOrigin(target)
+        let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+        applyAnimationBehavior(style: style, to: window)
+        if style == "none" {
+            if !NSApp.isActive {
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            bringWindowToFrontWithoutSystemAnimation(window) {
+                window.alphaValue = 1.0
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+            }
+            PerformanceTrace.event(
+                "main_window_reopen_visible",
+                details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
+            )
+            DispatchQueue.main.async { [weak self] in
+                self?.focusOnEditor()
+            }
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            window.alphaValue = 0
+            animateWindowOpen(window)
+        }
+    }
+
+    @discardableResult
+    private func moveVisibleExistingWindow(_ window: NSWindow, to target: NSPoint, startedAt: Int64) -> Bool {
+        let style = UserDefaults.standard.string(forKey: "windowAnimation") ?? "none"
+        applyAnimationBehavior(style: style, to: window)
+        if style == "none" {
+            var frame = window.frame
+            frame.origin = target
+            window.setFrame(frame, display: true, animate: false)
+            if !window.isKeyWindow {
+                bringWindowToFrontWithoutSystemAnimation(window) {
+                    window.orderFrontRegardless()
+                    window.makeKeyAndOrderFront(nil)
+                }
+            }
+            PerformanceTrace.event(
+                "main_window_repositioned",
+                details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
+            )
+            DispatchQueue.main.async { [weak self] in
+                self?.focusOnEditor()
+            }
+            return true
+        }
+
+        // アニメあり: 旧位置を見せないため一旦隠し、選択されたスタイルで再表示
+        window.orderOut(nil)
+        window.setFrameOrigin(target)
+        NSApp.activate(ignoringOtherApps: true)
+        animateWindowOpen(window)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in self?.focusOnEditor() }
+        return false
+    }
+
+    private func openNewWindow(requestedAt: Int64) {
+        let startedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event(
+            "main_window_new_started",
+            details: ["sinceRequestUs": "\(startedAt - requestedAt)"]
+        )
         let optional = createMainWindow()
         guard let window = optional else { return }
         configureMainWindow(window)
@@ -211,6 +248,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.setFrameOrigin(target)
         NSApp.activate(ignoringOtherApps: true)
         animateWindowOpen(window)
+        PerformanceTrace.event(
+            "main_window_new_visible",
+            details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
+        )
         completeOpen()
     }
 
@@ -556,7 +597,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             context.duration = 0.28
             window.animator().alphaValue = 1.0
         } completionHandler: { [weak self] in
-            self?.focusOnEditor()
+            DispatchQueue.main.async {
+                self?.focusOnEditor()
+            }
         }
     }
 
@@ -606,7 +649,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.animator().alphaValue = 1.0
             window.animator().setFrame(targetFrame, display: true)
         } completionHandler: { [weak self] in
-            self?.focusOnEditor()
+            DispatchQueue.main.async {
+                self?.focusOnEditor()
+            }
         }
     }
     
@@ -866,28 +911,60 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func focusOnEditor() {
         guard let window = mainWindow else { return }
+        let startedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event("main_window_focus_editor_started")
+
+        if let textView = cachedEditorTextView, textView.window === window {
+            focus(textView, startedAt: startedAt, source: "cached")
+            return
+        }
+
         // ウィンドウ内のNSTextViewを検索してフォーカスを設定
-        findAndFocusTextView(in: window.contentView)
+        if let textView = findTextView(in: window.contentView) {
+            cachedEditorTextView = textView
+            focus(textView, startedAt: startedAt, source: "searched")
+        } else {
+            PerformanceTrace.event(
+                "main_window_focus_editor_missing",
+                details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
+            )
+        }
     }
     
-    private func findAndFocusTextView(in view: NSView?) {
-        guard let view = view else { return }
+    private func findTextView(in view: NSView?) -> LiveEditorTextView? {
+        guard let view = view else { return nil }
         
-        if let textView = view as? NSTextView {
-            // テキストビューが見つかった場合、フォーカスを設定
-            DispatchQueue.main.async {
-                textView.window?.makeFirstResponder(textView)
-                // カーソルを末尾に移動
-                let range = NSRange(location: textView.string.count, length: 0)
-                textView.setSelectedRange(range)
-            }
-            return
+        if let textView = view as? LiveEditorTextView {
+            return textView
         }
         
         // 再帰的に子ビューを検索
         for subview in view.subviews {
-            findAndFocusTextView(in: subview)
+            if let textView = findTextView(in: subview) {
+                return textView
+            }
         }
+
+        return nil
+    }
+
+    private func focus(_ textView: LiveEditorTextView, startedAt: Int64, source: String) {
+        let textLength = textView.textStorage?.length ?? 0
+        textView.window?.makeFirstResponder(textView)
+
+        if textLength <= maxFocusedEditorTailSelectionLength {
+            textView.setSelectedRange(NSRange(location: textLength, length: 0))
+        }
+
+        PerformanceTrace.event(
+            "main_window_focus_editor_finished",
+            count: textLength,
+            details: [
+                "durationUs": "\(PerformanceTrace.nowMicros() - startedAt)",
+                "source": source,
+                "tailSelection": "\(textLength <= maxFocusedEditorTailSelectionLength)"
+            ]
+        )
     }
     
     // MARK: - NSWindowDelegate (moved to extension below)
