@@ -14,7 +14,7 @@ struct HistoryCategoryMenu: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .frame(width: 35, alignment: .leading)
+        .frame(width: KippleButtonMetrics.historyCategoryMenuWidth, alignment: .leading)
     }
 
     @ViewBuilder
@@ -79,35 +79,31 @@ struct HistoryCategoryMenu: View {
         let iconName = current.map { store.iconName(for: $0) } ?? item.category.icon
         return ZStack {
             Capsule()
-                .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                .frame(width: 36, height: 24)
+                .fill(
+                    isSelected
+                    ? KippleButtonAppearance.selectedPillFill
+                    : KippleButtonAppearance.inactivePillFill
+                )
+                .frame(
+                    width: KippleButtonMetrics.historyCategoryPillSize.width,
+                    height: KippleButtonMetrics.historyCategoryPillSize.height
+                )
 
             Image(systemName: iconName)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(iconColor)
-                .frame(width: 16, height: 16)
+                .foregroundColor(KippleButtonAppearance.foreground(isActive: isSelected))
+                .frame(
+                    width: KippleButtonMetrics.historyCategoryIconSize,
+                    height: KippleButtonMetrics.historyCategoryIconSize
+                )
         }
-    }
-
-    private var iconColor: Color {
-        if item.userCategoryId == store.urlCategoryId() ||
-            (item.userCategoryId == nil && item.category == .url) {
-            return .blue
-        }
-
-        if let userCategoryId = item.userCategoryId,
-           userCategoryId != store.noneCategoryId() {
-            return .accentColor
-        }
-
-        return isSelected ? .primary : .secondary
     }
 
     private func categoryMenuRow(name: String, systemImage: String, selected: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
                 .font(.system(size: 12, weight: .regular))
-                .foregroundColor(.secondary)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
             Text(verbatim: name)
                 .font(.system(size: 12))
             Spacer()

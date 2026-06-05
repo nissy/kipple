@@ -8,6 +8,66 @@
 import SwiftUI
 import AppKit
 
+enum KippleButtonMetrics {
+    static let toolbarSize: CGFloat = 30
+    static let compactIconSize: CGFloat = 24
+    static let historyRowSize: CGFloat = 22
+    static let historyCategoryMenuWidth: CGFloat = 35
+    static let historyCategoryPillSize = CGSize(width: 36, height: 24)
+    static let historyCategoryIconSize: CGFloat = 16
+}
+
+enum KippleButtonAppearance {
+    static let activeForeground = Color.white
+    static let inactiveForeground = Color.secondary
+    static let disabledForeground = Color.secondary.opacity(0.62)
+    static let disabledOpacity = 0.45
+    static let activeFillInset: CGFloat = 1.5
+    static let shadowRadius: CGFloat = 2
+    static let shadowY: CGFloat = 2
+    static let permissionWarningForeground = Color(.sRGB, red: 0.95, green: 0.12, blue: 0.10)
+    static let permissionWarningShadow = Color.black.opacity(0.25)
+    static let selectedPillFill = Color.white.opacity(0.2)
+    static let inactivePillFill = Color.secondary.opacity(0.1)
+    static let selectedSubtleFill = Color.primary.opacity(0.045)
+
+    static func foreground(isActive: Bool, isEnabled: Bool = true) -> Color {
+        guard isEnabled else { return disabledForeground }
+        return isActive ? activeForeground : inactiveForeground
+    }
+
+    static func circleFill(isActive: Bool, isEnabled: Bool = true) -> LinearGradient {
+        if isActive && isEnabled {
+            return LinearGradient(
+                colors: [
+                    Color.accentColor,
+                    Color.accentColor.opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+
+        return LinearGradient(
+            colors: [
+                Color.secondary.opacity(0.16),
+                Color.secondary.opacity(0.10)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static func circleShadow(isActive: Bool, isEnabled: Bool = true) -> Color {
+        guard isEnabled else { return Color.clear }
+        return isActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.04)
+    }
+
+    static func compactFill(isActive: Bool) -> Color {
+        isActive ? Color.accentColor : inactivePillFill
+    }
+}
+
 extension View {
     @ViewBuilder
     func kippleGlassPanel(
@@ -32,11 +92,11 @@ extension View {
         self
             .background(
                 shape
-                    .fill(Color.white.opacity(isActive ? 0.05 : 0))
+                    .fill(Color.primary.opacity(isActive ? 0.035 : 0))
             )
             .overlay(
                 shape
-                    .stroke(Color.white.opacity(isActive ? 0.075 : 0), lineWidth: 1)
+                    .stroke(Color.primary.opacity(isActive ? 0.035 : 0), lineWidth: 1)
             )
             .opacity(isEnabled ? 1.0 : 0.38)
     }
@@ -55,11 +115,7 @@ extension View {
     ) -> some View {
         if #available(macOS 26.0, *) {
             self
-                .background {
-                    shape
-                        .fill(Color.clear)
-                        .glassEffect(kippleGlass(tint: tint, interactive: interactive), in: shape)
-                }
+                .glassEffect(kippleGlass(tint: tint, interactive: interactive), in: shape)
                 .overlay(shape.stroke(strokeColor, lineWidth: strokeWidth))
                 .shadow(color: shadowColor, radius: shadowRadius, y: shadowY)
         } else {
@@ -75,6 +131,8 @@ extension View {
     func kippleLiquidControlGroup<S: Shape>(in shape: S, isEnabled: Bool = true) -> some View {
         if #available(macOS 26.0, *) {
             self
+                .glassEffect(.clear, in: shape)
+                .overlay(shape.stroke(Color.primary.opacity(0.025), lineWidth: 0.5))
                 .opacity(isEnabled ? 1.0 : 0.42)
         } else {
             self
@@ -89,13 +147,13 @@ extension View {
         isActive: Bool = false,
         isEnabled: Bool = true
     ) -> some View {
-        let opacity = isActive ? 0.18 : 0.12
         if #available(macOS 26.0, *) {
             self
-                .background(.regularMaterial, in: shape)
-                .background(Color.primary.opacity(opacity), in: shape)
+                .glassEffect(.clear.interactive(isEnabled), in: shape)
+                .overlay(shape.stroke(Color.primary.opacity(isActive ? 0.03 : 0.02), lineWidth: 0.5))
                 .opacity(isEnabled ? 1.0 : 0.42)
         } else {
+            let opacity = isActive ? 0.18 : 0.12
             self
                 .background(.regularMaterial, in: shape)
                 .background(Color.primary.opacity(opacity), in: shape)
@@ -107,11 +165,6 @@ extension View {
     func kippleLiquidWindowBackground() -> some View {
         if #available(macOS 26.0, *) {
             self
-                .background {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color(NSColor.windowBackgroundColor).opacity(0.94))
-                        .ignoresSafeArea()
-                }
         } else {
             self
                 .background {
@@ -120,6 +173,46 @@ extension View {
                         .ignoresSafeArea()
                 }
         }
+    }
+
+    @ViewBuilder
+    func kippleGlassButton(shape _: ButtonBorderShape = .circle) -> some View {
+        self.kippleSystemCircleButton()
+    }
+
+    @ViewBuilder
+    func kippleSystemCircleButton(
+        size: CGFloat = KippleButtonMetrics.toolbarSize,
+        isActive: Bool = false,
+        isEnabled: Bool = true
+    ) -> some View {
+        self
+            .buttonStyle(KippleSystemCircleButtonStyle(size: size, isActive: isActive, isEnabled: isEnabled))
+    }
+}
+
+private struct KippleSystemCircleButtonStyle: ButtonStyle {
+    let size: CGFloat
+    let isActive: Bool
+    let isEnabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: size, height: size)
+            .contentShape(Circle())
+            .background(
+                Circle()
+                    .fill(KippleButtonAppearance.circleFill(isActive: isActive, isEnabled: isEnabled))
+                    .padding(isActive && isEnabled ? KippleButtonAppearance.activeFillInset : 0)
+            )
+            .clipShape(Circle())
+            .shadow(
+                color: KippleButtonAppearance.circleShadow(isActive: isActive, isEnabled: isEnabled),
+                radius: KippleButtonAppearance.shadowRadius,
+                y: KippleButtonAppearance.shadowY
+            )
+            .opacity(isEnabled ? 1.0 : KippleButtonAppearance.disabledOpacity)
+            .opacity(configuration.isPressed ? 0.78 : 1.0)
     }
 }
 

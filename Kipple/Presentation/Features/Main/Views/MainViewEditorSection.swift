@@ -92,18 +92,18 @@ struct MainViewEditorSection: View {
 
     private var editorFieldFillColor: Color {
         if isTextEditable {
-            return Color.primary.opacity(0.05)
+            return Color.primary.opacity(0.032)
         }
 
-        return Color.primary.opacity(0.025)
+        return Color.primary.opacity(0.014)
     }
 
     private var editorFieldStrokeColor: Color {
         if isTextEditable {
-            return Color.accentColor.opacity(0.22)
+            return Color.accentColor.opacity(0.16)
         }
 
-        return Color.primary.opacity(0.05)
+        return Color.primary.opacity(0.025)
     }
 
     private var clearEditorButton: some View {

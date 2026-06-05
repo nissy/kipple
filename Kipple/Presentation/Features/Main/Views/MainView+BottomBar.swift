@@ -13,28 +13,7 @@ extension MainView {
         HStack(alignment: .center, spacing: 12) {
             Spacer()
 
-            HStack(alignment: .center, spacing: 10) {
-                bottomBarActionButton(
-                    systemName: "info.circle",
-                    helpKey: "About",
-                    action: onOpenAbout
-                )
-
-                bottomBarActionButton(
-                    systemName: "power.circle",
-                    helpKey: "Quit Kipple",
-                    action: showQuitConfirmationAlert
-                )
-
-                bottomBarActionButton(
-                    systemName: "gearshape",
-                    helpKey: "Settings",
-                    action: onOpenSettings
-                )
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .kippleLiquidControlGroup(in: Capsule(), isEnabled: true)
+            bottomActionGroup
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -52,6 +31,33 @@ extension MainView {
 }
 
 private extension MainView {
+    @ViewBuilder
+    var bottomActionGroup: some View {
+        bottomActionButtons
+    }
+
+    var bottomActionButtons: some View {
+        HStack(alignment: .center, spacing: 10) {
+            bottomBarActionButton(
+                systemName: "info.circle",
+                helpKey: "About",
+                action: onOpenAbout
+            )
+
+            bottomBarActionButton(
+                systemName: "power.circle",
+                helpKey: "Quit Kipple",
+                action: showQuitConfirmationAlert
+            )
+
+            bottomBarActionButton(
+                systemName: "gearshape",
+                helpKey: "Settings",
+                action: onOpenSettings
+            )
+        }
+    }
+
     func bottomBarActionButton(
         systemName: String,
         helpKey: LocalizedStringKey,
@@ -62,14 +68,13 @@ private extension MainView {
         }, label: {
             Image(systemName: systemName)
                 .font(MainViewMetrics.BottomBar.iconFont)
-                .foregroundColor(.secondary)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
                 .frame(
                     width: MainViewMetrics.BottomBar.buttonSize,
                     height: MainViewMetrics.BottomBar.buttonSize
                 )
-                .kippleControlSurface(in: Circle(), isEnabled: true)
         })
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton()
         .help(Text(helpKey))
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct MainViewHistorySection: View {
     let history: [ClipItem]
@@ -110,18 +111,7 @@ struct MainViewHistorySection: View {
 
     var body: some View {
         return VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if pasteMode != .clipboard {
-                    queueLoopControl
-                }
-                pinnedFilterButton
-                categoryFilterControl
-                searchField
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
-            .kippleLiquidControlGroup(in: Capsule(), isEnabled: true)
+            historyToolbar
 
             HistoryListView(
                 history: history,
@@ -155,19 +145,38 @@ struct MainViewHistorySection: View {
         )
     }
 
+    @ViewBuilder
+    private var historyToolbar: some View {
+        historyToolbarContent
+    }
+
+    private var historyToolbarContent: some View {
+        HStack(spacing: 8) {
+            if pasteMode != .clipboard {
+                queueLoopControl
+            }
+            pinnedFilterButton
+            categoryFilterControl
+            searchField
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+    }
+
     private var pinnedFilterButton: some View {
         Button {
             onTogglePinnedFilter()
         } label: {
             circleFilterIcon(
                 iconName: isPinnedFilterActive ? "pin.fill" : "pin",
-                iconColor: isPinnedFilterActive ? .primary : .secondary,
-                iconFont: MainViewMetrics.HistoryFilterIcon.pinnedFont,
+                iconColor: KippleButtonAppearance.foreground(isActive: isPinnedFilterActive),
+                iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont,
                 rotation: isPinnedFilterActive ? 0 : -45,
                 isActive: isPinnedFilterActive
             )
         }
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton(isActive: isPinnedFilterActive)
         .frame(
             width: MainViewMetrics.HistoryFilterIcon.diameter,
             height: MainViewMetrics.HistoryFilterIcon.diameter
@@ -207,12 +216,12 @@ struct MainViewHistorySection: View {
             } label: {
                 circleFilterIcon(
                     iconName: iconName,
-                    iconColor: .primary,
+                    iconColor: KippleButtonAppearance.activeForeground,
                     iconFont: MainViewMetrics.HistoryFilterIcon.categoryFont,
                     isActive: true
                 )
             }
-            .buttonStyle(PlainButtonStyle())
+            .kippleSystemCircleButton(isActive: true)
             .frame(
                 width: MainViewMetrics.HistoryFilterIcon.diameter,
                 height: MainViewMetrics.HistoryFilterIcon.diameter
@@ -253,13 +262,14 @@ struct MainViewHistorySection: View {
             } label: {
                 circleFilterIcon(
                     iconName: noneCategoryIconName,
-                    iconColor: .secondary,
+                    iconColor: KippleButtonAppearance.inactiveForeground,
                     iconFont: MainViewMetrics.HistoryFilterIcon.categoryFont,
                     isActive: false
                 )
             }
-            .menuStyle(BorderlessButtonMenuStyle())
             .menuIndicator(.hidden)
+            .buttonStyle(PlainButtonStyle())
+            .kippleSystemCircleButton(isActive: false)
             .frame(
                 width: MainViewMetrics.HistoryFilterIcon.diameter,
                 height: MainViewMetrics.HistoryFilterIcon.diameter
@@ -288,7 +298,7 @@ struct MainViewHistorySection: View {
             if let systemImage {
                 Image(systemName: systemImage)
                     .font(MainViewMetrics.HistoryFilterMenu.iconFont)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(KippleButtonAppearance.inactiveForeground)
             }
             Text(verbatim: text)
                 .font(MainViewMetrics.HistoryFilterMenu.labelFont)
@@ -315,18 +325,20 @@ struct MainViewHistorySection: View {
         } label: {
             circleFilterIcon(
                 iconName: "repeat",
-                iconColor: isQueueLoopActive ? .primary : .secondary,
+                iconColor: KippleButtonAppearance.foreground(
+                    isActive: isQueueLoopActive,
+                    isEnabled: canToggleQueueLoop
+                ),
                 iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont,
                 isActive: isQueueLoopActive
             )
         }
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton(isActive: isQueueLoopActive, isEnabled: canToggleQueueLoop)
         .frame(
             width: MainViewMetrics.HistoryFilterIcon.diameter,
             height: MainViewMetrics.HistoryFilterIcon.diameter
         )
         .disabled(!canToggleQueueLoop)
-        .opacity(canToggleQueueLoop ? 1.0 : 0.4)
         .help(Text(String(localized: "Queue loop")))
     }
 
@@ -335,7 +347,7 @@ struct MainViewHistorySection: View {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(MainViewMetrics.HistorySearchField.iconFont)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(KippleButtonAppearance.inactiveForeground)
                     .padding(.leading, 8)
 
                 TextField("Search", text: $searchText)
@@ -351,7 +363,7 @@ struct MainViewHistorySection: View {
                     }, label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(MainViewMetrics.HistorySearchField.clearIconFont)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(KippleButtonAppearance.inactiveForeground)
                     })
                     .buttonStyle(PlainButtonStyle())
                     .padding(.trailing, 8)
@@ -363,11 +375,11 @@ struct MainViewHistorySection: View {
         .frame(height: MainViewMetrics.HistorySearchField.height)
         .background(
             RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
-                .fill(Color.primary.opacity(0.045))
+                .fill(Color(NSColor.textBackgroundColor).opacity(0.42))
         )
         .overlay(
             RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 0.5)
         )
     }
 
@@ -379,15 +391,11 @@ struct MainViewHistorySection: View {
         isActive: Bool = false
     ) -> some View {
         ZStack {
-            Circle()
-                .fill(Color.clear)
-                .kippleControlSurface(in: Circle(), isActive: isActive, isEnabled: true)
-                .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
-
             Image(systemName: iconName)
                 .font(iconFont)
                 .foregroundColor(iconColor)
                 .rotationEffect(.degrees(rotation))
+                .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
         }
         .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
         .contentShape(Circle())

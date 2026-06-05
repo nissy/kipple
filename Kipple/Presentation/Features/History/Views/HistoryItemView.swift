@@ -144,13 +144,16 @@ struct HistoryItemView: View {
         if let queueBadge {
             let isActiveBadge = queueBadge > 0
             let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
-            let badgeBackground = isActiveBadge ? Color.primary.opacity(0.08) : Color.clear
+            let badgeBackground = isActiveBadge ? Color.primary.opacity(0.05) : Color.clear
             let badgeForeground = isActiveBadge ? Color.primary : Color.secondary
 
             Text(badgeText)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(badgeForeground)
-                .frame(width: 22, height: 22)
+                .frame(
+                    width: KippleButtonMetrics.historyRowSize,
+                    height: KippleButtonMetrics.historyRowSize
+                )
                 .background(
                     Circle()
                         .fill(badgeBackground)
@@ -173,11 +176,11 @@ struct HistoryItemView: View {
     private var backgroundView: some View {
         let baseFill: AnyShapeStyle
         if isSelected {
-            baseFill = AnyShapeStyle(Color.primary.opacity(0.08))
-        } else if isQueuePreviewed {
             baseFill = AnyShapeStyle(Color.primary.opacity(0.05))
+        } else if isQueuePreviewed {
+            baseFill = AnyShapeStyle(Color.primary.opacity(0.035))
         } else {
-            baseFill = AnyShapeStyle(Color.primary.opacity(isHoverActive ? 0.04 : 0))
+            baseFill = AnyShapeStyle(Color.primary.opacity(isHoverActive ? 0.026 : 0))
         }
 
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -193,7 +196,10 @@ struct HistoryItemView: View {
                 .font(.system(size: 10, weight: .medium))
                 .rotationEffect(.degrees(pinButtonRotation))
         }
-        .frame(width: 22, height: 22)
+        .frame(
+            width: KippleButtonMetrics.historyRowSize,
+            height: KippleButtonMetrics.historyRowSize
+        )
         .contentShape(Circle())
         .onTapGesture {
             closePopover()
@@ -207,26 +213,38 @@ struct HistoryItemView: View {
         if item.isActionable {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                    .frame(width: 22, height: 22)
+                    .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
+                    .frame(
+                        width: KippleButtonMetrics.historyRowSize,
+                        height: KippleButtonMetrics.historyRowSize
+                    )
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .primary : .secondary)
+                    .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
             }
-            .frame(width: 22, height: 22)
+            .frame(
+                width: KippleButtonMetrics.historyRowSize,
+                height: KippleButtonMetrics.historyRowSize
+            )
             .contentShape(Circle())
             .onTapGesture { handleTap() }
             .help(actionHelpText)
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
-                    .frame(width: 22, height: 22)
+                    .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
+                    .frame(
+                        width: KippleButtonMetrics.historyRowSize,
+                        height: KippleButtonMetrics.historyRowSize
+                    )
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .primary : .secondary)
+                    .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
             }
-            .frame(width: 22, height: 22)
+            .frame(
+                width: KippleButtonMetrics.historyRowSize,
+                height: KippleButtonMetrics.historyRowSize
+            )
             .contentShape(Circle())
             .onTapGesture {
                 closePopover()
@@ -246,11 +264,14 @@ struct HistoryItemView: View {
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isSelected ? .primary : .secondary)
-                .frame(width: 22, height: 22)
+                .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
+                .frame(
+                    width: KippleButtonMetrics.historyRowSize,
+                    height: KippleButtonMetrics.historyRowSize
+                )
                 .background(
                     Circle()
-                        .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
+                        .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
                 )
         }
     }
@@ -275,7 +296,7 @@ struct HistoryItemView: View {
         if let onDelete = onDelete, isHoverActive && !item.isPinned {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
                 .contentShape(Circle())
                 .help(deleteHelpText)
                 .onTapGesture {
@@ -356,7 +377,7 @@ struct HistoryItemView: View {
 
     // MARK: - Pin helper properties
     var pinButtonBackground: Color {
-        item.isPinned ? Color.accentColor.opacity(0.10) : Color.clear
+        KippleButtonAppearance.compactFill(isActive: item.isPinned)
     }
 
     var pinButtonIcon: String {
@@ -364,7 +385,7 @@ struct HistoryItemView: View {
     }
 
     var pinButtonForeground: Color {
-        item.isPinned ? .accentColor : .secondary
+        KippleButtonAppearance.foreground(isActive: item.isPinned)
     }
 
     var pinButtonRotation: Double {

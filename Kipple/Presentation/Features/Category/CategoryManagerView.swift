@@ -25,7 +25,7 @@ private enum CategoryManagerLayout {
 }
 
 private enum CategoryManagerAppearance {
-    static let builtInColor = Color.secondary.opacity(0.55)
+    static let builtInColor = KippleButtonAppearance.inactiveForeground.opacity(0.55)
 }
 
 struct CategoryManagerView: View {
@@ -123,7 +123,10 @@ struct CategoryManagerView: View {
                                 label: {
                                     Image(systemName: "trash")
                                         .font(.system(size: 12, weight: .medium))
-                                        .frame(width: CategoryManagerLayout.deleteColumnWidth, height: 24)
+                                        .frame(
+                                            width: CategoryManagerLayout.deleteColumnWidth,
+                                            height: KippleButtonMetrics.compactIconSize
+                                        )
                                 }
                             )
                             .buttonStyle(.borderless)
@@ -132,7 +135,10 @@ struct CategoryManagerView: View {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(CategoryManagerAppearance.builtInColor)
-                                .frame(width: CategoryManagerLayout.deleteColumnWidth, height: 24)
+                                .frame(
+                                    width: CategoryManagerLayout.deleteColumnWidth,
+                                    height: KippleButtonMetrics.compactIconSize
+                                )
                                 .help(Text("Built-in categories cannot be deleted"))
                         }
                     }
@@ -191,7 +197,10 @@ private extension CategoryManagerView {
     func iconSelector(for category: UserCategory) -> some View {
         if store.isBuiltIn(category.id) {
             Image(systemName: store.iconName(for: category))
-                .frame(width: 24, height: 24)
+                .frame(
+                    width: KippleButtonMetrics.compactIconSize,
+                    height: KippleButtonMetrics.compactIconSize
+                )
                 .font(.system(size: 14))
                 .foregroundColor(CategoryManagerAppearance.builtInColor)
         } else {
@@ -207,7 +216,10 @@ private extension CategoryManagerView {
                 }
             } label: {
                 Image(systemName: store.iconName(for: category))
-                    .frame(width: 24, height: 24)
+                    .frame(
+                        width: KippleButtonMetrics.compactIconSize,
+                        height: KippleButtonMetrics.compactIconSize
+                    )
                     .font(.system(size: 14))
             }
             .menuStyle(.borderlessButton)

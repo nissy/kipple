@@ -14,183 +14,121 @@ struct MainViewControlSection: View {
     let onSave: () -> Void
     let onTrim: () -> Void
     let onFormat: (ClipboardTextFormat) -> Void
-    @ObservedObject private var appSettings = AppSettings.shared
 
-    private let buttonHeight: CGFloat = 30
-    private let horizontalPadding: CGFloat = 10
-    private let trimButtonWidth: CGFloat = 40
-    private let formatMenuButtonWidth: CGFloat = 32
+    private let iconFont = Font.system(size: 11, weight: .semibold)
 
     var body: some View {
         HStack(spacing: 6) {
-            editModeButton
-            saveButton
-            formatMenu
+            controlButtons
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
-        .kippleLiquidControlGroup(in: Capsule(), isEnabled: !isEditorLocked)
+    }
+
+    private var controlButtons: some View {
+        HStack(spacing: 6) {
+            editModeButton
+            saveButton
+            trimButton
+            formatPickerButton
+        }
     }
 
     private var editModeButton: some View {
         Button(action: toggleEditorMode) {
-            HStack(spacing: 4) {
-                Image(systemName: editModeButtonIcon)
-                    .font(.system(size: 11, weight: .semibold))
-
-                Text(editModeButtonTitle)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-
-                if !editModeShortcut.isEmpty {
-                    shortcutBadge(editModeShortcut)
-                }
-            }
-                .padding(.horizontal, horizontalPadding)
-                .frame(minWidth: 64, minHeight: buttonHeight)
+            Image(systemName: editModeButtonIcon)
+                .font(iconFont)
+                .frame(
+                    width: KippleButtonMetrics.toolbarSize,
+                    height: KippleButtonMetrics.toolbarSize
+                )
                 .contentShape(Rectangle())
         }
         .accessibilityLabel(Text(editModeButtonTitle))
-        .buttonStyle(PlainButtonStyle())
         .foregroundColor(editModeButtonForegroundColor)
-        .kippleControlSurface(in: Capsule(), isActive: isEditing, isEnabled: !isEditorLocked)
+        .kippleSystemCircleButton(isActive: isEditing, isEnabled: !isEditorLocked)
         .disabled(isEditorLocked)
         .help(Text(editModeButtonHelpText))
         .focusable(false)
         .focusEffectDisabled()
     }
 
-    private var formatMenu: some View {
-        HStack(spacing: 0) {
-            Button(action: trim) {
-                HStack(spacing: 4) {
-                    Image(systemName: "scissors")
-                        .font(.system(size: 11, weight: .regular))
-                }
-                .padding(.horizontal, horizontalPadding)
-                .frame(width: trimButtonWidth, height: buttonHeight)
+    private var trimButton: some View {
+        Button(action: trim) {
+            Image(systemName: "scissors")
+                .font(iconFont)
+                .foregroundColor(formatButtonForegroundColor)
+                .frame(
+                    width: KippleButtonMetrics.toolbarSize,
+                    height: KippleButtonMetrics.toolbarSize
+                )
                 .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
-            .accessibilityLabel(Text("editor.trim"))
-            .focusable(false)
-            .focusEffectDisabled()
-
-            Rectangle()
-                .fill(formatButtonSeparatorColor)
-                .frame(width: 1, height: buttonHeight - 12)
-                .padding(.vertical, 6)
-                .allowsHitTesting(false)
-
-            Menu {
-                Button(action: { format(.json) }, label: {
-                    Label {
-                        Text("editor.format.json")
-                    } icon: {
-                        Image(systemName: "curlybraces")
-                    }
-                })
-
-                Button(action: { format(.yaml) }, label: {
-                    Label {
-                        Text("editor.format.yaml")
-                    } icon: {
-                        Image(systemName: "list.bullet.rectangle")
-                    }
-                })
-            } label: {
-                Image(systemName: "chevron.down")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(formatButtonForegroundColor)
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: formatMenuButtonWidth, height: buttonHeight)
-                    .contentShape(Rectangle())
-            }
-            .menuStyle(BorderlessButtonMenuStyle())
-            .menuIndicator(.hidden)
-            .buttonStyle(PlainButtonStyle())
-            .accessibilityLabel(Text("editor.format"))
-            .focusable(false)
-            .focusEffectDisabled()
         }
         .foregroundColor(formatButtonForegroundColor)
-        .kippleControlSurface(in: Capsule(), isEnabled: !isFormatDisabled)
+        .kippleSystemCircleButton(isEnabled: !isFormatDisabled)
         .disabled(isFormatDisabled)
-        .contentShape(Rectangle())
+        .accessibilityLabel(Text("editor.trim"))
+        .help(Text("editor.trim"))
+        .focusable(false)
+        .focusEffectDisabled()
+    }
+
+    private var formatPickerButton: some View {
+        Menu {
+            Button(action: { format(.json) }, label: {
+                Label {
+                    Text("editor.format.json")
+                } icon: {
+                    Image(systemName: "curlybraces")
+                }
+            })
+
+            Button(action: { format(.yaml) }, label: {
+                Label {
+                    Text("editor.format.yaml")
+                } icon: {
+                    Image(systemName: "list.bullet.rectangle")
+                }
+            })
+        } label: {
+            Image(systemName: "curlybraces")
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(formatButtonForegroundColor)
+                .font(iconFont)
+                .frame(
+                    width: KippleButtonMetrics.toolbarSize,
+                    height: KippleButtonMetrics.toolbarSize
+                )
+                .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton(isEnabled: !isFormatDisabled)
+        .disabled(isFormatDisabled)
+        .accessibilityLabel(Text("editor.format"))
         .help(Text(formatButtonHelpText))
         .focusable(false)
         .focusEffectDisabled()
     }
 
     private var saveButton: some View {
-        Button(action: onSave) {
-            saveButtonLabel
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: buttonHeight)
-            .contentShape(Rectangle())
+        Button(action: save) {
+            Image(systemName: "tray.and.arrow.down")
+                .font(iconFont)
+                .frame(
+                    width: KippleButtonMetrics.toolbarSize,
+                    height: KippleButtonMetrics.toolbarSize
+                )
+                .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
         .foregroundColor(saveButtonForegroundColor)
-        .kippleControlSurface(in: Capsule(), isActive: !isSaveDisabled, isEnabled: !isSaveDisabled)
+        .kippleSystemCircleButton(isEnabled: !isSaveDisabled)
         .disabled(isSaveDisabled)
         .help(Text(saveButtonHelpText))
         .focusable(false)
         .focusEffectDisabled()
-    }
-
-    private var saveButtonLabel: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "tray.and.arrow.down")
-                .font(.system(size: 11, weight: .semibold))
-
-            Text("editor.saveToHistory")
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-
-            let shortcut = getShortcutKeyDisplay()
-            if !shortcut.isEmpty {
-                shortcutBadge(shortcut)
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel(Text("editor.saveToHistory"))
-    }
-
-    private func buttonLabel(
-        systemImage: String,
-        title: LocalizedStringKey? = nil,
-        shortcut: String,
-        accessibilityLabel: LocalizedStringKey
-    ) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .regular))
-
-            if let title {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-
-            if !shortcut.isEmpty {
-                shortcutBadge(shortcut)
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel(Text(accessibilityLabel))
-    }
-
-    private func shortcutBadge(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
     }
 
     private var isEditing: Bool {
@@ -225,16 +163,12 @@ struct MainViewControlSection: View {
         isEditorLocked ? "editor.locked.help" : editModeButtonTitle
     }
 
-    private var editModeShortcut: String {
-        isEditing ? "ESC" : ""
-    }
-
     private var editModeButtonForegroundColor: Color {
-        isEditorLocked ? Color.secondary.opacity(0.62) : .primary
+        KippleButtonAppearance.foreground(isActive: isEditing, isEnabled: !isEditorLocked)
     }
 
     private var saveButtonForegroundColor: Color {
-        isSaveDisabled ? Color.secondary.opacity(0.62) : .primary
+        KippleButtonAppearance.foreground(isActive: false, isEnabled: !isSaveDisabled)
     }
 
     private var saveButtonHelpText: LocalizedStringKey {
@@ -248,13 +182,9 @@ struct MainViewControlSection: View {
 
         return "editor.saveToHistory"
     }
-    
-    private var formatButtonForegroundColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.62) : .primary
-    }
 
-    private var formatButtonSeparatorColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.06) : Color.secondary.opacity(0.08)
+    private var formatButtonForegroundColor: Color {
+        KippleButtonAppearance.foreground(isActive: false, isEnabled: !isFormatDisabled)
     }
 
     private func toggleEditorMode() {
@@ -279,42 +209,13 @@ struct MainViewControlSection: View {
         onTrim()
     }
 
+    private func save() {
+        guard !isSaveDisabled else { return }
+        onSave()
+    }
+
     private func format(_ textFormat: ClipboardTextFormat) {
         guard !isFormatDisabled else { return }
         onFormat(textFormat)
-    }
-
-    private func getShortcutKeyDisplay() -> String {
-        if appSettings.editorCopyHotkeyKeyCode == 0 || appSettings.editorCopyHotkeyModifierFlags == 0 {
-            return ""
-        }
-
-        let modifiers = NSEvent.ModifierFlags(rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags))
-        var parts: [String] = []
-
-        if modifiers.contains(.control) { parts.append("⌃") }
-        if modifiers.contains(.option) { parts.append("⌥") }
-        if modifiers.contains(.shift) { parts.append("⇧") }
-        if modifiers.contains(.command) { parts.append("⌘") }
-
-        if let keyChar = keyCodeToString(UInt16(appSettings.editorCopyHotkeyKeyCode)) {
-            parts.append(keyChar)
-        }
-
-        return parts.joined()
-    }
-
-    private func keyCodeToString(_ keyCode: UInt16) -> String? {
-        let keyMap: [UInt16: String] = [
-            1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
-            8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
-            16: "Y", 17: "T", 18: "1", 19: "2", 20: "3", 21: "4", 22: "6",
-            23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
-            30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 37: "L",
-            38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",", 44: "/",
-            45: "N", 46: "M", 47: ".", 50: "`"
-        ]
-        if keyCode == 0 { return nil }
-        return keyMap[keyCode]
     }
 }

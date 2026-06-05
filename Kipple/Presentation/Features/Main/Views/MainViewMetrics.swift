@@ -9,14 +9,14 @@ import SwiftUI
 
 enum MainViewMetrics {
     enum TitleBar {
-        static let buttonSize: CGFloat = 30
+        static let buttonSize: CGFloat = KippleButtonMetrics.toolbarSize
         static let iconFont: Font = .system(size: 12, weight: .medium)
         static let badgeFont: Font = .system(size: 11, weight: .bold)
         static let badgeOffset = CGSize(width: -2, height: 2)
     }
     
     enum BottomBar {
-        static let buttonSize: CGFloat = 30
+        static let buttonSize: CGFloat = KippleButtonMetrics.toolbarSize
         static let iconFont: Font = .system(size: 12, weight: .medium)
         static let clearIconFont: Font = .system(size: 12)
     }
@@ -34,7 +34,7 @@ enum MainViewMetrics {
     }
 
     enum HistoryFilterIcon {
-        static let diameter: CGFloat = 22
+        static let diameter: CGFloat = KippleButtonMetrics.toolbarSize
         static let defaultFont: Font = .system(size: 12, weight: .medium)
         static let pinnedFont: Font = .system(size: 10, weight: .medium)
         static let categoryFont: Font = .system(size: 13, weight: .medium)

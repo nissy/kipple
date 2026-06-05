@@ -35,7 +35,7 @@ struct ClipboardItemPopover: View {
                 .padding(16)
 
             Divider()
-                .opacity(0.25)
+                .opacity(0.08)
 
             Text(verbatim: previewText)
                 .font(Font(fontManager.historyFont))
@@ -48,21 +48,12 @@ struct ClipboardItemPopover: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Divider()
-                .opacity(0.2)
+                .opacity(0.07)
 
             metadataSection(for: item)
                 .padding(16)
         }
         .frame(width: 320)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(NSColor.windowBackgroundColor).opacity(0.94))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.black.opacity(0.025))
-                .allowsHitTesting(false)
-        )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 

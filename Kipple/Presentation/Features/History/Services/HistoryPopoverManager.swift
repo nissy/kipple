@@ -186,7 +186,7 @@ final class HistoryPopoverManager {
     private func installGlass(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
         let container = GlassContainerView(cornerRadius: 18)
         let glassView = NSGlassEffectView()
-        glassView.style = .clear
+        glassView.style = .regular
         glassView.cornerRadius = 18
         glassView.tintColor = nil
         glassView.translatesAutoresizingMaskIntoConstraints = false

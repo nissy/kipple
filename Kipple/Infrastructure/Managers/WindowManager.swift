@@ -62,7 +62,7 @@ private final class MainGlassContentController<Content: View>: NSViewController 
         let container = RoundedMaskContainerView(cornerRadius: 24)
 
         let glassView = NSGlassEffectView()
-        glassView.style = .clear
+        glassView.style = .regular
         glassView.cornerRadius = 24
         glassView.tintColor = nil
         glassView.translatesAutoresizingMaskIntoConstraints = false

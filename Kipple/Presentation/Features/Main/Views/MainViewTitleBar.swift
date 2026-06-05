@@ -45,6 +45,13 @@ struct MainViewTitleBarAccessory: View {
     @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
+        titleBarButtons
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(Color.clear)
+    }
+
+    private var titleBarButtons: some View {
         HStack(spacing: 8) {
             if state.showsQueueButton {
                 queueButton
@@ -55,9 +62,6 @@ struct MainViewTitleBarAccessory: View {
             
             editorButton
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .kippleLiquidControlGroup(in: Capsule(), isEnabled: true)
     }
 }
 
@@ -82,18 +86,17 @@ private extension MainViewTitleBarAccessory {
         let content = ZStack {
             Image(systemName: "text.magnifyingglass")
                 .font(MainViewMetrics.TitleBar.iconFont)
-                .foregroundColor(.secondary)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
         }
         .frame(
             width: MainViewMetrics.TitleBar.buttonSize,
             height: MainViewMetrics.TitleBar.buttonSize
         )
-        .background(titleBarIconSurface(isActive: false))
         
         return Button(action: handleCaptureButtonTap) {
             content
         }
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton()
         .help(captureHelpText)
         .overlay(permissionBadge(isActive: state.isCaptureEnabled), alignment: .topTrailing)
         .focusable(false)
@@ -110,14 +113,11 @@ private extension MainViewTitleBarAccessory {
             width: MainViewMetrics.TitleBar.buttonSize,
             height: MainViewMetrics.TitleBar.buttonSize
         )
-        .background(titleBarIconSurface(isActive: state.isQueueActive))
-        .scaleEffect(state.isQueueActive ? 1.0 : 0.9)
-        .animation(.spring(response: 0.3), value: state.isQueueActive)
         
         return Button(action: handleQueueButtonTap) {
             content
         }
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton(isActive: state.isQueueActive)
         .help(queueHelpText)
         .overlay(permissionBadge(isActive: state.isQueueEnabled), alignment: .topTrailing)
         .focusable(false)
@@ -129,30 +129,21 @@ private extension MainViewTitleBarAccessory {
             ZStack {
                 Image(systemName: state.isEditorEnabled ? "square.and.pencil" : "square.slash")
                     .font(MainViewMetrics.TitleBar.iconFont)
-                    .foregroundColor(state.isEditorEnabled ? .primary : .secondary)
+                    .foregroundColor(KippleButtonAppearance.foreground(isActive: state.isEditorEnabled))
             }
             .frame(
                 width: MainViewMetrics.TitleBar.buttonSize,
                 height: MainViewMetrics.TitleBar.buttonSize
             )
-            .background(titleBarIconSurface(isActive: state.isEditorEnabled))
         }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isEditorEnabled ? 1.0 : 0.92)
-        .animation(.spring(response: 0.3), value: state.isEditorEnabled)
+        .kippleSystemCircleButton(isActive: state.isEditorEnabled)
         .help(state.isEditorEnabled ? hideEditorHelpText : showEditorHelpText)
         .focusable(false)
         .focusEffectDisabled()
     }
     
-    func titleBarIconSurface(isActive: Bool) -> some View {
-        Circle()
-            .fill(Color.clear)
-            .kippleControlSurface(in: Circle(), isActive: isActive, isEnabled: true)
-    }
-
     private var queueIconColor: Color {
-        return state.isQueueActive ? .primary : .secondary
+        KippleButtonAppearance.foreground(isActive: state.isQueueActive)
     }
     
     private func handleCaptureButtonTap() {
@@ -182,8 +173,8 @@ private extension MainViewTitleBarAccessory {
             if !isActive {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(MainViewMetrics.TitleBar.badgeFont)
-                    .foregroundColor(Color(.sRGB, red: 1.0, green: 0.0, blue: 0.0))
-                    .shadow(color: Color.black.opacity(0.25), radius: 1, y: 1)
+                    .foregroundColor(KippleButtonAppearance.permissionWarningForeground)
+                    .shadow(color: KippleButtonAppearance.permissionWarningShadow, radius: 1, y: 1)
                     .offset(
                         x: MainViewMetrics.TitleBar.badgeOffset.width,
                         y: MainViewMetrics.TitleBar.badgeOffset.height
@@ -200,28 +191,22 @@ struct MainViewTitleBarPinButton: View {
     var body: some View {
         Button(action: state.requestToggleAlwaysOnTop) {
             ZStack {
-                Circle()
-                    .fill(state.isAlwaysOnTop ? Color.primary.opacity(0.05) : Color.clear)
+                Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
+                    .font(MainViewMetrics.TitleBar.iconFont)
+                    .foregroundColor(KippleButtonAppearance.foreground(isActive: state.isAlwaysOnTop))
+                    .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
                     .frame(
                         width: MainViewMetrics.TitleBar.buttonSize,
                         height: MainViewMetrics.TitleBar.buttonSize
                     )
-                
-                Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
-                    .font(MainViewMetrics.TitleBar.iconFont)
-                    .foregroundColor(state.isAlwaysOnTop ? .primary : .secondary)
-                    .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
             }
         }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isAlwaysOnTop ? 1.0 : 0.9)
-        .animation(.spring(response: 0.3), value: state.isAlwaysOnTop)
+        .kippleSystemCircleButton(isActive: state.isAlwaysOnTop)
         .help(
             state.isAlwaysOnTopForcedByQueue && !state.isAlwaysOnTop
                 ? queueForcedHelpText
                 : (state.isAlwaysOnTop ? disableAlwaysOnTopHelpText : enableAlwaysOnTopHelpText)
         )
-        .kippleControlSurface(in: Circle(), isActive: state.isAlwaysOnTop, isEnabled: true)
         .focusable(false)
         .focusEffectDisabled()
     }
