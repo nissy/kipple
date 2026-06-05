@@ -13,6 +13,130 @@ import Darwin
 private typealias ScreenUpdateFunction = @convention(c) () -> Void
 
 // swiftlint:disable file_length
+private final class MainGlassWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+private final class RoundedMaskContainerView: NSView {
+    private let cornerRadius: CGFloat
+
+    init(cornerRadius: CGFloat) {
+        self.cornerRadius = cornerRadius
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.cornerRadius = cornerRadius
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+        layer?.cornerRadius = cornerRadius
+    }
+}
+
+@available(macOS 26.0, *)
+private final class MainGlassContentController<Content: View>: NSViewController {
+    private let hostingController: NSHostingController<Content>
+
+    init(rootView: Content) {
+        hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
+        super.init(nibName: nil, bundle: nil)
+        addChild(hostingController)
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let container = RoundedMaskContainerView(cornerRadius: 24)
+
+        let glassView = NSGlassEffectView()
+        glassView.style = .clear
+        glassView.cornerRadius = 24
+        glassView.tintColor = nil
+        glassView.translatesAutoresizingMaskIntoConstraints = false
+        glassView.wantsLayer = true
+        glassView.layer?.cornerRadius = 24
+        glassView.layer?.cornerCurve = .continuous
+        glassView.layer?.masksToBounds = true
+
+        hostingController.view.wantsLayer = true
+        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingController.view.layer?.cornerRadius = 24
+        hostingController.view.layer?.cornerCurve = .continuous
+        hostingController.view.layer?.masksToBounds = true
+        glassView.contentView = hostingController.view
+        container.addSubview(glassView)
+        NSLayoutConstraint.activate([
+            glassView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            glassView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            glassView.topAnchor.constraint(equalTo: container.topAnchor),
+            glassView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+
+        view = container
+    }
+}
+
+private final class MainMaterialContentController<Content: View>: NSViewController {
+    private let hostingController: NSHostingController<Content>
+
+    init(rootView: Content) {
+        hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
+        super.init(nibName: nil, bundle: nil)
+        addChild(hostingController)
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let container = RoundedMaskContainerView(cornerRadius: 24)
+
+        let materialView = NSVisualEffectView()
+        materialView.blendingMode = .behindWindow
+        materialView.material = .popover
+        materialView.state = .active
+        materialView.translatesAutoresizingMaskIntoConstraints = false
+        materialView.wantsLayer = true
+        materialView.layer?.cornerRadius = 24
+        materialView.layer?.cornerCurve = .continuous
+        materialView.layer?.masksToBounds = true
+
+        hostingController.view.wantsLayer = true
+        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        materialView.addSubview(hostingController.view)
+        container.addSubview(materialView)
+        NSLayoutConstraint.activate([
+            materialView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            materialView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            materialView.topAnchor.constraint(equalTo: container.topAnchor),
+            materialView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            hostingController.view.leadingAnchor.constraint(equalTo: materialView.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: materialView.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: materialView.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: materialView.bottomAnchor)
+        ])
+
+        view = container
+    }
+}
+
 @MainActor
 protocol WindowManaging: AnyObject {
     func openMainWindow()
@@ -298,9 +422,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         )
         .environmentObject(viewModel)
         
-        let hostingController = NSHostingController(rootView: contentView)
-        hostingController.sizingOptions = []
-        mainWindow = NSWindow(contentViewController: hostingController)
+        if #available(macOS 26.0, *) {
+            mainWindow = MainGlassWindow(contentViewController: MainGlassContentController(rootView: contentView))
+        } else {
+            mainWindow = MainGlassWindow(contentViewController: MainMaterialContentController(rootView: contentView))
+        }
         return mainWindow
     }
     
@@ -309,7 +435,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.title = localizedMainWindowTitle()
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.styleMask = [.titled, .closable, .fullSizeContentView, .resizable]
+        window.titlebarSeparatorStyle = .none
+        window.styleMask = [.borderless, .resizable]
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.isMovableByWindowBackground = true
         window.level = isAlwaysOnTop ? .floating : .normal
         // M2 Mac対応: hidesOnDeactivateを動的に設定
         window.hidesOnDeactivate = !isAlwaysOnTop
@@ -330,10 +461,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
         configureWindowSize(window)
         
         // カーソル位置にウィンドウを配置
-        attachAlwaysOnTopButton(to: window)
-        DispatchQueue.main.async { [weak self, weak window] in
-            guard let window else { return }
-            self?.attachAlwaysOnTopButton(to: window)
+        if window.styleMask.contains(.titled) {
+            attachAlwaysOnTopButton(to: window)
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let window else { return }
+                self?.attachAlwaysOnTopButton(to: window)
+            }
         }
         positionWindowAtCursor(window)
     }
@@ -780,15 +913,21 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let viewModel = SettingsViewModel()
             let settingsView = SettingsView(viewModel: viewModel)
             let hostingController = SettingsHostingController(rootView: settingsView)
+            hostingController.view.wantsLayer = true
+            hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
 
             let window = NSWindow(contentViewController: hostingController)
         window.title = localizedSettingsWindowTitle()
-            window.styleMask = [.titled, .closable]
+            window.styleMask = [.titled, .closable, .fullSizeContentView]
             window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
             window.isReleasedWhenClosed = false
             window.titleVisibility = .visible
-            window.titlebarAppearsTransparent = false
+            window.titlebarAppearsTransparent = true
+            window.isOpaque = false
+            window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.08)
+            window.hasShadow = true
+            window.isMovableByWindowBackground = true
             window.standardWindowButton(.miniaturizeButton)?.isHidden = true
             window.standardWindowButton(.zoomButton)?.isHidden = true
             window.toolbarStyle = .preference

@@ -86,12 +86,9 @@ struct HistoryListView: View {
                             .padding(.vertical, 10)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
-        .background(
-            Color(NSColor.controlBackgroundColor).opacity(0.3)
-        )
         .background {
             ScrollLockObserver(isLocked: $isScrollLocked)
                 .allowsHitTesting(false)
@@ -245,11 +242,15 @@ private final class ScrollLockObserverView: NSView {
     private func attachObservers(to scrollView: NSScrollView) {
         let center = NotificationCenter.default
         let will = center.addObserver(forName: NSScrollView.willStartLiveScrollNotification, object: scrollView, queue: .main) { [weak self] _ in
-            self?.coordinator?.setLocked(true)
-            HistoryPopoverManager.shared.scheduleHide()
+            Task { @MainActor in
+                self?.coordinator?.setLocked(true)
+                HistoryPopoverManager.shared.scheduleHide()
+            }
         }
         let did = center.addObserver(forName: NSScrollView.didEndLiveScrollNotification, object: scrollView, queue: .main) { [weak self] _ in
-            self?.coordinator?.setLocked(false)
+            Task { @MainActor in
+                self?.coordinator?.setLocked(false)
+            }
         }
         observers = [will, did]
     }
@@ -271,6 +272,8 @@ private final class ScrollLockObserverView: NSView {
     }
 
     deinit {
-        detachObservers()
+        MainActor.assumeIsolated {
+            detachObservers()
+        }
     }
 }

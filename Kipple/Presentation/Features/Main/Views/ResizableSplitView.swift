@@ -67,16 +67,14 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
 
                 // ドラッグハンドル
                 ZStack {
-                    // Background area
                     Rectangle()
-                        .fill(Color(NSColor.windowBackgroundColor))
-                        .frame(height: handleHeight)  // 高さを少し増やす
-                    
-                    // Visual handle - 中央に配置
+                        .fill(Color.clear)
+                        .frame(height: handleHeight)
+
                     HStack(spacing: SplitHandleMetrics.dotSpacing) {
-                        ForEach(0..<SplitHandleMetrics.dotCount) { _ in
+                        ForEach(0..<SplitHandleMetrics.dotCount, id: \.self) { _ in
                             Circle()
-                                .fill(isDragging ? Color.accentColor : Color.gray.opacity(0.4))
+                                .fill(isDragging ? Color.primary.opacity(0.65) : Color.primary.opacity(0.2))
                                 .frame(
                                     width: SplitHandleMetrics.dotSize,
                                     height: SplitHandleMetrics.dotSize

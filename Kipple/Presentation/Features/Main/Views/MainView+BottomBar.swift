@@ -32,13 +32,12 @@ extension MainView {
                     action: onOpenSettings
                 )
             }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .kippleLiquidControlGroup(in: Capsule(), isEnabled: true)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(
-            Color(NSColor.windowBackgroundColor).opacity(0.95)
-                .background(.ultraThinMaterial)
-        )
         .alert("quit.alert.title", isPresented: quitConfirmationBinding) {
             Button("quit.alert.cancel", role: .cancel) {
                 cancelQuitConfirmationIfNeeded()
@@ -61,26 +60,14 @@ private extension MainView {
         Button(action: {
             action?()
         }, label: {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        colors: [
-                            Color(NSColor.controlBackgroundColor),
-                            Color(NSColor.controlBackgroundColor).opacity(0.85)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(
-                        width: MainViewMetrics.BottomBar.buttonSize,
-                        height: MainViewMetrics.BottomBar.buttonSize
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 2, y: 2)
-
-                Image(systemName: systemName)
-                    .font(MainViewMetrics.BottomBar.iconFont)
-                    .foregroundColor(.secondary)
-            }
+            Image(systemName: systemName)
+                .font(MainViewMetrics.BottomBar.iconFont)
+                .foregroundColor(.secondary)
+                .frame(
+                    width: MainViewMetrics.BottomBar.buttonSize,
+                    height: MainViewMetrics.BottomBar.buttonSize
+                )
+                .kippleControlSurface(in: Circle(), isEnabled: true)
         })
         .buttonStyle(PlainButtonStyle())
         .help(Text(helpKey))

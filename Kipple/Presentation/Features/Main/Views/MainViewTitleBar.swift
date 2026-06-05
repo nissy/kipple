@@ -57,7 +57,7 @@ struct MainViewTitleBarAccessory: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
-        .background(Color.clear)
+        .kippleLiquidControlGroup(in: Capsule(), isEnabled: true)
     }
 }
 
@@ -80,22 +80,15 @@ private extension MainViewTitleBarAccessory {
 
     var captureButton: some View {
         let content = ZStack {
-            Circle()
-                .fill(inactiveGradient)
-                .frame(
-                    width: MainViewMetrics.TitleBar.buttonSize,
-                    height: MainViewMetrics.TitleBar.buttonSize
-                )
-                .shadow(
-                    color: Color.black.opacity(0.12),
-                    radius: 3,
-                    y: 2
-                )
-            
             Image(systemName: "text.magnifyingglass")
                 .font(MainViewMetrics.TitleBar.iconFont)
                 .foregroundColor(.secondary)
         }
+        .frame(
+            width: MainViewMetrics.TitleBar.buttonSize,
+            height: MainViewMetrics.TitleBar.buttonSize
+        )
+        .background(titleBarIconSurface(isActive: false))
         
         return Button(action: handleCaptureButtonTap) {
             content
@@ -103,26 +96,21 @@ private extension MainViewTitleBarAccessory {
         .buttonStyle(PlainButtonStyle())
         .help(captureHelpText)
         .overlay(permissionBadge(isActive: state.isCaptureEnabled), alignment: .topTrailing)
+        .focusable(false)
+        .focusEffectDisabled()
     }
     
     var queueButton: some View {
         let content = ZStack {
-            Circle()
-                .fill(queueButtonBackground)
-                .frame(
-                    width: MainViewMetrics.TitleBar.buttonSize,
-                    height: MainViewMetrics.TitleBar.buttonSize
-                )
-                .shadow(
-                    color: queueShadowColor,
-                    radius: state.isQueueEnabled ? (state.isQueueActive ? 4 : 2) : 2,
-                    y: 2
-                )
-            
             Image(systemName: "list.number")
                 .font(MainViewMetrics.TitleBar.iconFont)
                 .foregroundColor(queueIconColor)
         }
+        .frame(
+            width: MainViewMetrics.TitleBar.buttonSize,
+            height: MainViewMetrics.TitleBar.buttonSize
+        )
+        .background(titleBarIconSurface(isActive: state.isQueueActive))
         .scaleEffect(state.isQueueActive ? 1.0 : 0.9)
         .animation(.spring(response: 0.3), value: state.isQueueActive)
         
@@ -132,70 +120,39 @@ private extension MainViewTitleBarAccessory {
         .buttonStyle(PlainButtonStyle())
         .help(queueHelpText)
         .overlay(permissionBadge(isActive: state.isQueueEnabled), alignment: .topTrailing)
+        .focusable(false)
+        .focusEffectDisabled()
     }
     
     var editorButton: some View {
         Button(action: state.requestToggleEditor) {
             ZStack {
-                Circle()
-                    .fill(editorButtonBackground)
-                    .frame(
-                        width: MainViewMetrics.TitleBar.buttonSize,
-                        height: MainViewMetrics.TitleBar.buttonSize
-                    )
-                    .shadow(
-                        color: state.isEditorEnabled ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08),
-                        radius: state.isEditorEnabled ? 4 : 2,
-                        y: 2
-                    )
-                
                 Image(systemName: state.isEditorEnabled ? "square.and.pencil" : "square.slash")
                     .font(MainViewMetrics.TitleBar.iconFont)
-                    .foregroundColor(state.isEditorEnabled ? .white : .secondary)
+                    .foregroundColor(state.isEditorEnabled ? .primary : .secondary)
             }
+            .frame(
+                width: MainViewMetrics.TitleBar.buttonSize,
+                height: MainViewMetrics.TitleBar.buttonSize
+            )
+            .background(titleBarIconSurface(isActive: state.isEditorEnabled))
         }
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(state.isEditorEnabled ? 1.0 : 0.92)
         .animation(.spring(response: 0.3), value: state.isEditorEnabled)
         .help(state.isEditorEnabled ? hideEditorHelpText : showEditorHelpText)
+        .focusable(false)
+        .focusEffectDisabled()
     }
     
-    var editorButtonBackground: LinearGradient {
-        state.isEditorEnabled ? activeGradient : inactiveGradient
-    }
-
-    var activeGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    var inactiveGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(NSColor.controlBackgroundColor),
-                Color(NSColor.controlBackgroundColor).opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var queueButtonBackground: LinearGradient {
-        return state.isQueueActive ? activeGradient : inactiveGradient
+    func titleBarIconSurface(isActive: Bool) -> some View {
+        Circle()
+            .fill(Color.clear)
+            .kippleControlSurface(in: Circle(), isActive: isActive, isEnabled: true)
     }
 
     private var queueIconColor: Color {
-        return state.isQueueActive ? .white : .secondary
-    }
-
-    private var queueShadowColor: Color {
-        if !state.isQueueEnabled {
-            return Color.black.opacity(0.08)
-        }
-        return state.isQueueActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
+        return state.isQueueActive ? .primary : .secondary
     }
     
     private func handleCaptureButtonTap() {
@@ -244,20 +201,15 @@ struct MainViewTitleBarPinButton: View {
         Button(action: state.requestToggleAlwaysOnTop) {
             ZStack {
                 Circle()
-                    .fill(state.isAlwaysOnTop ? activeGradient : inactiveGradient)
+                    .fill(state.isAlwaysOnTop ? Color.primary.opacity(0.05) : Color.clear)
                     .frame(
                         width: MainViewMetrics.TitleBar.buttonSize,
                         height: MainViewMetrics.TitleBar.buttonSize
                     )
-                    .shadow(
-                        color: state.isAlwaysOnTop ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.1),
-                        radius: state.isAlwaysOnTop ? 4 : 2,
-                        y: 2
-                    )
                 
                 Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
                     .font(MainViewMetrics.TitleBar.iconFont)
-                    .foregroundColor(state.isAlwaysOnTop ? .white : .secondary)
+                    .foregroundColor(state.isAlwaysOnTop ? .primary : .secondary)
                     .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
             }
         }
@@ -269,25 +221,9 @@ struct MainViewTitleBarPinButton: View {
                 ? queueForcedHelpText
                 : (state.isAlwaysOnTop ? disableAlwaysOnTopHelpText : enableAlwaysOnTopHelpText)
         )
-    }
-    
-    private var activeGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    private var inactiveGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(NSColor.controlBackgroundColor),
-                Color(NSColor.controlBackgroundColor).opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        .kippleControlSurface(in: Circle(), isActive: state.isAlwaysOnTop, isEnabled: true)
+        .focusable(false)
+        .focusEffectDisabled()
     }
 }
 

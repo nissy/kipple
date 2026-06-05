@@ -31,11 +31,15 @@ struct MainViewControlSection: View {
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
+        .kippleLiquidControlGroup(in: Capsule(), isEnabled: !isEditorLocked)
     }
 
     private var editModeButton: some View {
         Button(action: toggleEditorMode) {
             HStack(spacing: 4) {
+                Image(systemName: editModeButtonIcon)
+                    .font(.system(size: 11, weight: .semibold))
+
                 Text(editModeButtonTitle)
                     .font(.caption.weight(.semibold))
                     .lineLimit(1)
@@ -51,16 +55,12 @@ struct MainViewControlSection: View {
         }
         .accessibilityLabel(Text(editModeButtonTitle))
         .buttonStyle(PlainButtonStyle())
-        .foregroundColor(.white)
-        .background(editModeButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(editModeButtonBorder, lineWidth: 1)
-        )
-        .shadow(color: editModeButtonShadow, radius: 4, y: 2)
+        .foregroundColor(editModeButtonForegroundColor)
+        .kippleControlSurface(in: Capsule(), isActive: isEditing, isEnabled: !isEditorLocked)
         .disabled(isEditorLocked)
         .help(Text(editModeButtonHelpText))
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     private var formatMenu: some View {
@@ -76,6 +76,8 @@ struct MainViewControlSection: View {
             }
             .buttonStyle(PlainButtonStyle())
             .accessibilityLabel(Text("editor.trim"))
+            .focusable(false)
+            .focusEffectDisabled()
 
             Rectangle()
                 .fill(formatButtonSeparatorColor)
@@ -111,18 +113,16 @@ struct MainViewControlSection: View {
             .menuIndicator(.hidden)
             .buttonStyle(PlainButtonStyle())
             .accessibilityLabel(Text("editor.format"))
+            .focusable(false)
+            .focusEffectDisabled()
         }
         .foregroundColor(formatButtonForegroundColor)
-        .background(formatButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(formatButtonBorderColor, lineWidth: 1)
-        )
-        .shadow(color: formatButtonShadowColor, radius: 4, y: 2)
+        .kippleControlSurface(in: Capsule(), isEnabled: !isFormatDisabled)
         .disabled(isFormatDisabled)
         .contentShape(Rectangle())
         .help(Text(formatButtonHelpText))
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     private var saveButton: some View {
@@ -134,19 +134,18 @@ struct MainViewControlSection: View {
         }
         .buttonStyle(PlainButtonStyle())
         .foregroundColor(saveButtonForegroundColor)
-        .background(saveButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(saveButtonBorderColor, lineWidth: 1)
-        )
-        .shadow(color: saveButtonShadowColor, radius: 4, y: 2)
+        .kippleControlSurface(in: Capsule(), isActive: !isSaveDisabled, isEnabled: !isSaveDisabled)
         .disabled(isSaveDisabled)
         .help(Text(saveButtonHelpText))
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     private var saveButtonLabel: some View {
         HStack(spacing: 4) {
+            Image(systemName: "tray.and.arrow.down")
+                .font(.system(size: 11, weight: .semibold))
+
             Text("editor.saveToHistory")
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
@@ -189,22 +188,9 @@ struct MainViewControlSection: View {
     private func shortcutBadge(_ text: String) -> some View {
         Text(text)
             .font(.caption)
-            .foregroundColor(.white)
+            .foregroundColor(.secondary)
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(Color.white.opacity(0.25))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-
-    private var primaryButtonBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.accentColor,
-                Color.accentColor.opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 
     private var isEditing: Bool {
@@ -227,6 +213,14 @@ struct MainViewControlSection: View {
         return isEditing ? "editor.mode.finishEditing" : "editor.mode.startEditing"
     }
 
+    private var editModeButtonIcon: String {
+        if isEditorLocked {
+            return "lock.fill"
+        }
+
+        return isEditing ? "checkmark" : "pencil"
+    }
+
     private var editModeButtonHelpText: LocalizedStringKey {
         isEditorLocked ? "editor.locked.help" : editModeButtonTitle
     }
@@ -235,73 +229,12 @@ struct MainViewControlSection: View {
         isEditing ? "ESC" : ""
     }
 
-    private var editModeButtonBackground: LinearGradient {
-        if isEditorLocked {
-            return lockedButtonBackground
-        }
-
-        if isEditing {
-            return dangerButtonBackground
-        }
-
-        return primaryButtonBackground
-    }
-
-    private var editModeButtonBorder: Color {
-        Color.white.opacity(0.15)
-    }
-
-    private var editModeButtonShadow: Color {
-        Color.black.opacity(0.12)
-    }
-
-    private var dangerButtonBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.red,
-                Color.red.opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var lockedButtonBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.secondary.opacity(0.45),
-                Color.secondary.opacity(0.32)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var disabledButtonBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(NSColor.controlBackgroundColor).opacity(0.88),
-                Color(NSColor.controlBackgroundColor).opacity(0.72)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var saveButtonBackground: LinearGradient {
-        isSaveDisabled ? disabledButtonBackground : primaryButtonBackground
+    private var editModeButtonForegroundColor: Color {
+        isEditorLocked ? Color.secondary.opacity(0.62) : .primary
     }
 
     private var saveButtonForegroundColor: Color {
-        isSaveDisabled ? Color.secondary.opacity(0.62) : Color.white
-    }
-
-    private var saveButtonBorderColor: Color {
-        isSaveDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
-    }
-
-    private var saveButtonShadowColor: Color {
-        isSaveDisabled ? Color.clear : Color.black.opacity(0.12)
+        isSaveDisabled ? Color.secondary.opacity(0.62) : .primary
     }
 
     private var saveButtonHelpText: LocalizedStringKey {
@@ -316,35 +249,12 @@ struct MainViewControlSection: View {
         return "editor.saveToHistory"
     }
     
-    private var formatButtonBackground: LinearGradient {
-        if isFormatDisabled {
-            return disabledButtonBackground
-        }
-
-        return LinearGradient(
-            colors: [
-                Color.green,
-                Color.green.opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     private var formatButtonForegroundColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.62) : Color.white
-    }
-
-    private var formatButtonBorderColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+        isFormatDisabled ? Color.secondary.opacity(0.62) : .primary
     }
 
     private var formatButtonSeparatorColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.16) : Color.white.opacity(0.25)
-    }
-
-    private var formatButtonShadowColor: Color {
-        isFormatDisabled ? Color.clear : Color.black.opacity(0.12)
+        isFormatDisabled ? Color.secondary.opacity(0.06) : Color.secondary.opacity(0.08)
     }
 
     private func toggleEditorMode() {

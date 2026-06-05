@@ -33,8 +33,8 @@ final class HistoryPopoverManager {
             controller = newController
         }
 
-        let panel = panel ?? makePanel(with: controller)
-        panel.contentViewController = controller
+        let panel = panel ?? makePanel()
+        install(controller, in: panel)
         hostingController = controller
         self.panel = panel
 
@@ -50,35 +50,17 @@ final class HistoryPopoverManager {
         let anchorRectOnScreen = window.convertToScreen(anchorRectInWindow)
 
         let spacing: CGFloat = 8
-        let visibleFrame = screen.visibleFrame
-
-        let hasSpaceOnRight = anchorRectOnScreen.maxX + spacing + fittingSize.width <= visibleFrame.maxX
-        let hasSpaceOnLeft = anchorRectOnScreen.minX - spacing - fittingSize.width >= visibleFrame.minX
-        let preferredTrailing = anchorRectOnScreen.midX <= visibleFrame.midX
-
-        let resolvedTrailing: Bool
-        switch (hasSpaceOnLeft, hasSpaceOnRight) {
-        case (false, true):
-            resolvedTrailing = true
-        case (true, false):
-            resolvedTrailing = false
-        case (true, true):
-            resolvedTrailing = preferredTrailing
-        default:
-            resolvedTrailing = trailingEdge
-        }
-
-        var origin = CGPoint(
-            x: resolvedTrailing ? anchorRectOnScreen.maxX + spacing
-                                 : anchorRectOnScreen.minX - fittingSize.width - spacing,
-            y: anchorRectOnScreen.maxY - fittingSize.height
+        let origin = popoverOrigin(
+            anchorRectOnScreen: anchorRectOnScreen,
+            fittingSize: fittingSize,
+            visibleFrame: screen.visibleFrame,
+            spacing: spacing,
+            fallbackTrailing: trailingEdge
         )
-
-        origin.x = max(visibleFrame.minX, min(origin.x, visibleFrame.maxX - fittingSize.width))
-        origin.y = max(visibleFrame.minY, min(origin.y, visibleFrame.maxY - fittingSize.height))
-
         let frame = NSRect(origin: origin, size: fittingSize)
         panel.setFrame(frame, display: true)
+        panel.alphaValue = 1.0
+        panel.invalidateShadow()
         panel.orderFront(nil)
     }
 
@@ -109,7 +91,7 @@ final class HistoryPopoverManager {
         anchorView = nil
     }
 
-    private func makePanel(with controller: NSHostingController<ClipboardItemPopover>) -> NSPanel {
+    private func makePanel() -> NSPanel {
         let panel = NSPanel(contentRect: .zero,
                             styleMask: [.nonactivatingPanel, .borderless],
                             backing: .buffered,
@@ -118,11 +100,132 @@ final class HistoryPopoverManager {
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.hasShadow = true
+        panel.alphaValue = 1.0
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.collectionBehavior = [.transient, .ignoresCycle]
-        panel.contentViewController = controller
         panel.ignoresMouseEvents = false
         return panel
+    }
+
+    private final class GlassContainerView: NSView {
+        let contentHost = NSView()
+        private let cornerRadius: CGFloat
+
+        init(cornerRadius: CGFloat) {
+            self.cornerRadius = cornerRadius
+            super.init(frame: .zero)
+            wantsLayer = true
+            layer?.backgroundColor = NSColor.clear.cgColor
+            layer?.cornerRadius = cornerRadius
+            layer?.cornerCurve = .continuous
+            layer?.masksToBounds = true
+            contentHost.translatesAutoresizingMaskIntoConstraints = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder _: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func layout() {
+            super.layout()
+            layer?.cornerRadius = cornerRadius
+        }
+    }
+
+    private func popoverOrigin(
+        anchorRectOnScreen: NSRect,
+        fittingSize: NSSize,
+        visibleFrame: NSRect,
+        spacing: CGFloat,
+        fallbackTrailing: Bool
+    ) -> CGPoint {
+        let hasSpaceOnRight = anchorRectOnScreen.maxX + spacing + fittingSize.width <= visibleFrame.maxX
+        let hasSpaceOnLeft = anchorRectOnScreen.minX - spacing - fittingSize.width >= visibleFrame.minX
+        let preferredTrailing = anchorRectOnScreen.midX <= visibleFrame.midX
+
+        let resolvedTrailing: Bool
+        switch (hasSpaceOnLeft, hasSpaceOnRight) {
+        case (false, true):
+            resolvedTrailing = true
+        case (true, false):
+            resolvedTrailing = false
+        case (true, true):
+            resolvedTrailing = preferredTrailing
+        default:
+            resolvedTrailing = fallbackTrailing
+        }
+
+        var origin = CGPoint(
+            x: resolvedTrailing ? anchorRectOnScreen.maxX + spacing
+                                 : anchorRectOnScreen.minX - fittingSize.width - spacing,
+            y: anchorRectOnScreen.maxY - fittingSize.height
+        )
+        origin.x = max(visibleFrame.minX, min(origin.x, visibleFrame.maxX - fittingSize.width))
+        origin.y = max(visibleFrame.minY, min(origin.y, visibleFrame.maxY - fittingSize.height))
+        return origin
+    }
+
+    private func install(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
+        controller.view.wantsLayer = true
+        controller.view.layer?.backgroundColor = NSColor.clear.cgColor
+        controller.view.layer?.cornerRadius = 18
+        controller.view.layer?.cornerCurve = .continuous
+        controller.view.layer?.masksToBounds = true
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+
+        if #available(macOS 26.0, *) {
+            installGlass(controller, in: panel)
+        } else {
+            installMaterial(controller, in: panel)
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private func installGlass(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
+        let container = GlassContainerView(cornerRadius: 18)
+        let glassView = NSGlassEffectView()
+        glassView.style = .clear
+        glassView.cornerRadius = 18
+        glassView.tintColor = nil
+        glassView.translatesAutoresizingMaskIntoConstraints = false
+        glassView.wantsLayer = true
+        glassView.layer?.cornerRadius = 18
+        glassView.layer?.cornerCurve = .continuous
+        glassView.layer?.masksToBounds = true
+        glassView.contentView = controller.view
+        container.addSubview(glassView)
+        pin(glassView, to: container)
+        panel.contentView = container
+        panel.contentViewController = nil
+    }
+
+    private func installMaterial(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
+        let container = GlassContainerView(cornerRadius: 18)
+        let materialView = NSVisualEffectView()
+        materialView.blendingMode = .behindWindow
+        materialView.material = .popover
+        materialView.state = .active
+        materialView.translatesAutoresizingMaskIntoConstraints = false
+        materialView.wantsLayer = true
+        materialView.layer?.cornerRadius = 18
+        materialView.layer?.cornerCurve = .continuous
+        materialView.layer?.masksToBounds = true
+        materialView.addSubview(controller.view)
+        container.addSubview(materialView)
+        pin(materialView, to: container)
+        pin(controller.view, to: materialView)
+        panel.contentView = container
+        panel.contentViewController = nil
+    }
+
+    private func pin(_ child: NSView, to parent: NSView) {
+        NSLayoutConstraint.activate([
+            child.leadingAnchor.constraint(equalTo: parent.leadingAnchor),
+            child.trailingAnchor.constraint(equalTo: parent.trailingAnchor),
+            child.topAnchor.constraint(equalTo: parent.topAnchor),
+            child.bottomAnchor.constraint(equalTo: parent.bottomAnchor)
+        ])
     }
 }

@@ -17,15 +17,10 @@ extension SimpleLineNumberRulerView {
         guard !dirtyRect.isEmpty else { return }
 
         drawBackground(in: dirtyRect)
-        drawBorder(in: dirtyRect)
-
         let (fontSize, textAttributes) = setupFontAttributes(textView: textView)
         let fullText = textView.string as NSString
 
         if fullText.length == 0 {
-            if textView.isEditable {
-                drawEmptyTextHighlight(textView: textView)
-            }
             drawEmptyTextLineNumber(
                 textView: textView,
                 layoutManager: layoutManager,
@@ -64,6 +59,7 @@ extension SimpleLineNumberRulerView {
     }
 
     func drawBackground(in rect: NSRect) {
+        guard backgroundColor.alphaComponent > 0 else { return }
         backgroundColor.set()
         rect.fill()
     }
@@ -73,29 +69,11 @@ extension SimpleLineNumberRulerView {
         layoutManager: NSLayoutManager,
         fullText: NSString
     ) {
-        guard textView.isEditable else { return }
-
-        let selectedRange = textView.selectedRange()
-        let selectedLineNumber = calculateSelectedLineNumber(
-            fullText: fullText,
-            selectedRange: selectedRange
-        )
-
-        drawSelectedLineBackground(
-            textView: textView,
-            layoutManager: layoutManager,
-            fullText: fullText,
-            selectedLineNumber: selectedLineNumber
-        )
+        return
     }
 
     func drawBorder(in rect: NSRect) {
-        NSColor.separatorColor.set()
-        let borderPath = NSBezierPath()
-        borderPath.move(to: NSPoint(x: ruleThickness - 0.5, y: 0))
-        borderPath.line(to: NSPoint(x: ruleThickness - 0.5, y: rect.height))
-        borderPath.lineWidth = 1.0
-        borderPath.stroke()
+        return
     }
 
     func setupFontAttributes(textView: NSTextView) -> (CGFloat, [NSAttributedString.Key: Any]) {
@@ -104,29 +82,14 @@ extension SimpleLineNumberRulerView {
 
         let textAttributes: [NSAttributedString.Key: Any] = [
             .font: lineNumberFont,
-            .foregroundColor: NSColor.secondaryLabelColor
+            .foregroundColor: NSColor.secondaryLabelColor.withAlphaComponent(0.72)
         ]
 
         return (fontSize, textAttributes)
     }
 
     func drawEmptyTextHighlight(textView: NSTextView) {
-        let containerOrigin = textView.textContainerOrigin
-        let textContainerInset = textView.textContainerInset
-        let visibleRect = textView.visibleRect
-
-        let lineY = containerOrigin.y - visibleRect.origin.y
-        let adjustedHeight = fixedLineHeight - textContainerInset.height * 2
-        let adjustedY = lineY + textContainerInset.height
-
-        NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
-        let path = NSBezierPath(rect: NSRect(
-            x: 0,
-            y: adjustedY,
-            width: ruleThickness,
-            height: adjustedHeight
-        ))
-        path.fill()
+        return
     }
 
     func drawEmptyTextLineNumber(

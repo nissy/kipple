@@ -28,11 +28,11 @@ struct SettingsView: View {
     private var content: some View {
         VStack(spacing: 0) {
             toolbar
-            Divider()
             tabContent
                 .id(activeTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .frame(minWidth: 420, idealWidth: 480, maxWidth: 560, alignment: .topLeading)
         .background(glassBackground)
         .animation(nil, value: activeTab)
@@ -96,20 +96,15 @@ struct SettingsView: View {
         .padding(.top, 8)
         .padding(.bottom, 6)
         .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(NSColor.windowBackgroundColor).opacity(0.95),
-                    Color(NSColor.windowBackgroundColor).opacity(0.86)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+        .kippleLiquidGlass(
+            in: Rectangle(),
+            fallbackFill: Color.white.opacity(0.06),
+            strokeColor: Color.white.opacity(0.1)
         )
     }
 
     private var glassBackground: some View {
-        Color(NSColor.windowBackgroundColor)
+        Color.clear.kippleLiquidWindowBackground()
     }
 }
 
@@ -122,17 +117,15 @@ private struct SettingsToolbarButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 2) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(backgroundColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(borderColor, lineWidth: isSelected ? 1 : 0)
-                    )
+                Image(systemName: tab.symbolName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(iconColor)
                     .frame(width: 32, height: 32)
-                    .overlay(
-                        Image(systemName: tab.symbolName)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(iconColor)
+                    .kippleLiquidGlass(
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous),
+                        tint: nil,
+                        fallbackFill: Color.white.opacity(isSelected ? 0.08 : 0.06),
+                        strokeColor: Color.white.opacity(isSelected ? 0.18 : 0.1)
                     )
 
                 Text(tab.localizedTitleKey)
@@ -151,20 +144,15 @@ private struct SettingsToolbarButton: View {
     }
 
     private var backgroundColor: Color {
-        if isSelected {
-            return tab.accentColor.opacity(controlActiveState == .inactive ? 0.12 : 0.16)
-        } else {
-            return Color.secondary.opacity(controlActiveState == .inactive ? 0.06 : 0.1)
-        }
+        Color.white.opacity(isSelected ? 0.08 : 0.06)
     }
 
     private var borderColor: Color {
-        guard isSelected else { return Color.clear }
-        return tab.accentColor.opacity(controlActiveState == .inactive ? 0.2 : 0.35)
+        isSelected ? Color.white.opacity(0.18) : Color.white.opacity(0.1)
     }
 
     private var iconColor: Color {
-        isSelected ? tab.accentColor : Color.secondary
+        isSelected ? Color.primary : Color.secondary
     }
 
     private var labelColor: Color {

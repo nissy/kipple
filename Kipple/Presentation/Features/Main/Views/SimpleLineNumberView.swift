@@ -25,18 +25,18 @@ struct SimpleLineNumberView: NSViewRepresentable {
 
     private var editorBackgroundColor: NSColor {
         isEditable
-            ? NSColor.textBackgroundColor
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.12)
             : displayModeBackgroundColor
     }
 
     private var displayModeBackgroundColor: NSColor {
-        NSColor(calibratedWhite: 250.0 / 255.0, alpha: 1.0)
+        NSColor(calibratedWhite: 1.0, alpha: 0.08)
     }
 
     private var editorTextColor: NSColor {
         isEditable
             ? NSColor.labelColor
-            : NSColor.secondaryLabelColor
+            : NSColor.labelColor.withAlphaComponent(0.82)
     }
     
     func makeNSView(context: Context) -> NSScrollView {
@@ -70,7 +70,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         // カスタムルーラービューを設定
         let lineNumberView = SimpleLineNumberRulerView(textView: textView)
         lineNumberView.fixedLineHeight = lineHeight // 固定行高を渡す
-        lineNumberView.backgroundColor = editorBackgroundColor
+        lineNumberView.backgroundColor = .clear
         scrollView.verticalRulerView = lineNumberView
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = true
@@ -210,6 +210,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.smartInsertDeleteEnabled = false
         textView.backgroundColor = editorBackgroundColor
         textView.textColor = editorTextColor
+        textView.drawsBackground = false
         
         // CotEditorから学んだ重要な設定
         textView.layoutManager?.usesFontLeading = false
@@ -250,15 +251,21 @@ struct SimpleLineNumberView: NSViewRepresentable {
     }
 
     private func applyEditorBackground(to scrollView: NSScrollView, textView: NSTextView) {
-        let backgroundColor = editorBackgroundColor
-        textView.drawsBackground = true
-        textView.backgroundColor = backgroundColor
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = backgroundColor
-        scrollView.contentView.backgroundColor = backgroundColor
+        textView.wantsLayer = true
+        textView.layer?.backgroundColor = NSColor.clear.cgColor
+        textView.drawsBackground = false
+        textView.backgroundColor = .clear
+        scrollView.wantsLayer = true
+        scrollView.layer?.backgroundColor = NSColor.clear.cgColor
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+        scrollView.contentView.wantsLayer = true
+        scrollView.contentView.layer?.backgroundColor = NSColor.clear.cgColor
+        scrollView.contentView.drawsBackground = false
+        scrollView.contentView.backgroundColor = .clear
 
         if let rulerView = scrollView.verticalRulerView as? SimpleLineNumberRulerView {
-            rulerView.backgroundColor = backgroundColor
+            rulerView.backgroundColor = .clear
         }
     }
 

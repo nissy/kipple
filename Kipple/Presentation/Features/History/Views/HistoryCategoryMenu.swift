@@ -79,14 +79,28 @@ struct HistoryCategoryMenu: View {
         let iconName = current.map { store.iconName(for: $0) } ?? item.category.icon
         return ZStack {
             Capsule()
-                .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
                 .frame(width: 36, height: 24)
 
             Image(systemName: iconName)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .foregroundColor(iconColor)
                 .frame(width: 16, height: 16)
         }
+    }
+
+    private var iconColor: Color {
+        if item.userCategoryId == store.urlCategoryId() ||
+            (item.userCategoryId == nil && item.category == .url) {
+            return .blue
+        }
+
+        if let userCategoryId = item.userCategoryId,
+           userCategoryId != store.noneCategoryId() {
+            return .accentColor
+        }
+
+        return isSelected ? .primary : .secondary
     }
 
     private func categoryMenuRow(name: String, systemImage: String, selected: Bool) -> some View {

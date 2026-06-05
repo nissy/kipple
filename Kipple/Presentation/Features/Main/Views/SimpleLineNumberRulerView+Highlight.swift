@@ -134,7 +134,7 @@ extension SimpleLineNumberRulerView {
                 let adjustedHeight = self.fixedLineHeight - textContainerInset.height * 2
                 let adjustedY = lineY + textContainerInset.height
 
-                NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
+                NSColor.selectedTextBackgroundColor.withAlphaComponent(0.12).set()
                 let path = NSBezierPath(rect: NSRect(
                     x: 0,
                     y: adjustedY,
@@ -187,7 +187,7 @@ extension SimpleLineNumberRulerView {
         let adjustedHeight = self.fixedLineHeight - textContainerInset.height * 2
         let adjustedY = lineY + textContainerInset.height
 
-        NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
+        NSColor.selectedTextBackgroundColor.withAlphaComponent(0.12).set()
         let path = NSBezierPath(rect: NSRect(
             x: 0,
             y: adjustedY,

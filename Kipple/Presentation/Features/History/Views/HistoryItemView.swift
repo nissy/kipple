@@ -144,8 +144,8 @@ struct HistoryItemView: View {
         if let queueBadge {
             let isActiveBadge = queueBadge > 0
             let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
-            let badgeBackground = isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1)
-            let badgeForeground = isActiveBadge ? Color.white : Color.secondary
+            let badgeBackground = isActiveBadge ? Color.primary.opacity(0.08) : Color.clear
+            let badgeForeground = isActiveBadge ? Color.primary : Color.secondary
 
             Text(badgeText)
                 .font(.system(size: 11, weight: .semibold))
@@ -173,33 +173,15 @@ struct HistoryItemView: View {
     private var backgroundView: some View {
         let baseFill: AnyShapeStyle
         if isSelected {
-            baseFill = AnyShapeStyle(LinearGradient(
-                colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ))
+            baseFill = AnyShapeStyle(Color.primary.opacity(0.08))
         } else if isQueuePreviewed {
-            baseFill = AnyShapeStyle(Color.accentColor.opacity(0.25))
+            baseFill = AnyShapeStyle(Color.primary.opacity(0.05))
         } else {
-            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHoverActive ? 0.5 : 0.2))
+            baseFill = AnyShapeStyle(Color.primary.opacity(isHoverActive ? 0.04 : 0))
         }
 
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(baseFill)
-            .overlay {
-                if isHoverActive && !isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
-                } else if isQueuePreviewed && !isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
-                }
-            }
-            .shadow(
-                color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
-                radius: isSelected ? 8 : 0,
-                y: isSelected ? 4 : 0
-            )
     }
 
     private var pinButton: some View {
@@ -225,11 +207,11 @@ struct HistoryItemView: View {
         if item.isActionable {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
                     .frame(width: 22, height: 22)
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isSelected ? .primary : .secondary)
             }
             .frame(width: 22, height: 22)
             .contentShape(Circle())
@@ -238,11 +220,11 @@ struct HistoryItemView: View {
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                    .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
                     .frame(width: 22, height: 22)
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isSelected ? .primary : .secondary)
             }
             .frame(width: 22, height: 22)
             .contentShape(Circle())
@@ -264,11 +246,11 @@ struct HistoryItemView: View {
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .foregroundColor(isSelected ? .primary : .secondary)
                 .frame(width: 22, height: 22)
                 .background(
                     Circle()
-                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                        .fill(isSelected ? Color.primary.opacity(0.08) : Color.clear)
                 )
         }
     }
@@ -280,7 +262,7 @@ struct HistoryItemView: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .underline(isLinkActive, color: linkColor)
-            .foregroundColor(isLinkActive ? linkColor : (isSelected ? .white : .primary))
+            .foregroundColor(isLinkActive ? linkColor : .primary)
             .padding(.vertical, 3)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -374,7 +356,7 @@ struct HistoryItemView: View {
 
     // MARK: - Pin helper properties
     var pinButtonBackground: Color {
-        item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1)
+        item.isPinned ? Color.accentColor.opacity(0.10) : Color.clear
     }
 
     var pinButtonIcon: String {
@@ -382,7 +364,7 @@ struct HistoryItemView: View {
     }
 
     var pinButtonForeground: Color {
-        item.isPinned ? .white : .secondary
+        item.isPinned ? .accentColor : .secondary
     }
 
     var pinButtonRotation: Double {
