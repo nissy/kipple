@@ -39,9 +39,11 @@ struct MainViewEditorSection: View {
                 ) { offset in
                     scrollOffset = offset
                 }
-                .padding(.trailing, clearButtonInset)
+                .padding(.trailing, isTextEditable ? clearButtonInset : 0)
 
-                clearEditorButton
+                if isTextEditable {
+                    clearEditorButton
+                }
             }
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -114,11 +116,10 @@ struct MainViewEditorSection: View {
         Button(action: onClear) {
             Image(systemName: "xmark.circle.fill")
                 .font(MainViewMetrics.BottomBar.clearIconFont)
-                .foregroundColor(.secondary.opacity(isLocked ? 0.25 : 0.6))
-                .scaleEffect(hoveredClearButton && !isLocked ? 1.1 : 1.0)
+                .foregroundColor(.secondary.opacity(0.6))
+                .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(isLocked)
         .padding(.trailing, 8)
         .padding(.bottom, 6)
         .help(Text(clearHelpText))
@@ -128,6 +129,6 @@ struct MainViewEditorSection: View {
     }
 
     private var clearHelpText: LocalizedStringKey {
-        isLocked ? "editor.locked.help" : "Clear live editor"
+        "Clear live editor"
     }
 }

@@ -46,7 +46,7 @@ struct MainViewControlSection: View {
                     .fixedSize(horizontal: true, vertical: false)
 
                 if !editModeShortcut.isEmpty {
-                    shortcutBadge(editModeShortcut)
+                    shortcutBadge(editModeShortcut, isEnabled: !isEditorLocked)
                 }
             }
                 .padding(.horizontal, KippleButtonMetrics.editorControlHorizontalPadding)
@@ -161,20 +161,24 @@ struct MainViewControlSection: View {
 
             let shortcut = getShortcutKeyDisplay()
             if !shortcut.isEmpty {
-                shortcutBadge(shortcut)
+                shortcutBadge(shortcut, isEnabled: !isSaveDisabled)
             }
         }
         .accessibilityElement()
         .accessibilityLabel(Text("editor.saveToHistory"))
     }
 
-    private func shortcutBadge(_ text: String) -> some View {
+    private func shortcutBadge(_ text: String, isEnabled: Bool = true) -> some View {
         Text(text)
             .font(.caption)
-            .foregroundColor(.white)
+            .foregroundColor(isEnabled ? .white : disabledEditorControlForeground)
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(Color.white.opacity(0.25))
+            .background(
+                isEnabled
+                ? Color.white.opacity(0.25)
+                : Color.secondary.opacity(0.08)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 
@@ -269,8 +273,8 @@ struct MainViewControlSection: View {
     private var disabledButtonBackground: LinearGradient {
         LinearGradient(
             colors: [
-                Color(NSColor.controlBackgroundColor).opacity(0.88),
-                Color(NSColor.controlBackgroundColor).opacity(0.72)
+                Color.secondary.opacity(0.09),
+                Color.secondary.opacity(0.055)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -282,11 +286,11 @@ struct MainViewControlSection: View {
     }
 
     private var saveButtonForegroundColor: Color {
-        isSaveDisabled ? KippleButtonAppearance.disabledForeground : Color.white
+        isSaveDisabled ? disabledEditorControlForeground : Color.white
     }
 
     private var saveButtonBorderColor: Color {
-        isSaveDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+        isSaveDisabled ? disabledEditorControlBorder : Color.white.opacity(0.15)
     }
 
     private var saveButtonShadowColor: Color {
@@ -321,19 +325,27 @@ struct MainViewControlSection: View {
     }
 
     private var formatButtonForegroundColor: Color {
-        isFormatDisabled ? KippleButtonAppearance.disabledForeground : Color.white
+        isFormatDisabled ? disabledEditorControlForeground : Color.white
     }
 
     private var formatButtonBorderColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+        isFormatDisabled ? disabledEditorControlBorder : Color.white.opacity(0.15)
     }
 
     private var formatButtonSeparatorColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.16) : Color.white.opacity(0.25)
+        isFormatDisabled ? Color.secondary.opacity(0.10) : Color.white.opacity(0.25)
     }
 
     private var formatButtonShadowColor: Color {
         isFormatDisabled ? Color.clear : Color.black.opacity(0.12)
+    }
+
+    private var disabledEditorControlForeground: Color {
+        Color.secondary.opacity(0.46)
+    }
+
+    private var disabledEditorControlBorder: Color {
+        Color.secondary.opacity(0.09)
     }
 
     private func toggleEditorMode() {
