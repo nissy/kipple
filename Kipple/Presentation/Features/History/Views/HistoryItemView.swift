@@ -144,11 +144,15 @@ struct HistoryItemView: View {
         if let queueBadge {
             let isActiveBadge = queueBadge > 0
             let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
-            let badgeBackground = isActiveBadge ? Color.primary.opacity(0.05) : Color.clear
-            let badgeForeground = isActiveBadge ? Color.primary : Color.secondary
+            let badgeBackground = isActiveBadge
+                ? MainViewMetrics.HistoryQueueBadge.activeFill
+                : MainViewMetrics.HistoryQueueBadge.inactiveFill
+            let badgeForeground = isActiveBadge
+                ? MainViewMetrics.HistoryQueueBadge.activeForeground
+                : MainViewMetrics.HistoryQueueBadge.inactiveForeground
 
             Text(badgeText)
-                .font(.system(size: 11, weight: .semibold))
+                .font(MainViewMetrics.HistoryQueueBadge.font)
                 .foregroundColor(badgeForeground)
                 .frame(
                     width: MainViewMetrics.HistoryColumns.rowControlSize,
@@ -288,7 +292,7 @@ struct HistoryItemView: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .underline(isLinkActive, color: linkColor)
-            .foregroundColor(isLinkActive ? linkColor : .primary)
+            .foregroundColor(isLinkActive ? linkColor : MainViewMetrics.TextColor.primary)
             .padding(.vertical, 3)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)

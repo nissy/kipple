@@ -8,6 +8,11 @@
 import SwiftUI
 
 enum MainViewMetrics {
+    enum TextColor {
+        static let primary = Color(.sRGB, red: 0.2, green: 0.2, blue: 0.2, opacity: 1)
+        static let primaryNSColor = NSColor(calibratedWhite: 0.2, alpha: 1)
+    }
+
     enum TitleBar {
         static let buttonSize: CGFloat = KippleButtonMetrics.toolbarSize
         static let iconFont: Font = .system(size: 12, weight: .medium)
@@ -52,6 +57,14 @@ enum MainViewMetrics {
         static func font(size: CGFloat, weight: Font.Weight = .medium) -> Font {
             .system(size: size, weight: weight)
         }
+    }
+
+    enum HistoryQueueBadge {
+        static let font: Font = .system(size: 11, weight: .semibold)
+        static let activeFill = KippleButtonAppearance.inactivePillFill
+        static let inactiveFill = Color.clear
+        static let activeForeground = TextColor.primary
+        static let inactiveForeground = KippleButtonAppearance.inactiveForeground
     }
 
     enum Notification {

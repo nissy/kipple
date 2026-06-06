@@ -383,7 +383,7 @@ struct MainViewHistorySection: View {
                 TextField("Search", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(Font(fontManager.historyFont))
-                    .foregroundColor(.primary)
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
 
                 if !searchText.isEmpty {
                     Button(action: {

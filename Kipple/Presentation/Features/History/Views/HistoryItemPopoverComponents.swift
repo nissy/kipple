@@ -39,7 +39,7 @@ struct ClipboardItemPopover: View {
 
             Text(verbatim: previewText)
                 .font(Font(fontManager.historyFont))
-                .foregroundColor(.primary)
+                .foregroundColor(MainViewMetrics.TextColor.primary)
                 .lineSpacing(4)
                 .lineLimit(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -67,7 +67,7 @@ struct ClipboardItemPopover: View {
                     .foregroundColor(categoryInfo.color)
                 Text(verbatim: categoryInfo.name)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
@@ -84,7 +84,7 @@ struct ClipboardItemPopover: View {
                                 .foregroundColor(.accentColor)
                             Text(localizedAppName(appName))
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.primary)
+                                .foregroundColor(MainViewMetrics.TextColor.primary)
                         }
                     }
 
@@ -113,6 +113,7 @@ struct ClipboardItemPopover: View {
                     .foregroundColor(.secondary)
                 Text("\(item.characterCount)")
                     .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -121,6 +122,7 @@ struct ClipboardItemPopover: View {
                     .foregroundColor(.secondary)
                 Text(item.formattedTimestamp)
                     .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
                     .lineLimit(1)
             }
 
