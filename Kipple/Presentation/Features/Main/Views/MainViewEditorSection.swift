@@ -92,7 +92,7 @@ struct MainViewEditorSection: View {
 
     private var editorFieldFillColor: Color {
         if isTextEditable {
-            return Color.primary.opacity(0.032)
+            return Color(NSColor.textBackgroundColor).opacity(0.42)
         }
 
         return Color.primary.opacity(0.014)

@@ -50,6 +50,7 @@
 		337C50B780D7336D0ADA014B /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = D1689DF9D1CDB74E6322EF09 /* Localizable.strings */; };
 		34349FD5887B68716C6136E7 /* InternalClearExternalCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3F24D6851521E2B85EA282F /* InternalClearExternalCopyTests.swift */; };
 		38541710930127A075D18A53 /* CategoryClassifierCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF072F45BDF85E6C67D65531 /* CategoryClassifierCache.swift */; };
+		3905DF20E1D9C757C1ACE4E1 /* GlassDesignConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31469731A21B1F90261C739F /* GlassDesignConstants.swift */; };
 		3964413F83D1FEED4AA6E6C6 /* ClipboardRepositoryProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3130A617C51A0E02B110D8B5 /* ClipboardRepositoryProtocol.swift */; };
 		39F3DC5D7C95BBB84AB518FE /* ManageCategoriesButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 381FF9CEF8F860091FE91A61 /* ManageCategoriesButton.swift */; };
 		3D24378F7BDE4777E8E23CA4 /* MainViewModelSaveEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9313A736408C85DBBA98F8 /* MainViewModelSaveEditorTests.swift */; };
@@ -57,6 +58,7 @@
 		3F055E4767378CD68AA83E39 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB7B799720062D0F0A7B124 /* SettingsView.swift */; };
 		427F1FD66D8D46E661D2F049 /* MenuBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */; };
 		4550283FA1F4FA3B9CD5465E /* ModifierKeyPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5D167446E2D7AC69CFBC50 /* ModifierKeyPicker.swift */; };
+		458D67EFB61C8764D7200B7E /* GlassWindowContentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */; };
 		45AD6ABE24D83994D0581BAD /* PerformanceTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDB4B487C65FB7AD3BAC2638 /* PerformanceTrace.swift */; };
 		48D29A126052E1EBBB3A7229 /* ModernClipboardServiceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C58001947462F24A05B563 /* ModernClipboardServiceAdapter.swift */; };
 		4BDE12BA520CAB893292A359 /* SimpleLineNumberSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521450FFCC0BA6B6EDA813C3 /* SimpleLineNumberSupport.swift */; };
@@ -210,6 +212,7 @@
 		0F5147540CFEA499BC47D2B4 /* InternalOperationFlagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalOperationFlagTests.swift; sourceTree = "<group>"; };
 		10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchableFontPicker.swift; sourceTree = "<group>"; };
 		11352CAF753DC8E9F7C402DA /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
+		11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWindowContentController.swift; sourceTree = "<group>"; };
 		141F74397BC94FC87C361325 /* HistoryLimitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLimitTests.swift; sourceTree = "<group>"; };
 		14D69BC2609666CEE0808F3C /* SwiftDataRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositoryTests.swift; sourceTree = "<group>"; };
 		163B51E969EDBC688D6AD83E /* RecopyHistoryUpdateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecopyHistoryUpdateTests.swift; sourceTree = "<group>"; };
@@ -232,6 +235,7 @@
 		306656767496DF766095D811 /* ModernClipboardServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceTests.swift; sourceTree = "<group>"; };
 		3130A617C51A0E02B110D8B5 /* ClipboardRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardRepositoryProtocol.swift; sourceTree = "<group>"; };
 		313C2DE548F71294936CF09C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		31469731A21B1F90261C739F /* GlassDesignConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassDesignConstants.swift; sourceTree = "<group>"; };
 		31D5369E6F3C814F606861FF /* ClipItemEqualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipItemEqualityTests.swift; sourceTree = "<group>"; };
 		34031FD79B64E2B231396C7D /* IsolatedSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatedSettingsTests.swift; sourceTree = "<group>"; };
 		345D0EB535CE8BC2BFEB706E /* WindowBehaviorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBehaviorTests.swift; sourceTree = "<group>"; };
@@ -436,6 +440,7 @@
 			isa = PBXGroup;
 			children = (
 				FA12870223E68802EBD570A8 /* CategoryManagerWindowCoordinator.swift */,
+				11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */,
 				E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */,
 				AEFEE2E4DBEE84E717957C1A /* TextCaptureHotkeyManager.swift */,
 				C9ED909BCBE92C9FDBF3BCA1 /* UserCategoryStore.swift */,
@@ -491,6 +496,7 @@
 			isa = PBXGroup;
 			children = (
 				897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */,
+				31469731A21B1F90261C739F /* GlassDesignConstants.swift */,
 				97FA020C5A7CC371A552A059 /* LaunchAtLogin.swift */,
 				744EFD983380BA9F4014C37E /* Logger.swift */,
 			);
@@ -1136,6 +1142,8 @@
 				944B0CDE4FFC844F790F44D8 /* FontNameMappings.swift in Sources */,
 				919E67E084CDE81E36F92C5A /* FontSettings.swift in Sources */,
 				D756FBE1A9DB7DC26355B941 /* GeneralSettingsView.swift in Sources */,
+				3905DF20E1D9C757C1ACE4E1 /* GlassDesignConstants.swift in Sources */,
+				458D67EFB61C8764D7200B7E /* GlassWindowContentController.swift in Sources */,
 				A67CF7455D3C77FFE6FF4167 /* HistoryActionKeyMonitor.swift in Sources */,
 				3170C40F0D335A3A2C408A51 /* HistoryCategoryMenu.swift in Sources */,
 				C51B1B3F901D602D9A26EF2C /* HistoryItemPopoverComponents.swift in Sources */,

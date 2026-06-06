@@ -59,21 +59,21 @@ private final class MainGlassContentController<Content: View>: NSViewController 
     }
 
     override func loadView() {
-        let container = RoundedMaskContainerView(cornerRadius: 24)
+        let container = RoundedMaskContainerView(cornerRadius: KippleGlassMetrics.windowCornerRadius)
 
         let glassView = NSGlassEffectView()
         glassView.style = .regular
-        glassView.cornerRadius = 24
+        glassView.cornerRadius = KippleGlassMetrics.windowCornerRadius
         glassView.tintColor = nil
         glassView.translatesAutoresizingMaskIntoConstraints = false
         glassView.wantsLayer = true
-        glassView.layer?.cornerRadius = 24
+        glassView.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
         glassView.layer?.cornerCurve = .continuous
         glassView.layer?.masksToBounds = true
 
         hostingController.view.wantsLayer = true
         hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
-        hostingController.view.layer?.cornerRadius = 24
+        hostingController.view.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
         hostingController.view.layer?.cornerCurve = .continuous
         hostingController.view.layer?.masksToBounds = true
         glassView.contentView = hostingController.view
@@ -105,7 +105,7 @@ private final class MainMaterialContentController<Content: View>: NSViewControll
     }
 
     override func loadView() {
-        let container = RoundedMaskContainerView(cornerRadius: 24)
+        let container = RoundedMaskContainerView(cornerRadius: KippleGlassMetrics.windowCornerRadius)
 
         let materialView = NSVisualEffectView()
         materialView.blendingMode = .behindWindow
@@ -113,7 +113,7 @@ private final class MainMaterialContentController<Content: View>: NSViewControll
         materialView.state = .active
         materialView.translatesAutoresizingMaskIntoConstraints = false
         materialView.wantsLayer = true
-        materialView.layer?.cornerRadius = 24
+        materialView.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
         materialView.layer?.cornerCurve = .continuous
         materialView.layer?.masksToBounds = true
 
@@ -197,7 +197,6 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
     }
     private var preventAutoClose = false
-    private let referenceScreenshotPixelSize = NSSize(width: 750, height: 1500)
     
     // Observers
     private var windowObserver: NSObjectProtocol?
@@ -488,35 +487,68 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func configureWindowSize(_ window: NSWindow) {
-        let savedHeight = UserDefaults.standard.double(forKey: "windowHeight")
-        let savedWidth = UserDefaults.standard.double(forKey: "windowWidth")
-        let minimumSize = resolvedMinimumWindowSize(for: window)
-        let defaultWidth: CGFloat = minimumSize.width
-        let defaultHeight: CGFloat = minimumSize.height
-        let resolvedWidth = max(savedWidth > 0 ? CGFloat(savedWidth) : defaultWidth, minimumSize.width)
-        let resolvedHeight = max(savedHeight > 0 ? CGFloat(savedHeight) : defaultHeight, minimumSize.height)
-        window.setContentSize(NSSize(width: resolvedWidth, height: resolvedHeight))
+        let defaults = UserDefaults.standard
+        let savedHeight = defaults.double(forKey: "windowHeight")
+        let savedWidth = defaults.double(forKey: "windowWidth")
+        let minimumSize = KippleGlassMetrics.mainWindowMinimumSize
+        let maximumSize = KippleGlassMetrics.mainWindowMaximumSize
+        let defaultSize = KippleGlassMetrics.mainWindowDefaultSize
+        let shouldResetSavedSize = shouldResetOversizedMainWindow(
+            savedWidth: savedWidth,
+            savedHeight: savedHeight,
+            defaults: defaults
+        )
+        let resolvedWidth = clamp(
+            savedWidth > 0 && !shouldResetSavedSize ? CGFloat(savedWidth) : defaultSize.width,
+            min: minimumSize.width,
+            max: maximumSize.width
+        )
+        let resolvedHeight = clamp(
+            savedHeight > 0 && !shouldResetSavedSize ? CGFloat(savedHeight) : defaultSize.height,
+            min: minimumSize.height,
+            max: maximumSize.height
+        )
         window.contentMinSize = minimumSize
+        window.contentMaxSize = maximumSize
         window.minSize = minimumSize
-        let maxWidth = max(CGFloat(800), minimumSize.width)
-        let maxHeight = max(CGFloat(1200), minimumSize.height)
-        window.maxSize = NSSize(width: maxWidth, height: maxHeight)
+        window.maxSize = maximumSize
+        window.setContentSize(NSSize(width: resolvedWidth, height: resolvedHeight))
+    }
+
+    private func shouldResetOversizedMainWindow(
+        savedWidth: Double,
+        savedHeight: Double,
+        defaults: UserDefaults
+    ) -> Bool {
+        let migrationKey = "mainWindowOversizedSizeMigrated"
+        guard !defaults.bool(forKey: migrationKey) else {
+            return false
+        }
+
+        let threshold = KippleGlassMetrics.mainWindowOversizedMigrationThreshold
+        let isOversized = savedWidth >= threshold.width || savedHeight >= threshold.height
+        defaults.set(true, forKey: migrationKey)
+        guard isOversized else {
+            return false
+        }
+
+        let defaultSize = KippleGlassMetrics.mainWindowDefaultSize
+        defaults.set(defaultSize.width, forKey: "windowWidth")
+        defaults.set(defaultSize.height, forKey: "windowHeight")
+        return true
     }
 
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        let minimumSize = resolvedMinimumWindowSize(for: sender)
+        let minimumSize = KippleGlassMetrics.mainWindowMinimumSize
+        let maximumSize = KippleGlassMetrics.mainWindowMaximumSize
         var adjustedSize = frameSize
-        adjustedSize.width = max(adjustedSize.width, minimumSize.width)
-        adjustedSize.height = max(adjustedSize.height, minimumSize.height)
+        adjustedSize.width = clamp(adjustedSize.width, min: minimumSize.width, max: maximumSize.width)
+        adjustedSize.height = clamp(adjustedSize.height, min: minimumSize.height, max: maximumSize.height)
         return adjustedSize
     }
 
-    private func resolvedMinimumWindowSize(for window: NSWindow?) -> NSSize {
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
-        return NSSize(
-            width: referenceScreenshotPixelSize.width / scale,
-            height: referenceScreenshotPixelSize.height / scale
-        )
+    private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
+        Swift.min(Swift.max(value, minimum), maximum)
     }
     
     private func attachAlwaysOnTopButton(to window: NSWindow) {
@@ -913,19 +945,21 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let viewModel = SettingsViewModel()
             let settingsView = SettingsView(viewModel: viewModel)
             let hostingController = SettingsHostingController(rootView: settingsView)
-            hostingController.view.wantsLayer = true
-            hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
+            let contentController = GlassWindowContentController(
+                hostingController: hostingController,
+                cornerRadius: KippleGlassMetrics.windowCornerRadius
+            )
 
-            let window = NSWindow(contentViewController: hostingController)
-        window.title = localizedSettingsWindowTitle()
+            let window = NSWindow(contentViewController: contentController)
+            window.title = localizedSettingsWindowTitle()
             window.styleMask = [.titled, .closable, .fullSizeContentView]
-            window.setContentSize(NSSize(width: 460, height: 380))
+            window.setContentSize(KippleGlassMetrics.settingsWindowSize)
             window.center()
             window.isReleasedWhenClosed = false
             window.titleVisibility = .visible
             window.titlebarAppearsTransparent = true
             window.isOpaque = false
-            window.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.08)
+            window.backgroundColor = .clear
             window.hasShadow = true
             window.isMovableByWindowBackground = true
             window.standardWindowButton(.miniaturizeButton)?.isHidden = true
@@ -933,7 +967,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.toolbarStyle = .preference
 
             let coordinator = SettingsToolbarController(viewModel: viewModel)
-            coordinator.attach(to: window)
+            coordinator.attach(to: window, contentController: contentController)
             settingsCoordinator = coordinator
             settingsViewModel = viewModel
 

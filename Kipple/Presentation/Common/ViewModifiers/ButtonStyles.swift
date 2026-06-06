@@ -12,9 +12,20 @@ enum KippleButtonMetrics {
     static let toolbarSize: CGFloat = 30
     static let compactIconSize: CGFloat = 24
     static let historyRowSize: CGFloat = 22
-    static let historyCategoryMenuWidth: CGFloat = 35
-    static let historyCategoryPillSize = CGSize(width: 36, height: 24)
-    static let historyCategoryIconSize: CGFloat = 16
+    static let historyCategoryButtonSize: CGFloat = 24
+    static let historyCategoryIconSize: CGFloat = 15
+    static let prominentCornerRadius: CGFloat = KippleGlassMetrics.compactInputCornerRadius
+    static let prominentFontSize: CGFloat = 12
+    static let prominentHorizontalPadding: CGFloat = 14
+    static let prominentVerticalPadding: CGFloat = 5
+    static let prominentShadowOffsetY: CGFloat = 2
+    static let prominentShadowBlurRadius: CGFloat = 4
+    static let prominentPressedScale: CGFloat = 0.96
+    static let prominentPressedOffsetY: CGFloat = 2
+    static let toolbarPressedScale: CGFloat = 0.9
+    static let popoverCornerRadius: CGFloat = 4
+    static let popoverHorizontalPadding: CGFloat = 12
+    static let popoverVerticalPadding: CGFloat = 4
 }
 
 enum KippleButtonAppearance {
@@ -22,6 +33,8 @@ enum KippleButtonAppearance {
     static let inactiveForeground = Color.secondary
     static let disabledForeground = Color.secondary.opacity(0.62)
     static let disabledOpacity = 0.45
+    static let pressedOpacity = 0.78
+    static let linkPressedOpacity = 0.6
     static let activeFillInset: CGFloat = 1.5
     static let shadowRadius: CGFloat = 2
     static let shadowY: CGFloat = 2
@@ -30,6 +43,13 @@ enum KippleButtonAppearance {
     static let selectedPillFill = Color.white.opacity(0.2)
     static let inactivePillFill = Color.secondary.opacity(0.1)
     static let selectedSubtleFill = Color.primary.opacity(0.045)
+    static let prominentShadowFill = Color.accentColor.opacity(0.3)
+    static let prominentGradientEnd = Color.accentColor.opacity(0.8)
+    static let destructiveShadowFill = Color.red.opacity(0.3)
+    static let destructiveGradientEnd = Color(NSColor.systemRed).opacity(0.8)
+    static let popoverPressedFill = Color(NSColor.controlAccentColor).opacity(0.2)
+    static let popoverFill = Color(NSColor.controlBackgroundColor)
+    static let animation = Animation.spring(response: 0.2, dampingFraction: 0.8)
 
     static func foreground(isActive: Bool, isEnabled: Bool = true) -> Color {
         guard isEnabled else { return disabledForeground }
@@ -189,15 +209,13 @@ extension View {
         self
             .buttonStyle(KippleSystemCircleButtonStyle(size: size, isActive: isActive, isEnabled: isEnabled))
     }
-}
 
-private struct KippleSystemCircleButtonStyle: ButtonStyle {
-    let size: CGFloat
-    let isActive: Bool
-    let isEnabled: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+    func kippleSystemCircleSurface(
+        size: CGFloat = KippleButtonMetrics.toolbarSize,
+        isActive: Bool = false,
+        isEnabled: Bool = true
+    ) -> some View {
+        self
             .frame(width: size, height: size)
             .contentShape(Circle())
             .background(
@@ -212,7 +230,18 @@ private struct KippleSystemCircleButtonStyle: ButtonStyle {
                 y: KippleButtonAppearance.shadowY
             )
             .opacity(isEnabled ? 1.0 : KippleButtonAppearance.disabledOpacity)
-            .opacity(configuration.isPressed ? 0.78 : 1.0)
+    }
+}
+
+private struct KippleSystemCircleButtonStyle: ButtonStyle {
+    let size: CGFloat
+    let isActive: Bool
+    let isEnabled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .kippleSystemCircleSurface(size: size, isActive: isActive, isEnabled: isEnabled)
+            .opacity(configuration.isPressed ? KippleButtonAppearance.pressedOpacity : 1.0)
     }
 }
 
@@ -228,24 +257,24 @@ private func kippleGlass(tint: Color?, interactive: Bool) -> Glass {
 struct ProminentButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
+            .font(.system(size: KippleButtonMetrics.prominentFontSize, weight: .semibold))
+            .padding(.horizontal, KippleButtonMetrics.prominentHorizontalPadding)
+            .padding(.vertical, KippleButtonMetrics.prominentVerticalPadding)
             .background(
                 ZStack {
                     // Shadow layer
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.3))
-                        .offset(y: configuration.isPressed ? 0 : 2)
-                        .blur(radius: configuration.isPressed ? 0 : 4)
+                    RoundedRectangle(cornerRadius: KippleButtonMetrics.prominentCornerRadius, style: .continuous)
+                        .fill(KippleButtonAppearance.prominentShadowFill)
+                        .offset(y: configuration.isPressed ? 0 : KippleButtonMetrics.prominentShadowOffsetY)
+                        .blur(radius: configuration.isPressed ? 0 : KippleButtonMetrics.prominentShadowBlurRadius)
                     
                     // Main button
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: KippleButtonMetrics.prominentCornerRadius, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
                                     Color.accentColor,
-                                    Color.accentColor.opacity(0.8)
+                                    KippleButtonAppearance.prominentGradientEnd
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -254,9 +283,9 @@ struct ProminentButtonStyle: ButtonStyle {
                 }
             )
             .foregroundColor(.white)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .offset(y: configuration.isPressed ? 2 : 0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? KippleButtonMetrics.prominentPressedScale : 1.0)
+            .offset(y: configuration.isPressed ? KippleButtonMetrics.prominentPressedOffsetY : 0)
+            .animation(KippleButtonAppearance.animation, value: configuration.isPressed)
     }
 }
 
@@ -264,7 +293,7 @@ struct ToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundColor(configuration.isPressed ? .accentColor : .secondary)
-            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .scaleEffect(configuration.isPressed ? KippleButtonMetrics.toolbarPressedScale : 1.0)
     }
 }
 
@@ -272,7 +301,7 @@ struct LinkButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundColor(.accentColor)
-            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .opacity(configuration.isPressed ? KippleButtonAppearance.linkPressedOpacity : 1.0)
     }
 }
 
@@ -282,13 +311,13 @@ struct PopoverButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.caption)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
+            .padding(.horizontal, KippleButtonMetrics.popoverHorizontalPadding)
+            .padding(.vertical, KippleButtonMetrics.popoverVerticalPadding)
             .background(
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: KippleButtonMetrics.popoverCornerRadius, style: .continuous)
                     .fill(configuration.isPressed ? 
-                          Color(NSColor.controlAccentColor).opacity(0.2) : 
-                          Color(NSColor.controlBackgroundColor))
+                          KippleButtonAppearance.popoverPressedFill : 
+                          KippleButtonAppearance.popoverFill)
             )
             .foregroundColor(isDestructive ? .red : .primary)
     }
@@ -297,24 +326,24 @@ struct PopoverButtonStyle: ButtonStyle {
 struct DestructiveButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
+            .font(.system(size: KippleButtonMetrics.prominentFontSize, weight: .semibold))
+            .padding(.horizontal, KippleButtonMetrics.prominentHorizontalPadding)
+            .padding(.vertical, KippleButtonMetrics.prominentVerticalPadding)
             .background(
                 ZStack {
                     // Shadow layer
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.red.opacity(0.3))
-                        .offset(y: configuration.isPressed ? 0 : 2)
-                        .blur(radius: configuration.isPressed ? 0 : 4)
+                    RoundedRectangle(cornerRadius: KippleButtonMetrics.prominentCornerRadius, style: .continuous)
+                        .fill(KippleButtonAppearance.destructiveShadowFill)
+                        .offset(y: configuration.isPressed ? 0 : KippleButtonMetrics.prominentShadowOffsetY)
+                        .blur(radius: configuration.isPressed ? 0 : KippleButtonMetrics.prominentShadowBlurRadius)
                     
                     // Main button
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: KippleButtonMetrics.prominentCornerRadius, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
                                     Color(NSColor.systemRed),
-                                    Color(NSColor.systemRed).opacity(0.8)
+                                    KippleButtonAppearance.destructiveGradientEnd
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -323,8 +352,8 @@ struct DestructiveButtonStyle: ButtonStyle {
                 }
             )
             .foregroundColor(.white)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .offset(y: configuration.isPressed ? 2 : 0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? KippleButtonMetrics.prominentPressedScale : 1.0)
+            .offset(y: configuration.isPressed ? KippleButtonMetrics.prominentPressedOffsetY : 0)
+            .animation(KippleButtonAppearance.animation, value: configuration.isPressed)
     }
 }

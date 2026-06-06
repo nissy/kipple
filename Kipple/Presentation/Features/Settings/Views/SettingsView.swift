@@ -32,8 +32,14 @@ struct SettingsView: View {
                 .id(activeTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .frame(minWidth: 420, idealWidth: 480, maxWidth: 560, alignment: .topLeading)
+        .clipShape(RoundedRectangle(cornerRadius: KippleGlassMetrics.windowCornerRadius, style: .continuous))
+        .frame(
+            minWidth: SettingsLayoutMetrics.windowMinWidth,
+            idealWidth: SettingsLayoutMetrics.windowIdealWidth,
+            maxWidth: SettingsLayoutMetrics.windowMaxWidth,
+            minHeight: SettingsLayoutMetrics.windowMinHeight,
+            alignment: .topLeading
+        )
         .background(glassBackground)
         .animation(nil, value: activeTab)
         .onReceive(viewModel.$selectedTab) { newTab in
@@ -80,7 +86,7 @@ struct SettingsView: View {
     }
 
     private var toolbar: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: SettingsLayoutMetrics.toolbarSpacing) {
             ForEach(SettingsViewModel.Tab.allCases, id: \.self) { tab in
                 SettingsToolbarButton(
                     tab: tab,
@@ -92,14 +98,14 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
+        .padding(.horizontal, SettingsLayoutMetrics.toolbarHorizontalPadding)
+        .padding(.top, SettingsLayoutMetrics.toolbarTopPadding)
+        .padding(.bottom, SettingsLayoutMetrics.toolbarBottomPadding)
         .frame(maxWidth: .infinity)
         .kippleLiquidGlass(
             in: Rectangle(),
-            fallbackFill: Color.white.opacity(0.06),
-            strokeColor: Color.white.opacity(0.1)
+            fallbackFill: KippleGlassAppearance.toolbarFill,
+            strokeColor: KippleGlassAppearance.toolbarStroke
         )
     }
 
@@ -116,39 +122,37 @@ private struct SettingsToolbarButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
+            VStack(spacing: SettingsLayoutMetrics.rowVerticalSpacing) {
                 Image(systemName: tab.symbolName)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: SettingsLayoutMetrics.toolbarIconFontSize, weight: .semibold))
                     .foregroundColor(iconColor)
-                    .frame(width: 32, height: 32)
+                    .frame(
+                        width: SettingsLayoutMetrics.toolbarIconSize,
+                        height: SettingsLayoutMetrics.toolbarIconSize
+                    )
                     .kippleLiquidGlass(
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous),
+                        in: RoundedRectangle(
+                            cornerRadius: KippleGlassMetrics.compactInputCornerRadius,
+                            style: .continuous
+                        ),
                         tint: nil,
-                        fallbackFill: Color.white.opacity(isSelected ? 0.08 : 0.06),
-                        strokeColor: Color.white.opacity(isSelected ? 0.18 : 0.1)
+                        fallbackFill: KippleGlassAppearance.toolbarItemFill(isSelected: isSelected),
+                        strokeColor: KippleGlassAppearance.toolbarItemStroke(isSelected: isSelected)
                     )
 
                 Text(tab.localizedTitleKey)
-                    .font(.system(size: 11, weight: .regular))
+                    .font(.system(size: SettingsLayoutMetrics.toolbarLabelFontSize, weight: .regular))
                     .foregroundColor(labelColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(SettingsLayoutMetrics.toolbarLabelScaleFactor)
             }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
+            .padding(.horizontal, SettingsLayoutMetrics.toolbarButtonHorizontalPadding)
+            .padding(.vertical, SettingsLayoutMetrics.toolbarButtonVerticalPadding)
             .frame(width: SettingsLayoutMetrics.toolbarButtonWidth)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .accessibilityLabel(Text(tab.localizedTitleKey))
-    }
-
-    private var backgroundColor: Color {
-        Color.white.opacity(isSelected ? 0.08 : 0.06)
-    }
-
-    private var borderColor: Color {
-        isSelected ? Color.white.opacity(0.18) : Color.white.opacity(0.1)
     }
 
     private var iconColor: Color {

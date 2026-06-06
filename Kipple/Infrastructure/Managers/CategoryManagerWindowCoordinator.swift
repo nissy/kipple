@@ -13,6 +13,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
     static let shared = CategoryManagerWindowCoordinator()
 
     private var window: NSWindow?
+    private var contentController: GlassWindowContentController<CategoryManagerView>?
     private var onCloseHandlers: [() -> Void] = []
 
     private override init() {
@@ -35,21 +36,33 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
             return
         }
 
-        let controller = NSHostingController(rootView: CategoryManagerView())
-        controller.sizingOptions = []
+        let controller = GlassWindowContentController(
+            rootView: CategoryManagerView { [weak self] in
+                self?.close()
+            },
+            cornerRadius: KippleGlassMetrics.windowCornerRadius
+        )
 
         let window = NSWindow(contentViewController: controller)
         window.title = String(localized: "Manage Categories")
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
 
         applyContentSize(controller, to: window)
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.titleVisibility = .visible
-        window.titlebarAppearsTransparent = false
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.isMovableByWindowBackground = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
 
         self.window = window
+        self.contentController = controller
 
         NSApp.activate(ignoringOtherApps: true)
         window.level = .floating
@@ -60,7 +73,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
             guard
                 let self,
                 let window,
-                let controller = window.contentViewController as? NSHostingController<CategoryManagerView>
+                let controller = self.contentController
             else { return }
             self.applyContentSize(controller, to: window)
         }
@@ -76,15 +89,13 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         }
         onCloseHandlers.removeAll()
         window = nil
+        contentController = nil
     }
 
-    private func applyContentSize(_ controller: NSHostingController<CategoryManagerView>, to window: NSWindow) {
+    private func applyContentSize(_ controller: GlassWindowContentController<CategoryManagerView>, to window: NSWindow) {
         let fallbackSize = NSSize(width: CategoryManagerView.minimumWidth, height: CategoryManagerView.minimumHeight)
 
-        controller.view.layoutSubtreeIfNeeded()
-        var fitting = controller.view.fittingSize
-        if !fitting.width.isFinite || fitting.width <= 0 { fitting.width = fallbackSize.width }
-        if !fitting.height.isFinite || fitting.height <= 0 { fitting.height = fallbackSize.height }
+        let fitting = controller.hostedFittingSize(fallback: fallbackSize)
 
         let targetSize = NSSize(
             width: max(fitting.width, fallbackSize.width),
@@ -99,7 +110,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
         guard let anchorWindow else { return }
 
         var targetOrigin = NSPoint(
-            x: anchorWindow.frame.maxX + 16,
+            x: anchorWindow.frame.maxX + KippleGlassMetrics.adjacentWindowSpacing,
             y: anchorWindow.frame.maxY - window.frame.height
         )
 
@@ -107,7 +118,7 @@ final class CategoryManagerWindowCoordinator: NSObject, NSWindowDelegate {
             let visible = screen.visibleFrame
 
             if targetOrigin.x + window.frame.width > visible.maxX {
-                targetOrigin.x = anchorWindow.frame.minX - window.frame.width - 16
+                targetOrigin.x = anchorWindow.frame.minX - window.frame.width - KippleGlassMetrics.adjacentWindowSpacing
             }
 
             targetOrigin.x = max(visible.minX, min(targetOrigin.x, visible.maxX - window.frame.width))

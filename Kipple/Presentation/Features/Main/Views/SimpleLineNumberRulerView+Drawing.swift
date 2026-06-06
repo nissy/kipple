@@ -17,10 +17,12 @@ extension SimpleLineNumberRulerView {
         guard !dirtyRect.isEmpty else { return }
 
         drawBackground(in: dirtyRect)
+        drawBorder(in: dirtyRect)
         let (fontSize, textAttributes) = setupFontAttributes(textView: textView)
         let fullText = textView.string as NSString
 
         if fullText.length == 0 {
+            drawEmptyTextHighlight(textView: textView)
             drawEmptyTextLineNumber(
                 textView: textView,
                 layoutManager: layoutManager,
@@ -48,14 +50,7 @@ extension SimpleLineNumberRulerView {
         )
         drawLineNumbers(context: drawingContext)
 
-        drawLastEmptyLine(
-            fullText: fullText,
-            layoutManager: layoutManager,
-            textView: textView,
-            textAttributes: textAttributes,
-            rect: rect,
-            fontSize: fontSize
-        )
+        drawLastEmptyLine(context: drawingContext)
     }
 
     func drawBackground(in rect: NSRect) {
@@ -69,11 +64,27 @@ extension SimpleLineNumberRulerView {
         layoutManager: NSLayoutManager,
         fullText: NSString
     ) {
-        return
+        guard textView.isEditable else { return }
+        let selectedLineNumber = calculateSelectedLineNumber(
+            fullText: fullText,
+            selectedRange: textView.selectedRange()
+        )
+        drawSelectedLineBackground(
+            textView: textView,
+            layoutManager: layoutManager,
+            fullText: fullText,
+            selectedLineNumber: selectedLineNumber
+        )
     }
 
     func drawBorder(in rect: NSRect) {
-        return
+        NSColor.separatorColor.withAlphaComponent(0.45).set()
+        let borderPath = NSBezierPath()
+        let x = ruleThickness - 0.5
+        borderPath.move(to: NSPoint(x: x, y: bounds.minY))
+        borderPath.line(to: NSPoint(x: x, y: bounds.maxY))
+        borderPath.lineWidth = 1
+        borderPath.stroke()
     }
 
     func setupFontAttributes(textView: NSTextView) -> (CGFloat, [NSAttributedString.Key: Any]) {
@@ -89,7 +100,17 @@ extension SimpleLineNumberRulerView {
     }
 
     func drawEmptyTextHighlight(textView: NSTextView) {
-        return
+        guard textView.isEditable else { return }
+
+        let height = max(fixedLineHeight - textView.textContainerInset.height * 2, 1)
+        let y = textView.textContainerInset.height - textView.visibleRect.origin.y
+        NSColor.selectedTextBackgroundColor.withAlphaComponent(0.12).set()
+        NSBezierPath(rect: NSRect(
+            x: 0,
+            y: y,
+            width: ruleThickness,
+            height: height
+        )).fill()
     }
 
     func drawEmptyTextLineNumber(
@@ -126,29 +147,27 @@ extension SimpleLineNumberRulerView {
         lineString.draw(at: drawingPoint, withAttributes: textAttributes)
     }
 
-    func drawLastEmptyLine(
-        fullText: NSString,
-        layoutManager: NSLayoutManager,
-        textView: NSTextView,
-        textAttributes: [NSAttributedString.Key: Any],
-        rect: NSRect,
-        fontSize: CGFloat
-    ) {
-        guard fullText.length > 0 && fullText.hasSuffix("\n") else { return }
+    func drawLastEmptyLine(context: LineNumberDrawingContext) {
+        guard context.fullText.length > 0 && context.fullText.hasSuffix("\n") else { return }
 
-        let totalLineCount = SimpleLineNumberRulerView.countLines(in: fullText)
+        let totalLineCount = SimpleLineNumberRulerView.countLines(in: context.fullText)
         let lastLineNumber = totalLineCount
-        let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: fullText.length - 1)
-        if lastGlyphIndex < layoutManager.numberOfGlyphs {
-            let lastLineRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
-            let containerOrigin = textView.textContainerOrigin
-            let lineY = lastLineRect.maxY + containerOrigin.y - textView.visibleRect.origin.y
+        let lastGlyphIndex = context.layoutManager.glyphIndexForCharacter(at: context.fullText.length - 1)
+        if lastGlyphIndex < context.layoutManager.numberOfGlyphs {
+            let lastLineRect = context.layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+            let containerOrigin = context.textView.textContainerOrigin
+            let lineY = lastLineRect.maxY + containerOrigin.y - context.textView.visibleRect.origin.y
 
             let lineString = "\(lastLineNumber)"
-            let size = lineString.size(withAttributes: textAttributes)
-            let lineNumberFont = textAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: fontSize)
+            let drawingAttributes = lineNumberAttributes(
+                context: context,
+                lineNumber: lastLineNumber
+            )
+            let size = lineString.size(withAttributes: drawingAttributes)
+            let lineNumberFont = context.textAttributes[.font] as? NSFont ??
+                NSFont.systemFont(ofSize: context.fontSize)
             let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
-            let lineCenterY = lineY + textView.textContainerInset.height + (fixedLineHeight / 2)
+            let lineCenterY = lineY + context.textView.textContainerInset.height + (fixedLineHeight / 2)
             let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
             let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
 
@@ -162,7 +181,7 @@ extension SimpleLineNumberRulerView {
                 y: drawingY
             )
 
-            lineString.draw(at: drawingPoint, withAttributes: textAttributes)
+            lineString.draw(at: drawingPoint, withAttributes: drawingAttributes)
         }
     }
 }

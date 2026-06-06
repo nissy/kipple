@@ -7,14 +7,24 @@ struct HistoryCategoryMenu: View {
     let onOpenCategoryManager: (() -> Void)?
 
     private let store = UserCategoryStore.shared
+    @State private var isHovered = false
 
     var body: some View {
         Menu(content: menuContent) {
             menuLabel
         }
+        .menuIndicator(.hidden)
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .frame(width: KippleButtonMetrics.historyCategoryMenuWidth, alignment: .leading)
+        .frame(
+            width: KippleButtonMetrics.historyCategoryButtonSize,
+            height: KippleButtonMetrics.historyCategoryButtonSize
+        )
+        .background(categoryAffordance)
+        .contentShape(Circle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 
     @ViewBuilder
@@ -78,25 +88,32 @@ struct HistoryCategoryMenu: View {
         let current = store.category(id: item.userCategoryId)
         let iconName = current.map { store.iconName(for: $0) } ?? item.category.icon
         return ZStack {
-            Capsule()
-                .fill(
-                    isSelected
-                    ? KippleButtonAppearance.selectedPillFill
-                    : KippleButtonAppearance.inactivePillFill
-                )
-                .frame(
-                    width: KippleButtonMetrics.historyCategoryPillSize.width,
-                    height: KippleButtonMetrics.historyCategoryPillSize.height
-                )
-
             Image(systemName: iconName)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(KippleButtonAppearance.foreground(isActive: isSelected))
+                .foregroundColor(categoryIconForeground)
                 .frame(
                     width: KippleButtonMetrics.historyCategoryIconSize,
                     height: KippleButtonMetrics.historyCategoryIconSize
                 )
         }
+        .frame(
+            width: KippleButtonMetrics.historyCategoryButtonSize,
+            height: KippleButtonMetrics.historyCategoryButtonSize
+        )
+        .contentShape(Circle())
+    }
+
+    private var categoryAffordance: some View {
+        Circle()
+            .fill(
+                isSelected || isHovered
+                ? KippleButtonAppearance.inactivePillFill
+                : Color.clear
+            )
+    }
+
+    private var categoryIconForeground: Color {
+        isSelected ? .primary : KippleButtonAppearance.inactiveForeground
     }
 
     private func categoryMenuRow(name: String, systemImage: String, selected: Bool) -> some View {

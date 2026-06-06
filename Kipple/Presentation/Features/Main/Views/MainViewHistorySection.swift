@@ -42,6 +42,7 @@ struct MainViewHistorySection: View {
     let canToggleQueueLoop: Bool
     let onToggleQueueLoop: () -> Void
     @ObservedObject private var fontManager = FontManager.shared
+    @State private var isCategoryFilterHovered = false
 
     init(
         history: [ClipItem],
@@ -216,16 +217,21 @@ struct MainViewHistorySection: View {
             } label: {
                 circleFilterIcon(
                     iconName: iconName,
-                    iconColor: KippleButtonAppearance.activeForeground,
+                    iconColor: toolbarFilterIconForeground(isActive: true),
                     iconFont: MainViewMetrics.HistoryFilterIcon.categoryFont,
                     isActive: true
                 )
             }
-            .kippleSystemCircleButton(isActive: true)
+            .buttonStyle(PlainButtonStyle())
             .frame(
                 width: MainViewMetrics.HistoryFilterIcon.diameter,
                 height: MainViewMetrics.HistoryFilterIcon.diameter
             )
+            .background(toolbarFilterAffordance(isActive: true, isHovered: isCategoryFilterHovered))
+            .contentShape(Circle())
+            .onHover { hovering in
+                isCategoryFilterHovered = hovering
+            }
             .help(Text(verbatim: currentCategoryFilterLabel))
         } else {
             Menu {
@@ -269,11 +275,15 @@ struct MainViewHistorySection: View {
             }
             .menuIndicator(.hidden)
             .buttonStyle(PlainButtonStyle())
-            .kippleSystemCircleButton(isActive: false)
             .frame(
                 width: MainViewMetrics.HistoryFilterIcon.diameter,
                 height: MainViewMetrics.HistoryFilterIcon.diameter
             )
+            .background(toolbarFilterAffordance(isActive: false, isHovered: isCategoryFilterHovered))
+            .contentShape(Circle())
+            .onHover { hovering in
+                isCategoryFilterHovered = hovering
+            }
             .help(Text(verbatim: noneCategoryDisplayName))
         }
     }
@@ -317,6 +327,19 @@ struct MainViewHistorySection: View {
 
     private var noneCategoryDisplayName: String {
         "None"
+    }
+
+    private func toolbarFilterAffordance(isActive: Bool, isHovered: Bool) -> some View {
+        Circle()
+            .fill(
+                isActive || isHovered
+                ? KippleButtonAppearance.inactivePillFill
+                : Color.clear
+            )
+    }
+
+    private func toolbarFilterIconForeground(isActive: Bool) -> Color {
+        isActive ? .primary : KippleButtonAppearance.inactiveForeground
     }
 
     private var queueLoopControl: some View {

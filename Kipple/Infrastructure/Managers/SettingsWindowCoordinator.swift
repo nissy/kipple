@@ -20,10 +20,11 @@ final class SettingsHostingController<Content: View>: NSHostingController<Conten
 final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     private let viewModel: SettingsViewModel
     private weak var window: NSWindow?
+    private weak var contentController: GlassWindowContentController<SettingsView>?
     private var cancellables = Set<AnyCancellable>()
     private let appSettings = AppSettings.shared
     private var localizationCancellable: AnyCancellable?
-    private let minimumContentSize = NSSize(width: 430, height: 300)
+    private let minimumContentSize = KippleGlassMetrics.settingsWindowSize
     private lazy var toolbar: NSToolbar = {
         let toolbar = NSToolbar(identifier: Self.toolbarIdentifier)
         toolbar.delegate = self
@@ -51,8 +52,9 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
             }
     }
 
-    func attach(to window: NSWindow) {
+    func attach(to window: NSWindow, contentController: GlassWindowContentController<SettingsView>) {
         self.window = window
+        self.contentController = contentController
         window.toolbar = toolbar
         toolbar.isVisible = false
         toolbar.selectedItemIdentifier = viewModel.selectedTab.toolbarIdentifier
@@ -152,10 +154,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
 
     private func updateWindowSize(animated: Bool) {
         guard let window = window else { return }
-        guard let contentView = window.contentView else { return }
-
-        contentView.layoutSubtreeIfNeeded()
-        var targetSize = contentView.fittingSize
+        var targetSize = contentController?.hostedFittingSize(fallback: minimumContentSize) ?? minimumContentSize
         targetSize.width = max(targetSize.width, minimumContentSize.width)
         targetSize.height = max(targetSize.height, minimumContentSize.height)
 
