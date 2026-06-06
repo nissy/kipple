@@ -28,18 +28,12 @@ struct SettingsView: View {
     private var content: some View {
         VStack(spacing: 0) {
             toolbar
+            Divider()
             tabContent
                 .id(activeTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .clipShape(RoundedRectangle(cornerRadius: KippleGlassMetrics.windowCornerRadius, style: .continuous))
-        .frame(
-            minWidth: SettingsLayoutMetrics.windowMinWidth,
-            idealWidth: SettingsLayoutMetrics.windowIdealWidth,
-            maxWidth: SettingsLayoutMetrics.windowMaxWidth,
-            minHeight: SettingsLayoutMetrics.windowMinHeight,
-            alignment: .topLeading
-        )
+        .frame(minWidth: 420, idealWidth: 480, maxWidth: 560, alignment: .topLeading)
         .background(glassBackground)
         .animation(nil, value: activeTab)
         .onReceive(viewModel.$selectedTab) { newTab in
@@ -86,7 +80,7 @@ struct SettingsView: View {
     }
 
     private var toolbar: some View {
-        HStack(alignment: .center, spacing: SettingsLayoutMetrics.toolbarSpacing) {
+        HStack(alignment: .center, spacing: 8) {
             ForEach(SettingsViewModel.Tab.allCases, id: \.self) { tab in
                 SettingsToolbarButton(
                     tab: tab,
@@ -98,19 +92,24 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(.horizontal, SettingsLayoutMetrics.toolbarHorizontalPadding)
-        .padding(.top, SettingsLayoutMetrics.toolbarTopPadding)
-        .padding(.bottom, SettingsLayoutMetrics.toolbarBottomPadding)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
         .frame(maxWidth: .infinity)
-        .kippleLiquidGlass(
-            in: Rectangle(),
-            fallbackFill: KippleGlassAppearance.toolbarFill,
-            strokeColor: KippleGlassAppearance.toolbarStroke
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(NSColor.windowBackgroundColor).opacity(0.95),
+                    Color(NSColor.windowBackgroundColor).opacity(0.86)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         )
     }
 
     private var glassBackground: some View {
-        Color.clear.kippleLiquidWindowBackground()
+        Color(NSColor.windowBackgroundColor)
     }
 }
 
@@ -122,32 +121,28 @@ private struct SettingsToolbarButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: SettingsLayoutMetrics.rowVerticalSpacing) {
-                Image(systemName: tab.symbolName)
-                    .font(.system(size: SettingsLayoutMetrics.toolbarIconFontSize, weight: .semibold))
-                    .foregroundColor(iconColor)
-                    .frame(
-                        width: SettingsLayoutMetrics.toolbarIconSize,
-                        height: SettingsLayoutMetrics.toolbarIconSize
+            VStack(spacing: 2) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(borderColor, lineWidth: isSelected ? 1 : 0)
                     )
-                    .kippleLiquidGlass(
-                        in: RoundedRectangle(
-                            cornerRadius: KippleGlassMetrics.compactInputCornerRadius,
-                            style: .continuous
-                        ),
-                        tint: nil,
-                        fallbackFill: KippleGlassAppearance.toolbarItemFill(isSelected: isSelected),
-                        strokeColor: KippleGlassAppearance.toolbarItemStroke(isSelected: isSelected)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Image(systemName: tab.symbolName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(iconColor)
                     )
 
                 Text(tab.localizedTitleKey)
-                    .font(.system(size: SettingsLayoutMetrics.toolbarLabelFontSize, weight: .regular))
+                    .font(.system(size: 11, weight: .regular))
                     .foregroundColor(labelColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(SettingsLayoutMetrics.toolbarLabelScaleFactor)
+                    .minimumScaleFactor(0.85)
             }
-            .padding(.horizontal, SettingsLayoutMetrics.toolbarButtonHorizontalPadding)
-            .padding(.vertical, SettingsLayoutMetrics.toolbarButtonVerticalPadding)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
             .frame(width: SettingsLayoutMetrics.toolbarButtonWidth)
         }
         .buttonStyle(.plain)
@@ -155,8 +150,21 @@ private struct SettingsToolbarButton: View {
         .accessibilityLabel(Text(tab.localizedTitleKey))
     }
 
+    private var backgroundColor: Color {
+        if isSelected {
+            return tab.accentColor.opacity(controlActiveState == .inactive ? 0.12 : 0.16)
+        } else {
+            return Color.secondary.opacity(controlActiveState == .inactive ? 0.06 : 0.1)
+        }
+    }
+
+    private var borderColor: Color {
+        guard isSelected else { return Color.clear }
+        return tab.accentColor.opacity(controlActiveState == .inactive ? 0.2 : 0.35)
+    }
+
     private var iconColor: Color {
-        isSelected ? Color.primary : Color.secondary
+        isSelected ? tab.accentColor : Color.secondary
     }
 
     private var labelColor: Color {

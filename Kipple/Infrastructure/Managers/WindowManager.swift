@@ -945,29 +945,21 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let viewModel = SettingsViewModel()
             let settingsView = SettingsView(viewModel: viewModel)
             let hostingController = SettingsHostingController(rootView: settingsView)
-            let contentController = GlassWindowContentController(
-                hostingController: hostingController,
-                cornerRadius: KippleGlassMetrics.windowCornerRadius
-            )
 
-            let window = NSWindow(contentViewController: contentController)
+            let window = NSWindow(contentViewController: hostingController)
             window.title = localizedSettingsWindowTitle()
-            window.styleMask = [.titled, .closable, .fullSizeContentView]
-            window.setContentSize(KippleGlassMetrics.settingsWindowSize)
+            window.styleMask = [.titled, .closable]
+            window.setContentSize(NSSize(width: 460, height: 380))
             window.center()
             window.isReleasedWhenClosed = false
             window.titleVisibility = .visible
-            window.titlebarAppearsTransparent = true
-            window.isOpaque = false
-            window.backgroundColor = .clear
-            window.hasShadow = true
-            window.isMovableByWindowBackground = true
+            window.titlebarAppearsTransparent = false
             window.standardWindowButton(.miniaturizeButton)?.isHidden = true
             window.standardWindowButton(.zoomButton)?.isHidden = true
             window.toolbarStyle = .preference
 
             let coordinator = SettingsToolbarController(viewModel: viewModel)
-            coordinator.attach(to: window, contentController: contentController)
+            coordinator.attach(to: window)
             settingsCoordinator = coordinator
             settingsViewModel = viewModel
 
