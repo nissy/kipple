@@ -167,19 +167,11 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
 
     func startServices() {
-        // Perform data migration if needed
         Task {
-            await performDataMigrationIfNeeded()
-
-            // Start clipboard monitoring
             clipboardService.startMonitoring()
         }
 
         // HotkeyManager already registers during initialization
-    }
-
-    private func performDataMigrationIfNeeded() async {
-        // Migration is no longer needed
     }
     
     @objc func openMainWindow() {
@@ -205,24 +197,11 @@ final class MenuBarApp: NSObject, ObservableObject {
         }
     }
     
-    @objc private func openPreferences() {
-        windowManager.openSettings()
-    }
-    
-    @objc private func showAbout() {
-        windowManager.showAbout()
-    }
-
     @MainActor
     private func openAccessibilityPreferences() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
-    }
-
-    @objc private func quit() {
-        // Calling terminate triggers applicationShouldTerminate
-        NSApplication.shared.terminate(nil)
     }
     
     private func performAsyncTermination() {

@@ -199,11 +199,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var preventAutoClose = false
     
     // Observers
-    private var windowObserver: NSObjectProtocol?
-    private var windowResignObserver: NSObjectProtocol?
     private var windowResizeObserver: NSObjectProtocol?
-    private var appDidResignActiveObserver: NSObjectProtocol?
-    private var appDidBecomeActiveObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
     var onTextCaptureRequested: (() -> Void)?
@@ -834,27 +830,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func setupMainWindowObservers(_ window: NSWindow) {
         removeMainWindowObservers()
-        windowObserver = addWindowDidBecomeKeyObserver(window)
-        windowResignObserver = addWindowDidBecomeMainObserver(window)
         windowResizeObserver = addWindowResizeObserver(window)
-        appDidResignActiveObserver = addAppDidResignActiveObserver(window)
-        appDidBecomeActiveObserver = addAppDidBecomeActiveObserver()
-    }
-
-    private func addWindowDidBecomeKeyObserver(_ window: NSWindow) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeKeyNotification,
-            object: window,
-            queue: .main
-        ) { _ in }
-    }
-
-    private func addWindowDidBecomeMainObserver(_ window: NSWindow) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeMainNotification,
-            object: window,
-            queue: .main
-        ) { _ in }
     }
 
     private func addWindowResizeObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -869,37 +845,13 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
         }
     }
-
-    private func addAppDidResignActiveObserver(_ window: NSWindow) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { _ in }
-    }
-
-    private func addAppDidBecomeActiveObserver() -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { _ in }
-    }
     
     private func removeMainWindowObservers() {
         let observers = [
-            windowObserver,
-            windowResignObserver,
-            windowResizeObserver,
-            appDidResignActiveObserver,
-            appDidBecomeActiveObserver
+            windowResizeObserver
         ]
         observers.compactMap { $0 }.forEach { NotificationCenter.default.removeObserver($0) }
-        windowObserver = nil
-        windowResignObserver = nil
         windowResizeObserver = nil
-        appDidResignActiveObserver = nil
-        appDidBecomeActiveObserver = nil
     }
     
     private func handleMainWindowClose() {
