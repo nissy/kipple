@@ -373,44 +373,7 @@ struct MainViewHistorySection: View {
     }
 
     private var searchField: some View {
-        ZStack(alignment: .leading) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(MainViewMetrics.HistorySearchField.iconFont)
-                    .foregroundColor(KippleButtonAppearance.inactiveForeground)
-                    .padding(.leading, 8)
-
-                TextField("Search", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(Font(fontManager.historyFont))
-                    .foregroundColor(MainViewMetrics.TextColor.primary)
-
-                if !searchText.isEmpty {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.2)) {
-                            searchText = ""
-                        }
-                    }, label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(MainViewMetrics.HistorySearchField.clearIconFont)
-                            .foregroundColor(KippleButtonAppearance.inactiveForeground)
-                    })
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.trailing, 8)
-                    .transition(.scale.combined(with: .opacity))
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: MainViewMetrics.HistorySearchField.height)
-        .background(
-            RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
-                .fill(Color(NSColor.textBackgroundColor).opacity(0.42))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
-                .stroke(Color.secondary.opacity(0.14), lineWidth: 0.5)
-        )
+        HistorySearchField(searchText: $searchText)
     }
 
     private func circleFilterIcon(
@@ -429,5 +392,56 @@ struct MainViewHistorySection: View {
         }
         .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
         .contentShape(Circle())
+    }
+}
+
+private struct HistorySearchField: View {
+    @Binding var searchText: String
+    @ObservedObject private var fontManager = FontManager.shared
+    @FocusState private var isSearchFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(MainViewMetrics.HistorySearchField.iconFont)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
+                .padding(.leading, 8)
+
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(Font(fontManager.historyFont))
+                .foregroundColor(MainViewMetrics.TextColor.primary)
+                .focused($isSearchFocused)
+                .frame(maxHeight: .infinity)
+
+            if !searchText.isEmpty {
+                Button(action: {
+                    withAnimation(.spring(response: 0.2)) {
+                        searchText = ""
+                    }
+                }, label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(MainViewMetrics.HistorySearchField.clearIconFont)
+                        .foregroundColor(KippleButtonAppearance.inactiveForeground)
+                })
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, 8)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: MainViewMetrics.HistorySearchField.height)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isSearchFocused = true
+        }
+        .background(
+            RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
+                .fill(Color(NSColor.textBackgroundColor).opacity(0.42))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 0.5)
+        )
     }
 }

@@ -110,15 +110,15 @@ struct MainViewControlSection: View {
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(formatButtonForegroundColor)
                     .font(iconFont)
-                    .frame(
-                        width: KippleButtonMetrics.editorFormatMenuButtonWidth,
-                        height: KippleButtonMetrics.editorControlHeight
-                    )
-                    .contentShape(Rectangle())
             }
-            .menuStyle(BorderlessButtonMenuStyle())
             .menuIndicator(.hidden)
-            .buttonStyle(PlainButtonStyle())
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .frame(
+                width: KippleButtonMetrics.editorFormatMenuButtonWidth,
+                height: KippleButtonMetrics.editorControlHeight
+            )
+            .contentShape(Rectangle())
             .accessibilityLabel(Text("editor.format"))
         }
         .foregroundColor(formatButtonForegroundColor)
