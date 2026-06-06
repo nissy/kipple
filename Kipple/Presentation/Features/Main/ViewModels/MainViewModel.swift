@@ -39,6 +39,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let isPinnedFilterActive: Bool
     }
 
+    private struct HistoryLookupToken: Equatable {
+        let id: UUID
+        let isPinned: Bool
+    }
+
     @Published var editorText: String
     
     let clipboardService: any ClipboardServiceProtocol
@@ -105,7 +110,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var pendingShiftSelection: [ClipItem] = []
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
-    private var latestHistorySnapshot: [ClipItem] = []
+    private var historyIDByContent: [String: UUID] = [:]
+    private var latestPinnedHistorySnapshot: [ClipItem] = []
+    private var historyLookupTokens: [HistoryLookupToken] = []
     private static let newlineSet = CharacterSet.newlines
 
     init(
@@ -233,6 +240,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // swiftlint:disable:next function_body_length cyclomatic_complexity
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
+        let startedAt = PerformanceTrace.nowMicros()
         let tracedContent = items.first?.content
         PerformanceTrace.event("viewmodel_update_started", content: tracedContent, count: items.count)
         rebuildHistoryLookups(using: items)
@@ -257,6 +265,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
                               !requireURLsOnly &&
                               !requirePinnedOnly
 
+        let filteredStartedAt = PerformanceTrace.nowMicros()
         let filtered: [ClipItem]
         if noFiltersActive {
             filtered = items
@@ -291,8 +300,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
                 return true
             }
         }
+        let filteredFinishedAt = PerformanceTrace.nowMicros()
 
+        let queueStartedAt = PerformanceTrace.nowMicros()
         let queueOrdered = applyQueueOrdering(to: filtered)
+        let queueFinishedAt = PerformanceTrace.nowMicros()
         let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
         let paginationFilterState = PaginationFilterState(
             searchText: searchText,
@@ -308,7 +320,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let newHistory = Array(queueOrdered.prefix(newCurrentHistoryLimit))
         let newHasMoreHistory = newHistory.count < queueOrdered.count
         let newPinnedItems = isPinnedFilterActive ? queueOrdered : []
-        let newPinnedHistory = items.filter { $0.isPinned }
+        let newPinnedHistory = latestPinnedHistorySnapshot
 
         let applyState = { [self] in
             pinnedHistory = newPinnedHistory
@@ -323,7 +335,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
                 "viewmodel_history_published",
                 content: newHistory.first?.content,
                 count: newHistory.count,
-                details: ["filtered": "\(queueOrdered.count)"]
+                details: [
+                    "filtered": "\(queueOrdered.count)",
+                    "filterUs": "\(filteredFinishedAt - filteredStartedAt)",
+                    "queueUs": "\(queueFinishedAt - queueStartedAt)",
+                    "totalUs": "\(PerformanceTrace.nowMicros() - startedAt)"
+                ]
             )
         }
 
@@ -337,7 +354,40 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func rebuildHistoryLookups(using items: [ClipItem]) {
-        latestHistorySnapshot = items
+        guard !historyLookupMatches(items) else { return }
+
+        var lookup: [String: UUID] = [:]
+        var pinned: [ClipItem] = []
+        var tokens: [HistoryLookupToken] = []
+        lookup.reserveCapacity(items.count)
+        pinned.reserveCapacity(pinnedHistory.count)
+        tokens.reserveCapacity(items.count)
+        for item in items {
+            tokens.append(HistoryLookupToken(id: item.id, isPinned: item.isPinned))
+            if lookup[item.content] == nil {
+                lookup[item.content] = item.id
+            }
+            if item.isPinned {
+                pinned.append(item)
+            }
+        }
+        historyIDByContent = lookup
+        latestPinnedHistorySnapshot = pinned
+        historyLookupTokens = tokens
+    }
+
+    private func historyLookupMatches(_ items: [ClipItem]) -> Bool {
+        guard historyLookupTokens.count == items.count else {
+            return false
+        }
+
+        for (index, item) in items.enumerated() {
+            let token = historyLookupTokens[index]
+            if token.id != item.id || token.isPinned != item.isPinned {
+                return false
+            }
+        }
+        return true
     }
 
     private func updateCurrentClipboardItemID() {
@@ -348,7 +398,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
             return
         }
-        let matchedID = latestHistorySnapshot.first { $0.content == currentContent }?.id
+        let matchedID = historyIDByContent[currentContent]
         if currentClipboardItemID != matchedID {
             currentClipboardItemID = matchedID
         }
