@@ -13,7 +13,7 @@ private enum SplitHandleMetrics {
     static let dotSpacing: CGFloat = 3
     static let dotCount: Int = 3
     static let activeScale: CGFloat = 1.2
-    static let hitAreaOpacity: CGFloat = 0.001
+    static let handleHeight: Double = 24
 }
 
 struct SplitViewResetConfiguration: Equatable {
@@ -33,7 +33,7 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
     let preferredHeightsProvider: (() -> (top: Double?, bottom: Double?))?
 
     @State private var isDragging = false
-    private let handleHeight: Double = 16
+    private let handleHeight: Double = SplitHandleMetrics.handleHeight
     @State private var appliedTopHeight: Double
     @State private var dragStartTopHeight: Double?
     @State private var lastGeometryHeight: Double = 0
@@ -242,9 +242,11 @@ private final class SplitDragHandleView: NSView {
     var onDragEnded: (() -> Void)?
 
     private var startY: CGFloat?
+    override var mouseDownCanMoveWindow: Bool { false }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        postsFrameChangedNotifications = true
     }
 
     @available(*, unavailable)
@@ -254,6 +256,14 @@ private final class SplitDragHandleView: NSView {
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .resizeUpDown)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(point) ? self : nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
     }
 
     override func mouseDown(with event: NSEvent) {
