@@ -136,8 +136,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             }
             .store(in: &cancellables)
 
-        // 初回読み込み
-        updateFilteredItems(self.clipboardService.history)
+        // 初回読み込み。ModernClipboardServiceAdapter は bind 時の @Published 初期送出で同期されるため、
+        // ここで重複フィルタリングしない。
+        if !(resolvedService is ModernClipboardServiceAdapter) {
+            updateFilteredItems(self.clipboardService.history)
+        }
         currentClipboardContent = resolvedService.currentClipboardContent
     }
 

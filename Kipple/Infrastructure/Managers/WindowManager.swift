@@ -252,6 +252,24 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     // MARK: - Main Window
+
+    @MainActor
+    func prewarmMainWindow() {
+        guard mainWindow == nil else { return }
+
+        let startedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event("main_window_prewarm_started")
+        guard let window = createMainWindow() else { return }
+        configureMainWindow(window)
+        setupMainWindowObservers(window)
+        window.orderOut(nil)
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        PerformanceTrace.event(
+            "main_window_prewarm_finished",
+            details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
+        )
+    }
     
     @MainActor
     func openMainWindow() {
@@ -314,9 +332,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 "main_window_reopen_visible",
                 details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
             )
-            DispatchQueue.main.async { [weak self] in
-                self?.focusOnEditor()
-            }
+            focusOnEditor()
         } else {
             NSApp.activate(ignoringOtherApps: true)
             window.alphaValue = 0
@@ -342,9 +358,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 "main_window_repositioned",
                 details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
             )
-            DispatchQueue.main.async { [weak self] in
-                self?.focusOnEditor()
-            }
+            focusOnEditor()
             return true
         }
 
@@ -726,9 +740,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.orderFrontRegardless()
                 window.makeKeyAndOrderFront(nil)
             }
-            DispatchQueue.main.async { [weak self] in
-                self?.focusOnEditor()
-            }
+            focusOnEditor()
         default: // "fade"
             animateFade(window)
         }

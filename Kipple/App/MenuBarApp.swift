@@ -103,6 +103,9 @@ final class MenuBarApp: NSObject, ObservableObject {
             guard let self else { return }
             self.setupTextCaptureHotkey()
             self.startServices()
+            DispatchQueue.main.async { [weak self] in
+                self?.windowManager.prewarmMainWindow()
+            }
         }
     }
 
