@@ -39,9 +39,10 @@ enum MainViewMetrics {
     }
 
     enum HistoryColumns {
-        static let sectionHorizontalPadding: CGFloat = 8
-        static let horizontalInset: CGFloat = 2
+        static let sectionHorizontalPadding: CGFloat = 10
+        static let horizontalInset: CGFloat = 6
         static let spacing: CGFloat = 5
+        static let toolbarSpacing: CGFloat = 10
         static let toolbarTopPadding: CGFloat = 0
         static let toolbarBottomPadding: CGFloat = 6
         static let controlColumnWidth: CGFloat = KippleButtonMetrics.historyCategoryButtonSize

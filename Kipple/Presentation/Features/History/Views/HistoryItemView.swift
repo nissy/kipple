@@ -306,6 +306,11 @@ struct HistoryItemView: View {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 14))
                 .foregroundColor(KippleButtonAppearance.inactiveForeground)
+                .frame(
+                    width: MainViewMetrics.HistoryColumns.rowControlSize,
+                    height: MainViewMetrics.HistoryColumns.rowControlSize
+                )
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
                 .contentShape(Circle())
                 .help(deleteHelpText)
                 .onTapGesture {

@@ -206,6 +206,7 @@
 "history.clear.deleteCount" = "This will delete %d items from history.";
 "history.clear.pinnedPreserved" = "%d pinned items will remain.";
 "history.clear.success" = "Deleted %d items from history.";
+"history.scrollToTop" = "Scroll to top of history";
 "minutes" = "minutes";
 "seconds" = "seconds";
 "copies" = "copies";

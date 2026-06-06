@@ -28,56 +28,56 @@ struct HistoryListView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 2, pinnedViews: []) {
                     ForEach(history, id: \.id) { item in
-                    let queueBadgeValue = HistoryQueueBadgeCalculator.queueBadgeValue(
-                        for: item,
-                        pasteMode: pasteMode,
-                        provider: queueBadgeProvider
-                    )
-                    let isClipboardItem = HistoryListView.isCurrentClipboardItem(
-                        item,
-                        currentID: currentClipboardItemID
-                    )
+                        let queueBadgeValue = HistoryQueueBadgeCalculator.queueBadgeValue(
+                            for: item,
+                            pasteMode: pasteMode,
+                            provider: queueBadgeProvider
+                        )
+                        let isClipboardItem = HistoryListView.isCurrentClipboardItem(
+                            item,
+                            currentID: currentClipboardItemID
+                        )
 
-                    HistoryItemView(
-                        item: item,
-                        isSelected: selectedHistoryItem?.id == item.id,
-                        isCurrentClipboardItem: isClipboardItem,
-                        queueBadge: queueBadgeValue,
-                        isQueuePreviewed: queueSelectionPreview.contains(item.id),
-                        isScrollLocked: isScrollLocked,
-                        onTap: {
-                            onSelectItem(item)
-                        },
-                        onTogglePin: {
-                            onTogglePin(item)
-                        },
-                        onDelete: onDelete != nil ? {
-                            withAnimation(.spring(response: 0.3)) {
-                                onDelete?(item)
-                            }
-                        } : nil,
-                        onCategoryTap: nil,
-                        onChangeCategory: onChangeUserCategory != nil ? { catId in
-                            onChangeUserCategory?(item, catId)
-                        } : nil,
-                        onOpenCategoryManager: onOpenCategoryManager,
-                        historyFont: historyFont,
-                        onOpenItem: onOpenItem.map { handler in
-                            { handler(item) }
-                        },
-                        onSplitEditorIntoHistory: onSplitEditorIntoHistory,
-                        hoverResetSignal: hoverResetSignal,
-                        hoverCoordinator: hoverCoordinator
-                    )
-                    .frame(height: 32)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: item.isPinned)
-                    .onAppear {
-                        onLoadMore(item)
-                    }
+                        HistoryItemView(
+                            item: item,
+                            isSelected: selectedHistoryItem?.id == item.id,
+                            isCurrentClipboardItem: isClipboardItem,
+                            queueBadge: queueBadgeValue,
+                            isQueuePreviewed: queueSelectionPreview.contains(item.id),
+                            isScrollLocked: isScrollLocked,
+                            onTap: {
+                                onSelectItem(item)
+                            },
+                            onTogglePin: {
+                                onTogglePin(item)
+                            },
+                            onDelete: onDelete != nil ? {
+                                withAnimation(.spring(response: 0.3)) {
+                                    onDelete?(item)
+                                }
+                            } : nil,
+                            onCategoryTap: nil,
+                            onChangeCategory: onChangeUserCategory != nil ? { catId in
+                                onChangeUserCategory?(item, catId)
+                            } : nil,
+                            onOpenCategoryManager: onOpenCategoryManager,
+                            historyFont: historyFont,
+                            onOpenItem: onOpenItem.map { handler in
+                                { handler(item) }
+                            },
+                            onSplitEditorIntoHistory: onSplitEditorIntoHistory,
+                            hoverResetSignal: hoverResetSignal,
+                            hoverCoordinator: hoverCoordinator
+                        )
+                        .frame(height: 32)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.2), value: item.isPinned)
+                        .onAppear {
+                            onLoadMore(item)
+                        }
                     }
                     if hasMoreItems && isLoadingMore {
                         ProgressView()
@@ -89,32 +89,46 @@ struct HistoryListView: View {
                 .padding(.horizontal, MainViewMetrics.HistoryColumns.horizontalInset)
                 .padding(.vertical, 4)
             }
-        .background {
-            ScrollLockObserver(isLocked: $isScrollLocked)
-                .allowsHitTesting(false)
-        }
-        .onChange(of: copyScrollRequest?.id) { _, _ in
-            handleCopyScrollRequest(with: proxy)
-        }
-        .onChange(of: hoverResetRequest?.id) { _, _ in
-            handleHoverResetRequest()
-        }
-        .onChange(of: isScrollLocked) { _, locked in
-            if locked {
-                hoverCoordinator.clearHover()
+            .background {
+                scrollObservers
+            }
+            .onChange(of: copyScrollRequest?.id) { _, _ in
+                handleCopyScrollRequest(with: proxy)
+            }
+            .onChange(of: hoverResetRequest?.id) { _, _ in
+                handleHoverResetRequest()
+            }
+            .onChange(of: isScrollLocked) { _, locked in
+                if locked {
+                    hoverCoordinator.clearHover()
+                }
             }
         }
-        }
         .environmentObject(actionKeyMonitor)
+    }
+
+    private var scrollObservers: some View {
+        ScrollLockObserver(isLocked: $isScrollLocked)
+        .allowsHitTesting(false)
     }
 
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
         guard copyScrollRequest != nil else { return }
         copyScrollRequest = nil
+        scrollToTop(with: proxy, animated: false)
+    }
+
+    private func scrollToTop(with proxy: ScrollViewProxy, animated: Bool) {
         guard let topID = history.first?.id else { return }
 
         DispatchQueue.main.async {
-            proxy.scrollTo(topID, anchor: .top)
+            if animated {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(topID, anchor: .top)
+                }
+            } else {
+                proxy.scrollTo(topID, anchor: .top)
+            }
         }
     }
 

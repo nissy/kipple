@@ -152,13 +152,14 @@ struct MainViewHistorySection: View {
     }
 
     private var historyToolbarContent: some View {
-        HStack(spacing: MainViewMetrics.HistoryColumns.spacing) {
+        HStack(spacing: MainViewMetrics.HistoryColumns.toolbarSpacing) {
             if pasteMode != .clipboard {
                 queueLoopControl
             }
             pinnedFilterButton
             categoryFilterControl
             searchField
+            scrollToTopButton
         }
         .padding(.horizontal, MainViewMetrics.HistoryColumns.horizontalInset)
         .padding(.top, MainViewMetrics.HistoryColumns.toolbarTopPadding)
@@ -374,6 +375,31 @@ struct MainViewHistorySection: View {
 
     private var searchField: some View {
         HistorySearchField(searchText: $searchText)
+    }
+
+    private var scrollToTopButton: some View {
+        let isEnabled = history.count >= 2
+
+        return Button {
+            copyScrollRequest = HistoryCopyScrollRequest()
+        } label: {
+            circleFilterIcon(
+                iconName: "arrow.up.to.line",
+                iconColor: KippleButtonAppearance.foreground(isActive: false, isEnabled: isEnabled),
+                iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont
+            )
+        }
+        .kippleSystemCircleButton(
+            size: MainViewMetrics.HistoryFilterIcon.diameter,
+            isEnabled: isEnabled
+        )
+        .frame(
+            width: MainViewMetrics.HistoryFilterIcon.diameter,
+            height: MainViewMetrics.HistoryFilterIcon.diameter
+        )
+        .disabled(!isEnabled)
+        .help(Text(String(localized: "history.scrollToTop")))
+        .accessibilityLabel(Text(String(localized: "history.scrollToTop")))
     }
 
     private func circleFilterIcon(
