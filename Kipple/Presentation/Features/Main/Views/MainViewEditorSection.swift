@@ -83,6 +83,10 @@ struct MainViewEditorSection: View {
     }
 
     private var statusColor: Color {
+        if isEditing {
+            return Color(NSColor.systemRed)
+        }
+
         if isTextEditable {
             return .accentColor
         }

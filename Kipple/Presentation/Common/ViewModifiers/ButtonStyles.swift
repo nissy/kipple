@@ -14,6 +14,12 @@ enum KippleButtonMetrics {
     static let historyRowSize: CGFloat = 22
     static let historyCategoryButtonSize: CGFloat = 24
     static let historyCategoryIconSize: CGFloat = 15
+    static let editorControlHeight: CGFloat = 30
+    static let editorControlCornerRadius: CGFloat = 8
+    static let editorControlHorizontalPadding: CGFloat = 10
+    static let editorModeMinWidth: CGFloat = 64
+    static let editorTrimButtonWidth: CGFloat = 40
+    static let editorFormatMenuButtonWidth: CGFloat = 32
     static let prominentCornerRadius: CGFloat = KippleGlassMetrics.compactInputCornerRadius
     static let prominentFontSize: CGFloat = 12
     static let prominentHorizontalPadding: CGFloat = 14

@@ -86,7 +86,7 @@ struct HistoryListView: View {
                             .padding(.vertical, 10)
                     }
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, MainViewMetrics.HistoryColumns.horizontalInset)
                 .padding(.vertical, 4)
             }
         .background {

@@ -33,11 +33,22 @@ enum MainViewMetrics {
         static let height: CGFloat = 32
     }
 
+    enum HistoryColumns {
+        static let sectionHorizontalPadding: CGFloat = 8
+        static let horizontalInset: CGFloat = 2
+        static let spacing: CGFloat = 5
+        static let toolbarTopPadding: CGFloat = 0
+        static let toolbarBottomPadding: CGFloat = 6
+        static let controlColumnWidth: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
+        static let rowControlSize: CGFloat = KippleButtonMetrics.historyRowSize
+        static let rowCategorySize: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
+    }
+
     enum HistoryFilterIcon {
-        static let diameter: CGFloat = KippleButtonMetrics.toolbarSize
-        static let defaultFont: Font = .system(size: 12, weight: .medium)
+        static let diameter: CGFloat = HistoryColumns.controlColumnWidth
+        static let defaultFont: Font = .system(size: 10, weight: .medium)
         static let pinnedFont: Font = .system(size: 10, weight: .medium)
-        static let categoryFont: Font = .system(size: 13, weight: .medium)
+        static let categoryFont: Font = .system(size: 12, weight: .medium)
         static func font(size: CGFloat, weight: Font.Weight = .medium) -> Font {
             .system(size: size, weight: weight)
         }

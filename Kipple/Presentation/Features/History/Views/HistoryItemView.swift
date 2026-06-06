@@ -126,14 +126,14 @@ struct HistoryItemView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { handleTap() }
 
-            HStack(spacing: 8) {
+            HStack(spacing: MainViewMetrics.HistoryColumns.spacing) {
                 queueBadgeView
                 pinButton
                 categoryMenuView
                 historyText
                 deleteButton
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 0)
             .padding(.vertical, 4)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -151,13 +151,14 @@ struct HistoryItemView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(badgeForeground)
                 .frame(
-                    width: KippleButtonMetrics.historyRowSize,
-                    height: KippleButtonMetrics.historyRowSize
+                    width: MainViewMetrics.HistoryColumns.rowControlSize,
+                    height: MainViewMetrics.HistoryColumns.rowControlSize
                 )
                 .background(
                     Circle()
                         .fill(badgeBackground)
                 )
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
                 .contentShape(Circle())
                 .help(
                     Text(
@@ -197,9 +198,10 @@ struct HistoryItemView: View {
                 .rotationEffect(.degrees(pinButtonRotation))
         }
         .frame(
-            width: KippleButtonMetrics.historyRowSize,
-            height: KippleButtonMetrics.historyRowSize
+            width: MainViewMetrics.HistoryColumns.rowControlSize,
+            height: MainViewMetrics.HistoryColumns.rowControlSize
         )
+        .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
         .contentShape(Circle())
         .onTapGesture {
             closePopover()
@@ -215,17 +217,18 @@ struct HistoryItemView: View {
                 Circle()
                     .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
                     .frame(
-                        width: KippleButtonMetrics.historyRowSize,
-                        height: KippleButtonMetrics.historyRowSize
+                        width: MainViewMetrics.HistoryColumns.rowControlSize,
+                        height: MainViewMetrics.HistoryColumns.rowControlSize
                     )
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
             }
             .frame(
-                width: KippleButtonMetrics.historyRowSize,
-                height: KippleButtonMetrics.historyRowSize
+                width: MainViewMetrics.HistoryColumns.rowControlSize,
+                height: MainViewMetrics.HistoryColumns.rowControlSize
             )
+            .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
             .contentShape(Circle())
             .onTapGesture { handleTap() }
             .help(actionHelpText)
@@ -234,17 +237,18 @@ struct HistoryItemView: View {
                 Circle()
                     .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
                     .frame(
-                        width: KippleButtonMetrics.historyRowSize,
-                        height: KippleButtonMetrics.historyRowSize
+                        width: MainViewMetrics.HistoryColumns.rowControlSize,
+                        height: MainViewMetrics.HistoryColumns.rowControlSize
                     )
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
             }
             .frame(
-                width: KippleButtonMetrics.historyRowSize,
-                height: KippleButtonMetrics.historyRowSize
+                width: MainViewMetrics.HistoryColumns.rowControlSize,
+                height: MainViewMetrics.HistoryColumns.rowControlSize
             )
+            .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
             .contentShape(Circle())
             .onTapGesture {
                 closePopover()
@@ -266,13 +270,14 @@ struct HistoryItemView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
                 .frame(
-                    width: KippleButtonMetrics.historyRowSize,
-                    height: KippleButtonMetrics.historyRowSize
+                    width: MainViewMetrics.HistoryColumns.rowControlSize,
+                    height: MainViewMetrics.HistoryColumns.rowControlSize
                 )
                 .background(
                     Circle()
                         .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
                 )
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
         }
     }
 
@@ -413,6 +418,7 @@ private extension HistoryItemView {
             onChangeCategory: onChangeCategory,
             onOpenCategoryManager: onOpenCategoryManager
         )
+        .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
     }
 
     var hasContextMenuActions: Bool {

@@ -136,7 +136,7 @@ struct MainViewHistorySection: View {
                 hoverResetRequest: $hoverResetRequest
             )
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, MainViewMetrics.HistoryColumns.sectionHorizontalPadding)
         .padding(.vertical, 6)
         .kippleGlassPanel(
             cornerRadius: 20,
@@ -152,7 +152,7 @@ struct MainViewHistorySection: View {
     }
 
     private var historyToolbarContent: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MainViewMetrics.HistoryColumns.spacing) {
             if pasteMode != .clipboard {
                 queueLoopControl
             }
@@ -160,9 +160,9 @@ struct MainViewHistorySection: View {
             categoryFilterControl
             searchField
         }
-        .padding(.horizontal, 10)
-        .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.horizontal, MainViewMetrics.HistoryColumns.horizontalInset)
+        .padding(.top, MainViewMetrics.HistoryColumns.toolbarTopPadding)
+        .padding(.bottom, MainViewMetrics.HistoryColumns.toolbarBottomPadding)
     }
 
     private var pinnedFilterButton: some View {
@@ -177,7 +177,10 @@ struct MainViewHistorySection: View {
                 isActive: isPinnedFilterActive
             )
         }
-        .kippleSystemCircleButton(isActive: isPinnedFilterActive)
+        .kippleSystemCircleButton(
+            size: MainViewMetrics.HistoryFilterIcon.diameter,
+            isActive: isPinnedFilterActive
+        )
         .frame(
             width: MainViewMetrics.HistoryFilterIcon.diameter,
             height: MainViewMetrics.HistoryFilterIcon.diameter
@@ -356,7 +359,11 @@ struct MainViewHistorySection: View {
                 isActive: isQueueLoopActive
             )
         }
-        .kippleSystemCircleButton(isActive: isQueueLoopActive, isEnabled: canToggleQueueLoop)
+        .kippleSystemCircleButton(
+            size: MainViewMetrics.HistoryFilterIcon.diameter,
+            isActive: isQueueLoopActive,
+            isEnabled: canToggleQueueLoop
+        )
         .frame(
             width: MainViewMetrics.HistoryFilterIcon.diameter,
             height: MainViewMetrics.HistoryFilterIcon.diameter
