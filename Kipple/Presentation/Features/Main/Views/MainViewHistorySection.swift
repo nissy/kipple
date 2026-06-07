@@ -43,6 +43,7 @@ struct MainViewHistorySection: View {
     let onToggleQueueLoop: () -> Void
     @ObservedObject private var fontManager = FontManager.shared
     @State private var isCategoryFilterHovered = false
+    @State private var canScrollToTop = false
 
     init(
         history: [ClipItem],
@@ -132,6 +133,7 @@ struct MainViewHistorySection: View {
                 onLoadMore: onLoadMore,
                 hasMoreItems: hasMoreItems,
                 isLoadingMore: isLoadingMore,
+                canScrollToTop: $canScrollToTop,
                 copyScrollRequest: $copyScrollRequest,
                 hoverResetRequest: $hoverResetRequest
             )
@@ -378,26 +380,24 @@ struct MainViewHistorySection: View {
     }
 
     private var scrollToTopButton: some View {
-        let isEnabled = history.count >= 2
-
-        return Button {
+        Button {
             copyScrollRequest = HistoryCopyScrollRequest()
         } label: {
             circleFilterIcon(
                 iconName: "arrow.up.to.line",
-                iconColor: KippleButtonAppearance.foreground(isActive: false, isEnabled: isEnabled),
+                iconColor: KippleButtonAppearance.foreground(isActive: false, isEnabled: canScrollToTop),
                 iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont
             )
         }
         .kippleSystemCircleButton(
             size: MainViewMetrics.HistoryFilterIcon.diameter,
-            isEnabled: isEnabled
+            isEnabled: canScrollToTop
         )
         .frame(
             width: MainViewMetrics.HistoryFilterIcon.diameter,
             height: MainViewMetrics.HistoryFilterIcon.diameter
         )
-        .disabled(!isEnabled)
+        .disabled(!canScrollToTop)
         .help(Text(String(localized: "history.scrollToTop")))
         .accessibilityLabel(Text(String(localized: "history.scrollToTop")))
     }

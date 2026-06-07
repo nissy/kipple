@@ -19,6 +19,7 @@ struct HistoryListView: View {
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
+    @Binding var canScrollToTop: Bool
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
     @State private var hoverResetSignal = UUID()
@@ -88,15 +89,22 @@ struct HistoryListView: View {
                 }
                 .padding(.horizontal, MainViewMetrics.HistoryColumns.horizontalInset)
                 .padding(.vertical, 4)
-            }
-            .background {
-                scrollObservers
+                .background {
+                    ScrollPositionObserver(
+                        canScrollToTop: $canScrollToTop,
+                        isScrollLocked: $isScrollLocked
+                    )
+                    .allowsHitTesting(false)
+                }
             }
             .onChange(of: copyScrollRequest?.id) { _, _ in
                 handleCopyScrollRequest(with: proxy)
             }
             .onChange(of: hoverResetRequest?.id) { _, _ in
                 handleHoverResetRequest()
+            }
+            .onChange(of: history.first?.id) { _, _ in
+                canScrollToTop = false
             }
             .onChange(of: isScrollLocked) { _, locked in
                 if locked {
@@ -107,11 +115,6 @@ struct HistoryListView: View {
         .environmentObject(actionKeyMonitor)
     }
 
-    private var scrollObservers: some View {
-        ScrollLockObserver(isLocked: $isScrollLocked)
-        .allowsHitTesting(false)
-    }
-
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
         guard copyScrollRequest != nil else { return }
         copyScrollRequest = nil
@@ -119,7 +122,10 @@ struct HistoryListView: View {
     }
 
     private func scrollToTop(with proxy: ScrollViewProxy, animated: Bool) {
-        guard let topID = history.first?.id else { return }
+        guard let topID = history.first?.id else {
+            canScrollToTop = false
+            return
+        }
 
         DispatchQueue.main.async {
             if animated {
@@ -129,6 +135,7 @@ struct HistoryListView: View {
             } else {
                 proxy.scrollTo(topID, anchor: .top)
             }
+            canScrollToTop = false
         }
     }
 
@@ -165,6 +172,170 @@ final class HistoryHoverCoordinator: ObservableObject {
     }
 }
 
+private struct ScrollPositionObserver: NSViewRepresentable {
+    @Binding var canScrollToTop: Bool
+    @Binding var isScrollLocked: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(canScrollToTop: $canScrollToTop, isScrollLocked: $isScrollLocked)
+    }
+
+    func makeNSView(context: Context) -> ScrollPositionObserverView {
+        let view = ScrollPositionObserverView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateNSView(_ nsView: ScrollPositionObserverView, context: Context) {
+        nsView.coordinator = context.coordinator
+        nsView.attachIfNeeded()
+    }
+
+    final class Coordinator {
+        private var canScrollToTop: Binding<Bool>
+        private var isScrollLocked: Binding<Bool>
+
+        init(canScrollToTop: Binding<Bool>, isScrollLocked: Binding<Bool>) {
+            self.canScrollToTop = canScrollToTop
+            self.isScrollLocked = isScrollLocked
+        }
+
+        func setCanScrollToTop(_ canScroll: Bool) {
+            if canScrollToTop.wrappedValue != canScroll {
+                canScrollToTop.wrappedValue = canScroll
+            }
+        }
+
+        func setLocked(_ locked: Bool) {
+            if isScrollLocked.wrappedValue != locked {
+                isScrollLocked.wrappedValue = locked
+            }
+        }
+    }
+}
+
+private final class ScrollPositionObserverView: NSView {
+    weak var coordinator: ScrollPositionObserver.Coordinator?
+    private var observers: [NSObjectProtocol] = []
+    private weak var observedScrollView: NSScrollView?
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        attachIfNeeded()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        attachIfNeeded()
+    }
+
+    func attachIfNeeded() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let target = self.findEnclosingScrollView()
+            if self.observedScrollView === target {
+                self.updateScrollState()
+                return
+            }
+            self.detachObservers()
+            guard let scrollView = target else { return }
+            self.observedScrollView = scrollView
+            self.attachObservers(to: scrollView)
+            self.updateScrollState()
+        }
+    }
+
+    private func findEnclosingScrollView() -> NSScrollView? {
+        var current: NSView? = self
+        while let view = current {
+            if let scrollView = view as? NSScrollView {
+                return scrollView
+            }
+            current = view.superview
+        }
+        return nil
+    }
+
+    private func attachObservers(to scrollView: NSScrollView) {
+        scrollView.contentView.postsBoundsChangedNotifications = true
+
+        let center = NotificationCenter.default
+        let bounds = center.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateScrollState()
+            }
+        }
+        let will = center.addObserver(
+            forName: NSScrollView.willStartLiveScrollNotification,
+            object: scrollView,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.coordinator?.setLocked(true)
+                HistoryPopoverManager.shared.scheduleHide()
+                self?.updateScrollState()
+            }
+        }
+        let did = center.addObserver(
+            forName: NSScrollView.didEndLiveScrollNotification,
+            object: scrollView,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.coordinator?.setLocked(false)
+                self?.updateScrollState()
+            }
+        }
+        observers = [bounds, will, did]
+    }
+
+    private func updateScrollState() {
+        guard let scrollView = observedScrollView else {
+            coordinator?.setCanScrollToTop(false)
+            return
+        }
+
+        let visibleBounds = scrollView.contentView.bounds
+        let documentBounds = scrollView.documentView?.bounds ?? .zero
+        let topOffset: CGFloat
+        if scrollView.documentView?.isFlipped == true {
+            topOffset = visibleBounds.minY
+        } else {
+            topOffset = max(0, documentBounds.maxY - visibleBounds.maxY)
+        }
+        coordinator?.setCanScrollToTop(topOffset > Self.topTolerance)
+    }
+
+    private func detachObservers() {
+        for observer in observers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        observers.removeAll()
+        if observedScrollView != nil {
+            coordinator?.setCanScrollToTop(false)
+            coordinator?.setLocked(false)
+        }
+        observedScrollView = nil
+    }
+
+    override func removeFromSuperview() {
+        detachObservers()
+        super.removeFromSuperview()
+    }
+
+    deinit {
+        MainActor.assumeIsolated {
+            detachObservers()
+        }
+    }
+
+    private static let topTolerance: CGFloat = 8
+}
+
 enum HistoryQueueBadgeCalculator {
     static func queueBadgeValue(
         for item: ClipItem,
@@ -182,112 +353,5 @@ extension HistoryListView {
     static func isCurrentClipboardItem(_ item: ClipItem, currentID: UUID?) -> Bool {
         guard let currentID else { return false }
         return item.id == currentID
-    }
-}
-
-private struct ScrollLockObserver: NSViewRepresentable {
-    @Binding var isLocked: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(isLocked: $isLocked)
-    }
-
-    func makeNSView(context: Context) -> ScrollLockObserverView {
-        let view = ScrollLockObserverView()
-        view.coordinator = context.coordinator
-        return view
-    }
-
-    func updateNSView(_ nsView: ScrollLockObserverView, context: Context) {
-        nsView.coordinator = context.coordinator
-        nsView.attachIfNeeded()
-    }
-
-    final class Coordinator {
-        private var isLocked: Binding<Bool>
-
-        init(isLocked: Binding<Bool>) {
-            self.isLocked = isLocked
-        }
-
-        func setLocked(_ locked: Bool) {
-            if isLocked.wrappedValue != locked {
-                isLocked.wrappedValue = locked
-            }
-        }
-    }
-}
-
-private final class ScrollLockObserverView: NSView {
-    weak var coordinator: ScrollLockObserver.Coordinator?
-    private var observers: [NSObjectProtocol] = []
-    private weak var observedScrollView: NSScrollView?
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        attachIfNeeded()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        attachIfNeeded()
-    }
-
-    func attachIfNeeded() {
-        let target = findEnclosingScrollView()
-        if observedScrollView === target { return }
-        detachObservers()
-        guard let scrollView = target else { return }
-        observedScrollView = scrollView
-        attachObservers(to: scrollView)
-    }
-
-    private func findEnclosingScrollView() -> NSScrollView? {
-        var current: NSView? = self
-        while let view = current {
-            if let scroll = view as? NSScrollView {
-                return scroll
-            }
-            current = view.superview
-        }
-        return nil
-    }
-
-    private func attachObservers(to scrollView: NSScrollView) {
-        let center = NotificationCenter.default
-        let will = center.addObserver(forName: NSScrollView.willStartLiveScrollNotification, object: scrollView, queue: .main) { [weak self] _ in
-            Task { @MainActor in
-                self?.coordinator?.setLocked(true)
-                HistoryPopoverManager.shared.scheduleHide()
-            }
-        }
-        let did = center.addObserver(forName: NSScrollView.didEndLiveScrollNotification, object: scrollView, queue: .main) { [weak self] _ in
-            Task { @MainActor in
-                self?.coordinator?.setLocked(false)
-            }
-        }
-        observers = [will, did]
-    }
-
-    private func detachObservers() {
-        for observer in observers {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        observers.removeAll()
-        if observedScrollView != nil {
-            coordinator?.setLocked(false)
-        }
-        observedScrollView = nil
-    }
-
-    override func removeFromSuperview() {
-        detachObservers()
-        super.removeFromSuperview()
-    }
-
-    deinit {
-        MainActor.assumeIsolated {
-            detachObservers()
-        }
     }
 }
