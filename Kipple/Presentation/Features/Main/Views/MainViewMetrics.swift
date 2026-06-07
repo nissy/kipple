@@ -42,7 +42,7 @@ enum MainViewMetrics {
         static let sectionHorizontalPadding: CGFloat = 10
         static let horizontalInset: CGFloat = 6
         static let spacing: CGFloat = 5
-        static let toolbarSpacing: CGFloat = 10
+        static let toolbarSpacing: CGFloat = spacing
         static let toolbarTopPadding: CGFloat = 0
         static let toolbarBottomPadding: CGFloat = 6
         static let controlColumnWidth: CGFloat = KippleButtonMetrics.historyCategoryButtonSize

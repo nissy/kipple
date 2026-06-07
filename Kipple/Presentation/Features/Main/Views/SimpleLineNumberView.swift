@@ -36,7 +36,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
     private var editorTextColor: NSColor {
         isEditable
             ? MainViewMetrics.TextColor.primaryNSColor
-            : MainViewMetrics.TextColor.primaryNSColor.withAlphaComponent(0.82)
+            : MainViewMetrics.TextColor.primaryNSColor.withAlphaComponent(0.58)
     }
     
     func makeNSView(context: Context) -> NSScrollView {
