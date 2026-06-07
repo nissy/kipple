@@ -139,7 +139,7 @@ extension SimpleLineNumberRulerView {
     }
 
     func drawCurrentLineHighlight(y: CGFloat, height: CGFloat) {
-        NSColor.systemYellow.withAlphaComponent(0.42).set()
+        NSColor.systemBlue.withAlphaComponent(0.20).set()
         let path = NSBezierPath(rect: NSRect(
             x: 0,
             y: y,

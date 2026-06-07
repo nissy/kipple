@@ -15,6 +15,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     private let modernService = ModernClipboardService.shared
     private var refreshTask: Task<Void, Never>?
+    private var pendingOperationTask: Task<Void, Never>?
     private var pendingClipboardContent: String?
     private var lastKnownHistoryRevision: UInt64?
 
@@ -59,7 +60,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func copyToClipboard(_ content: String, fromEditor: Bool) {
         pendingClipboardContent = content
         currentClipboardContent = content
-        Task {
+        pendingOperationTask = Task {
             await modernService.copyToClipboard(content, fromEditor: fromEditor)
             await refreshHistory()
         }
@@ -69,7 +70,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         pendingClipboardContent = content
         currentClipboardContent = content.isEmpty ? nil : content
 
-        Task {
+        pendingOperationTask = Task {
             await modernService.writeToClipboardOnly(content)
         }
     }
@@ -255,6 +256,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func resetAdapterStateForTesting() async {
         refreshTask?.cancel()
         refreshTask = nil
+        pendingOperationTask?.cancel()
+        pendingOperationTask = nil
         history = []
         currentClipboardContent = nil
         pendingClipboardContent = nil
@@ -263,6 +266,14 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         // Ensure we are in sync with the service after it resets.
         await refreshHistory()
         startPeriodicRefresh()
+    }
+
+    func flushPendingAdapterOperationForTesting() async {
+        await pendingOperationTask?.value
+    }
+
+    func refreshHistoryForTesting() async {
+        await refreshHistory()
     }
     #endif
 

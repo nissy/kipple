@@ -314,14 +314,7 @@ struct MainViewControlSection: View {
             return disabledButtonBackground
         }
 
-        return LinearGradient(
-            colors: [
-                Color.green,
-                Color.green.opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        return primaryButtonBackground
     }
 
     private var formatButtonForegroundColor: Color {
