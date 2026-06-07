@@ -13,6 +13,130 @@ import Darwin
 private typealias ScreenUpdateFunction = @convention(c) () -> Void
 
 // swiftlint:disable file_length
+private final class MainGlassWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+private final class RoundedMaskContainerView: NSView {
+    private let cornerRadius: CGFloat
+
+    init(cornerRadius: CGFloat) {
+        self.cornerRadius = cornerRadius
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.cornerRadius = cornerRadius
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+        layer?.cornerRadius = cornerRadius
+    }
+}
+
+@available(macOS 26.0, *)
+private final class MainGlassContentController<Content: View>: NSViewController {
+    private let hostingController: NSHostingController<Content>
+
+    init(rootView: Content) {
+        hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
+        super.init(nibName: nil, bundle: nil)
+        addChild(hostingController)
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let container = RoundedMaskContainerView(cornerRadius: KippleGlassMetrics.windowCornerRadius)
+
+        let glassView = NSGlassEffectView()
+        glassView.style = .regular
+        glassView.cornerRadius = KippleGlassMetrics.windowCornerRadius
+        glassView.tintColor = nil
+        glassView.translatesAutoresizingMaskIntoConstraints = false
+        glassView.wantsLayer = true
+        glassView.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
+        glassView.layer?.cornerCurve = .continuous
+        glassView.layer?.masksToBounds = true
+
+        hostingController.view.wantsLayer = true
+        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingController.view.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
+        hostingController.view.layer?.cornerCurve = .continuous
+        hostingController.view.layer?.masksToBounds = true
+        glassView.contentView = hostingController.view
+        container.addSubview(glassView)
+        NSLayoutConstraint.activate([
+            glassView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            glassView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            glassView.topAnchor.constraint(equalTo: container.topAnchor),
+            glassView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+
+        view = container
+    }
+}
+
+private final class MainMaterialContentController<Content: View>: NSViewController {
+    private let hostingController: NSHostingController<Content>
+
+    init(rootView: Content) {
+        hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
+        super.init(nibName: nil, bundle: nil)
+        addChild(hostingController)
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func loadView() {
+        let container = RoundedMaskContainerView(cornerRadius: KippleGlassMetrics.windowCornerRadius)
+
+        let materialView = NSVisualEffectView()
+        materialView.blendingMode = .behindWindow
+        materialView.material = .popover
+        materialView.state = .active
+        materialView.translatesAutoresizingMaskIntoConstraints = false
+        materialView.wantsLayer = true
+        materialView.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
+        materialView.layer?.cornerCurve = .continuous
+        materialView.layer?.masksToBounds = true
+
+        hostingController.view.wantsLayer = true
+        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        materialView.addSubview(hostingController.view)
+        container.addSubview(materialView)
+        NSLayoutConstraint.activate([
+            materialView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            materialView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            materialView.topAnchor.constraint(equalTo: container.topAnchor),
+            materialView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            hostingController.view.leadingAnchor.constraint(equalTo: materialView.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: materialView.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: materialView.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: materialView.bottomAnchor)
+        ])
+
+        view = container
+    }
+}
+
 @MainActor
 protocol WindowManaging: AnyObject {
     func openMainWindow()
@@ -73,14 +197,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
     }
     private var preventAutoClose = false
-    private let referenceScreenshotPixelSize = NSSize(width: 750, height: 1500)
     
     // Observers
-    private var windowObserver: NSObjectProtocol?
-    private var windowResignObserver: NSObjectProtocol?
     private var windowResizeObserver: NSObjectProtocol?
-    private var appDidResignActiveObserver: NSObjectProtocol?
-    private var appDidBecomeActiveObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
     var onTextCaptureRequested: (() -> Void)?
@@ -129,6 +248,24 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     // MARK: - Main Window
+
+    @MainActor
+    func prewarmMainWindow() {
+        guard mainWindow == nil else { return }
+
+        let startedAt = PerformanceTrace.nowMicros()
+        PerformanceTrace.event("main_window_prewarm_started")
+        guard let window = createMainWindow() else { return }
+        configureMainWindow(window)
+        setupMainWindowObservers(window)
+        window.orderOut(nil)
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        PerformanceTrace.event(
+            "main_window_prewarm_finished",
+            details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
+        )
+    }
     
     @MainActor
     func openMainWindow() {
@@ -191,9 +328,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 "main_window_reopen_visible",
                 details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
             )
-            DispatchQueue.main.async { [weak self] in
-                self?.focusOnEditor()
-            }
+            focusOnEditor()
         } else {
             NSApp.activate(ignoringOtherApps: true)
             window.alphaValue = 0
@@ -219,9 +354,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 "main_window_repositioned",
                 details: ["durationUs": "\(PerformanceTrace.nowMicros() - startedAt)"]
             )
-            DispatchQueue.main.async { [weak self] in
-                self?.focusOnEditor()
-            }
+            focusOnEditor()
             return true
         }
 
@@ -298,9 +431,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
         )
         .environmentObject(viewModel)
         
-        let hostingController = NSHostingController(rootView: contentView)
-        hostingController.sizingOptions = []
-        mainWindow = NSWindow(contentViewController: hostingController)
+        if #available(macOS 26.0, *) {
+            mainWindow = MainGlassWindow(contentViewController: MainGlassContentController(rootView: contentView))
+        } else {
+            mainWindow = MainGlassWindow(contentViewController: MainMaterialContentController(rootView: contentView))
+        }
         return mainWindow
     }
     
@@ -309,7 +444,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
         window.title = localizedMainWindowTitle()
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
-        window.styleMask = [.titled, .closable, .fullSizeContentView, .resizable]
+        window.titlebarSeparatorStyle = .none
+        window.styleMask = [.borderless, .resizable]
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.isMovableByWindowBackground = true
         window.level = isAlwaysOnTop ? .floating : .normal
         // M2 Mac対応: hidesOnDeactivateを動的に設定
         window.hidesOnDeactivate = !isAlwaysOnTop
@@ -330,10 +470,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
         configureWindowSize(window)
         
         // カーソル位置にウィンドウを配置
-        attachAlwaysOnTopButton(to: window)
-        DispatchQueue.main.async { [weak self, weak window] in
-            guard let window else { return }
-            self?.attachAlwaysOnTopButton(to: window)
+        if window.styleMask.contains(.titled) {
+            attachAlwaysOnTopButton(to: window)
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let window else { return }
+                self?.attachAlwaysOnTopButton(to: window)
+            }
         }
         positionWindowAtCursor(window)
     }
@@ -355,35 +497,68 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     private func configureWindowSize(_ window: NSWindow) {
-        let savedHeight = UserDefaults.standard.double(forKey: "windowHeight")
-        let savedWidth = UserDefaults.standard.double(forKey: "windowWidth")
-        let minimumSize = resolvedMinimumWindowSize(for: window)
-        let defaultWidth: CGFloat = minimumSize.width
-        let defaultHeight: CGFloat = minimumSize.height
-        let resolvedWidth = max(savedWidth > 0 ? CGFloat(savedWidth) : defaultWidth, minimumSize.width)
-        let resolvedHeight = max(savedHeight > 0 ? CGFloat(savedHeight) : defaultHeight, minimumSize.height)
-        window.setContentSize(NSSize(width: resolvedWidth, height: resolvedHeight))
+        let defaults = UserDefaults.standard
+        let savedHeight = defaults.double(forKey: "windowHeight")
+        let savedWidth = defaults.double(forKey: "windowWidth")
+        let minimumSize = KippleGlassMetrics.mainWindowMinimumSize
+        let maximumSize = KippleGlassMetrics.mainWindowMaximumSize
+        let defaultSize = KippleGlassMetrics.mainWindowDefaultSize
+        let shouldResetSavedSize = shouldResetOversizedMainWindow(
+            savedWidth: savedWidth,
+            savedHeight: savedHeight,
+            defaults: defaults
+        )
+        let resolvedWidth = clamp(
+            savedWidth > 0 && !shouldResetSavedSize ? CGFloat(savedWidth) : defaultSize.width,
+            min: minimumSize.width,
+            max: maximumSize.width
+        )
+        let resolvedHeight = clamp(
+            savedHeight > 0 && !shouldResetSavedSize ? CGFloat(savedHeight) : defaultSize.height,
+            min: minimumSize.height,
+            max: maximumSize.height
+        )
         window.contentMinSize = minimumSize
+        window.contentMaxSize = maximumSize
         window.minSize = minimumSize
-        let maxWidth = max(CGFloat(800), minimumSize.width)
-        let maxHeight = max(CGFloat(1200), minimumSize.height)
-        window.maxSize = NSSize(width: maxWidth, height: maxHeight)
+        window.maxSize = maximumSize
+        window.setContentSize(NSSize(width: resolvedWidth, height: resolvedHeight))
+    }
+
+    private func shouldResetOversizedMainWindow(
+        savedWidth: Double,
+        savedHeight: Double,
+        defaults: UserDefaults
+    ) -> Bool {
+        let migrationKey = "mainWindowOversizedSizeMigrated"
+        guard !defaults.bool(forKey: migrationKey) else {
+            return false
+        }
+
+        let threshold = KippleGlassMetrics.mainWindowOversizedMigrationThreshold
+        let isOversized = savedWidth >= threshold.width || savedHeight >= threshold.height
+        defaults.set(true, forKey: migrationKey)
+        guard isOversized else {
+            return false
+        }
+
+        let defaultSize = KippleGlassMetrics.mainWindowDefaultSize
+        defaults.set(defaultSize.width, forKey: "windowWidth")
+        defaults.set(defaultSize.height, forKey: "windowHeight")
+        return true
     }
 
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        let minimumSize = resolvedMinimumWindowSize(for: sender)
+        let minimumSize = KippleGlassMetrics.mainWindowMinimumSize
+        let maximumSize = KippleGlassMetrics.mainWindowMaximumSize
         var adjustedSize = frameSize
-        adjustedSize.width = max(adjustedSize.width, minimumSize.width)
-        adjustedSize.height = max(adjustedSize.height, minimumSize.height)
+        adjustedSize.width = clamp(adjustedSize.width, min: minimumSize.width, max: maximumSize.width)
+        adjustedSize.height = clamp(adjustedSize.height, min: minimumSize.height, max: maximumSize.height)
         return adjustedSize
     }
 
-    private func resolvedMinimumWindowSize(for window: NSWindow?) -> NSSize {
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
-        return NSSize(
-            width: referenceScreenshotPixelSize.width / scale,
-            height: referenceScreenshotPixelSize.height / scale
-        )
+    private func clamp(_ value: CGFloat, min minimum: CGFloat, max maximum: CGFloat) -> CGFloat {
+        Swift.min(Swift.max(value, minimum), maximum)
     }
     
     private func attachAlwaysOnTopButton(to window: NSWindow) {
@@ -561,9 +736,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 window.orderFrontRegardless()
                 window.makeKeyAndOrderFront(nil)
             }
-            DispatchQueue.main.async { [weak self] in
-                self?.focusOnEditor()
-            }
+            focusOnEditor()
         default: // "fade"
             animateFade(window)
         }
@@ -657,27 +830,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func setupMainWindowObservers(_ window: NSWindow) {
         removeMainWindowObservers()
-        windowObserver = addWindowDidBecomeKeyObserver(window)
-        windowResignObserver = addWindowDidBecomeMainObserver(window)
         windowResizeObserver = addWindowResizeObserver(window)
-        appDidResignActiveObserver = addAppDidResignActiveObserver(window)
-        appDidBecomeActiveObserver = addAppDidBecomeActiveObserver()
-    }
-
-    private func addWindowDidBecomeKeyObserver(_ window: NSWindow) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeKeyNotification,
-            object: window,
-            queue: .main
-        ) { _ in }
-    }
-
-    private func addWindowDidBecomeMainObserver(_ window: NSWindow) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeMainNotification,
-            object: window,
-            queue: .main
-        ) { _ in }
     }
 
     private func addWindowResizeObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -692,37 +845,13 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
         }
     }
-
-    private func addAppDidResignActiveObserver(_ window: NSWindow) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { _ in }
-    }
-
-    private func addAppDidBecomeActiveObserver() -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { _ in }
-    }
     
     private func removeMainWindowObservers() {
         let observers = [
-            windowObserver,
-            windowResignObserver,
-            windowResizeObserver,
-            appDidResignActiveObserver,
-            appDidBecomeActiveObserver
+            windowResizeObserver
         ]
         observers.compactMap { $0 }.forEach { NotificationCenter.default.removeObserver($0) }
-        windowObserver = nil
-        windowResignObserver = nil
         windowResizeObserver = nil
-        appDidResignActiveObserver = nil
-        appDidBecomeActiveObserver = nil
     }
     
     private func handleMainWindowClose() {
@@ -782,7 +911,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             let hostingController = SettingsHostingController(rootView: settingsView)
 
             let window = NSWindow(contentViewController: hostingController)
-        window.title = localizedSettingsWindowTitle()
+            window.title = localizedSettingsWindowTitle()
             window.styleMask = [.titled, .closable]
             window.setContentSize(NSSize(width: 460, height: 380))
             window.center()

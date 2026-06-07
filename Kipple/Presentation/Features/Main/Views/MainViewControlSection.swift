@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct MainViewControlSection: View {
     @Binding var editorMode: MainViewModel.ClipboardEditorMode
@@ -16,21 +17,24 @@ struct MainViewControlSection: View {
     let onFormat: (ClipboardTextFormat) -> Void
     @ObservedObject private var appSettings = AppSettings.shared
 
-    private let buttonHeight: CGFloat = 30
-    private let horizontalPadding: CGFloat = 10
-    private let trimButtonWidth: CGFloat = 40
-    private let formatMenuButtonWidth: CGFloat = 32
+    private let iconFont = Font.system(size: 11, weight: .semibold)
 
     var body: some View {
         HStack(spacing: 6) {
-            editModeButton
-            saveButton
-            formatMenu
+            controlButtons
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
+    }
+
+    private var controlButtons: some View {
+        HStack(spacing: 6) {
+            editModeButton
+            saveButton
+            formatMenu
+        }
     }
 
     private var editModeButton: some View {
@@ -42,44 +46,46 @@ struct MainViewControlSection: View {
                     .fixedSize(horizontal: true, vertical: false)
 
                 if !editModeShortcut.isEmpty {
-                    shortcutBadge(editModeShortcut)
+                    shortcutBadge(editModeShortcut, isEnabled: !isEditorLocked)
                 }
             }
-                .padding(.horizontal, horizontalPadding)
-                .frame(minWidth: 64, minHeight: buttonHeight)
+                .padding(.horizontal, KippleButtonMetrics.editorControlHorizontalPadding)
+                .frame(
+                    minWidth: KippleButtonMetrics.editorModeMinWidth,
+                    minHeight: KippleButtonMetrics.editorControlHeight
+                )
                 .contentShape(Rectangle())
         }
         .accessibilityLabel(Text(editModeButtonTitle))
         .buttonStyle(PlainButtonStyle())
         .foregroundColor(.white)
         .background(editModeButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(editModeButtonBorder, lineWidth: 1)
-        )
+        .clipShape(editorControlShape)
+        .overlay(editorControlShape.stroke(editModeButtonBorder, lineWidth: 1))
         .shadow(color: editModeButtonShadow, radius: 4, y: 2)
         .disabled(isEditorLocked)
         .help(Text(editModeButtonHelpText))
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     private var formatMenu: some View {
         HStack(spacing: 0) {
             Button(action: trim) {
-                HStack(spacing: 4) {
-                    Image(systemName: "scissors")
-                        .font(.system(size: 11, weight: .regular))
-                }
-                .padding(.horizontal, horizontalPadding)
-                .frame(width: trimButtonWidth, height: buttonHeight)
-                .contentShape(Rectangle())
+                Image(systemName: "scissors")
+                    .font(iconFont)
+                    .frame(
+                        width: KippleButtonMetrics.editorTrimButtonWidth,
+                        height: KippleButtonMetrics.editorControlHeight
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
             .accessibilityLabel(Text("editor.trim"))
 
             Rectangle()
                 .fill(formatButtonSeparatorColor)
-                .frame(width: 1, height: buttonHeight - 12)
+                .frame(width: 1, height: KippleButtonMetrics.editorControlHeight - 12)
                 .padding(.vertical, 6)
                 .allowsHitTesting(false)
 
@@ -103,46 +109,47 @@ struct MainViewControlSection: View {
                 Image(systemName: "chevron.down")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(formatButtonForegroundColor)
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: formatMenuButtonWidth, height: buttonHeight)
-                    .contentShape(Rectangle())
+                    .font(iconFont)
             }
-            .menuStyle(BorderlessButtonMenuStyle())
             .menuIndicator(.hidden)
-            .buttonStyle(PlainButtonStyle())
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .frame(
+                width: KippleButtonMetrics.editorFormatMenuButtonWidth,
+                height: KippleButtonMetrics.editorControlHeight
+            )
+            .contentShape(Rectangle())
             .accessibilityLabel(Text("editor.format"))
         }
         .foregroundColor(formatButtonForegroundColor)
         .background(formatButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(formatButtonBorderColor, lineWidth: 1)
-        )
+        .clipShape(editorControlShape)
+        .overlay(editorControlShape.stroke(formatButtonBorderColor, lineWidth: 1))
         .shadow(color: formatButtonShadowColor, radius: 4, y: 2)
         .disabled(isFormatDisabled)
         .contentShape(Rectangle())
         .help(Text(formatButtonHelpText))
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     private var saveButton: some View {
-        Button(action: onSave) {
+        Button(action: save) {
             saveButtonLabel
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: buttonHeight)
-            .contentShape(Rectangle())
+                .padding(.horizontal, KippleButtonMetrics.editorControlHorizontalPadding)
+                .frame(height: KippleButtonMetrics.editorControlHeight)
+                .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .foregroundColor(saveButtonForegroundColor)
         .background(saveButtonBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(saveButtonBorderColor, lineWidth: 1)
-        )
+        .clipShape(editorControlShape)
+        .overlay(editorControlShape.stroke(saveButtonBorderColor, lineWidth: 1))
         .shadow(color: saveButtonShadowColor, radius: 4, y: 2)
         .disabled(isSaveDisabled)
         .help(Text(saveButtonHelpText))
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     private var saveButtonLabel: some View {
@@ -154,46 +161,32 @@ struct MainViewControlSection: View {
 
             let shortcut = getShortcutKeyDisplay()
             if !shortcut.isEmpty {
-                shortcutBadge(shortcut)
+                shortcutBadge(shortcut, isEnabled: !isSaveDisabled)
             }
         }
         .accessibilityElement()
         .accessibilityLabel(Text("editor.saveToHistory"))
     }
 
-    private func buttonLabel(
-        systemImage: String,
-        title: LocalizedStringKey? = nil,
-        shortcut: String,
-        accessibilityLabel: LocalizedStringKey
-    ) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .regular))
-
-            if let title {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-
-            if !shortcut.isEmpty {
-                shortcutBadge(shortcut)
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel(Text(accessibilityLabel))
-    }
-
-    private func shortcutBadge(_ text: String) -> some View {
+    private func shortcutBadge(_ text: String, isEnabled: Bool = true) -> some View {
         Text(text)
             .font(.caption)
-            .foregroundColor(.white)
+            .foregroundColor(isEnabled ? .white : disabledEditorControlForeground)
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(Color.white.opacity(0.25))
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .background(
+                isEnabled
+                ? Color.white.opacity(0.25)
+                : Color.secondary.opacity(0.08)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+    }
+
+    private var editorControlShape: RoundedRectangle {
+        RoundedRectangle(
+            cornerRadius: KippleButtonMetrics.editorControlCornerRadius,
+            style: .continuous
+        )
     }
 
     private var primaryButtonBackground: LinearGradient {
@@ -280,8 +273,8 @@ struct MainViewControlSection: View {
     private var disabledButtonBackground: LinearGradient {
         LinearGradient(
             colors: [
-                Color(NSColor.controlBackgroundColor).opacity(0.88),
-                Color(NSColor.controlBackgroundColor).opacity(0.72)
+                Color.secondary.opacity(0.09),
+                Color.secondary.opacity(0.055)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -293,11 +286,11 @@ struct MainViewControlSection: View {
     }
 
     private var saveButtonForegroundColor: Color {
-        isSaveDisabled ? Color.secondary.opacity(0.62) : Color.white
+        isSaveDisabled ? disabledEditorControlForeground : Color.white
     }
 
     private var saveButtonBorderColor: Color {
-        isSaveDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+        isSaveDisabled ? disabledEditorControlBorder : Color.white.opacity(0.15)
     }
 
     private var saveButtonShadowColor: Color {
@@ -315,36 +308,37 @@ struct MainViewControlSection: View {
 
         return "editor.saveToHistory"
     }
-    
+
     private var formatButtonBackground: LinearGradient {
         if isFormatDisabled {
             return disabledButtonBackground
         }
 
-        return LinearGradient(
-            colors: [
-                Color.green,
-                Color.green.opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        return primaryButtonBackground
     }
 
     private var formatButtonForegroundColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.62) : Color.white
+        isFormatDisabled ? disabledEditorControlForeground : Color.white
     }
 
     private var formatButtonBorderColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.18) : Color.white.opacity(0.15)
+        isFormatDisabled ? disabledEditorControlBorder : Color.white.opacity(0.15)
     }
 
     private var formatButtonSeparatorColor: Color {
-        isFormatDisabled ? Color.secondary.opacity(0.16) : Color.white.opacity(0.25)
+        isFormatDisabled ? Color.secondary.opacity(0.10) : Color.white.opacity(0.25)
     }
 
     private var formatButtonShadowColor: Color {
         isFormatDisabled ? Color.clear : Color.black.opacity(0.12)
+    }
+
+    private var disabledEditorControlForeground: Color {
+        Color.secondary.opacity(0.46)
+    }
+
+    private var disabledEditorControlBorder: Color {
+        Color.secondary.opacity(0.09)
     }
 
     private func toggleEditorMode() {
@@ -367,6 +361,11 @@ struct MainViewControlSection: View {
     private func trim() {
         guard !isFormatDisabled else { return }
         onTrim()
+    }
+
+    private func save() {
+        guard !isSaveDisabled else { return }
+        onSave()
     }
 
     private func format(_ textFormat: ClipboardTextFormat) {

@@ -9,7 +9,7 @@ import SwiftUI
 
 private enum CategoryManagerLayout {
     static let columnSpacing: CGFloat = 8
-    static let iconColumnWidth: CGFloat = 36
+    static let iconColumnWidth: CGFloat = 56
     static let nameColumnMinWidth: CGFloat = 180
     static let toggleColumnWidth: CGFloat = 140
     static let deleteColumnWidth: CGFloat = 40
@@ -52,13 +52,25 @@ struct CategoryManagerView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth)
 
-                Picker("Icon", selection: $symbol) {
+                Menu {
                     ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
-                        Label(s, systemImage: s).labelStyle(.iconOnly)
-                            .tag(s)
+                        Button {
+                            symbol = s
+                        } label: {
+                            Label(s, systemImage: s)
+                                .labelStyle(.iconOnly)
+                                .accessibilityLabel(Text(s))
+                        }
                     }
+                } label: {
+                    Image(systemName: symbol)
+                        .frame(width: 24, height: 24)
+                        .font(.system(size: 14))
                 }
-                .pickerStyle(.menu)
+                .menuIndicator(.hidden)
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(Text("Choose icon"))
 
                 Button("Add") {
                     guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -75,19 +87,23 @@ struct CategoryManagerView: View {
                     Text("Icon")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                         .frame(width: CategoryManagerLayout.iconColumnWidth, alignment: .leading)
                     Text("Name")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                         .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth, alignment: .leading)
                     Spacer(minLength: CategoryManagerLayout.spacerMinWidth)
                     Text("Show in filter")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                         .frame(width: CategoryManagerLayout.toggleColumnWidth, alignment: .center)
                     Text("Delete")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                         .frame(width: CategoryManagerLayout.deleteColumnWidth, alignment: .center)
                 }
                 .padding(.vertical, 4)
@@ -210,6 +226,7 @@ private extension CategoryManagerView {
                     .frame(width: 24, height: 24)
                     .font(.system(size: 14))
             }
+            .menuIndicator(.hidden)
             .menuStyle(.borderlessButton)
             .fixedSize()
             .help(Text("Change icon"))

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct ClipboardItemPopover: View {
     private let initialItem: ClipItem
@@ -32,26 +33,28 @@ struct ClipboardItemPopover: View {
         return VStack(alignment: .leading, spacing: 0) {
             headerSection(for: item)
                 .padding(16)
-                .background(Color(NSColor.textBackgroundColor).opacity(0.5))
+
+            Divider()
+                .opacity(0.08)
 
             Text(verbatim: previewText)
                 .font(Font(fontManager.historyFont))
+                .foregroundColor(MainViewMetrics.TextColor.primary)
                 .lineSpacing(4)
                 .lineLimit(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .multilineTextAlignment(.leading)
                 .padding(16)
                 .fixedSize(horizontal: false, vertical: true)
-                .background(Color(NSColor.textBackgroundColor))
+
+            Divider()
+                .opacity(0.07)
 
             metadataSection(for: item)
                 .padding(16)
-                .background(Color(NSColor.windowBackgroundColor))
         }
         .frame(width: 320)
-        .background(Color(NSColor.windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(color: Color.black.opacity(0.1), radius: 6, y: 3)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func headerSection(for item: ClipItem) -> some View {
@@ -61,13 +64,14 @@ struct ClipboardItemPopover: View {
             HStack(spacing: 6) {
                 Image(systemName: categoryInfo.icon)
                     .font(.system(size: 12))
+                    .foregroundColor(categoryInfo.color)
                 Text(verbatim: categoryInfo.name)
                     .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
             }
-            .foregroundColor(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Capsule().fill(categoryInfo.color))
+            .kippleControlSurface(in: Capsule(), isEnabled: true)
 
             Spacer()
 
@@ -80,7 +84,7 @@ struct ClipboardItemPopover: View {
                                 .foregroundColor(.accentColor)
                             Text(localizedAppName(appName))
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.primary)
+                                .foregroundColor(MainViewMetrics.TextColor.primary)
                         }
                     }
 
@@ -109,6 +113,7 @@ struct ClipboardItemPopover: View {
                     .foregroundColor(.secondary)
                 Text("\(item.characterCount)")
                     .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -117,6 +122,7 @@ struct ClipboardItemPopover: View {
                     .foregroundColor(.secondary)
                 Text(item.formattedTimestamp)
                     .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(MainViewMetrics.TextColor.primary)
                     .lineLimit(1)
             }
 

@@ -43,7 +43,7 @@ struct MainView: View {
     @State var editorHeightResetID: UUID?
     @State private var lastKnownEditorPosition: String = AppSettings.shared.editorPosition
     private let minimumSectionHeight: Double = 150
-    private let titleBarHeight: CGFloat = 8
+    let titleBarHeight: CGFloat = 48
     @State private var isShowingQuitConfirmation = false
     @State private var ignoreNextAutoCloseAfterQueueFinish = false
     @State private var pendingReactivateAfterQueueFinish = false
@@ -245,12 +245,10 @@ extension MainView {
                 )
             }
         }
-        .background(
-            Color(NSColor.windowBackgroundColor)
-        )
-
         .padding(.top, titleBarHeight)
+        .kippleLiquidWindowBackground()
         .frame(minWidth: 300, maxWidth: .infinity)
+        .overlay(alignment: .top) { titleBarControls }
         .overlay(
             CopiedNotificationView(
                 showNotification: $isShowingCopiedNotification,
