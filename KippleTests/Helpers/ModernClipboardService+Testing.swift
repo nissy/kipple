@@ -24,7 +24,7 @@ extension ModernClipboardService {
         await MainActor.run {
             RepositoryProvider.useTestingRepository(repository)
         }
-        await setRepository(repository)
+        setRepository(repository)
         await loadHistoryFromRepository()
     }
 }

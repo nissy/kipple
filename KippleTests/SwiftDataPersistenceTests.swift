@@ -95,7 +95,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
     /// Test that metadata updates persist
     func testMetadataUpdatesPersist() async throws {
         // Given: Add item with initial metadata
-        var item = ClipItem(
+        let item = ClipItem(
             content: "Metadata Test",
             isPinned: false,
             sourceApp: "Initial App",

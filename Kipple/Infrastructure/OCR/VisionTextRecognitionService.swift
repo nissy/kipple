@@ -32,7 +32,7 @@ final class VisionTextRecognitionService: TextRecognitionServiceProtocol {
             let handler = VNImageRequestHandler(cgImage: image, options: [:])
             try handler.perform([request])
 
-            guard let observations = request.results as? [VNRecognizedTextObservation] else {
+            guard let observations = request.results else {
                 return ""
             }
 

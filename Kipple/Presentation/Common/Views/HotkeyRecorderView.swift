@@ -263,7 +263,9 @@ final class KeyCaptureView: NSView {
                 object: window,
                 queue: .main
             ) { [weak self] _ in
-                self?.finishRecordingIfFocusLost()
+                Task { @MainActor [weak self] in
+                    self?.finishRecordingIfFocusLost()
+                }
             }
         }
 
@@ -272,7 +274,9 @@ final class KeyCaptureView: NSView {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.finishRecordingIfFocusLost()
+            Task { @MainActor [weak self] in
+                self?.finishRecordingIfFocusLost()
+            }
         }
     }
 
@@ -292,7 +296,7 @@ final class KeyCaptureView: NSView {
         onFocusLost?()
     }
 
-    deinit {
+    isolated deinit {
         removeLocalMonitor()
         removeFocusObservers()
     }

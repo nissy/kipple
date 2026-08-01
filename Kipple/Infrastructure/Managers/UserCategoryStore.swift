@@ -93,7 +93,7 @@ final class UserCategoryStore: ObservableObject {
 
     enum BuiltInKind { case none, url }
     func builtInKind(for id: UUID) -> BuiltInKind? {
-        if id == Self.builtInNoneID { return .none }
+        if id == Self.builtInNoneID { return BuiltInKind.none }
         if id == Self.builtInURLID { return .url }
         return nil
     }

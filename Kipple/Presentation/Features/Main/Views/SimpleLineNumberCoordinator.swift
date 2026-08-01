@@ -8,7 +8,8 @@
 import SwiftUI
 import AppKit
 
-final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, NSLayoutManagerDelegate {
+@MainActor
+final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, @preconcurrency NSLayoutManagerDelegate {
     var parent: SimpleLineNumberView
     weak var textView: NSTextView?
     weak var scrollView: NSScrollView?
@@ -24,7 +25,7 @@ final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, NSLayoutM
         super.init()
     }
     
-    deinit {
+    isolated deinit {
         if let observer = notificationObserver {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -39,7 +40,9 @@ final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, NSLayoutM
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.updateLayout()
+            Task { @MainActor [weak self] in
+                self?.updateLayout()
+            }
         }
     }
     

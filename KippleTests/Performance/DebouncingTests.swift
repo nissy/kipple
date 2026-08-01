@@ -19,17 +19,17 @@ final class DebouncingTests: XCTestCase {
     private var cancellables = Set<AnyCancellable>()
     private var mockClipboardService: MockClipboardService!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         cancellables.removeAll()
         mockClipboardService = MockClipboardService()
     }
     
-    override func tearDown() {
+    override func tearDown() async throws {
         cancellables.removeAll()
         mockClipboardService?.reset()
         mockClipboardService = nil
-        super.tearDown()
+        try await super.tearDown()
     }
     
     // MARK: - Editor Save Debouncing (500ms)

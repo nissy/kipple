@@ -853,8 +853,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             forName: NSWindow.didResizeNotification,
             object: window,
             queue: .main
-        ) { notification in
-            if let window = notification.object as? NSWindow {
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let window = self?.mainWindow else { return }
                 UserDefaults.standard.set(window.frame.height, forKey: "windowHeight")
                 UserDefaults.standard.set(window.frame.width, forKey: "windowWidth")
             }
@@ -961,14 +962,16 @@ final class WindowManager: NSObject, NSWindowDelegate {
             object: settingsWindow,
             queue: .main
         ) { [weak self] _ in
-            NSApp.setActivationPolicy(.accessory)
-            if let observer = self?.settingsObserver {
-                NotificationCenter.default.removeObserver(observer)
-                self?.settingsObserver = nil
+            Task { @MainActor [weak self] in
+                NSApp.setActivationPolicy(.accessory)
+                if let observer = self?.settingsObserver {
+                    NotificationCenter.default.removeObserver(observer)
+                    self?.settingsObserver = nil
+                }
+                self?.settingsCoordinator = nil
+                self?.settingsViewModel = nil
+                self?.settingsWindow = nil
             }
-            self?.settingsCoordinator = nil
-            self?.settingsViewModel = nil
-            self?.settingsWindow = nil
         }
     }
     

@@ -73,8 +73,6 @@ final class SwiftDataRepositoryComprehensiveTests: XCTestCase, @unchecked Sendab
             content: "Updated",
             isPinned: true
         )
-        // Update using the original item's id
-        var mutableItem = updatedItem
         // We'll test update by deleting old and saving new
         try await repository.delete(originalItem)
         try await repository.save([updatedItem])

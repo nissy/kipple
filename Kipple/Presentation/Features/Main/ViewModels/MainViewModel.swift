@@ -199,7 +199,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if keepPinned {
             await clipboardService.clearHistory(keepPinned: true)
         } else {
-            await clipboardService.clearAllHistory()
+            clipboardService.clearAllHistory()
         }
         loadHistory()
     }

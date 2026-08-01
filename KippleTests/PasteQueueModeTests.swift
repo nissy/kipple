@@ -15,8 +15,8 @@ final class PasteQueueModeTests: XCTestCase {
     private var mockService: MockClipboardService!
     private var pasteMonitor: MockPasteCommandMonitor!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         mockService = MockClipboardService()
         pasteMonitor = MockPasteCommandMonitor()
         viewModel = MainViewModel(
@@ -29,11 +29,11 @@ final class PasteQueueModeTests: XCTestCase {
         viewModel.loadHistory()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         viewModel = nil
         mockService = nil
         pasteMonitor = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testEnqueueAddsItemsInOrder() {

@@ -250,7 +250,9 @@ struct PermissionsSettingsView: View {
     private func startPermissionPolling() {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            refreshPermissions()
+            Task { @MainActor in
+                refreshPermissions()
+            }
         }
         if let timer = permissionPollingTimer {
             RunLoop.main.add(timer, forMode: .common)

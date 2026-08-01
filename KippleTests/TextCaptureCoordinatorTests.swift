@@ -39,7 +39,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
     }
 
     func testStartCaptureFlowWhenPermissionGrantedPresentsOverlay() {
-        var preflightState = true
+        let preflightState = true
         let overlay = StubOverlayController()
 
         let dependencies = TextCaptureCoordinator.ScreenCapturePermissionDependencies(

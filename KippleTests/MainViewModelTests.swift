@@ -16,18 +16,18 @@ class MainViewModelTests: XCTestCase {
     var viewModel: MainViewModel!
     var mockClipboardService: MockClipboardService!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         UserDefaults.standard.removeObject(forKey: "lastEditorText")
         mockClipboardService = MockClipboardService()
         viewModel = MainViewModel(clipboardService: mockClipboardService)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         viewModel = nil
         mockClipboardService = nil
         UserDefaults.standard.removeObject(forKey: "lastEditorText")
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Editor Tests

@@ -248,7 +248,7 @@ final class ModernClipboardPinPreservationTests: XCTestCase {
         let testContent = ""
         await service.copyToClipboard(testContent, fromEditor: false)
 
-        var history = await service.getHistory()
+        let history = await service.getHistory()
         XCTAssertTrue(history.isEmpty, "Empty content should be ignored")
     }
 
