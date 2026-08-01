@@ -996,7 +996,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
 extension MainViewModel {
     var canUsePasteQueue: Bool {
-        pasteMonitor.hasAccessibilityPermission
+        pasteMonitor.hasInputMonitoringPermission
     }
 
     var canUseScreenTextCapture: Bool {

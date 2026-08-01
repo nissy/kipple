@@ -2,6 +2,7 @@
 "1. Click “Request Permission Again” and follow the macOS prompt to System Settings." = "1. Click “Request Permission Again” and follow the macOS prompt to System Settings.";
 "1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings." = "1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings.";
 "2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”." = "2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”.";
+"2. In System Settings → Privacy & Security → Input Monitoring, enable “Kipple”." = "2. In System Settings → Privacy & Security → Input Monitoring, enable “Kipple”.";
 "2. In System Settings → Privacy & Security → Screen Recording, enable “Kipple”." = "2. In System Settings → Privacy & Security → Screen Recording, enable “Kipple”.";
 "3. Return to Kipple; the status badge switches to Granted automatically." = "3. Return to Kipple; the status badge switches to Granted automatically.";
 "Abc 123 あいう" = "Abc 123 あいう";
@@ -10,6 +11,7 @@
 "About" = "About";
 "About Kipple" = "About Kipple";
 "Accessibility Permission" = "Accessibility Permission";
+"Input Monitoring Permission" = "Input Monitoring Permission";
 "Accessibility Permission Ready" = "Accessibility Permission Ready";
 "Add" = "Add";
 "Add Fallback Font" = "Add Fallback Font";
@@ -157,6 +159,8 @@
 "Screen Recording Permission" = "Screen Recording Permission";
 "Screen Recording Permission Ready" = "Screen Recording Permission Ready";
 "Request Access" = "Request Access";
+"Used By" = "Used By";
+"This feature is unavailable without this permission." = "This feature is unavailable without this permission.";
 "Overview" = "Overview";
 "Text Capture Hotkey" = "Global Hotkey";
 "Screen Text Capture" = "Screen Text Capture";
@@ -181,7 +185,6 @@
 "System Default" = "System Default";
 "The selected shortcut is already taken. Try another combination." = "The selected shortcut is already taken. Try another combination.";
 "This enables standard users to approve the permission." = "This enables standard users to approve the permission.";
-"Tip: Granting Accessibility lets Kipple observe Command+V while running in the background." = "Tip: Granting Accessibility lets Kipple observe Command+V while running in the background.";
 "Automation Prompt Tip" = "If macOS shows an “Automation” prompt, allow Kipple to control System Settings so the shortcut can open the correct pane.";
 "Top" = "Top";
 "URL" = "URL";
@@ -196,7 +199,8 @@
 "Other Fonts" = "Other Fonts";
 "Font size" = "Font size";
 "Text could not be detected. Please try another area." = "Text could not be detected. Please try another area.";
-"Why: Lets Quick Paste watch Command+V for clipboard automation. Input stays on device." = "Why: Lets Quick Paste watch Command+V for clipboard automation. Input stays on device.";
+"Why: Lets Paste on Selection send Command+V to the frontmost app. Input stays on device." = "Why: Lets Paste on Selection send Command+V to the frontmost app. Input stays on device.";
+"Why: Lets the paste queue watch Command+V to advance items. Input stays on device." = "Why: Lets the paste queue watch Command+V to advance items. Input stays on device.";
 "Why: Needed so Screen Text Capture can read on-screen text. No screen data leaves your Mac." = "Why: Needed so Screen Text Capture can read on-screen text. No screen data leaves your Mac.";
 "Window Animation" = "Window Animation";
 "Yu Gothic" = "Yu Gothic";

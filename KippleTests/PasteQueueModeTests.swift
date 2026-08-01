@@ -275,7 +275,7 @@ final class PasteQueueModeTests: XCTestCase {
     }
 
     func testQueueSelectionIgnoredWhenPermissionMissing() {
-        pasteMonitor.hasAccessibilityPermission = false
+        pasteMonitor.hasInputMonitoringPermission = false
         let items = Array(mockService.history.prefix(2))
 
         viewModel.toggleQueueMode()
@@ -513,10 +513,11 @@ final class PasteQueueModeTests: XCTestCase {
 private final class MockPasteCommandMonitor: PasteCommandMonitoring {
     private var handler: (() -> Void)?
     private(set) var isMonitoring = false
-    var hasAccessibilityPermission: Bool = true
+    private(set) var permissionRequestCount = 0
+    var hasInputMonitoringPermission: Bool = true
 
     func start(handler: @escaping () -> Void) -> Bool {
-        guard hasAccessibilityPermission else { return false }
+        guard hasInputMonitoringPermission else { return false }
         self.handler = handler
         isMonitoring = true
         return true
@@ -525,6 +526,12 @@ private final class MockPasteCommandMonitor: PasteCommandMonitoring {
     func stop() {
         handler = nil
         isMonitoring = false
+    }
+
+    @discardableResult
+    func requestInputMonitoringPermission() -> Bool {
+        permissionRequestCount += 1
+        return hasInputMonitoringPermission
     }
 
     func simulatePasteCommand() {

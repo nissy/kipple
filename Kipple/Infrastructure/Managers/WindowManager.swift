@@ -200,6 +200,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     // Observers
     private var windowResizeObserver: NSObjectProtocol?
+    private var appDidBecomeActiveObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var aboutObserver: NSObjectProtocol?
     var onTextCaptureRequested: (() -> Void)?
@@ -831,6 +832,20 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func setupMainWindowObservers(_ window: NSWindow) {
         removeMainWindowObservers()
         windowResizeObserver = addWindowResizeObserver(window)
+        appDidBecomeActiveObserver = addAppDidBecomeActiveObserver()
+    }
+
+    private func addAppDidBecomeActiveObserver() -> NSObjectProtocol {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // システム設定で権限を付与して戻った直後にキューボタンの有効状態を反映する
+            Task { @MainActor in
+                self?.syncTitleBarQueueState()
+            }
+        }
     }
 
     private func addWindowResizeObserver(_ window: NSWindow) -> NSObjectProtocol {
@@ -848,10 +863,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
     
     private func removeMainWindowObservers() {
         let observers = [
-            windowResizeObserver
+            windowResizeObserver,
+            appDidBecomeActiveObserver
         ]
         observers.compactMap { $0 }.forEach { NotificationCenter.default.removeObserver($0) }
         windowResizeObserver = nil
+        appDidBecomeActiveObserver = nil
     }
     
     private func handleMainWindowClose() {
