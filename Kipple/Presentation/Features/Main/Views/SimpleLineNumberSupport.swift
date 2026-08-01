@@ -34,6 +34,7 @@ struct SelectedLineHighlightState {
     var currentLineNumber: Int
     var lastLineProcessed: Int
     var lastLineRect: NSRect?
+    var didDrawSelectedLine: Bool
 }
 
 struct SelectedLineHighlightInput {

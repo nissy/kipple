@@ -9,6 +9,21 @@ import SwiftUI
 import AppKit
 
 extension MainView {
+    var titleBarControls: some View {
+        HStack(alignment: .top) {
+            MainViewTitleBarAccessory(state: titleBarState)
+
+            Spacer(minLength: 12)
+
+            MainViewTitleBarPinButton(state: titleBarState)
+                .padding(.top, 4)
+                .padding(.trailing, 12)
+        }
+        .frame(height: titleBarHeight, alignment: .top)
+        .padding(.top, 4)
+        .padding(.leading, 10)
+    }
+
     // MARK: - Editor Helpers
     var isEditorEnabled: Bool {
         appSettings.editorPosition != "disabled"

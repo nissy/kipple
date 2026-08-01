@@ -20,17 +20,6 @@ struct MainViewEditorSection: View {
     @ObservedObject private var fontManager = FontManager.shared
     @State private var hoveredClearButton = false
     private let clearButtonInset: CGFloat = 20
-    private var displayModeBackgroundColor: NSColor {
-        NSColor(calibratedWhite: 250.0 / 255.0, alpha: 1.0)
-    }
-    private var editorShadowColor: Color {
-        isEditing && !isLocked ? Color.black.opacity(0.08) : Color.clear
-    }
-    private var editorBackgroundColor: Color {
-        isEditing && !isLocked
-            ? Color(NSColor.textBackgroundColor)
-            : Color(displayModeBackgroundColor)
-    }
     private var isTextEditable: Bool {
         isEditing && !isLocked
     }
@@ -41,10 +30,6 @@ struct MainViewEditorSection: View {
 
             // エディタコンテンツ
             ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(editorBackgroundColor)
-                    .shadow(color: editorShadowColor, radius: isEditing ? 8 : 0, y: isEditing ? 4 : 0)
-                
                 SimpleLineNumberView(
                     text: $editorText,
                     font: fontManager.editorFont,
@@ -54,11 +39,21 @@ struct MainViewEditorSection: View {
                 ) { offset in
                     scrollOffset = offset
                 }
-                .padding(.trailing, clearButtonInset)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.trailing, isTextEditable ? clearButtonInset : 0)
 
-                clearEditorButton
+                if isTextEditable {
+                    clearEditorButton
+                }
             }
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(editorFieldFillColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(editorFieldStrokeColor, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 8)
@@ -90,22 +85,41 @@ struct MainViewEditorSection: View {
     }
 
     private var statusColor: Color {
-        if isLocked {
-            return .secondary
+        if isEditing {
+            return Color(NSColor.systemRed)
         }
 
-        return isEditing ? .red.opacity(0.75) : .secondary
+        if isTextEditable {
+            return .accentColor
+        }
+
+        return .secondary
+    }
+
+    private var editorFieldFillColor: Color {
+        if isTextEditable {
+            return Color(NSColor.textBackgroundColor).opacity(0.42)
+        }
+
+        return Color.primary.opacity(0.014)
+    }
+
+    private var editorFieldStrokeColor: Color {
+        if isTextEditable {
+            return Color.accentColor.opacity(0.16)
+        }
+
+        return Color.primary.opacity(0.025)
     }
 
     private var clearEditorButton: some View {
         Button(action: onClear) {
             Image(systemName: "xmark.circle.fill")
                 .font(MainViewMetrics.BottomBar.clearIconFont)
-                .foregroundColor(.secondary.opacity(isLocked ? 0.25 : 0.6))
-                .scaleEffect(hoveredClearButton && !isLocked ? 1.1 : 1.0)
+                .foregroundColor(.secondary.opacity(0.6))
+                .scaleEffect(hoveredClearButton ? 1.1 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(isLocked)
         .padding(.trailing, 8)
         .padding(.bottom, 6)
         .help(Text(clearHelpText))
@@ -115,6 +129,6 @@ struct MainViewEditorSection: View {
     }
 
     private var clearHelpText: LocalizedStringKey {
-        isLocked ? "editor.locked.help" : "Clear live editor"
+        "Clear live editor"
     }
 }

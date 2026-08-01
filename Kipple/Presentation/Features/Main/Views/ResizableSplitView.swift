@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import AppKit
 
 private enum SplitHandleMetrics {
     static let dotSize: CGFloat = 5
     static let dotSpacing: CGFloat = 3
     static let dotCount: Int = 3
     static let activeScale: CGFloat = 1.2
+    static let handleHeight: Double = 24
 }
 
 struct SplitViewResetConfiguration: Equatable {
@@ -31,8 +33,9 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
     let preferredHeightsProvider: (() -> (top: Double?, bottom: Double?))?
 
     @State private var isDragging = false
-    private let handleHeight: Double = 16
+    private let handleHeight: Double = SplitHandleMetrics.handleHeight
     @State private var appliedTopHeight: Double
+    @State private var dragStartTopHeight: Double?
     @State private var lastGeometryHeight: Double = 0
     @State private var processedResetID: UUID?
     
@@ -67,16 +70,10 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
 
                 // ドラッグハンドル
                 ZStack {
-                    // Background area
-                    Rectangle()
-                        .fill(Color(NSColor.windowBackgroundColor))
-                        .frame(height: handleHeight)  // 高さを少し増やす
-                    
-                    // Visual handle - 中央に配置
                     HStack(spacing: SplitHandleMetrics.dotSpacing) {
-                        ForEach(0..<SplitHandleMetrics.dotCount) { _ in
+                        ForEach(0..<SplitHandleMetrics.dotCount, id: \.self) { _ in
                             Circle()
-                                .fill(isDragging ? Color.accentColor : Color.gray.opacity(0.4))
+                                .fill(isDragging ? Color.primary.opacity(0.65) : Color.primary.opacity(0.2))
                                 .frame(
                                     width: SplitHandleMetrics.dotSize,
                                     height: SplitHandleMetrics.dotSize
@@ -85,30 +82,32 @@ struct ResizableSplitView<Top: View, Bottom: View>: View {
                     }
                     .scaleEffect(isDragging ? SplitHandleMetrics.activeScale : 1.0)
                     .animation(.spring(response: 0.3), value: isDragging)
-                }
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    if hovering {
-                        NSCursor.resizeUpDown.push()
-                    } else {
-                        NSCursor.pop()
-                    }
-                }
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                isDragging = true
-                                let totalHeight = Double(geometry.size.height)
-                                let proposed = appliedTopHeight + Double(value.translation.height)
-                                let metrics = resolvedHeights(totalHeight: totalHeight, proposedTopHeight: proposed)
-                                apply(metrics, updatingBinding: metrics.shouldPersist)
-                            }
-                            .onEnded { _ in
-                                isDragging = false
-                                let metrics = resolvedHeights(totalHeight: Double(geometry.size.height))
-                                apply(metrics)
-                            }
+                    .allowsHitTesting(false)
+
+                    SplitDragHandle(
+                        onDragBegan: {
+                            dragStartTopHeight = appliedTopHeight
+                            isDragging = true
+                        },
+                        onDragChanged: { translation in
+                            let totalHeight = Double(geometry.size.height)
+                            let proposed = (dragStartTopHeight ?? appliedTopHeight) + Double(translation)
+                            let metrics = resolvedHeights(totalHeight: totalHeight, proposedTopHeight: proposed)
+                            apply(metrics, updatingBinding: metrics.shouldPersist)
+                        },
+                        onDragEnded: {
+                            isDragging = false
+                            dragStartTopHeight = nil
+                            let metrics = resolvedHeights(totalHeight: Double(geometry.size.height))
+                            apply(metrics)
+                        }
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: handleHeight)
+                .contentShape(Rectangle())
+                .zIndex(1)
 
                 // ボトムコンテンツ
                 bottomContent
@@ -215,4 +214,70 @@ private struct SplitMetrics {
     let top: Double
     let bottom: Double
     let shouldPersist: Bool
+}
+
+private struct SplitDragHandle: NSViewRepresentable {
+    let onDragBegan: () -> Void
+    let onDragChanged: (CGFloat) -> Void
+    let onDragEnded: () -> Void
+
+    func makeNSView(context: Context) -> SplitDragHandleView {
+        let view = SplitDragHandleView()
+        view.onDragBegan = onDragBegan
+        view.onDragChanged = onDragChanged
+        view.onDragEnded = onDragEnded
+        return view
+    }
+
+    func updateNSView(_ nsView: SplitDragHandleView, context: Context) {
+        nsView.onDragBegan = onDragBegan
+        nsView.onDragChanged = onDragChanged
+        nsView.onDragEnded = onDragEnded
+    }
+}
+
+private final class SplitDragHandleView: NSView {
+    var onDragBegan: (() -> Void)?
+    var onDragChanged: ((CGFloat) -> Void)?
+    var onDragEnded: (() -> Void)?
+
+    private var startY: CGFloat?
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        postsFrameChangedNotifications = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .resizeUpDown)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(point) ? self : nil
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        startY = event.locationInWindow.y
+        onDragBegan?()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let startY else { return }
+        onDragChanged?(startY - event.locationInWindow.y)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        startY = nil
+        onDragEnded?()
+    }
 }

@@ -127,13 +127,38 @@ extension SimpleLineNumberRulerView {
         }
 
         let lineString = "\(params.currentLineNumber)"
-        let size = lineString.size(withAttributes: context.textAttributes)
+        let textAttributes = lineNumberAttributes(
+            context: context,
+            lineNumber: params.currentLineNumber
+        )
+        let size = lineString.size(withAttributes: textAttributes)
         let drawingPoint = NSPoint(
             x: ruleThickness - size.width - 5,
             y: drawingY
         )
 
-        lineString.draw(at: drawingPoint, withAttributes: context.textAttributes)
+        lineString.draw(at: drawingPoint, withAttributes: textAttributes)
+    }
+
+    func lineNumberAttributes(
+        context: LineNumberDrawingContext,
+        lineNumber: Int
+    ) -> [NSAttributedString.Key: Any] {
+        guard context.textView.isEditable else {
+            return context.textAttributes
+        }
+
+        let selectedLineNumber = calculateSelectedLineNumber(
+            fullText: context.fullText,
+            selectedRange: context.textView.selectedRange()
+        )
+        guard lineNumber == selectedLineNumber else {
+            return context.textAttributes
+        }
+
+        var attributes = context.textAttributes
+        attributes[.foregroundColor] = NSColor.labelColor.withAlphaComponent(0.68)
+        return attributes
     }
 
     private func updateLineNumberCount(

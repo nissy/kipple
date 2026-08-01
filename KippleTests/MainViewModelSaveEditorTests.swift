@@ -69,24 +69,25 @@ final class MainViewModelSaveEditorTests: XCTestCase {
     }
 
     func testSaveEditorToHistoryStaysAvailableAfterClipboardOnlyRefresh() async throws {
-        _ = try await prepareAdapterBackedViewModel(sourceText: "original")
+        let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
         commitEditorText("edited but unsaved")
 
         XCTAssertTrue(viewModel.canSaveEditorToHistory)
 
-        try await Task.sleep(for: .milliseconds(5_500))
+        await refreshAdapterBackedClipboardState(adapter)
 
         XCTAssertEqual(viewModel.editorText, "edited but unsaved")
         XCTAssertTrue(viewModel.canSaveEditorToHistory)
     }
 
     func testSaveEditorToHistoryStaysAvailableAfterMultipleClipboardOnlyRefreshes() async throws {
-        _ = try await prepareAdapterBackedViewModel(sourceText: "original")
+        let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
         commitEditorText("edited across multiple refreshes")
 
         XCTAssertTrue(viewModel.canSaveEditorToHistory)
 
-        try await Task.sleep(for: .milliseconds(10_500))
+        await refreshAdapterBackedClipboardState(adapter)
+        await refreshAdapterBackedClipboardState(adapter)
 
         XCTAssertEqual(viewModel.editorText, "edited across multiple refreshes")
         XCTAssertTrue(viewModel.canSaveEditorToHistory)
@@ -99,21 +100,21 @@ final class MainViewModelSaveEditorTests: XCTestCase {
         XCTAssertTrue(viewModel.canSaveEditorToHistory)
 
         adapter.copyToClipboard("external copy", fromEditor: false)
-        try await Task.sleep(for: .milliseconds(500))
+        await refreshAdapterBackedClipboardState(adapter)
 
         XCTAssertEqual(viewModel.editorText, "external copy")
         XCTAssertFalse(viewModel.canSaveEditorToHistory)
     }
 
     func testSavedEditorTextStaysUnavailableAfterClipboardOnlyRefresh() async throws {
-        _ = try await prepareAdapterBackedViewModel(sourceText: "original")
+        let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
         commitEditorText("edited and saved after refresh")
 
         let count = await viewModel.saveEditorToHistory()
         XCTAssertEqual(count, 1)
         XCTAssertFalse(viewModel.canSaveEditorToHistory)
 
-        try await Task.sleep(for: .milliseconds(5_500))
+        await refreshAdapterBackedClipboardState(adapter)
 
         XCTAssertEqual(viewModel.editorText, "edited and saved after refresh")
         XCTAssertFalse(viewModel.canSaveEditorToHistory)
@@ -174,7 +175,7 @@ final class MainViewModelSaveEditorTests: XCTestCase {
         await ModernClipboardService.shared.resetForTesting()
         await adapter.clearHistory(keepPinned: false)
         adapter.copyToClipboard(sourceText, fromEditor: false)
-        try await Task.sleep(for: .milliseconds(300))
+        await refreshAdapterBackedClipboardState(adapter)
         viewModel = MainViewModel(clipboardService: adapter)
         return adapter
     }
@@ -183,5 +184,10 @@ final class MainViewModelSaveEditorTests: XCTestCase {
         viewModel.beginClipboardEditing()
         viewModel.editorText = text
         viewModel.commitClipboardEditor()
+    }
+
+    private func refreshAdapterBackedClipboardState(_ adapter: ModernClipboardServiceAdapter) async {
+        await adapter.flushPendingAdapterOperationForTesting()
+        await adapter.refreshHistoryForTesting()
     }
 }

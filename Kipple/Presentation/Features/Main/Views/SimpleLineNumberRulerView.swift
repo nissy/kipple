@@ -24,13 +24,19 @@ final class SimpleLineNumberRulerView: NSRulerView {
     init(textView: NSTextView) {
         self.textView = textView
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
-        ruleThickness = 40
+        ruleThickness = 28
         clientView = textView
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
     }
 
     @available(*, unavailable)
     required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        drawHashMarksAndLabels(in: dirtyRect)
     }
 
     func extendedVisibleGlyphRange(

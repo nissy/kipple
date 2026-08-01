@@ -45,6 +45,13 @@ struct MainViewTitleBarAccessory: View {
     @ObservedObject private var appSettings = AppSettings.shared
     
     var body: some View {
+        titleBarButtons
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(Color.clear)
+    }
+
+    private var titleBarButtons: some View {
         HStack(spacing: 8) {
             if state.showsQueueButton {
                 queueButton
@@ -55,9 +62,6 @@ struct MainViewTitleBarAccessory: View {
             
             editorButton
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .background(Color.clear)
     }
 }
 
@@ -80,122 +84,66 @@ private extension MainViewTitleBarAccessory {
 
     var captureButton: some View {
         let content = ZStack {
-            Circle()
-                .fill(inactiveGradient)
-                .frame(
-                    width: MainViewMetrics.TitleBar.buttonSize,
-                    height: MainViewMetrics.TitleBar.buttonSize
-                )
-                .shadow(
-                    color: Color.black.opacity(0.12),
-                    radius: 3,
-                    y: 2
-                )
-            
             Image(systemName: "text.magnifyingglass")
                 .font(MainViewMetrics.TitleBar.iconFont)
-                .foregroundColor(.secondary)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
         }
+        .frame(
+            width: MainViewMetrics.TitleBar.buttonSize,
+            height: MainViewMetrics.TitleBar.buttonSize
+        )
         
         return Button(action: handleCaptureButtonTap) {
             content
         }
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton()
         .help(captureHelpText)
         .overlay(permissionBadge(isActive: state.isCaptureEnabled), alignment: .topTrailing)
+        .focusable(false)
+        .focusEffectDisabled()
     }
     
     var queueButton: some View {
         let content = ZStack {
-            Circle()
-                .fill(queueButtonBackground)
-                .frame(
-                    width: MainViewMetrics.TitleBar.buttonSize,
-                    height: MainViewMetrics.TitleBar.buttonSize
-                )
-                .shadow(
-                    color: queueShadowColor,
-                    radius: state.isQueueEnabled ? (state.isQueueActive ? 4 : 2) : 2,
-                    y: 2
-                )
-            
             Image(systemName: "list.number")
                 .font(MainViewMetrics.TitleBar.iconFont)
                 .foregroundColor(queueIconColor)
         }
-        .scaleEffect(state.isQueueActive ? 1.0 : 0.9)
-        .animation(.spring(response: 0.3), value: state.isQueueActive)
+        .frame(
+            width: MainViewMetrics.TitleBar.buttonSize,
+            height: MainViewMetrics.TitleBar.buttonSize
+        )
         
         return Button(action: handleQueueButtonTap) {
             content
         }
-        .buttonStyle(PlainButtonStyle())
+        .kippleSystemCircleButton(isActive: state.isQueueActive)
         .help(queueHelpText)
         .overlay(permissionBadge(isActive: state.isQueueEnabled), alignment: .topTrailing)
+        .focusable(false)
+        .focusEffectDisabled()
     }
     
     var editorButton: some View {
         Button(action: state.requestToggleEditor) {
             ZStack {
-                Circle()
-                    .fill(editorButtonBackground)
-                    .frame(
-                        width: MainViewMetrics.TitleBar.buttonSize,
-                        height: MainViewMetrics.TitleBar.buttonSize
-                    )
-                    .shadow(
-                        color: state.isEditorEnabled ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08),
-                        radius: state.isEditorEnabled ? 4 : 2,
-                        y: 2
-                    )
-                
                 Image(systemName: state.isEditorEnabled ? "square.and.pencil" : "square.slash")
                     .font(MainViewMetrics.TitleBar.iconFont)
-                    .foregroundColor(state.isEditorEnabled ? .white : .secondary)
+                    .foregroundColor(KippleButtonAppearance.foreground(isActive: state.isEditorEnabled))
             }
+            .frame(
+                width: MainViewMetrics.TitleBar.buttonSize,
+                height: MainViewMetrics.TitleBar.buttonSize
+            )
         }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isEditorEnabled ? 1.0 : 0.92)
-        .animation(.spring(response: 0.3), value: state.isEditorEnabled)
+        .kippleSystemCircleButton(isActive: state.isEditorEnabled)
         .help(state.isEditorEnabled ? hideEditorHelpText : showEditorHelpText)
+        .focusable(false)
+        .focusEffectDisabled()
     }
     
-    var editorButtonBackground: LinearGradient {
-        state.isEditorEnabled ? activeGradient : inactiveGradient
-    }
-
-    var activeGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.accentColor, Color.accentColor.opacity(0.85)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    var inactiveGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(NSColor.controlBackgroundColor),
-                Color(NSColor.controlBackgroundColor).opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var queueButtonBackground: LinearGradient {
-        return state.isQueueActive ? activeGradient : inactiveGradient
-    }
-
     private var queueIconColor: Color {
-        return state.isQueueActive ? .white : .secondary
-    }
-
-    private var queueShadowColor: Color {
-        if !state.isQueueEnabled {
-            return Color.black.opacity(0.08)
-        }
-        return state.isQueueActive ? Color.accentColor.opacity(0.25) : Color.black.opacity(0.08)
+        KippleButtonAppearance.foreground(isActive: state.isQueueActive)
     }
     
     private func handleCaptureButtonTap() {
@@ -225,8 +173,8 @@ private extension MainViewTitleBarAccessory {
             if !isActive {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(MainViewMetrics.TitleBar.badgeFont)
-                    .foregroundColor(Color(.sRGB, red: 1.0, green: 0.0, blue: 0.0))
-                    .shadow(color: Color.black.opacity(0.25), radius: 1, y: 1)
+                    .foregroundColor(KippleButtonAppearance.permissionWarningForeground)
+                    .shadow(color: KippleButtonAppearance.permissionWarningShadow, radius: 1, y: 1)
                     .offset(
                         x: MainViewMetrics.TitleBar.badgeOffset.width,
                         y: MainViewMetrics.TitleBar.badgeOffset.height
@@ -243,51 +191,24 @@ struct MainViewTitleBarPinButton: View {
     var body: some View {
         Button(action: state.requestToggleAlwaysOnTop) {
             ZStack {
-                Circle()
-                    .fill(state.isAlwaysOnTop ? activeGradient : inactiveGradient)
+                Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
+                    .font(MainViewMetrics.TitleBar.iconFont)
+                    .foregroundColor(KippleButtonAppearance.foreground(isActive: state.isAlwaysOnTop))
+                    .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
                     .frame(
                         width: MainViewMetrics.TitleBar.buttonSize,
                         height: MainViewMetrics.TitleBar.buttonSize
                     )
-                    .shadow(
-                        color: state.isAlwaysOnTop ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.1),
-                        radius: state.isAlwaysOnTop ? 4 : 2,
-                        y: 2
-                    )
-                
-                Image(systemName: state.isAlwaysOnTop ? "pin.fill" : "pin")
-                    .font(MainViewMetrics.TitleBar.iconFont)
-                    .foregroundColor(state.isAlwaysOnTop ? .white : .secondary)
-                    .rotationEffect(.degrees(state.isAlwaysOnTop ? 0 : -45))
             }
         }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(state.isAlwaysOnTop ? 1.0 : 0.9)
-        .animation(.spring(response: 0.3), value: state.isAlwaysOnTop)
+        .kippleSystemCircleButton(isActive: state.isAlwaysOnTop)
         .help(
             state.isAlwaysOnTopForcedByQueue && !state.isAlwaysOnTop
                 ? queueForcedHelpText
                 : (state.isAlwaysOnTop ? disableAlwaysOnTopHelpText : enableAlwaysOnTopHelpText)
         )
-    }
-    
-    private var activeGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    private var inactiveGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(NSColor.controlBackgroundColor),
-                Color(NSColor.controlBackgroundColor).opacity(0.85)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        .focusable(false)
+        .focusEffectDisabled()
     }
 }
 

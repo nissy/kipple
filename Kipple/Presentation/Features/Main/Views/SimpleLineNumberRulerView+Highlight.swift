@@ -45,7 +45,6 @@ extension SimpleLineNumberRulerView {
             visibleGlyphRange: visibleGlyphRange
         )
         let containerOrigin = textView.textContainerOrigin
-
         let initialLineNumber = initialLineNumber(
             layoutManager: layoutManager,
             fullText: fullText,
@@ -60,21 +59,22 @@ extension SimpleLineNumberRulerView {
             extendedGlyphRange: extendedGlyphRange,
             initialLineNumber: initialLineNumber
         )
-
         let state = highlightSelectedLineFragments(
             textView: textView,
             layoutManager: layoutManager,
             input: highlightInput
         )
 
-        drawLastLineHighlightIfNeeded(
-            fullText: highlightInput.fullText,
-            selectedLineNumber: highlightInput.selectedLineNumber,
-            lastLineProcessed: state.lastLineProcessed,
-            layoutManager: layoutManager,
-            containerOrigin: highlightInput.containerOrigin,
-            lastLineRect: state.lastLineRect
-        )
+        if !state.didDrawSelectedLine {
+            drawEmptyLogicalLineHighlightIfNeeded(
+                fullText: highlightInput.fullText,
+                selectedLineNumber: highlightInput.selectedLineNumber,
+                layoutManager: layoutManager,
+                containerOrigin: highlightInput.containerOrigin,
+                visibleRect: highlightInput.visibleRect,
+                lastLineRect: state.lastLineRect
+            )
+        }
     }
 
     func initialLineNumber(
@@ -105,45 +105,32 @@ extension SimpleLineNumberRulerView {
         var state = SelectedLineHighlightState(
             currentLineNumber: input.initialLineNumber,
             lastLineProcessed: input.initialLineNumber,
-            lastLineRect: nil
+            lastLineRect: nil,
+            didDrawSelectedLine: false
         )
-        var isHighlightingLine = false
 
         layoutManager.enumerateLineFragments(forGlyphRange: input.extendedGlyphRange) { lineRect, _, _, glyphRange, _ in
             let characterRange = layoutManager.characterRange(
                 forGlyphRange: glyphRange,
                 actualGlyphRange: nil
             )
+            let fragmentLineNumber = SimpleLineNumberRulerView.countLines(
+                in: input.fullText,
+                upTo: characterRange.location
+            )
 
-            if characterRange.location == 0 {
-                isHighlightingLine = (state.currentLineNumber == input.selectedLineNumber)
-            } else if characterRange.location > 0 && characterRange.location <= input.fullText.length {
-                let previousCharIndex = characterRange.location - 1
-                let previousChar = input.fullText.substring(
-                    with: NSRange(location: previousCharIndex, length: 1)
+            if fragmentLineNumber == input.selectedLineNumber {
+                let lineY = lineRect.origin.y + input.containerOrigin.y - input.visibleRect.origin.y
+                let textContainerInset = textView.textContainerInset
+                self.drawCurrentLineHighlight(
+                    y: lineY + textContainerInset.height,
+                    height: max(self.fixedLineHeight - textContainerInset.height * 2, 1)
                 )
-                if previousChar == "\n" {
-                    state.currentLineNumber += 1
-                    isHighlightingLine = (state.currentLineNumber == input.selectedLineNumber)
-                }
+                state.didDrawSelectedLine = true
             }
 
-           if isHighlightingLine {
-               let lineY = lineRect.origin.y + input.containerOrigin.y - input.visibleRect.origin.y
-               let textContainerInset = textView.textContainerInset
-                let adjustedHeight = self.fixedLineHeight - textContainerInset.height * 2
-                let adjustedY = lineY + textContainerInset.height
-
-                NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
-                let path = NSBezierPath(rect: NSRect(
-                    x: 0,
-                    y: adjustedY,
-                    width: self.ruleThickness,
-                    height: adjustedHeight
-                ))
-                path.fill()
-            }
-
+            state.currentLineNumber = fragmentLineNumber +
+                self.highlightNewlineCount(in: characterRange, fullText: input.fullText)
             state.lastLineRect = lineRect
             state.lastLineProcessed = state.currentLineNumber
         }
@@ -151,49 +138,141 @@ extension SimpleLineNumberRulerView {
         return state
     }
 
-    func drawLastLineHighlightIfNeeded(
-        fullText: NSString,
-        selectedLineNumber: Int,
-        lastLineProcessed: Int,
-        layoutManager: NSLayoutManager,
-        containerOrigin: NSPoint,
-        lastLineRect: NSRect?
-    ) {
-        guard fullText.length > 0 && fullText.hasSuffix("\n") else { return }
-
-        let lastLineNumber = cachedLineCount(for: fullText)
-
-        guard selectedLineNumber == lastLineNumber else { return }
-
-        var lineY: CGFloat
-
-        if let lastRect = lastLineRect {
-            lineY = lastRect.maxY + containerOrigin.y - (textView?.visibleRect.origin.y ?? 0)
-        } else if fullText.length > 0 {
-            let lastCharIndex = max(0, fullText.length - 2)
-            let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: lastCharIndex)
-            if lastGlyphIndex < layoutManager.numberOfGlyphs {
-                let rect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
-                lineY = rect.maxY + containerOrigin.y - (textView?.visibleRect.origin.y ?? 0)
-            } else {
-                lineY = containerOrigin.y - (textView?.visibleRect.origin.y ?? 0)
-            }
-        } else {
-            lineY = containerOrigin.y - (textView?.visibleRect.origin.y ?? 0)
-        }
-
-        guard let textView else { return }
-       let textContainerInset = textView.textContainerInset
-        let adjustedHeight = self.fixedLineHeight - textContainerInset.height * 2
-        let adjustedY = lineY + textContainerInset.height
-
-        NSColor.selectedTextBackgroundColor.withAlphaComponent(0.2).set()
+    func drawCurrentLineHighlight(y: CGFloat, height: CGFloat) {
+        NSColor.systemBlue.withAlphaComponent(0.20).set()
         let path = NSBezierPath(rect: NSRect(
             x: 0,
-            y: adjustedY,
-            width: self.ruleThickness,
-            height: adjustedHeight
+            y: y,
+            width: ruleThickness,
+            height: max(height, 1)
         ))
         path.fill()
+    }
+
+    func highlightNewlineCount(in characterRange: NSRange, fullText: NSString) -> Int {
+        guard characterRange.location < fullText.length else {
+            return 0
+        }
+
+        let safeLength = min(characterRange.length, fullText.length - characterRange.location)
+        guard safeLength > 0 else {
+            return 0
+        }
+
+        let lineText = fullText.substring(
+            with: NSRange(location: characterRange.location, length: safeLength)
+        ) as NSString
+        var count = 0
+        var searchRange = NSRange(location: 0, length: lineText.length)
+        while searchRange.length > 0 {
+            let foundRange = lineText.range(of: "\n", options: [], range: searchRange)
+            guard foundRange.location != NSNotFound else {
+                break
+            }
+            count += 1
+            searchRange.location = foundRange.location + foundRange.length
+            searchRange.length = lineText.length - searchRange.location
+        }
+        return count
+    }
+
+    func drawEmptyLogicalLineHighlightIfNeeded(
+        fullText: NSString,
+        selectedLineNumber: Int,
+        layoutManager: NSLayoutManager,
+        containerOrigin: NSPoint,
+        visibleRect: NSRect,
+        lastLineRect: NSRect?
+    ) {
+        guard let lineStartLocation = lineStartLocation(
+            forLineNumber: selectedLineNumber,
+            in: fullText
+        ), isEmptyLogicalLine(startLocation: lineStartLocation, fullText: fullText) else {
+            return
+        }
+
+        let lineY = emptyLogicalLineY(
+            lineStartLocation: lineStartLocation,
+            fullText: fullText,
+            layoutManager: layoutManager,
+            containerOrigin: containerOrigin,
+            visibleRect: visibleRect,
+            lastLineRect: lastLineRect
+        )
+
+        drawCurrentLineHighlight(
+            y: lineY,
+            height: fixedLineHeight
+        )
+    }
+
+    func lineStartLocation(forLineNumber lineNumber: Int, in fullText: NSString) -> Int? {
+        guard lineNumber >= 1 else { return nil }
+        guard lineNumber > 1 else { return 0 }
+
+        var currentLineNumber = 1
+        var searchRange = NSRange(location: 0, length: fullText.length)
+
+        while searchRange.length > 0 {
+            let foundRange = fullText.range(of: "\n", options: [], range: searchRange)
+            guard foundRange.location != NSNotFound else {
+                return nil
+            }
+
+            currentLineNumber += 1
+            if currentLineNumber == lineNumber {
+                return foundRange.location + foundRange.length
+            }
+
+            searchRange.location = foundRange.location + foundRange.length
+            searchRange.length = fullText.length - searchRange.location
+        }
+
+        return nil
+    }
+
+    func isEmptyLogicalLine(startLocation: Int, fullText: NSString) -> Bool {
+        guard startLocation < fullText.length else {
+            return true
+        }
+
+        let firstCharacter = fullText.substring(
+            with: NSRange(location: startLocation, length: 1)
+        )
+        return firstCharacter == "\n"
+    }
+
+    func emptyLogicalLineY(
+        lineStartLocation: Int,
+        fullText: NSString,
+        layoutManager: NSLayoutManager,
+        containerOrigin: NSPoint,
+        visibleRect: NSRect,
+        lastLineRect: NSRect?
+    ) -> CGFloat {
+        guard layoutManager.numberOfGlyphs > 0 else {
+            return containerOrigin.y - visibleRect.origin.y
+        }
+
+        if lineStartLocation == 0 {
+            let glyphIndex = layoutManager.glyphIndexForCharacter(at: 0)
+            guard glyphIndex < layoutManager.numberOfGlyphs else {
+                return containerOrigin.y - visibleRect.origin.y
+            }
+            let rect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
+            return rect.origin.y + containerOrigin.y - visibleRect.origin.y
+        }
+
+        let previousCharacterIndex = min(lineStartLocation - 1, fullText.length - 1)
+        let previousGlyphIndex = layoutManager.glyphIndexForCharacter(at: previousCharacterIndex)
+        guard previousGlyphIndex < layoutManager.numberOfGlyphs else {
+            if let lastLineRect {
+                return lastLineRect.maxY + containerOrigin.y - visibleRect.origin.y
+            }
+            return containerOrigin.y - visibleRect.origin.y
+        }
+
+        let previousRect = layoutManager.lineFragmentRect(forGlyphAt: previousGlyphIndex, effectiveRange: nil)
+        return previousRect.maxY + containerOrigin.y - visibleRect.origin.y
     }
 }

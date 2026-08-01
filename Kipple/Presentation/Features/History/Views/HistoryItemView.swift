@@ -126,14 +126,14 @@ struct HistoryItemView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { handleTap() }
 
-            HStack(spacing: 8) {
+            HStack(spacing: MainViewMetrics.HistoryColumns.spacing) {
                 queueBadgeView
                 pinButton
                 categoryMenuView
                 historyText
                 deleteButton
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 0)
             .padding(.vertical, 4)
         }
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -144,17 +144,25 @@ struct HistoryItemView: View {
         if let queueBadge {
             let isActiveBadge = queueBadge > 0
             let badgeText = isActiveBadge ? "\(queueBadge)" : "-"
-            let badgeBackground = isActiveBadge ? Color.accentColor : Color.secondary.opacity(0.1)
-            let badgeForeground = isActiveBadge ? Color.white : Color.secondary
+            let badgeBackground = isActiveBadge
+                ? MainViewMetrics.HistoryQueueBadge.activeFill
+                : MainViewMetrics.HistoryQueueBadge.inactiveFill
+            let badgeForeground = isActiveBadge
+                ? MainViewMetrics.HistoryQueueBadge.activeForeground
+                : MainViewMetrics.HistoryQueueBadge.inactiveForeground
 
             Text(badgeText)
-                .font(.system(size: 11, weight: .semibold))
+                .font(MainViewMetrics.HistoryQueueBadge.font)
                 .foregroundColor(badgeForeground)
-                .frame(width: 22, height: 22)
+                .frame(
+                    width: MainViewMetrics.HistoryColumns.rowControlSize,
+                    height: MainViewMetrics.HistoryColumns.rowControlSize
+                )
                 .background(
                     Circle()
                         .fill(badgeBackground)
                 )
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
                 .contentShape(Circle())
                 .help(
                     Text(
@@ -173,33 +181,15 @@ struct HistoryItemView: View {
     private var backgroundView: some View {
         let baseFill: AnyShapeStyle
         if isSelected {
-            baseFill = AnyShapeStyle(LinearGradient(
-                colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ))
+            baseFill = AnyShapeStyle(Color.primary.opacity(0.05))
         } else if isQueuePreviewed {
-            baseFill = AnyShapeStyle(Color.accentColor.opacity(0.25))
+            baseFill = AnyShapeStyle(Color.primary.opacity(0.035))
         } else {
-            baseFill = AnyShapeStyle(Color(NSColor.quaternaryLabelColor).opacity(isHoverActive ? 0.5 : 0.2))
+            baseFill = AnyShapeStyle(Color.primary.opacity(isHoverActive ? 0.026 : 0))
         }
 
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(baseFill)
-            .overlay {
-                if isHoverActive && !isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
-                } else if isQueuePreviewed && !isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
-                }
-            }
-            .shadow(
-                color: isSelected ? Color.accentColor.opacity(0.3) : Color.clear,
-                radius: isSelected ? 8 : 0,
-                y: isSelected ? 4 : 0
-            )
     }
 
     private var pinButton: some View {
@@ -211,7 +201,11 @@ struct HistoryItemView: View {
                 .font(.system(size: 10, weight: .medium))
                 .rotationEffect(.degrees(pinButtonRotation))
         }
-        .frame(width: 22, height: 22)
+        .frame(
+            width: MainViewMetrics.HistoryColumns.rowControlSize,
+            height: MainViewMetrics.HistoryColumns.rowControlSize
+        )
+        .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
         .contentShape(Circle())
         .onTapGesture {
             closePopover()
@@ -225,26 +219,40 @@ struct HistoryItemView: View {
         if item.isActionable {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 22, height: 22)
+                    .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
+                    .frame(
+                        width: MainViewMetrics.HistoryColumns.rowControlSize,
+                        height: MainViewMetrics.HistoryColumns.rowControlSize
+                    )
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
             }
-            .frame(width: 22, height: 22)
+            .frame(
+                width: MainViewMetrics.HistoryColumns.rowControlSize,
+                height: MainViewMetrics.HistoryColumns.rowControlSize
+            )
+            .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
             .contentShape(Circle())
             .onTapGesture { handleTap() }
             .help(actionHelpText)
         } else if let onCategoryTap = onCategoryTap {
             ZStack {
                 Circle()
-                    .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
-                    .frame(width: 22, height: 22)
+                    .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
+                    .frame(
+                        width: MainViewMetrics.HistoryColumns.rowControlSize,
+                        height: MainViewMetrics.HistoryColumns.rowControlSize
+                    )
                 Image(systemName: item.category.icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
+                    .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
             }
-            .frame(width: 22, height: 22)
+            .frame(
+                width: MainViewMetrics.HistoryColumns.rowControlSize,
+                height: MainViewMetrics.HistoryColumns.rowControlSize
+            )
+            .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
             .contentShape(Circle())
             .onTapGesture {
                 closePopover()
@@ -264,12 +272,16 @@ struct HistoryItemView: View {
         } else {
             Image(systemName: item.category.icon)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
-                .frame(width: 22, height: 22)
+                .foregroundColor(isSelected ? .primary : KippleButtonAppearance.inactiveForeground)
+                .frame(
+                    width: MainViewMetrics.HistoryColumns.rowControlSize,
+                    height: MainViewMetrics.HistoryColumns.rowControlSize
+                )
                 .background(
                     Circle()
-                        .fill(isSelected ? Color.white.opacity(0.2) : Color.secondary.opacity(0.1))
+                        .fill(isSelected ? KippleButtonAppearance.selectedSubtleFill : Color.clear)
                 )
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
         }
     }
 
@@ -280,7 +292,7 @@ struct HistoryItemView: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .underline(isLinkActive, color: linkColor)
-            .foregroundColor(isLinkActive ? linkColor : (isSelected ? .white : .primary))
+            .foregroundColor(isLinkActive ? linkColor : MainViewMetrics.TextColor.primary)
             .padding(.vertical, 3)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -293,7 +305,12 @@ struct HistoryItemView: View {
         if let onDelete = onDelete, isHoverActive && !item.isPinned {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
+                .frame(
+                    width: MainViewMetrics.HistoryColumns.rowControlSize,
+                    height: MainViewMetrics.HistoryColumns.rowControlSize
+                )
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
                 .contentShape(Circle())
                 .help(deleteHelpText)
                 .onTapGesture {
@@ -374,7 +391,7 @@ struct HistoryItemView: View {
 
     // MARK: - Pin helper properties
     var pinButtonBackground: Color {
-        item.isPinned ? Color.accentColor : Color.secondary.opacity(0.1)
+        KippleButtonAppearance.compactFill(isActive: item.isPinned)
     }
 
     var pinButtonIcon: String {
@@ -382,7 +399,7 @@ struct HistoryItemView: View {
     }
 
     var pinButtonForeground: Color {
-        item.isPinned ? .white : .secondary
+        KippleButtonAppearance.foreground(isActive: item.isPinned)
     }
 
     var pinButtonRotation: Double {
@@ -410,6 +427,7 @@ private extension HistoryItemView {
             onChangeCategory: onChangeCategory,
             onOpenCategoryManager: onOpenCategoryManager
         )
+        .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
     }
 
     var hasContextMenuActions: Bool {

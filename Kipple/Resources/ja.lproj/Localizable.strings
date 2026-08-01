@@ -206,6 +206,7 @@
 "history.clear.deleteCount" = "履歴から %d 件を削除します。";
 "history.clear.pinnedPreserved" = "ピン留め %d 件は残ります。";
 "history.clear.success" = "履歴から %d 件を削除しました。";
+"history.scrollToTop" = "履歴の先頭へ";
 "minutes" = "分";
 "seconds" = "秒";
 "copies" = "回";
