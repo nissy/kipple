@@ -190,6 +190,8 @@ extension SettingsViewModel.Tab {
             return NSToolbarItem.Identifier("com.kipple.settings.clipboard")
         case .permission:
             return NSToolbarItem.Identifier("com.kipple.settings.permission")
+        case .ai:
+            return NSToolbarItem.Identifier("com.kipple.settings.ai")
         }
     }
 
@@ -199,6 +201,7 @@ extension SettingsViewModel.Tab {
         case "com.kipple.settings.editor": self = .editor
         case "com.kipple.settings.clipboard": self = .clipboard
         case "com.kipple.settings.permission": self = .permission
+        case "com.kipple.settings.ai": self = .ai
         default: return nil
         }
     }

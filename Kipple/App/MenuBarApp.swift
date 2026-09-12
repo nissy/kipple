@@ -175,6 +175,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
 
     func startServices() {
+        MCPIntegration.shared.restart()
         Task {
             clipboardService.startMonitoring()
         }
@@ -312,6 +313,7 @@ extension MenuBarApp: NSApplicationDelegate {
     
     func applicationWillTerminate(_ notification: Notification) {
         
+        MCPIntegration.shared.stop()
         // The save work should be finished by this point
     }
 }

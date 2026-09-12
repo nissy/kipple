@@ -226,3 +226,33 @@
 "AboutHighlightSecurity" = "Protected by macOS security features";
 "AboutHighlightDeletion" = "Data can be cleared at any time";
 "AboutCopyright" = "© 2025 Kipple";
+
+// MCP integration
+"AI Integration" = "AI Integration";
+"Enable MCP" = "Enable MCP";
+"AI can add text and replace the clipboard. Clipboard history cannot be read." = "AI can add text and replace the clipboard. Clipboard history cannot be read.";
+"MCP disabled" = "MCP disabled";
+"MCP ready" = "MCP ready";
+"MCP unavailable" = "MCP unavailable";
+"Done" = "Done";
+"Update the AI client configuration" = "Update the AI client configuration";
+"Item details" = "Item details";
+"Title" = "Title";
+"Source" = "Source";
+"Registered" = "Registered";
+"Preview limited to 4,000 characters" = "Preview limited to 4,000 characters";
+"Could not save. Check the title." = "Could not save. Check the title.";
+"Item unavailable" = "This item has been deleted.";
+"Added by AI" = "Added by AI";
+"Clipboard updated. Your edits are preserved." = "Clipboard updated. Your edits are preserved.";
+
+"Configuration copy failed; try again" = "Configuration copy failed; try again";
+
+"Copy connection settings" = "Copy connection settings";
+
+"MCP starting" = "MCP starting";
+"Connection settings" = "Connection settings";
+"Connection settings copied" = "Connection settings copied";
+"Up to 80,000 characters per item." = "Up to 80,000 characters per item.";
+"Local programs running as your user can add text while MCP is enabled." = "Local programs running as your user can add text while MCP is enabled.";
+"Paste the settings into your AI client. You can use the same settings with multiple clients." = "Paste the settings into your AI client. You can use the same settings with multiple clients.";

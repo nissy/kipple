@@ -12,7 +12,7 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
             return SwiftDataRepository(container: container)
         }
 
-        let schema = Schema([ClipItemModel.self])
+        let schema = Schema([ClipItemModel.self, MCPReceiptModel.self])
         let config = inMemory
             ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
             : ModelConfiguration(schema: schema)
@@ -155,6 +155,44 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         try saveIfNeeded(context)
     }
 
+    func receipt(for key: String) throws -> MCPStoredReceipt? {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<MCPReceiptModel>(predicate: #Predicate { $0.key == key })
+        guard let model = try context.fetch(descriptor).first,
+              model.receivedAt > Date().addingTimeInterval(-86_400) else { return nil }
+        return try JSONDecoder().decode(MCPStoredReceipt.self, from: model.data)
+    }
+
+    func commitMCP(
+        inserted: [ClipItem],
+        updated: [ClipItem],
+        removed: [UUID],
+        record: MCPStoredReceipt
+    ) throws {
+        let context = makeContext()
+        try removeItems(removed, context: context)
+        try updateItems(updated, context: context)
+        try insertItems(inserted, context: context)
+        try storeReceipt(record, context: context)
+        try saveIfNeeded(context)
+    }
+
+    func updateReceipt(_ record: MCPStoredReceipt) throws {
+        let context = makeContext()
+        try storeReceipt(record, context: context)
+        try saveIfNeeded(context)
+    }
+
+    private func storeReceipt(_ record: MCPStoredReceipt, context: ModelContext) throws {
+        let cutoff = Date().addingTimeInterval(-86_400)
+        let key = record.key
+        let descriptor = FetchDescriptor<MCPReceiptModel>(
+            predicate: #Predicate { $0.receivedAt < cutoff || $0.key == key }
+        )
+        for old in try context.fetch(descriptor) { context.delete(old) }
+        context.insert(try MCPReceiptModel(record: record))
+    }
+
     // MARK: - Internal helpers
 
     private func insertItems(_ items: [ClipItem], context: ModelContext) throws {
@@ -172,7 +210,8 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 bundleId: item.bundleIdentifier,
                 processId: item.processID,
                 isFromEditor: item.isFromEditor ?? false,
-                userCategoryId: item.userCategoryId
+                userCategoryId: item.userCategoryId,
+                metadata: item.metadata
             )
             context.insert(model)
         }
@@ -204,7 +243,8 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 bundleId: item.bundleIdentifier,
                 processId: item.processID,
                 isFromEditor: item.isFromEditor ?? false,
-                userCategoryId: item.userCategoryId
+                userCategoryId: item.userCategoryId,
+                metadata: item.metadata
             ))
         }
     }
@@ -234,5 +274,6 @@ private extension ClipItemModel {
         processId = item.processID
         isFromEditor = item.isFromEditor ?? false
         userCategoryId = item.userCategoryId
+        metadataData = item.metadata.flatMap { try? JSONEncoder().encode($0) }
     }
 }

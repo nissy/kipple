@@ -15,6 +15,7 @@ final class ClipItemModel {
     var processId: Int32?
     var isFromEditor: Bool
     var userCategoryId: UUID?
+    var metadataData: Data?
 
     init(
         id: UUID = UUID(),
@@ -27,7 +28,8 @@ final class ClipItemModel {
         bundleId: String? = nil,
         processId: Int32? = nil,
         isFromEditor: Bool = false,
-        userCategoryId: UUID? = nil
+        userCategoryId: UUID? = nil,
+        metadata: ClipMetadata? = nil
     ) {
         self.id = id
         self.content = content
@@ -40,6 +42,7 @@ final class ClipItemModel {
         self.processId = processId
         self.isFromEditor = isFromEditor
         self.userCategoryId = userCategoryId
+        self.metadataData = metadata.flatMap { try? JSONEncoder().encode($0) }
     }
 
     convenience init(from clipItem: ClipItem) {
@@ -54,7 +57,8 @@ final class ClipItemModel {
             bundleId: clipItem.bundleIdentifier,
             processId: clipItem.processID,
             isFromEditor: clipItem.isFromEditor ?? false,
-            userCategoryId: clipItem.userCategoryId
+            userCategoryId: clipItem.userCategoryId,
+            metadata: clipItem.metadata
         )
     }
 
@@ -70,7 +74,8 @@ final class ClipItemModel {
             bundleIdentifier: bundleId,
             processID: processId,
             isFromEditor: isFromEditor,
-            userCategoryId: userCategoryId
+            userCategoryId: userCategoryId,
+            metadata: metadataData.flatMap { try? JSONDecoder().decode(ClipMetadata.self, from: $0) }
         )
     }
 

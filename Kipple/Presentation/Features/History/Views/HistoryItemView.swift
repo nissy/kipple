@@ -30,6 +30,7 @@ struct HistoryItemView: View {
     private let displayContent: String
 
     @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
+    @State private var showingDetails = false
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
@@ -71,7 +72,8 @@ struct HistoryItemView: View {
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.hoverResetSignal = hoverResetSignal
         self.hoverCoordinator = hoverCoordinator
-        self.displayContent = HistoryItemView.makeDisplayContent(from: item.content)
+        let preview = HistoryItemView.makeDisplayContent(from: item.content)
+        self.displayContent = item.title ?? preview
     }
 
     var body: some View {
@@ -86,12 +88,9 @@ struct HistoryItemView: View {
         }
 
         return Group {
-            if hasContextMenuActions {
-                baseView.contextMenu { contextMenuContent }
-            } else {
-                baseView
-            }
+            baseView.contextMenu { contextMenuContent }
         }
+        .sheet(isPresented: $showingDetails) { ClipDetailsView(item: item) }
         .onChange(of: hoverResetSignal) { _, _ in
             resetHoverState()
         }
@@ -287,17 +286,32 @@ struct HistoryItemView: View {
 
     private var historyText: some View {
         let isLinkActive = actionKeyMonitor.isActionKeyActive && item.isActionable
-        return Text(verbatim: displayContent)
+        return HStack(spacing: 4) {
+            if item.metadata?.source == .mcp { Image(systemName: "sparkles").font(.caption) }
+            if item.title != nil { titleBadge }
+            Text(verbatim: displayContent)
+                .underline(isLinkActive, color: linkColor)
+        }
             .font(historyFont)
             .lineLimit(1)
             .truncationMode(.tail)
-            .underline(isLinkActive, color: linkColor)
             .foregroundColor(isLinkActive ? linkColor : MainViewMetrics.TextColor.primary)
             .padding(.vertical, 3)
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { handleTap() }
+    }
+
+    private var titleBadge: some View {
+        Text(verbatim: "Title")
+            .font(.system(size: 10, weight: .medium))
+            .foregroundColor(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(KippleButtonAppearance.inactivePillFill, in: RoundedRectangle(cornerRadius: 3))
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
@@ -430,12 +444,10 @@ private extension HistoryItemView {
         .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth)
     }
 
-    var hasContextMenuActions: Bool {
-        (item.isActionable && onOpenItem != nil) || onSplitEditorIntoHistory != nil
-    }
-
     @ViewBuilder
     var contextMenuContent: some View {
+        Button("Item details") { closePopover(); showingDetails = true }
+        Divider()
         if let onOpenItem, item.isActionable {
             Button {
                 closePopover()

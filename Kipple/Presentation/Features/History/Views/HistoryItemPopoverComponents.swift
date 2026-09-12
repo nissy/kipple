@@ -31,6 +31,12 @@ struct ClipboardItemPopover: View {
     private func content(for item: ClipItem) -> some View {
         let previewText = Self.makePreviewText(for: item)
         return VStack(alignment: .leading, spacing: 0) {
+            if let title = item.title {
+                Text(verbatim: title).font(.headline).padding([.top, .horizontal], 16)
+            }
+            if item.metadata?.source == .mcp {
+                Text("Added by AI").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
+            }
             headerSection(for: item)
                 .padding(16)
 

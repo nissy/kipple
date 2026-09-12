@@ -29,11 +29,6 @@ APPSTORE_EXPORT_DIR = $(PROD_BUILD_DIR)/AppStoreExport
 APPSTORE_PKG_PATH = $(APPSTORE_EXPORT_DIR)/$(PROJECT_NAME).pkg
 APPSTORE_EXPORT_OPTIONS = $(PROD_BUILD_DIR)/AppStoreExportOptions.plist
 
-# Swift macro plugin paths (SwiftData + Foundation predicates)
-SWIFTDATA_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libSwiftDataMacros.dylib
-FOUNDATION_PLUGIN = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib
-SWIFT_PLUGIN_FLAGS = -load-plugin-library $(SWIFTDATA_PLUGIN) -load-plugin-library $(FOUNDATION_PLUGIN)
-
 # Environment variables (from .envrc)
 DEVELOPMENT_TEAM ?= R7LKF73J2W
 PRODUCT_BUNDLE_IDENTIFIER ?= com.nissy.Kipple
@@ -137,7 +132,7 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		CODE_SIGN_IDENTITY="-" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		build
 	@echo "$(GREEN)Copying to dev directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_DEBUG) -derivedDataPath $(DEV_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
@@ -179,7 +174,7 @@ build: generate ## Build production version
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
 		ARCHS="x86_64 arm64" \
 		ONLY_ACTIVE_ARCH=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		build
 	@echo "$(GREEN)Copying to prod directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_RELEASE) -derivedDataPath $(PROD_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
@@ -206,8 +201,9 @@ test: generate ## Run all tests
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests
+	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/Debug/Kipple.app/Contents/Helpers/KippleMCP"
 
 test-coverage: generate ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage…$(NC)"
@@ -223,7 +219,7 @@ test-coverage: generate ## Run tests with coverage report
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests
 
 test-specific: generate ## Run specific test (use TEST=ClassName)
@@ -241,7 +237,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		CODE_SIGN_IDENTITY="" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests/$(TEST)
 
 #===============================================================================
@@ -285,7 +281,7 @@ archive: generate ## Create xcarchive with Developer ID signing
 		CODE_SIGN_IDENTITY="Developer ID Application: Yoshihiko Nishida (R7LKF73J2W)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		archive
 	@echo "$(GREEN)Archive created at: $(ARCHIVE_PATH)$(NC)"
 
@@ -451,7 +447,7 @@ appstore-archive: generate ## Create xcarchive for Mac App Store submission
 		CODE_SIGN_IDENTITY="$(APPLE_DISTRIBUTION_IDENTITY)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-		OTHER_SWIFT_FLAGS="$(SWIFT_PLUGIN_FLAGS)" \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		archive
 	@echo "$(GREEN)Archive created at: $(APPSTORE_ARCHIVE_PATH)$(NC)"
 
@@ -587,3 +583,8 @@ bump-version: ## Update version (usage: make bump-version VERSION=2.0.6)
 
 bump-build: ## Increment build number only
 	@./Scripts/update_version.sh --build-only
+
+.PHONY: mcpb
+MCP_HELPER ?= build/release/Kipple.app/Contents/Helpers/KippleMCP
+mcpb: ## Package a signed MCP helper without credentials
+	python3 Scripts/package_mcpb.py --helper "$(MCP_HELPER)"

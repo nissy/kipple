@@ -14,7 +14,10 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     // MARK: - Properties
 
     private let modernService = ModernClipboardService.shared
+    private let refreshGate = AsyncMutationGate()
     private var refreshTask: Task<Void, Never>?
+    private var operationGeneration: UInt64 = 0
+    var copyEpoch: UInt64 { operationGeneration }
     private var pendingOperationTask: Task<Void, Never>?
     private var pendingClipboardContent: String?
     private var lastKnownHistoryRevision: UInt64?
@@ -35,7 +38,16 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
             name: .modernClipboardHistoryDidChange,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(mcpWillCopy(_:)), name: .mcpWillCopy, object: nil
+        )
         startPeriodicRefresh()
+    }
+
+    @objc private func mcpWillCopy(_ notification: Notification) {
+        operationGeneration &+= 1
+        pendingOperationTask?.cancel()
+        pendingClipboardContent = nil
     }
 
     deinit {
@@ -60,8 +72,10 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func copyToClipboard(_ content: String, fromEditor: Bool) {
         pendingClipboardContent = content
         currentClipboardContent = content
-        pendingOperationTask = Task {
-            await modernService.copyToClipboard(content, fromEditor: fromEditor)
+        enqueueClipboardOperation { [self] generation in
+            await modernService.copyToClipboard(content, fromEditor: fromEditor) {
+                await self.isCurrentOperation(generation)
+            }
             await refreshHistory()
         }
     }
@@ -69,9 +83,10 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func writeToClipboardOnly(_ content: String) {
         pendingClipboardContent = content
         currentClipboardContent = content.isEmpty ? nil : content
-
-        pendingOperationTask = Task {
-            await modernService.writeToClipboardOnly(content)
+        enqueueClipboardOperation { [self] generation in
+            await modernService.writeToClipboardOnly(content) {
+                await self.isCurrentOperation(generation)
+            }
         }
     }
 
@@ -84,17 +99,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     func recopyFromHistory(_ item: ClipItem) {
         prepareForRecopy(of: item)
-        Task {
-            await modernService.recopyFromHistory(item)
+        enqueueClipboardOperation { [self] generation in
+            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
             await refreshHistory()
         }
     }
 
     func clearSystemClipboard() async {
-        await modernService.clearSystemClipboard()
-        pendingClipboardContent = nil
-        currentClipboardContent = nil
-        await refreshHistory()
+        await enqueueClipboardOperation { [self] generation in
+            await modernService.clearSystemClipboard { await self.isCurrentOperation(generation) }
+            guard generation == operationGeneration else { return }
+            pendingClipboardContent = nil
+            currentClipboardContent = nil
+            await refreshHistory()
+        }.value
     }
 
     func togglePin(for item: ClipItem) -> Bool {
@@ -187,7 +205,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func searchHistory(_ query: String) -> [ClipItem] {
         // Synchronous search on current cached history
         history.filter { item in
-            item.content.localizedCaseInsensitiveContains(query)
+            item.matchesSearch(query)
         }
     }
 
@@ -196,6 +214,21 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     // MARK: - Private Methods
+
+    @discardableResult
+    private func enqueueClipboardOperation(
+        _ operation: @escaping @MainActor (UInt64) async -> Void
+    ) -> Task<Void, Never> {
+        let generation = operationGeneration
+        let previous = pendingOperationTask
+        let task = Task {
+            await previous?.value
+            guard generation == operationGeneration, !Task.isCancelled else { return }
+            await operation(generation)
+        }
+        pendingOperationTask = task
+        return task
+    }
 
     private func startPeriodicRefresh() {
         let interval: TimeInterval = 5.0
@@ -208,6 +241,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     private func refreshHistory() async {
+        await refreshGate.acquire()
+        defer { refreshGate.release() }
         let previousClipboardContent = currentClipboardContent
         let newRevision = await modernService.getHistoryRevision()
         let newCurrentContent = await modernService.getCurrentClipboardContent()
@@ -290,14 +325,18 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     func recopyFromHistoryAndWait(_ item: ClipItem) async {
         prepareForRecopy(of: item)
-        await modernService.recopyFromHistory(item)
-        await refreshHistory()
+        await enqueueClipboardOperation { [self] generation in
+            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
+            await refreshHistory()
+        }.value
     }
 
     /// pasteboard 書き込みのみ待機する軽量版。history 再同期は後段で finalizeRecopyRefresh() を呼ぶこと
     func recopyFromHistoryAwaitingPasteboard(_ item: ClipItem) async {
         prepareForRecopy(of: item)
-        await modernService.recopyFromHistory(item)
+        await enqueueClipboardOperation { [self] generation in
+            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
+        }.value
     }
 
     /// recopyFromHistoryAwaitingPasteboard 後の history 再同期
@@ -305,9 +344,11 @@ extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
         await refreshHistory()
     }
 
+    private func isCurrentOperation(_ generation: UInt64) -> Bool { operationGeneration == generation }
+
     private func prepareForRecopy(of item: ClipItem) {
         pendingClipboardContent = item.content
-        currentClipboardContent = item.content
+        currentClipboardContent = pendingClipboardContent
     }
 
     /// Get pinned items from history

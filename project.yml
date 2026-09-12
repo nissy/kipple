@@ -23,6 +23,9 @@ settings:
     COMBINE_HIDPI_IMAGES: YES
 
 packages:
+  MCP:
+    url: https://github.com/modelcontextprotocol/swift-sdk.git
+    exactVersion: 0.12.1
   Yams:
     url: https://github.com/jpsim/Yams.git
     from: 6.2.2
@@ -32,6 +35,7 @@ targets:
     type: application
     platform: macOS
     sources:
+      - path: Shared
       - path: Kipple
         excludes:
           - "**/.DS_Store"
@@ -64,10 +68,37 @@ targets:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
     dependencies:
+      - target: KippleMCP
+        embed: true
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       - sdk: libsqlite3.tbd
       - package: Yams
     preBuildScripts: []
     postBuildScripts: []
+
+  KippleMCP:
+    type: tool
+    platform: macOS
+    sources:
+      - path: KippleMCP
+      - path: Shared
+    dependencies:
+      - package: MCP
+        product: MCP
+    settings:
+      base:
+        PRODUCT_NAME: KippleMCP
+        CODE_SIGN_ENTITLEMENTS: KippleMCP/KippleMCP.entitlements
+        SKIP_INSTALL: YES
+        GENERATE_INFOPLIST_FILE: YES
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
 
   KippleTests:
     type: bundle.unit-test

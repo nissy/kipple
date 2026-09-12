@@ -106,6 +106,43 @@ final class MainViewModelSaveEditorTests: XCTestCase {
         XCTAssertFalse(viewModel.canSaveEditorToHistory)
     }
 
+    func testRapidEditorWritesAndCopiesKeepLatestClipboardAndHistory() async throws {
+        let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
+        for index in 0..<20 {
+            commitEditorText("draft \(index)")
+            adapter.copyToClipboard("copy \(index)", fromEditor: false)
+        }
+        await refreshAdapterBackedClipboardState(adapter)
+        let clipboard = await ModernClipboardService.shared.getCurrentClipboardContent()
+        XCTAssertEqual(clipboard, "copy 19")
+        XCTAssertEqual(viewModel.editorText, "copy 19")
+        XCTAssertFalse(viewModel.canSaveEditorToHistory)
+        for index in 0..<20 {
+            XCTAssertTrue(adapter.history.contains { $0.content == "copy \(index)" })
+        }
+    }
+
+    func testPendingEditorWriteDoesNotRestoreClearedClipboard() async throws {
+        let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
+        commitEditorText("pending draft")
+        await adapter.clearSystemClipboard()
+        await refreshAdapterBackedClipboardState(adapter)
+        let clipboard = await ModernClipboardService.shared.getCurrentClipboardContent()
+        XCTAssertNil(clipboard)
+        XCTAssertEqual(viewModel.editorText, "")
+    }
+
+    func testRecopyAfterPendingEditorWriteKeepsSelectedHistoryText() async throws {
+        let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
+        let item = try XCTUnwrap(adapter.history.first { $0.content == "original" })
+        commitEditorText("pending draft")
+        await adapter.recopyFromHistoryAwaitingPasteboard(item)
+        await refreshAdapterBackedClipboardState(adapter)
+        let clipboard = await ModernClipboardService.shared.getCurrentClipboardContent()
+        XCTAssertEqual(clipboard, "original")
+        XCTAssertEqual(viewModel.editorText, "original")
+    }
+
     func testSavedEditorTextStaysUnavailableAfterClipboardOnlyRefresh() async throws {
         let adapter = try await prepareAdapterBackedViewModel(sourceText: "original")
         commitEditorText("edited and saved after refresh")

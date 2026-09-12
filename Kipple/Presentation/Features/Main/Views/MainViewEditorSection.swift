@@ -16,6 +16,7 @@ struct MainViewEditorSection: View {
     let onBeginEditing: () -> Void
     let onCommitEditing: () -> Void
     let onClear: () -> Void
+    var isClipboardUpdated = false
     @State private var scrollOffset: CGFloat = 0
     @ObservedObject private var fontManager = FontManager.shared
     @State private var hoveredClearButton = false
@@ -27,6 +28,9 @@ struct MainViewEditorSection: View {
     var body: some View {
         VStack(spacing: 0) {
             editorStatusLabel
+            if isClipboardUpdated {
+                Text("Clipboard updated. Your edits are preserved.").font(.caption).foregroundStyle(.secondary)
+            }
 
             // エディタコンテンツ
             ZStack(alignment: .bottomTrailing) {

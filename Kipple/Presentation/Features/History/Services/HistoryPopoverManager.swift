@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 @MainActor
 final class HistoryPopoverManager {
@@ -17,7 +18,13 @@ final class HistoryPopoverManager {
     private weak var anchorView: NSView?
     private var hideWorkItem: DispatchWorkItem?
 
-    private init() {}
+    private var observers = Set<AnyCancellable>()
+
+    private init() {
+        NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)
+            .sink { [weak self] _ in self?.hide() }
+            .store(in: &observers)
+    }
 
     func show(item: ClipItem, from anchorView: NSView, trailingEdge: Bool) {
         hideWorkItem?.cancel()
