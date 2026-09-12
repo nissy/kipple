@@ -83,6 +83,7 @@
 		5A08917C3CDE5860FB29C64E /* HotkeyManagerProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */; };
 		5CBBA050B4549931A071F4FE /* HistoryListViewHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DC0B764C1B9C0B7D59700E /* HistoryListViewHelperTests.swift */; };
 		5DA5FD30710060D9FF7158BF /* ModernClipboardServicePinUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643A0D867F7B8BE9E0C6DDB3 /* ModernClipboardServicePinUpdateTests.swift */; };
+		5E2F87DAA5AAD6182FD9B552 /* MCPConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C06F7D47534462B06D88C33 /* MCPConfigurationTests.swift */; };
 		5EDC7569975751F28A1D96CF /* PasteCommandMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1AB7367D3A5AC598FEAB6C /* PasteCommandMonitorTests.swift */; };
 		5EF8C1590662867113127642 /* ButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */; };
 		6251C6BBF34040D4B1B43FDF /* ClipboardTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76728D9DB2FF36A4859D9180 /* ClipboardTextFormatter.swift */; };
@@ -269,6 +270,7 @@
 		167B79F14132ADCEE67F5C5E /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = en; path = en.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		184889D405CAF3B49E5A64B2 /* TextCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCaptureCoordinator.swift; sourceTree = "<group>"; };
 		1B01ED0E79A9494F70A575FB /* ScreenRecordingPermissionOpener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingPermissionOpener.swift; sourceTree = "<group>"; };
+		1C06F7D47534462B06D88C33 /* MCPConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPConfigurationTests.swift; sourceTree = "<group>"; };
 		1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecopyPerformanceTests.swift; sourceTree = "<group>"; };
 		1E7DC09A0AED6030C1368BAC /* MCPRegistrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPRegistrationTests.swift; sourceTree = "<group>"; };
 		202AE76511A06BF28D5FB2FE /* ClipboardServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardServiceProtocol.swift; sourceTree = "<group>"; };
@@ -1081,6 +1083,7 @@
 				2C9313A736408C85DBBA98F8 /* MainViewModelSaveEditorTests.swift */,
 				275DFFC02347F3912374B823 /* MainViewModelTests.swift */,
 				82D7E6D973077D2CD1A5C250 /* MainViewReactivateTests.swift */,
+				1C06F7D47534462B06D88C33 /* MCPConfigurationTests.swift */,
 				ACCA91F2D67F379ADF2D26C7 /* MCPDebugSocketTests.swift */,
 				1351DBB094396B86B81A81B6 /* MCPIntegrationTests.swift */,
 				1583C506E680B82932041796 /* MCPLocalTransportTests.swift */,
@@ -1429,6 +1432,7 @@
 				51881E0A8B168EEA8EF54E82 /* LineNumberAlignmentVisualTest.swift in Sources */,
 				D4D7150A572560FE2E5A5311 /* LoggerLazyEvaluationTests.swift in Sources */,
 				B378CB5E84CF4DD1C234F629 /* LoggerTests.swift in Sources */,
+				5E2F87DAA5AAD6182FD9B552 /* MCPConfigurationTests.swift in Sources */,
 				24B667096281FAB8406B099D /* MCPDebugSocketTests.swift in Sources */,
 				63F9717BDA7C8F50CCDE3DCF /* MCPIntegrationTests.swift in Sources */,
 				E8E5335B01694ACF79DE96E2 /* MCPLocalTransportTests.swift in Sources */,
@@ -1846,8 +1850,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/modelcontextprotocol/swift-sdk.git";
 			requirement = {
-				kind = exactVersion;
-				version = 0.12.1;
+				kind = revision;
+				revision = f7077e0d5cd57e0b2a497862017aa94ee344252f;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

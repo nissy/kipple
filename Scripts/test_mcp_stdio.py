@@ -1,4 +1,4 @@
-"""Verify the tokenless MCP schema and rejected inputs without clipboard writes."""
+"""Verify client handshakes, the MCP schema and rejected inputs without clipboard writes."""
 
 import json
 import os
@@ -9,8 +9,7 @@ import sys
 import uuid
 
 
-def main():
-    helper = Path(sys.argv[1]).resolve(strict=True)
+def verify_session(helper, capabilities):
     environment = {key: value for key, value in os.environ.items() if not key.startswith("KIPPLE_")}
     process = subprocess.Popen(
         [str(helper)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -24,13 +23,16 @@ def main():
         process.stdin.flush()
         if not select.select([process.stdout], [], [], 8)[0]:
             raise AssertionError("MCP response timed out: " + method)
-        response = json.loads(process.stdout.readline())
+        line = process.stdout.readline()
+        assert line, f"MCP server closed stdout during {method} (exit: {process.poll()})"
+        response = json.loads(line)
         assert response["id"] == identifier
+        assert "error" not in response, f"{method} failed: {response.get('error')}"
         return response["result"]
 
     try:
         initialized = request("initialize", {
-            "protocolVersion": "2025-11-25", "capabilities": {},
+            "protocolVersion": "2025-11-25", "capabilities": capabilities,
             "clientInfo": {"name": "Kipple test", "version": "1.0"},
         }, 1)
         assert initialized["serverInfo"]["name"] == "Kipple"
@@ -63,7 +65,27 @@ def main():
         process.terminate()
         process.wait(timeout=5)
         assert not process.stderr.read(), "Unexpected MCP stderr output"
-    print("MCP stdio: initialize, tokenless schema, removed fields and 80,000-character limits passed.")
+
+
+def main():
+    helper = Path(sys.argv[1]).resolve(strict=True)
+    for capabilities in [
+        {},
+        # Codex 0.154.0+: this valid object failed with Swift SDK 0.12.1.
+        {"experimental": {"codex/auth-change": {}}},
+        {
+            "experimental": {"openai/visibility": {"enabled": True}},
+            "extensions": {
+                "io.modelcontextprotocol/ui": {"mimeTypes": ["text/html;profile=mcp-app"]},
+            },
+            "roots": {"listChanged": True},
+            "sampling": {},
+            "elicitation": {"form": {}, "url": {}},
+        },
+    ]:
+        verify_session(helper, capabilities)
+    print("MCP stdio: basic/Codex/nested-capability handshakes, tokenless schema, "
+          "removed fields and 80,000-character limits passed.")
 
 
 if __name__ == "__main__":

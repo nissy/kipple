@@ -4,6 +4,10 @@ import CryptoKit
 
 @MainActor
 final class MCPIntegration: ObservableObject {
+    enum ConfigurationFormat: CaseIterable {
+        case json, codex, claudeCode
+    }
+
     static let shared = MCPIntegration()
     @Published var enabled: Bool {
         didSet { defaults.set(enabled, forKey: "mcpEnabled"); restart() }
@@ -51,16 +55,28 @@ final class MCPIntegration: ObservableObject {
         }
     }
 
-    static func configuration() throws -> String {
-        let path = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/KippleMCP").path
+    static func configuration(
+        for format: ConfigurationFormat = .json,
+        helperURL: URL = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/KippleMCP")
+    ) throws -> String {
+        let path = helperURL.path
+        let quotedPath = "'" + path.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
+        switch format {
+        case .codex:
+            return "codex mcp add kipple -- \(quotedPath)"
+        case .claudeCode:
+            return "claude mcp add --transport stdio --scope user kipple -- \(quotedPath)"
+        case .json:
+            break
+        }
         let value = ["mcpServers": ["kipple": ["command": path]]]
         let data = try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys])
         guard let configuration = String(data: data, encoding: .utf8) else { throw MCPFailure.invalidInput }
         return configuration
     }
 
-    func copyConfiguration() async -> Bool {
-        guard enabled, let content = try? Self.configuration() else { return false }
+    func copyConfiguration(for format: ConfigurationFormat = .json) async -> Bool {
+        guard enabled, let content = try? Self.configuration(for: format) else { return false }
         let expected = generation
         return await service.copyMCPConfiguration(content) { [weak self] in
             self?.isActive(expected) == true

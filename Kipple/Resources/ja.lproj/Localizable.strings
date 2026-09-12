@@ -248,11 +248,17 @@
 
 "Configuration copy failed; try again" = "コピーできませんでした。もう一度お試しください。";
 
-"Copy connection settings" = "接続設定をコピー";
-
 "MCP starting" = "MCPを開始しています";
-"Connection settings" = "接続設定";
-"Connection settings copied" = "接続設定をコピーしました";
+"Add Kipple to an AI client" = "AIにKippleを追加";
+"Copy Codex add command" = "Codexの追加コマンドをコピー";
+"Copy Claude Code add command" = "Claude Codeの追加コマンドをコピー";
+"Codex add command copied" = "Codexの追加コマンドをコピーしました";
+"Claude Code add command copied" = "Claude Codeの追加コマンドをコピーしました";
+"Run the copied command in Terminal. Requires the Codex or Claude Code CLI." = "コピーしたコマンドをターミナルで実行してください。対応するCLIのインストールが必要です。";
+"Kipple will be available across all projects." = "どのプロジェクトでも使えるように追加します。";
+"Configure with JSON" = "JSONで設定する";
+"Copy MCP settings (JSON)" = "MCP設定（JSON）をコピー";
+"MCP settings (JSON) copied" = "MCP設定（JSON）をコピーしました";
+"Paste this JSON into an AI client's MCP configuration." = "JSON形式でMCPを設定するAIクライアントに貼り付けてください。";
 "Up to 80,000 characters per item." = "本文は1件あたり8万文字まで登録できます。";
 "Local programs running as your user can add text while MCP is enabled." = "有効にすると、このMacで同じユーザーとして動くプログラムから登録できます。";
-"Paste the settings into your AI client. You can use the same settings with multiple clients." = "コピーした接続設定をAIクライアントに登録してください。複数のクライアントで同じ設定を使えます。";

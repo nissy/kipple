@@ -248,11 +248,17 @@
 
 "Configuration copy failed; try again" = "Configuration copy failed; try again";
 
-"Copy connection settings" = "Copy connection settings";
-
 "MCP starting" = "MCP starting";
-"Connection settings" = "Connection settings";
-"Connection settings copied" = "Connection settings copied";
+"Add Kipple to an AI client" = "Add Kipple to an AI client";
+"Copy Codex add command" = "Copy Codex add command";
+"Copy Claude Code add command" = "Copy Claude Code add command";
+"Codex add command copied" = "Codex add command copied";
+"Claude Code add command copied" = "Claude Code add command copied";
+"Run the copied command in Terminal. Requires the Codex or Claude Code CLI." = "Run the copied command in Terminal. Requires the Codex or Claude Code CLI.";
+"Kipple will be available across all projects." = "Kipple will be available across all projects.";
+"Configure with JSON" = "Configure with JSON";
+"Copy MCP settings (JSON)" = "Copy MCP settings (JSON)";
+"MCP settings (JSON) copied" = "MCP settings (JSON) copied";
+"Paste this JSON into an AI client's MCP configuration." = "Paste this JSON into an AI client's MCP configuration.";
 "Up to 80,000 characters per item." = "Up to 80,000 characters per item.";
 "Local programs running as your user can add text while MCP is enabled." = "Local programs running as your user can add text while MCP is enabled.";
-"Paste the settings into your AI client. You can use the same settings with multiple clients." = "Paste the settings into your AI client. You can use the same settings with multiple clients.";

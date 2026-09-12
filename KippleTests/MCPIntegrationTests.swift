@@ -67,32 +67,50 @@ final class MCPIntegrationTests: XCTestCase {
         let context = try fixture()
         await context.service.writeToClipboardOnly("Keep this clipboard")
         context.integration.enabled = false
-        let copied = await context.integration.copyConfiguration()
+        for format in MCPIntegration.ConfigurationFormat.allCases {
+            let copied = await context.integration.copyConfiguration(for: format)
+            XCTAssertFalse(copied)
+        }
         let result = await context.integration.register(.init(
             version: 1, request: .init(requestId: UUID(), items: [.init(content: "Blocked")])
         ))
-        XCTAssertFalse(copied)
         XCTAssertEqual(result.code, "INTEGRATION_DISABLED")
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Keep this clipboard")
         let history = await context.service.getHistory()
         XCTAssertTrue(history.isEmpty)
     }
 
+    func testAllConfigurationFormatsCopyWithoutEnteringHistory() async throws {
+        let context = try fixture()
+        for format in MCPIntegration.ConfigurationFormat.allCases {
+            let copied = await context.integration.copyConfiguration(for: format)
+            XCTAssertTrue(copied)
+            let expected = try MCPIntegration.configuration(for: format)
+            XCTAssertEqual(NSPasteboard.general.string(forType: .string), expected)
+            let visible = await context.service.getCurrentClipboardContent()
+            XCTAssertEqual(visible, expected)
+            let history = await context.service.getHistory()
+            XCTAssertTrue(history.isEmpty)
+        }
+    }
+
     func testDisablingMCPImmediatelyBeforeConfigurationWritePreservesClipboard() async throws {
-        for reenable in [false, true] {
-            let context = try fixture()
-            let integration = context.integration
-            await context.service.writeToClipboardOnly("Keep this clipboard")
-            let observer = NotificationCenter.default.addObserver(forName: .mcpWillCopy, object: nil, queue: .main) { _ in
-                MainActor.assumeIsolated {
-                    integration.enabled = false
-                    if reenable { integration.enabled = true }
+        for format in MCPIntegration.ConfigurationFormat.allCases {
+            for reenable in [false, true] {
+                let context = try fixture()
+                let integration = context.integration
+                await context.service.writeToClipboardOnly("Keep this clipboard")
+                let observer = NotificationCenter.default.addObserver(forName: .mcpWillCopy, object: nil, queue: .main) { _ in
+                    MainActor.assumeIsolated {
+                        integration.enabled = false
+                        if reenable { integration.enabled = true }
+                    }
                 }
+                let copied = await integration.copyConfiguration(for: format)
+                NotificationCenter.default.removeObserver(observer)
+                XCTAssertFalse(copied)
+                XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Keep this clipboard")
             }
-            let copied = await integration.copyConfiguration()
-            NotificationCenter.default.removeObserver(observer)
-            XCTAssertFalse(copied)
-            XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Keep this clipboard")
         }
     }
 

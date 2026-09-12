@@ -137,8 +137,8 @@ build-dev: generate ## Build and run development version (keeps permissions)
 	@echo "$(GREEN)Copying to dev directory…$(NC)"
 	@BUILD_PATH=$$(xcodebuild -project $(XCODE_PROJECT) -scheme $(SCHEME) -configuration $(CONFIGURATION_DEBUG) -derivedDataPath $(DEV_BUILD_DIR)/DerivedData -showBuildSettings DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) | grep -E '^\s*BUILT_PRODUCTS_DIR' | awk '{print $$3}'); \
 	if [ -d "$$BUILD_PATH/$(PROJECT_NAME).app" ]; then \
-		cp -R "$$BUILD_PATH/$(PROJECT_NAME).app" $(DEV_BUILD_DIR)/; \
-		echo "$(GREEN)Development build available at: $(DEV_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
+		STAGING_DIR=$$(mktemp -d "$(DEV_BUILD_DIR)/.install-XXXXXX") || exit 1; \
+		cp -R "$$BUILD_PATH/$(PROJECT_NAME).app" "$$STAGING_DIR/" || exit 1; \
 		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes…$(NC)"; \
 		EXISTING_PIDS=$$(pgrep -x $(PROJECT_NAME) || true); \
 		if [ -n "$$EXISTING_PIDS" ]; then \
@@ -146,6 +146,17 @@ build-dev: generate ## Build and run development version (keeps permissions)
 			pkill -x $(PROJECT_NAME) || true; \
 			sleep 2; \
 		fi; \
+		if [ -d "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" ]; then \
+			mv "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" "$$STAGING_DIR/previous.app" || exit 1; \
+		fi; \
+		if ! mv "$$STAGING_DIR/$(PROJECT_NAME).app" "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app"; then \
+			if [ -d "$$STAGING_DIR/previous.app" ]; then \
+				mv "$$STAGING_DIR/previous.app" "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app"; \
+			fi; \
+			exit 1; \
+		fi; \
+		rm -rf "$$STAGING_DIR"; \
+		echo "$(GREEN)Development build available at: $(DEV_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
 		echo "$(BLUE)Starting development version…$(NC)"; \
 		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" || true; \
 	fi
