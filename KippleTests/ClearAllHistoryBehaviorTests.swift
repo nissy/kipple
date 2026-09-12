@@ -123,7 +123,7 @@ final class ClearAllHistoryBehaviorTests: XCTestCase {
         await service.copyToClipboard("Item 2", fromEditor: false)
         await service.copyToClipboard("Item 3", fromEditor: false)
 
-        var history = await service.getHistory()
+        let history = await service.getHistory()
         _ = await service.togglePin(for: history[0])
         await service.flushPendingSaves()
 

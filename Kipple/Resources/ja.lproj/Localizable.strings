@@ -2,6 +2,7 @@
 "1. Click “Request Permission Again” and follow the macOS prompt to System Settings." = "1. 「再度許可をリクエスト」をクリックし、macOSの案内に従ってシステム設定を開きます。";
 "1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings." = "1. 「再度許可をリクエスト」をクリックしてmacOSのダイアログを表示するか、システム設定を開きます。";
 "2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”." = "2. システム設定 → プライバシーとセキュリティ → アクセシビリティで「Kipple」を有効にします。";
+"2. In System Settings → Privacy & Security → Input Monitoring, enable “Kipple”." = "2. システム設定 → プライバシーとセキュリティ → 入力監視で「Kipple」を有効にします。";
 "2. In System Settings → Privacy & Security → Screen Recording, enable “Kipple”." = "2. システム設定 → プライバシーとセキュリティ → 画面収録で「Kipple」を有効にします。";
 "3. Return to Kipple; the status badge switches to Granted automatically." = "3. Kippleに戻ると、ステータスバッジが自動的に「許可済み」に切り替わります。";
 "Abc 123 あいう" = "Abc 123 あいう";
@@ -10,6 +11,7 @@
 "About" = "アプリ情報";
 "About Kipple" = "Kipple について";
 "Accessibility Permission" = "アクセシビリティの許可";
+"Input Monitoring Permission" = "入力監視の許可";
 "Accessibility Permission Ready" = "アクセシビリティの許可は設定済み";
 "Add" = "追加";
 "Add Fallback Font" = "フォールバックフォントを追加";
@@ -157,6 +159,8 @@
 "Screen Recording Permission" = "画面収録の権限";
 "Screen Recording Permission Ready" = "画面収録の権限は設定済み";
 "Request Access" = "アクセスをリクエスト";
+"Used By" = "対象の機能";
+"This feature is unavailable without this permission." = "この権限がない場合、この機能は使用できません。";
 "Overview" = "概要";
 "Text Capture Hotkey" = "グローバルホットキー";
 "Screen Text Capture" = "画面テキストキャプチャ";
@@ -181,7 +185,6 @@
 "System Default" = "システム設定に合わせる";
 "The selected shortcut is already taken. Try another combination." = "選択したショートカットは既に使用されています。別の組み合わせを試してください。";
 "This enables standard users to approve the permission." = "これにより一般ユーザーでも権限を承認できます。";
-"Tip: Granting Accessibility lets Kipple observe Command+V while running in the background." = "ヒント: アクセシビリティを許可すると、Kipple はバックグラウンドで Command+V を監視できます。";
 "Automation Prompt Tip" = "macOS で「自動操作」の確認が表示された場合は、Kipple にシステム設定の操作を許可するとショートカットから対象のペインを開けます。";
 "Top" = "上";
 "URL" = "URL";
@@ -196,7 +199,8 @@
 "Other Fonts" = "その他のフォント";
 "Font size" = "フォントサイズ";
 "Text could not be detected. Please try another area." = "テキストを検出できませんでした。別の領域を選択してください。";
-"Why: Lets Quick Paste watch Command+V for clipboard automation. Input stays on device." = "理由: クイックペーストが Command+V を監視し、自動貼り付けを実現します。入力はデバイス内に留まります。";
+"Why: Lets Paste on Selection send Command+V to the frontmost app. Input stays on device." = "理由: 「選択してペースト」が前面のアプリへ Command+V を送るために必要です。入力はデバイス内に留まります。";
+"Why: Lets the paste queue watch Command+V to advance items. Input stays on device." = "理由: 「キューペーストモード」が Command+V を検知して次のアイテムへ進むために必要です。入力はデバイス内に留まります。";
 "Why: Needed so Screen Text Capture can read on-screen text. No screen data leaves your Mac." = "理由: 画面テキストキャプチャが画面上の文字を読み取るために必要です。画面データがMacの外へ送信されることはありません。";
 "Window Animation" = "ウィンドウアニメーション";
 "Yu Gothic" = "游ゴシック";

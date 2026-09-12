@@ -9,6 +9,13 @@ import Foundation
 import ApplicationServices
 import AppKit
 
+/// Kipple 自身が合成するペーストイベントの識別子。
+/// PasteCommandMonitor がキュー前進の対象から除外するために参照する
+enum SyntheticPasteEvent {
+    // "KPST" (Kipple Paste)
+    static let sourceUserData: Int64 = 0x4B50_5354
+}
+
 @MainActor
 final class AutoPasteController {
     static let shared = AutoPasteController()
@@ -36,6 +43,12 @@ final class AutoPasteController {
         DispatchQueue.main.asyncAfter(deadline: .now() + fireDelay, execute: work)
     }
 
+    /// キューモード開始時に呼び、予約済みの auto paste がキューを誤って進めないようにする
+    func cancelPendingPaste() {
+        pendingWorkItem?.cancel()
+        pendingWorkItem = nil
+    }
+
     private func sendPasteCommand() {
         guard AXIsProcessTrusted() else { return }
         guard let frontApp = NSWorkspace.shared.frontmostApplication,
@@ -53,6 +66,8 @@ final class AutoPasteController {
 
         keyDown.flags = [.maskCommand]
         keyUp.flags = [.maskCommand]
+        keyDown.setIntegerValueField(.eventSourceUserData, value: SyntheticPasteEvent.sourceUserData)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: SyntheticPasteEvent.sourceUserData)
         keyDown.post(tap: .cghidEventTap)
         keyUp.post(tap: .cghidEventTap)
     }

@@ -162,7 +162,7 @@ private extension MainViewTitleBarAccessory {
             state.requestToggleQueue()
         } else {
             NotificationCenter.default.post(
-                name: .accessibilityPermissionRequested,
+                name: .inputMonitoringPermissionRequested,
                 object: nil
             )
         }

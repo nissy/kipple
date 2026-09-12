@@ -1,6 +1,7 @@
 @testable import Kipple
 import XCTest
 
+@MainActor
 final class HistoryListViewHelperTests: XCTestCase {
     func testIsCurrentClipboardItemMatchesID() {
         let item = ClipItem(content: "match")

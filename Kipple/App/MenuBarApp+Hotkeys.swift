@@ -39,19 +39,20 @@ extension MenuBarApp {
             queue: .main
         ) { [weak self] notification in
             guard
-                let self,
                 let userInfo = notification.userInfo,
                 let keyCode = userInfo["keyCode"] as? Int,
                 let modifierFlags = userInfo["modifierFlags"] as? Int
             else { return }
 
             let enabled = userInfo["enabled"] as? Bool ?? true
-            self.handleTextCaptureSettingsChange(
-                enabled: enabled,
-                keyCode: UInt16(keyCode),
-                modifierFlagsRawValue: UInt(modifierFlags),
-                manager: manager
-            )
+            Task { @MainActor [weak self] in
+                self?.handleTextCaptureSettingsChange(
+                    enabled: enabled,
+                    keyCode: UInt16(keyCode),
+                    modifierFlagsRawValue: UInt(modifierFlags),
+                    manager: manager
+                )
+            }
         }
     }
 

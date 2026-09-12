@@ -61,13 +61,11 @@ final class LaunchAtLoginTests: XCTestCase {
         let expectation = self.expectation(description: "Notification should be posted on error")
         expectation.isInverted = true // We don't expect this to be fulfilled in normal operation
         
-        var notificationReceived = false
         let observer = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("LaunchAtLoginError"),
             object: nil,
             queue: .main
         ) { _ in
-            notificationReceived = true
             expectation.fulfill()
         }
         
@@ -75,12 +73,7 @@ final class LaunchAtLoginTests: XCTestCase {
         launchAtLogin.isEnabled = true
         
         // Then
-        waitForExpectations(timeout: 1.0) { _ in
-            // In CI environment, this might fail, which is expected
-            if notificationReceived {
-                // LaunchAtLogin error notification received (expected in test environment)
-            }
-        }
+        wait(for: [expectation], timeout: 1.0)
         
         NotificationCenter.default.removeObserver(observer)
     }

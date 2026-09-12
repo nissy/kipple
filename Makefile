@@ -84,7 +84,7 @@ help: ## Show this help message
 	@echo "$(YELLOW)=== Development Commands ===$(NC)"
 	@echo "  $(GREEN)make generate$(NC)      Generate Xcode project from project.yml"
 	@echo "  $(GREEN)make build-dev$(NC)     Build and run development version"
-	@echo "  $(GREEN)make run$(NC)           Run development version"
+	@echo "  $(GREEN)make run$(NC)           Build and run development version"
 	@echo "  $(GREEN)make test$(NC)          Run all tests"
 	@echo "  $(GREEN)make lint$(NC)          Run SwiftLint"
 	@echo "  $(GREEN)make clean-dev$(NC)     Clean development build"
@@ -155,23 +155,7 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" || true; \
 	fi
 
-run: ## Run development version
-	@echo "$(BLUE)Running $(PROJECT_NAME)…$(NC)"
-	@if [ -d "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" ]; then \
-		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes…$(NC)"; \
-		EXISTING_PIDS=$$(pgrep -x $(PROJECT_NAME) || true); \
-		if [ -n "$$EXISTING_PIDS" ]; then \
-			echo "$(YELLOW)Stopping existing processes: $$EXISTING_PIDS$(NC)"; \
-			pkill -x $(PROJECT_NAME) || true; \
-			sleep 2; \
-		fi; \
-		echo "$(BLUE)Starting development version…$(NC)"; \
-		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app"; \
-	else \
-		echo "$(RED)Error: Development build not found at $(DEV_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
-		echo "$(YELLOW)Run 'make build-dev' first$(NC)"; \
-		exit 1; \
-	fi
+run: build-dev ## Build and run development version
 
 #===============================================================================
 # PRODUCTION BUILD TARGETS

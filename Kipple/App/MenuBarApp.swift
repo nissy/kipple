@@ -27,7 +27,7 @@ final class MenuBarApp: NSObject, ObservableObject {
     var textCaptureHotkeyManager: TextCaptureHotkeyManager?
     var textCaptureHotkeyObserver: NSObjectProtocol?
     private var screenRecordingPermissionObserver: NSObjectProtocol?
-    private var accessibilityPermissionObserver: NSObjectProtocol?
+    private var inputMonitoringPermissionObserver: NSObjectProtocol?
     
     // Properties for asynchronous termination handling
     private var isTerminating = false
@@ -55,29 +55,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Skip heavy initialization when running unit tests
         guard !Self.isTestEnvironment else { return }
 
-        screenRecordingPermissionObserver = NotificationCenter.default.addObserver(
-            forName: .screenRecordingPermissionRequested,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.windowManager.openSettings(tab: .permission)
-                ScreenRecordingPermissionOpener.openSystemSettings()
-            }
-        }
-
-        accessibilityPermissionObserver = NotificationCenter.default.addObserver(
-            forName: .accessibilityPermissionRequested,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.windowManager.openSettings(tab: .permission)
-                self.openAccessibilityPreferences()
-            }
-        }
+        observePermissionRequests()
 
         // Set up notification for SimplifiedHotkeyManager
         DispatchQueue.main.async { [weak self] in
@@ -105,6 +83,36 @@ final class MenuBarApp: NSObject, ObservableObject {
             self.startServices()
             DispatchQueue.main.async { [weak self] in
                 self?.windowManager.prewarmMainWindow()
+            }
+        }
+    }
+
+    /// タイトルバーの権限バッジから要求された際に、設定画面と該当のシステム設定ペインを開く
+    private func observePermissionRequests() {
+        screenRecordingPermissionObserver = NotificationCenter.default.addObserver(
+            forName: .screenRecordingPermissionRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.windowManager.openSettings(tab: .permission)
+                ScreenRecordingPermissionOpener.openSystemSettings()
+            }
+        }
+
+        inputMonitoringPermissionObserver = NotificationCenter.default.addObserver(
+            forName: .inputMonitoringPermissionRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.windowManager.openSettings(tab: .permission)
+                // 初回はシステムのプロンプトを出し、出せない (既に拒否済み等) 場合は設定ペインへ誘導
+                if !CGRequestListenEventAccess() {
+                    self.openInputMonitoringPreferences()
+                }
             }
         }
     }
@@ -198,8 +206,8 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @MainActor
-    private func openAccessibilityPreferences() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+    private func openInputMonitoringPreferences() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
         }
     }

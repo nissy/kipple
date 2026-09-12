@@ -14,8 +14,8 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
     var mockClipboardService: MockClipboardService!
     private var cancellables = Set<AnyCancellable>()
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         mockClipboardService = MockClipboardService()
         viewModel = MainViewModel(clipboardService: mockClipboardService)
         cancellables.removeAll()
@@ -23,12 +23,12 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
         viewModel.updateFilteredItems(mockClipboardService.history)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         mockClipboardService?.reset()
         viewModel = nil
         mockClipboardService = nil
         cancellables.removeAll()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func setupTestHistory() {

@@ -158,6 +158,8 @@ extension MainView {
 
     func toggleQueueModeFromTitleBar() {
         guard viewModel.canUsePasteQueue else { return }
+        // 予約済みの auto paste (合成 Cmd+V) がキューを誤って進めないよう先に潰す
+        AutoPasteController.shared.cancelPendingPaste()
         withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
             viewModel.toggleQueueMode()
         }

@@ -25,6 +25,8 @@ class JapaneseFontAlignmentTest: XCTestCase, @unchecked Sendable {
             // 差分を計算
             let japaneseLineHeight = japaneseFont.ascender - japaneseFont.descender + japaneseFont.leading
             let englishLineHeight = englishFont.ascender - englishFont.descender + englishFont.leading
+            XCTAssertGreaterThan(japaneseLineHeight, 0)
+            XCTAssertGreaterThan(englishLineHeight, 0)
         }
     }
     
@@ -49,6 +51,9 @@ class JapaneseFontAlignmentTest: XCTestCase, @unchecked Sendable {
         let textCenter = lineY + (textFont.ascender - textFont.descender) / 2
         let lineNumberCenter = (lineNumberFont.ascender - lineNumberFont.descender) / 2
         let altDrawingY2 = textCenter - lineNumberCenter - lineNumberFont.descender
+        XCTAssertTrue(drawingY.isFinite)
+        XCTAssertTrue(altDrawingY1.isFinite)
+        XCTAssertTrue(altDrawingY2.isFinite)
     }
     
     func testLayoutManagerLineFragmentPositioning() {
@@ -85,15 +90,14 @@ class JapaneseFontAlignmentTest: XCTestCase, @unchecked Sendable {
         layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, glyphRange, _ in
             let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
             let lineText = (textStorage.string as NSString).substring(with: characterRange)
-            
+            XCTAssertFalse(lineText.isEmpty)
             lineNumber += 1
         }
+        XCTAssertGreaterThan(lineNumber, 1)
     }
     
     func testFontFallbackBehavior() {
         // フォントフォールバックの動作をテスト
-        let fontManager = FontManager.shared
-        
         // 日本語と英語を含むフォント設定
         let testSettings = FontSettings(
             primaryFontName: "SFMono-Regular",
@@ -108,6 +112,7 @@ class JapaneseFontAlignmentTest: XCTestCase, @unchecked Sendable {
         for fontName in testSettings.fontList {
             if let font = NSFont(name: fontName, size: testSettings.primaryFontSize) {
                 let height = font.ascender - font.descender + font.leading
+                XCTAssertGreaterThanOrEqual(maxHeight, height)
             }
         }
     }

@@ -1,6 +1,7 @@
 @testable import Kipple
 import XCTest
 
+@MainActor
 final class HistoryItemViewDisplayContentTests: XCTestCase {
     func testMakeDisplayContentStopsAtNewline() {
         let result = HistoryItemView.makeDisplayContent(from: "first line\nsecond line")

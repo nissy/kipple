@@ -19,8 +19,8 @@ import Cocoa
 final class AppInfoTests: XCTestCase {
     var mockClipboardService: MockClipboardService!
     
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         mockClipboardService = MockClipboardService()
         
         // クリーンな状態を確保
@@ -28,11 +28,11 @@ final class AppInfoTests: XCTestCase {
         NSPasteboard.general.clearContents()
     }
     
-    override func tearDown() {
+    override func tearDown() async throws {
         mockClipboardService?.reset()
         mockClipboardService = nil
         NSPasteboard.general.clearContents()
-        super.tearDown()
+        try await super.tearDown()
     }
     
     // MARK: - 基本的なアプリ情報取得
@@ -52,7 +52,6 @@ final class AppInfoTests: XCTestCase {
         // テスト用のアイテムを追加
         let uuid = UUID().uuidString
         let testContent = "KIPPLE_TEST_\(uuid)"
-        let testItem = ClipItem(content: testContent)
         
         // アプリ情報を設定（テスト環境用）
         // ClipItemのプロパティはletなので、新しいインスタンスを作成

@@ -41,6 +41,14 @@ class LineNumberAlignmentVisualTest: XCTestCase {
             if isJapaneseFont(textFont) {
                 newDrawingY += 1.0
             }
+
+            XCTAssertTrue(oldDrawingY.isFinite, "\(fontType) old position should be finite")
+            XCTAssertTrue(newDrawingY.isFinite, "\(fontType) new position should be finite")
+            XCTAssertLessThan(
+                abs(newDrawingY - oldDrawingY),
+                lineHeight,
+                "\(fontType) alignment adjustment should stay within one line"
+            )
         }
     }
     

@@ -18,9 +18,10 @@ final class PerformanceMetricsTests: XCTestCase {
         // When: Simulating scroll operations
         measure {
             var visibleRange = 0..<20
+            let operationCount = min(100, itemCount - visibleRange.count)
 
             // Simulate scrolling through the list
-            for _ in 0..<100 {
+            for _ in 0..<operationCount {
                 visibleRange = visibleRange.lowerBound + 1..<visibleRange.upperBound + 1
 
                 // Simulate view updates for visible range

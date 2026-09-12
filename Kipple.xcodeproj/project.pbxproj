@@ -75,6 +75,7 @@
 		5A08917C3CDE5860FB29C64E /* HotkeyManagerProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC12FF2542A82E03A59012F /* HotkeyManagerProviderTests.swift */; };
 		5CBBA050B4549931A071F4FE /* HistoryListViewHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DC0B764C1B9C0B7D59700E /* HistoryListViewHelperTests.swift */; };
 		5DA5FD30710060D9FF7158BF /* ModernClipboardServicePinUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643A0D867F7B8BE9E0C6DDB3 /* ModernClipboardServicePinUpdateTests.swift */; };
+		5EDC7569975751F28A1D96CF /* PasteCommandMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1AB7367D3A5AC598FEAB6C /* PasteCommandMonitorTests.swift */; };
 		5EF8C1590662867113127642 /* ButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 897DCA35EFDD7A9296F85AC5 /* ButtonStyles.swift */; };
 		6251C6BBF34040D4B1B43FDF /* ClipboardTextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76728D9DB2FF36A4859D9180 /* ClipboardTextFormatter.swift */; };
 		62F009B02F724594C0A15CCF /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297CBB8448A107E022CAC728 /* WindowManager.swift */; };
@@ -318,6 +319,7 @@
 		9B327CFF33804D2F84C6E6E5 /* ModernClipboardHashResetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardHashResetTests.swift; sourceTree = "<group>"; };
 		9CF40741FF97648B5350B9F3 /* HotkeySettingsSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsSyncTests.swift; sourceTree = "<group>"; };
 		9E12EDD1DC3948006995C1E5 /* WindowFocusReturnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowFocusReturnTests.swift; sourceTree = "<group>"; };
+		9F1AB7367D3A5AC598FEAB6C /* PasteCommandMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteCommandMonitorTests.swift; sourceTree = "<group>"; };
 		A0ED818B8D1B98408B17D834 /* ClipboardMonitoringDuplicateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitoringDuplicateTests.swift; sourceTree = "<group>"; };
 		A1EF33FDC2171B34E560EF64 /* MenuBarApp+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MenuBarApp+Testing.swift"; sourceTree = "<group>"; };
 		A2FB380E7244A02795ADCB17 /* AutoPinSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoPinSettingsView.swift; sourceTree = "<group>"; };
@@ -966,6 +968,7 @@
 				643A0D867F7B8BE9E0C6DDB3 /* ModernClipboardServicePinUpdateTests.swift */,
 				95A21AC6929667A00FB9B0DF /* ModernClipboardServiceStartupTests.swift */,
 				306656767496DF766095D811 /* ModernClipboardServiceTests.swift */,
+				9F1AB7367D3A5AC598FEAB6C /* PasteCommandMonitorTests.swift */,
 				7C6A2394EEFF7F2A077E9F62 /* PasteQueueModeTests.swift */,
 				D3A8A074D41803EB02702E99 /* PerformanceMetricsTests.swift */,
 				163B51E969EDBC688D6AD83E /* RecopyHistoryUpdateTests.swift */,
@@ -1274,6 +1277,7 @@
 				5DA5FD30710060D9FF7158BF /* ModernClipboardServicePinUpdateTests.swift in Sources */,
 				906C0F98B6A60A0BE9DCD168 /* ModernClipboardServiceStartupTests.swift in Sources */,
 				8F38595FFA66609AB4C620F2 /* ModernClipboardServiceTests.swift in Sources */,
+				5EDC7569975751F28A1D96CF /* PasteCommandMonitorTests.swift in Sources */,
 				D1753E89CB41984167AB36AA /* PasteQueueModeTests.swift in Sources */,
 				C17A8F50F8EF6738C84200D9 /* PerformanceMetricsTests.swift in Sources */,
 				99AACF46738A2255AEEADED7 /* RecopyHistoryUpdateTests.swift in Sources */,
@@ -1418,7 +1422,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.1.8;
+				MARKETING_VERSION = 2.1.9;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1426,7 +1430,7 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 6.2;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -1527,14 +1531,14 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.1.8;
+				MARKETING_VERSION = 2.1.9;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = Kipple;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 6.2;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};

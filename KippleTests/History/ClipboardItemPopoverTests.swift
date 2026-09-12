@@ -1,6 +1,7 @@
 @testable import Kipple
 import XCTest
 
+@MainActor
 final class ClipboardItemPopoverTests: XCTestCase {
     func testResolveItemFallsBackToInitialWhenNotFound() {
         let item = ClipItem(content: "initial")

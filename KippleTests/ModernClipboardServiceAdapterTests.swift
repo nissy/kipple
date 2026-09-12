@@ -108,7 +108,7 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         }
 
         // When
-        let isPinned = adapter.togglePin(for: item)
+        _ = adapter.togglePin(for: item)
 
         // Wait for async update
         try? await Task.sleep(for: .milliseconds(200))

@@ -33,14 +33,15 @@ class IsolatedSettingsTests: XCTestCase {
     }
     
     func testSettingsInIsolation() {
+        let realValueBefore = UserDefaults.standard.object(forKey: "filterCategoryNone") as? Bool
+
         // テスト用UserDefaultsで操作
         testDefaults.set(true, forKey: "filterCategoryNone")
         
         XCTAssertTrue(testDefaults.bool(forKey: "filterCategoryNone"))
         
         // 本番のUserDefaultsには影響なし
-        let realDefaults = UserDefaults.standard
-        let realValue = realDefaults.object(forKey: "filterCategoryNone") as? Bool ?? false
-        // realValueは変更されていない
+        let realValueAfter = UserDefaults.standard.object(forKey: "filterCategoryNone") as? Bool
+        XCTAssertEqual(realValueAfter, realValueBefore)
     }
 }
