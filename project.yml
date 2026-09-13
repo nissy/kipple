@@ -13,7 +13,7 @@ options:
 settings:
   base:
     DEVELOPMENT_TEAM: R7LKF73J2W
-    MARKETING_VERSION: 2.1.9
+    MARKETING_VERSION: 2.2.0
     CURRENT_PROJECT_VERSION: 1
     PRODUCT_NAME: Kipple
     MACOSX_DEPLOYMENT_TARGET: 14.0
@@ -23,6 +23,10 @@ settings:
     COMBINE_HIDPI_IMAGES: YES
 
 packages:
+  MCP:
+    url: https://github.com/modelcontextprotocol/swift-sdk.git
+    # Fix nested initialize capabilities (upstream PR #276); use a release once included.
+    revision: f7077e0d5cd57e0b2a497862017aa94ee344252f
   Yams:
     url: https://github.com/jpsim/Yams.git
     from: 6.2.2
@@ -32,6 +36,7 @@ targets:
     type: application
     platform: macOS
     sources:
+      - path: Shared
       - path: Kipple
         excludes:
           - "**/.DS_Store"
@@ -64,10 +69,37 @@ targets:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
     dependencies:
+      - target: KippleMCP
+        embed: true
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       - sdk: libsqlite3.tbd
       - package: Yams
     preBuildScripts: []
     postBuildScripts: []
+
+  KippleMCP:
+    type: tool
+    platform: macOS
+    sources:
+      - path: KippleMCP
+      - path: Shared
+    dependencies:
+      - package: MCP
+        product: MCP
+    settings:
+      base:
+        PRODUCT_NAME: KippleMCP
+        CODE_SIGN_ENTITLEMENTS: KippleMCP/KippleMCP.entitlements
+        SKIP_INSTALL: YES
+        GENERATE_INFOPLIST_FILE: YES
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
 
   KippleTests:
     type: bundle.unit-test

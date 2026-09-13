@@ -1,0 +1,28 @@
+{
+  "manifest_version": "0.3",
+  "name": "kipple",
+  "display_name": "Kipple",
+  "version": "1.0.0",
+  "description": "Add text up to 80,000 characters per item to Kipple and copy the first item to the clipboard.",
+  "author": {
+    "name": "Kipple contributors"
+  },
+  "server": {
+    "type": "binary",
+    "entry_point": "server/KippleMCP",
+    "mcp_config": {
+      "command": "${__dirname}/server/KippleMCP"
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ]
+  },
+  "tools": [
+    {
+      "name": "kipple_add_items",
+      "description": "Register text and replace the current clipboard with the first item. No history reading."
+    }
+  ]
+}

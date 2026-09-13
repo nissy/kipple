@@ -14,10 +14,12 @@ struct SettingsView: View {
     @ObservedObject private var appSettings = AppSettings.shared
     @Environment(\.controlActiveState) private var controlActiveState
     @State private var activeTab: SettingsViewModel.Tab
+    private let mcpIntegration: MCPIntegration
 
-    init(viewModel: SettingsViewModel = SettingsViewModel()) {
+    init(viewModel: SettingsViewModel = SettingsViewModel(), mcpIntegration: MCPIntegration = .shared) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
         _activeTab = State(initialValue: viewModel.selectedTab)
+        self.mcpIntegration = mcpIntegration
     }
 
     var body: some View {
@@ -76,6 +78,8 @@ struct SettingsView: View {
             DataSettingsView()
         case .permission:
             PermissionsSettingsView()
+        case .ai:
+            MCPSettingsView(integration: mcpIntegration)
         }
     }
 
@@ -143,7 +147,7 @@ private struct SettingsToolbarButton: View {
             }
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .frame(width: SettingsLayoutMetrics.toolbarButtonWidth)
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())

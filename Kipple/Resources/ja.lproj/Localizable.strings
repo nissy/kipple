@@ -81,7 +81,7 @@
 "editor.format.error.yaml.structure" = "YAMLのマップまたはリストではありません";
 "editor.format.error.output" = "整形結果を文字列に変換できません";
 "editor.format.error.utf8" = "UTF-8文字列として読み取れません";
-"Save" = "Save";
+"Save" = "保存";
 "Editor Position" = "ライブエディタの位置";
 "External Source" = "外部アプリ";
 "English" = "英語";
@@ -226,3 +226,39 @@
 "AboutHighlightSecurity" = "macOSのセキュリティ機能で保護されています";
 "AboutHighlightDeletion" = "いつでもデータを削除できます";
 "AboutCopyright" = "© 2025 Kipple";
+
+// MCP integration
+"AI Integration" = "AI連携";
+"Enable MCP" = "MCPを有効にする";
+"AI can add text and replace the clipboard. Clipboard history cannot be read." = "AIからテキストを登録してクリップボードを更新できます。履歴の読み取りはできません。";
+"MCP disabled" = "MCPは無効です";
+"MCP ready" = "接続を受け付けています";
+"MCP unavailable" = "MCPを利用できません。接続設定とアプリの署名を確認してください。";
+"Done" = "完了";
+"Update the AI client configuration" = "AIクライアントの接続設定を更新してください。";
+"Item details" = "項目の詳細";
+"Title" = "タイトル";
+"Source" = "登録元";
+"Registered" = "初回登録";
+"Preview limited to 4,000 characters" = "プレビューは先頭4,000文字です";
+"Could not save. Check the title." = "保存できませんでした。タイトルを確認してください。";
+"Item unavailable" = "この項目は削除されています";
+"Added by AI" = "AIから登録";
+"Clipboard updated. Your edits are preserved." = "クリップボードは更新済みです。編集内容は保持しています。";
+
+"Configuration copy failed; try again" = "コピーできませんでした。もう一度お試しください。";
+
+"MCP starting" = "MCPを開始しています";
+"Add Kipple to an AI client" = "AIにKippleを追加";
+"Copy Codex add command" = "Codexの追加コマンドをコピー";
+"Copy Claude Code add command" = "Claude Codeの追加コマンドをコピー";
+"Codex add command copied" = "Codexの追加コマンドをコピーしました";
+"Claude Code add command copied" = "Claude Codeの追加コマンドをコピーしました";
+"Run the copied command in Terminal. Requires the Codex or Claude Code CLI." = "コピーしたコマンドをターミナルで実行してください。対応するCLIのインストールが必要です。";
+"Kipple will be available across all projects." = "どのプロジェクトでも使えるように追加します。";
+"Configure with JSON" = "JSONで設定する";
+"Copy MCP settings (JSON)" = "MCP設定（JSON）をコピー";
+"MCP settings (JSON) copied" = "MCP設定（JSON）をコピーしました";
+"Paste this JSON into an AI client's MCP configuration." = "JSON形式でMCPを設定するAIクライアントに貼り付けてください。";
+"Up to 80,000 characters per item." = "本文は1件あたり8万文字まで登録できます。";
+"Local programs running as your user can add text while MCP is enabled." = "有効にすると、このMacで同じユーザーとして動くプログラムから登録できます。";

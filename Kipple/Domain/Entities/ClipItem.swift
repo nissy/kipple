@@ -34,7 +34,7 @@ enum ClipItemCategory: String, CaseIterable {
 }
 
 struct ClipItem: Identifiable, Codable, Equatable {
-    let id: UUID
+    var id: UUID
     let content: String
     var timestamp: Date
     var isPinned: Bool
@@ -44,6 +44,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let bundleIdentifier: String?
     let processID: Int32?
     let isFromEditor: Bool?
+    var metadata: ClipMetadata?
     // User-defined category
     var userCategoryId: UUID?
     
@@ -92,7 +93,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     }
     
     var category: ClipItemCategory {
-        CategoryClassifier.shared.classify(content: content, isFromEditor: isFromEditor ?? false)
+        return CategoryClassifier.shared.classify(content: content, isFromEditor: isFromEditor ?? false)
     }
     
     init(
@@ -104,7 +105,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         bundleIdentifier: String? = nil,
         processID: Int32? = nil,
         isFromEditor: Bool = false,
-        userCategoryId: UUID? = nil
+        userCategoryId: UUID? = nil,
+        metadata: ClipMetadata? = nil
     ) {
         self.id = UUID()
         self.content = content
@@ -117,6 +119,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.processID = processID
         self.isFromEditor = isFromEditor
         self.userCategoryId = userCategoryId
+        self.metadata = metadata ?? ClipMetadata(createdAt: timestamp, source: isFromEditor ? .editor : .clipboard)
     }
     
     init(
@@ -130,7 +133,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         bundleIdentifier: String?,
         processID: Int32?,
         isFromEditor: Bool?,
-        userCategoryId: UUID? = nil
+        userCategoryId: UUID? = nil,
+        metadata: ClipMetadata? = nil
     ) {
         self.id = id
         self.content = content
@@ -143,6 +147,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.processID = processID
         self.isFromEditor = isFromEditor
         self.userCategoryId = userCategoryId
+        self.metadata = metadata
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
@@ -156,7 +161,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         lhs.bundleIdentifier == rhs.bundleIdentifier &&
         lhs.processID == rhs.processID &&
         lhs.isFromEditor == rhs.isFromEditor &&
-        lhs.userCategoryId == rhs.userCategoryId
+        lhs.userCategoryId == rhs.userCategoryId &&
+        lhs.metadata == rhs.metadata
     }
     
     // 行数を計算

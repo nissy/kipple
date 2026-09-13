@@ -78,6 +78,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published private(set) var pasteQueue: [UUID] = []
     @Published private(set) var queueSelectionPreview: Set<UUID> = []
     @Published private(set) var clipboardEditorMode: ClipboardEditorMode = .display
+    @Published private(set) var clipboardUpdatedWhileEditing = false
     private var clipboardEditingOriginalText: String?
     private var editorSaveBaselineText: String?
     private var editorClipboardOnlyWriteText: String?
@@ -130,6 +131,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         self.screenCapturePermissionCheck = screenCapturePermissionCheck
         
         subscribeToClipboardService()
+        observeClipboardActions()
 
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
         // 注: UserDefaultsの変更通知は特定のキーを識別できないため、
@@ -149,6 +151,19 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             updateFilteredItems(self.clipboardService.history)
         }
         currentClipboardContent = resolvedService.currentClipboardContent
+    }
+
+    private func observeClipboardActions() {
+        NotificationCenter.default.publisher(for: .mcpWillCopy)
+            .sink { [weak self] _ in
+                self?.resetPasteQueue()
+                if self?.clipboardEditorMode == .editing { self?.clipboardUpdatedWhileEditing = true }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyHistoryItemToEditor(_ item: ClipItem) {
+        applyClipboardContentToEditor(item.content)
     }
 
     private func subscribeToClipboardService() {
@@ -189,8 +204,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     func copyToClipboard(_ item: ClipItem) {
-        clipboardService.copyToClipboard(item.content, fromEditor: false)
-        applyClipboardContentToEditor(item.content)
+        clipboardService.recopyFromHistory(item)
+        applyHistoryItemToEditor(item)
         resetFiltersAfterCopy()
         clearQueueAfterManualCopyIfNeeded()
     }
@@ -238,7 +253,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
 
-    // swiftlint:disable:next function_body_length cyclomatic_complexity
+    // swiftlint:disable:next function_body_length
     func updateFilteredItems(_ items: [ClipItem], animated: Bool = false) {
         let startedAt = PerformanceTrace.nowMicros()
         let tracedContent = items.first?.content
@@ -290,13 +305,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
                         return false
                     }
                 }
-                if hasSearchQuery {
-                    let matchesContent = item.content.localizedCaseInsensitiveContains(searchQuery)
-                    let matchesSourceApp = item.sourceApp?.localizedCaseInsensitiveContains(searchQuery) ?? false
-                    if !matchesContent && !matchesSourceApp {
-                        return false
-                    }
-                }
+                if hasSearchQuery && !item.matchesSearch(searchQuery) { return false }
                 return true
             }
         }
@@ -513,11 +522,16 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private func writeEditorTextToClipboardOnly(_ text: String) {
         editorClipboardOnlyWriteText = text
         clipboardService.writeToClipboardOnly(text)
+        clipboardUpdatedWhileEditing = false
         currentClipboardContent = text.isEmpty ? nil : text
     }
 
     private func applyClipboardContentToEditor(_ content: String?) {
         currentClipboardContent = content
+        if clipboardEditorMode == .editing {
+            clipboardUpdatedWhileEditing = content != clipboardEditingOriginalText
+            return
+        }
         if editorClipboardOnlyWriteText == (content ?? "") {
             // Clipboard-only writes from the live editor can be published more than once by the adapter.
             // Keep the save baseline unchanged until a different clipboard value arrives.
@@ -559,7 +573,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     @discardableResult
     func splitHistoryItemIntoHistory(_ item: ClipItem) async -> Int {
-        await splitLinesIntoHistory(item.content)
+        return await splitLinesIntoHistory(item.content)
     }
     
     // These are now async methods above, keeping for backward compatibility
@@ -608,22 +622,25 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     /// 履歴アイテム選択（修飾キー検出対応）
     func selectHistoryItem(_ item: ClipItem, forceInsert _: Bool = false) {
         clipboardService.recopyFromHistory(item)
-        applyClipboardContentToEditor(item.content)
+        applyHistoryItemToEditor(item)
         finalizeHistorySelection()
     }
 
     func selectHistoryItemAndWait(_ item: ClipItem, forceInsert _: Bool = false) async {
+        let epoch = (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch
         if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
             await asyncService.recopyFromHistoryAndWait(item)
         } else {
             clipboardService.recopyFromHistory(item)
         }
-        applyClipboardContentToEditor(item.content)
+        guard epoch == (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch else { return }
+        applyHistoryItemToEditor(item)
         finalizeHistorySelection()
     }
 
     /// pasteboard 書き込み完了までだけ待機。history 再同期は finalizeRecopyRefresh() を別途呼ぶ
     func selectHistoryItemAwaitingPasteboard(_ item: ClipItem, forceInsert _: Bool = false) async {
+        let epoch = (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch
         if let adapter = clipboardService as? ModernClipboardServiceAdapter {
             await adapter.recopyFromHistoryAwaitingPasteboard(item)
         } else if let asyncService = clipboardService as? ClipboardServiceAsyncRecopying {
@@ -631,7 +648,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         } else {
             clipboardService.recopyFromHistory(item)
         }
-        applyClipboardContentToEditor(item.content)
+        guard epoch == (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch else { return }
+        applyHistoryItemToEditor(item)
         finalizeHistorySelection()
     }
 
@@ -990,7 +1008,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         expectedQueueHeadID = nextItem.id
         clipboardService.recopyFromHistory(nextItem)
-        applyClipboardContentToEditor(nextItem.content)
+        applyHistoryItemToEditor(nextItem)
     }
 }
 

@@ -1134,6 +1134,8 @@ extension WindowManager {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
+                      // 詳細シートへのフォーカス移動では親パネルを非表示にしない。
+                      window.attachedSheet == nil,
                       !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
@@ -1161,6 +1163,10 @@ extension WindowManager: WindowManaging {}
 
 #if DEBUG
 extension WindowManager {
+    func setMainWindowForTesting(_ window: NSWindow) {
+        mainWindow = window
+    }
+
     func setAppToRestoreForTesting(_ app: LastActiveAppTracker.AppInfo?) {
         appToRestoreAfterClose = app
     }

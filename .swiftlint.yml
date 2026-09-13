@@ -4,6 +4,8 @@
 included:
   - Kipple
   - KippleTests
+  - KippleMCP
+  - Shared
 
 excluded:
   - build

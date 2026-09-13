@@ -59,6 +59,7 @@ final class SettingsViewModel: ObservableObject {
         case editor
         case clipboard
         case permission
+        case ai
 
         var titleKey: String {
             switch self {
@@ -66,6 +67,7 @@ final class SettingsViewModel: ObservableObject {
             case .editor: return "Editor"
             case .clipboard: return "Clipboard"
             case .permission: return "Permission"
+            case .ai: return "AI Integration"
             }
         }
         var localizedTitle: String {
@@ -78,6 +80,7 @@ final class SettingsViewModel: ObservableObject {
             case .editor: return "pencil"
             case .clipboard: return "doc.on.clipboard"
             case .permission: return "lock.shield"
+            case .ai: return "sparkles"
             }
         }
 

@@ -507,7 +507,7 @@ extension MainView {
                 onToggleAlwaysOnTop: toggleAlwaysOnTop,
                 onBeginEditing: viewModel.beginClipboardEditing,
                 onCommitEditing: viewModel.commitClipboardEditor,
-                onClear: clearAction
+                onClear: clearAction, isClipboardUpdated: viewModel.clipboardUpdatedWhileEditing
             )
             MainViewControlSection(
                 editorMode: clipboardEditorModeBinding, isEditorLocked: viewModel.isQueueModeActive,
