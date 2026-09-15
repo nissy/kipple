@@ -128,7 +128,7 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		-derivedDataPath $(DEV_BUILD_DIR)/DerivedData \
 		-xcconfig Config/Version.xcconfig \
 		DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) \
-		PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
+		APP_PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
 		CODE_SIGN_IDENTITY="-" \
 		CODE_SIGNING_REQUIRED=NO \
 		CODE_SIGNING_ALLOWED=NO \
@@ -177,8 +177,8 @@ build: generate ## Build production version
 		-derivedDataPath $(PROD_BUILD_DIR)/DerivedData \
 		-xcconfig Config/Version.xcconfig \
 		DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) \
-		PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
-		TEST_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
+		APP_PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
+		TEST_PRODUCT_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
 		CODE_SIGN_STYLE=Manual \
 		CODE_SIGN_IDENTITY="Developer ID Application: Yoshihiko Nishida (R7LKF73J2W)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
@@ -194,6 +194,7 @@ build: generate ## Build production version
 		echo "$(GREEN)Production build available at: $(PROD_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
 		codesign -dv --verbose=2 "$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"; \
 	fi
+	$(MAKE) test-mcp-release MCP_HELPER="$(PROD_BUILD_DIR)/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
 
 #===============================================================================
 # TEST TARGETS  
@@ -215,6 +216,11 @@ test: generate ## Run all tests
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests
 	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/Debug/Kipple.app/Contents/Helpers/KippleMCP"
+
+.PHONY: test-mcp-release
+test-mcp-release: ## Verify signed MCP helper startup without clipboard writes
+	codesign --verify --strict "$(MCP_HELPER)"
+	python3 Scripts/test_mcp_stdio.py "$(MCP_HELPER)"
 
 test-coverage: generate ## Run tests with coverage report
 	@echo "$(BLUE)Running tests with coverage…$(NC)"
@@ -286,8 +292,8 @@ archive: generate ## Create xcarchive with Developer ID signing
 		-allowProvisioningUpdates \
 		-xcconfig Config/Version.xcconfig \
 		DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) \
-		PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
-		TEST_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
+		APP_PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
+		TEST_PRODUCT_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
 		CODE_SIGN_STYLE=Manual \
 		CODE_SIGN_IDENTITY="Developer ID Application: Yoshihiko Nishida (R7LKF73J2W)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
@@ -295,6 +301,7 @@ archive: generate ## Create xcarchive with Developer ID signing
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		archive
 	@echo "$(GREEN)Archive created at: $(ARCHIVE_PATH)$(NC)"
+	$(MAKE) test-mcp-release MCP_HELPER="$(ARCHIVE_PATH)/Products/Applications/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
 
 package: archive ## Export app from archive with Developer ID
 	@echo "$(BLUE)Exporting app from archive…$(NC)"
@@ -324,9 +331,11 @@ package: archive ## Export app from archive with Developer ID
 	@echo "$(GREEN)App exported to: $(EXPORT_PATH)/$(PROJECT_NAME).app$(NC)"
 	@echo "$(BLUE)Verifying signature…$(NC)"
 	@codesign -dv --verbose=2 "$(EXPORT_PATH)/$(PROJECT_NAME).app"
+	$(MAKE) test-mcp-release MCP_HELPER="$(EXPORT_PATH)/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
 	@echo "$(BLUE)Copying to release directory…$(NC)"
 	@rm -rf "$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"
 	@cp -R "$(EXPORT_PATH)/$(PROJECT_NAME).app" "$(PROD_BUILD_DIR)/"
+	$(MAKE) test-mcp-release MCP_HELPER="$(PROD_BUILD_DIR)/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
 	@echo "$(GREEN)Production app ready at: $(PROD_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"
 
 dmg: package ## Create DMG for distribution
@@ -452,8 +461,8 @@ appstore-archive: generate ## Create xcarchive for Mac App Store submission
 		-allowProvisioningUpdates \
 		-xcconfig Config/Version.xcconfig \
 		DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) \
-		PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
-		TEST_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
+		APP_PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
+		TEST_PRODUCT_BUNDLE_IDENTIFIER="$(TEST_BUNDLE_IDENTIFIER)" \
 		CODE_SIGN_STYLE=Manual \
 		CODE_SIGN_IDENTITY="$(APPLE_DISTRIBUTION_IDENTITY)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \

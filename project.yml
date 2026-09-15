@@ -16,6 +16,8 @@ settings:
     MARKETING_VERSION: 2.2.0
     CURRENT_PROJECT_VERSION: 1
     PRODUCT_NAME: Kipple
+    APP_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.Kipple
+    TEST_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.KippleTests
     MACOSX_DEPLOYMENT_TARGET: 14.0
     SWIFT_VERSION: 6.0
     ENABLE_HARDENED_RUNTIME: YES
@@ -56,7 +58,7 @@ targets:
         INFOPLIST_KEY_NSHumanReadableCopyright: Copyright © 2025 Kipple. All rights reserved.
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_LSUIElement: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.nissy.Kipple
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_PRODUCT_BUNDLE_IDENTIFIER)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Kipple/Kipple.entitlements
         ENABLE_PREVIEWS: YES
@@ -92,9 +94,11 @@ targets:
     settings:
       base:
         PRODUCT_NAME: KippleMCP
+        PRODUCT_BUNDLE_IDENTIFIER: com.nissy.KippleMCP
         CODE_SIGN_ENTITLEMENTS: KippleMCP/KippleMCP.entitlements
         SKIP_INSTALL: YES
         GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
       configs:
         Debug:
           CODE_SIGN_IDENTITY: "-"
@@ -115,7 +119,7 @@ targets:
         BUNDLE_LOADER: $(TEST_HOST)
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Kipple.app/Contents/MacOS/Kipple
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.nissy.KippleTests
+        PRODUCT_BUNDLE_IDENTIFIER: $(TEST_PRODUCT_BUNDLE_IDENTIFIER)
         PRODUCT_MODULE_NAME: KippleTests
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
