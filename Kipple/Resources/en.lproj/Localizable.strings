@@ -276,3 +276,7 @@
 "Deleting a category keeps the history and its other categories." = "Deleting a category keeps the history and its other categories.";
 "Could not delete the category. Please try again." = "Could not delete the category. Please try again.";
 "Open item details to view all categories." = "Right-click and open Item details to view all categories.";
+"Copied from" = "Copied from";
+"Source window" = "Window";
+"Copied at" = "Copied at";
+"%@ characters" = "%@ characters";
