@@ -6,7 +6,6 @@ struct HistoryItemPreviewContent: View {
     let categories: [UserCategory]
     let historyFont: NSFont
     @Environment(\.locale) private var locale
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -37,7 +36,6 @@ struct HistoryItemPreviewContent: View {
         .foregroundStyle(.primary)
         .padding(20)
         .frame(width: 320, alignment: .leading)
-        .background(.background.opacity(reduceTransparency ? 1 : 0.94))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -51,10 +49,7 @@ struct HistoryItemPreviewContent: View {
             if let sourceApp = Self.nonempty(item.sourceApp) {
                 GridRow(alignment: .firstTextBaseline) {
                     metadataLabel("Copied from")
-                    HStack(spacing: 6) {
-                        sourceAppIcon
-                        Text(verbatim: localizedAppName(sourceApp))
-                    }
+                    Text(verbatim: localizedAppName(sourceApp))
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .help(sourceApp)
@@ -88,39 +83,6 @@ struct HistoryItemPreviewContent: View {
         }
         .font(.system(size: 11))
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var sourceAppIcon: some View {
-        Group {
-            if let icon = sourceAppBitmap {
-                Image(decorative: icon, scale: 1)
-                    .renderingMode(.original)
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                Image(systemName: "app.badge.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 16, height: 16)
-        .accessibilityHidden(true)
-    }
-
-    private var sourceAppBitmap: CGImage? {
-        guard let bundleIdentifier = Self.nonempty(item.bundleIdentifier),
-              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
-              let icon = NSWorkspace.shared.icon(forFile: appURL.path)
-                .cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: nil, width: 32, height: 32, bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-            return nil
-        }
-        // Extended-range app icons must not change the brightness of the surrounding SDR content.
-        context.interpolationQuality = .high
-        context.draw(icon, in: CGRect(x: 0, y: 0, width: 32, height: 32))
-        return context.makeImage()
     }
 
     private func metadataLabel(_ key: LocalizedStringKey) -> some View {
