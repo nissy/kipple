@@ -21,10 +21,12 @@ final class TextCaptureCoordinator {
     private let textRecognitionService: any TextRecognitionServiceProtocol
     private let windowManager: WindowManaging
     private let screenCapturePermission: ScreenCapturePermissionDependencies
+    private let imageCaptureService: any ScreenImageCapturing
     private let overlayFactory: ScreenSelectionOverlayFactory
 
     private var overlayController: (any ScreenSelectionOverlayControlling)?
     private var permissionMonitoringTask: Task<Void, Never>?
+    private var captureTask: Task<Void, Never>?
     private var isAwaitingPermission = false
     private var shouldResumeCaptureAfterPermission = false
 
@@ -33,6 +35,7 @@ final class TextCaptureCoordinator {
         textRecognitionService: any TextRecognitionServiceProtocol,
         windowManager: WindowManaging,
         screenCapturePermission: ScreenCapturePermissionDependencies = .live,
+        imageCaptureService: any ScreenImageCapturing = ScreenImageCaptureService(),
         overlayFactory: @escaping ScreenSelectionOverlayFactory = { onSelection, onCancel in
             ScreenSelectionOverlayController(onSelection: onSelection, onCancel: onCancel)
         }
@@ -41,14 +44,18 @@ final class TextCaptureCoordinator {
         self.textRecognitionService = textRecognitionService
         self.windowManager = windowManager
         self.screenCapturePermission = screenCapturePermission
+        self.imageCaptureService = imageCaptureService
         self.overlayFactory = overlayFactory
     }
 
     deinit {
         permissionMonitoringTask?.cancel()
+        captureTask?.cancel()
     }
 
     func startCaptureFlow() {
+        captureTask?.cancel()
+        captureTask = nil
 
         guard screenCapturePermission.preflight() else {
             shouldResumeCaptureAfterPermission = true
@@ -136,9 +143,20 @@ final class TextCaptureCoordinator {
 
     private func handleSelection(rect: CGRect, screen: NSScreen) {
         overlayController = nil
+        captureTask?.cancel()
+        captureTask = Task { [weak self] in
+            await self?.captureAndRecognize(rect: rect, screen: screen)
+        }
+    }
 
-        guard let image = captureImage(from: rect, on: screen) else {
-            Logger.shared.error("Failed to capture image from selection.")
+    private func captureAndRecognize(rect: CGRect, screen: NSScreen) async {
+        let image: CGImage
+        do {
+            image = try await imageCaptureService.captureImage(from: rect, on: screen)
+            try Task.checkCancellation()
+        } catch {
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            Logger.shared.error("Failed to capture image from selection: \(error.localizedDescription)")
             presentErrorAlert(
                 message: NSLocalizedString(
                     "Failed to capture the screen. Check Screen Recording permissions in System Settings.",
@@ -150,31 +168,26 @@ final class TextCaptureCoordinator {
 
         playShutterSound()
 
-        Task {
-            do {
-                let text = try await textRecognitionService.recognizeText(from: image)
-                try Task.checkCancellation()
-                await MainActor.run { [weak self] in
-                    self?.handleRecognizedText(text)
-                }
-            } catch {
-                Logger.shared.error("OCR failed with error: \(error.localizedDescription)")
-                await MainActor.run { [weak self] in
-                    self?.presentErrorAlert(
-                        message: NSLocalizedString(
-                            "Could not extract text.\nPlease try again.",
-                            comment: "Error shown when OCR fails to extract text"
-                        )
-                    )
-                }
-            }
+        do {
+            let text = try await textRecognitionService.recognizeText(from: image)
+            try Task.checkCancellation()
+            handleRecognizedText(text)
+        } catch {
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            Logger.shared.error("OCR failed with error: \(error.localizedDescription)")
+            presentErrorAlert(
+                message: NSLocalizedString(
+                    "Could not extract text.\nPlease try again.",
+                    comment: "Error shown when OCR fails to extract text"
+                )
+            )
         }
     }
 
     private func handleRecognizedText(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.trimmingCharacters(in: .newlines)
 
-        guard !trimmed.isEmpty else {
+        guard !trimmed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             Logger.shared.warning("No text recognized from selection.")
             presentErrorAlert(
                 message: NSLocalizedString(
@@ -188,50 +201,6 @@ final class TextCaptureCoordinator {
         clipboardService.copyToClipboard(trimmed, fromEditor: false)
         windowManager.openMainWindow()
         windowManager.showCopiedNotification()
-    }
-
-    private func captureImage(from rect: CGRect, on screen: NSScreen) -> CGImage? {
-        guard
-            let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
-            let fullImage = CGDisplayCreateImage(screenNumber)
-        else {
-            Logger.shared.error("Could not create display image for screen \(screen).")
-            return nil
-        }
-
-        let scale = screen.backingScaleFactor
-        let screenFrame = screen.frame
-
-        var localRect = CGRect(
-            x: (rect.origin.x - screenFrame.origin.x) * scale,
-            y: (rect.origin.y - screenFrame.origin.y) * scale,
-            width: rect.size.width * scale,
-            height: rect.size.height * scale
-        )
-
-        localRect = localRect.integral
-
-        if localRect.width < 1 { localRect.size.width = 1 }
-        if localRect.height < 1 { localRect.size.height = 1 }
-
-        let maxWidth = CGFloat(fullImage.width)
-        let maxHeight = CGFloat(fullImage.height)
-
-        localRect.origin.x = max(0, min(localRect.origin.x, maxWidth - 1))
-        localRect.size.width = min(localRect.size.width, maxWidth - localRect.origin.x)
-        localRect.size.height = min(localRect.size.height, maxHeight - localRect.origin.y)
-
-        let bottomLeftY = localRect.origin.y
-        var invertedY = maxHeight - bottomLeftY - localRect.size.height
-        if invertedY < 0 {
-            invertedY = 0
-        }
-        if invertedY + localRect.size.height > maxHeight {
-            invertedY = max(0, maxHeight - localRect.size.height)
-        }
-        localRect.origin.y = invertedY
-
-        return fullImage.cropping(to: localRect)
     }
 
     private func presentErrorAlert(message: String) {
@@ -325,6 +294,10 @@ extension TextCaptureCoordinator {
 
     func test_isAwaitingPermission() -> Bool {
         isAwaitingPermission
+    }
+
+    func test_captureTask() -> Task<Void, Never>? {
+        captureTask
     }
 }
 #endif

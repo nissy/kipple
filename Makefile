@@ -183,7 +183,6 @@ build: generate ## Build production version
 		CODE_SIGN_IDENTITY="Developer ID Application: Yoshihiko Nishida (R7LKF73J2W)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-		ARCHS="x86_64 arm64" \
 		ONLY_ACTIVE_ARCH=NO \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		build

@@ -152,7 +152,9 @@ Screen Text Capture は、画面上の文字を範囲選択して OCR で取り�
 
 認識したテキストは次のように扱われます。
 
-- 前後の空白を取り除く
+- 段落の区切りを空行で保持
+- 表はタブ区切り（TSV）でコピーし、空セルの列位置を保持
+- 前後の不要な改行を取り除く
 - クリップボードへコピー
 - 履歴へ保存
 - Kipple のメインウィンドウを開く
@@ -259,8 +261,8 @@ Queue と Paste on Selection で、Command + V の検知や貼り付け操作を
 
 ## 動作環境
 
-- macOS 14.0 以降
-- Apple Silicon / Intel Mac
+- macOS 27.0 以降
+- Apple Silicon（M1以降）搭載のMac
 
 ## できないこと
 

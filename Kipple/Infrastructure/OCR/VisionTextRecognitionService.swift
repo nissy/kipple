@@ -22,27 +22,41 @@ final class VisionTextRecognitionService: TextRecognitionServiceProtocol {
     func recognizeText(from image: CGImage) async throws -> String {
         try Task.checkCancellation()
 
-        return try await Task.detached(priority: .userInitiated) { [recognitionLanguages, minimumTextHeight] in
-            let request = VNRecognizeTextRequest()
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            request.minimumTextHeight = minimumTextHeight
-            request.recognitionLanguages = recognitionLanguages
+        var request = RecognizeDocumentsRequest()
+        request.textRecognitionOptions.recognitionLanguages = recognitionLanguages.map { Locale.Language(identifier: $0) }
+        request.textRecognitionOptions.minimumTextHeightFraction = minimumTextHeight
+        request.textRecognitionOptions.useLanguageCorrection = true
+        request.barcodeDetectionOptions.enabled = false
 
-            let handler = VNImageRequestHandler(cgImage: image, options: [:])
-            try handler.perform([request])
-
-            guard let observations = request.results else {
-                return ""
+        let observations = try await request.perform(on: image)
+        try Task.checkCancellation()
+        return observations.map { observation in
+            let document = observation.document
+            let paragraphs = document.paragraphs.map {
+                OCRDocumentFormatter.Paragraph(
+                    text: $0.transcript, bounds: $0.boundingRegion.boundingBox.cgRect,
+                    lineIDs: Set($0.lines.map(\.uuid))
+                )
             }
-
-            let lines = observations.compactMap { observation -> String? in
-                observation.topCandidates(1).first?.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let tables = document.tables.map { table in
+                OCRDocumentFormatter.Table(
+                    cells: table.rows.flatMap { row in
+                        row.map {
+                            OCRDocumentFormatter.Cell(
+                                text: $0.content.text.transcript, rows: $0.rowRange, columns: $0.columnRange
+                            )
+                        }
+                    },
+                    bounds: table.boundingRegion.boundingBox.cgRect,
+                    lineIDs: Set(table.rows.flatMap { $0 }.flatMap { $0.content.text.lines.map(\.uuid) })
+                )
             }
-
-            return lines
-                .filter { !$0.isEmpty }
-                .joined(separator: "\n")
-        }.value
+            let listLineIDs = Set(document.lists.flatMap { $0.items }.flatMap { $0.content.text.lines.map(\.uuid) })
+            return OCRDocumentFormatter.text(
+                paragraphs: paragraphs, tables: tables, listLineIDs: listLineIDs, fallback: document.text.transcript
+            )
+        }
+        .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        .joined(separator: "\n\n")
     }
 }

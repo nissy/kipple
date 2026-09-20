@@ -71,6 +71,7 @@ Queue をオンにして履歴からクリップを選び、`Command + V` を繰
 Screen Text Capture では、画面上の範囲を選択して macOS Vision OCR でテキストを抽出できます。
 
 認識したテキストはクリップボードへコピーされ、履歴にも保存されます。OCR 処理は Mac の中で完結します。
+段落の区切りを保持し、認識した表は表計算ソフトへ貼り付けやすいタブ区切りのテキストとしてコピーします。
 
 ### Paste on Selection
 
@@ -99,7 +100,8 @@ Kipple はクリップボード履歴を外部サービスへ送信しません�
 
 ## Requirements
 
-- macOS 14.0 以降
+- Apple Silicon（M1以降）搭載のMac
+- macOS 27.0 以降
 
 ## License
 

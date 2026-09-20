@@ -11,6 +11,7 @@ import CoreGraphics
 protocol TextRecognitionServiceProtocol: AnyObject {
     /// 指定された画像からテキストを抽出して返します。
     /// - Parameter image: 画面キャプチャなどのCGImage。
-    /// - Returns: 改行区切りで連結されたテキスト。文字が検出できなかった場合は空文字列。
+    /// - Returns: 認識したテキスト。段落を空行、表をTSVで表現します。
+    ///   文字が検出できなかった場合は空文字列。
     func recognizeText(from image: CGImage) async throws -> String
 }

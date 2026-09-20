@@ -2,7 +2,7 @@ name: Kipple
 options:
   bundleIdPrefix: com.nissy
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "27.0"
   createIntermediateGroups: true
   groupSortPosition: bottom
   developmentLanguage: en
@@ -13,12 +13,13 @@ options:
 settings:
   base:
     DEVELOPMENT_TEAM: R7LKF73J2W
-    MARKETING_VERSION: 2.2.0
+    MARKETING_VERSION: 2.2.2
     CURRENT_PROJECT_VERSION: 1
     PRODUCT_NAME: Kipple
     APP_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.Kipple
     TEST_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.KippleTests
-    MACOSX_DEPLOYMENT_TARGET: 14.0
+    MACOSX_DEPLOYMENT_TARGET: 27.0
+    ARCHS: arm64
     SWIFT_VERSION: 6.0
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
