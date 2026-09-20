@@ -20,7 +20,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Properties
 
     private var history: [ClipItem] = []
-    private let mutationGate = AsyncMutationGate()
+    private let mutationGate: AsyncMutationGate
+    private let clipboardWriter: @MainActor @Sendable (String) -> Int
     private var copyGeneration: UInt64 = 0
     private var isRepositoryReady = false
     private var pollingTask: Task<Void, Never>?
@@ -50,31 +51,38 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Initialization
 
     #if DEBUG
-    init(testRepository: ClipboardRepositoryProtocol) {
+    init(
+        testRepository: ClipboardRepositoryProtocol,
+        loadOnStartup: Bool = false,
+        clipboardWriter: @escaping @MainActor @Sendable (String) -> Int = writeSystemClipboard
+    ) {
+        mutationGate = AsyncMutationGate(initiallyOccupied: loadOnStartup)
+        self.clipboardWriter = clipboardWriter
         repository = testRepository
-        isRepositoryReady = true
+        isRepositoryReady = !loadOnStartup
+        if loadOnStartup {
+            Task { await initializeService() }
+        }
     }
     #endif
 
     private init() {
-        // Setup save pipeline and repository initialization in async context
-        Task {
-            // Get initial settings from AppSettings
-            let maxItems = await MainActor.run {
-                AppSettings.shared.maxHistoryItems
-            }
-            await self.setMaxHistoryItems(maxItems)
+        // Reserve the mutation gate before publishing the service, so startup always runs first.
+        mutationGate = AsyncMutationGate(initiallyOccupied: true)
+        clipboardWriter = Self.writeSystemClipboard
+        Task { await initializeService() }
+    }
 
-            let initialChangeCount = await MainActor.run {
-                NSPasteboard.general.changeCount
-            }
-            await self.updateLastChangeCount(initialChangeCount)
-
-            await self.initializeRepository()
-            await self.setupSavePipeline()
-            await self.loadHistoryFromRepository()
-            await self.setupAppTracking()
+    private func initializeService() async {
+        defer { mutationGate.release() }
+        maxHistoryItems = await MainActor.run { AppSettings.shared.maxHistoryItems }
+        lastChangeCount = await Self.currentPasteboardChangeCount()
+        if repository == nil {
+            await initializeRepository()
         }
+        setupSavePipeline()
+        await loadHistoryWhileLocked()
+        await setupAppTracking()
     }
 
     private func initializeRepository() async {
@@ -84,6 +92,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
+        isRepositoryReady = false
         persistedSnapshot = [:]
         itemIDByContent = [:]
     }
@@ -102,7 +111,13 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func loadHistoryFromRepository() async {
         await mutationGate.acquire()
         defer { mutationGate.release() }
+        await loadHistoryWhileLocked()
+    }
+
+    private func loadHistoryWhileLocked() async {
+        isRepositoryReady = false
         guard let repository = repository else { return }
+        let previousHistory = history
 
         do {
             let pinnedItems = try await repository.loadPinned()
@@ -148,6 +163,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             isRepositoryReady = true
             notifyHistoryObservers()
         } catch {
+            history = previousHistory
+            rebuildContentLookup()
+            markHistoryChanged()
+            notifyHistoryObservers()
             Logger.shared.error("Failed to load history: \(error)")
         }
     }
@@ -173,7 +192,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     private func saveHistory(_ candidate: [ClipItem], record: MCPStoredReceipt? = nil) async throws {
-        guard let repository else { throw MCPFailure.persistence }
+        guard isRepositoryReady, let repository else { throw MCPFailure.persistence }
         let items = candidate
         let current = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         let inserted = items.filter { persistedSnapshot[$0.id] == nil }
@@ -226,18 +245,23 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await copyToClipboard(content, fromEditor: fromEditor) { true }
     }
 
+    @discardableResult
     func copyToClipboard(
         _ content: String,
         fromEditor: Bool,
         source: ClipMetadata.Source? = nil,
         shouldCopy: @Sendable () async -> Bool
-    ) async {
+    ) async -> Bool {
         let generation = copyGeneration
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        guard generation == copyGeneration, await shouldCopy() else { return }
+        guard generation == copyGeneration, !Task.isCancelled, await shouldCopy() else { return false }
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedContent.isEmpty else { return }
+        guard !trimmedContent.isEmpty else { return false }
+        if !isRepositoryReady {
+            await loadHistoryWhileLocked()
+        }
+        guard isRepositoryReady, !Task.isCancelled else { return false }
 
         // Mark as internal copy to avoid re-adding to history
         await state.setInternalCopy(true)
@@ -269,12 +293,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             item.id = existing.id
             item.metadata = (item.metadata ?? ClipMetadata()).inheritingDetails(from: existing.metadata)
         }
+        guard generation == copyGeneration, !Task.isCancelled, await shouldCopy() else {
+            _ = await recordClipboardWrite(-1)
+            return false
+        }
         let newChangeCount = await writeClipboardItem(item)
 
         // Record the expected changeCount for this internal operation
-        guard await recordClipboardWrite(newChangeCount) else { return }
+        guard await recordClipboardWrite(newChangeCount) else { return false }
 
         addToHistory(item)
+        return true
     }
 
     func writeToClipboardOnly(_ content: String) async {
@@ -595,6 +624,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private func checkClipboard() async {
         await mutationGate.acquire()
         defer { mutationGate.release() }
+        guard isRepositoryReady else { return }
         let changeCount = await Self.currentPasteboardChangeCount()
 
         guard changeCount != lastChangeCount else { return }
@@ -1078,15 +1108,21 @@ extension ModernClipboardService {
         _ item: ClipItem,
         shouldWrite: @MainActor @Sendable () -> Bool = { true }
     ) async -> Int {
+        let writer = clipboardWriter
         let count = await MainActor.run { () -> Int in
-            guard shouldWrite() else { return -1 }
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            guard pasteboard.setString(item.content, forType: .string) else { return -1 }
-            return pasteboard.changeCount
+            guard !Task.isCancelled, shouldWrite() else { return -1 }
+            return writer(item.content)
         }
         if count >= 0 { lastChangeCount = count }
         return count
+    }
+
+    @MainActor
+    private static func writeSystemClipboard(_ content: String) -> Int {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard pasteboard.setString(content, forType: .string) else { return -1 }
+        return pasteboard.changeCount
     }
 
     func previousReceipt(key: String) async throws -> MCPStoredReceipt? {

@@ -120,6 +120,7 @@
 "Name" = "Name";
 "None" = "None";
 "OCR Error" = "OCR Error";
+"Could not copy the recognized text. Please try again." = "Could not copy the recognized text. Please try again.";
 "Note: On macOS 15+, the section label is Screen & System Audio Recording." = "Note: On macOS 15+, the section label is Screen & System Audio Recording.";
 "OK" = "OK";
 "Once granted, configure the screen text capture shortcut below." = "Once granted, configure the screen text capture shortcut below.";

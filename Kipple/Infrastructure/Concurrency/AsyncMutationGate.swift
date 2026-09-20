@@ -3,8 +3,12 @@ import Foundation
 /// Explicitly serializes operations across actor suspension points.
 final class AsyncMutationGate: @unchecked Sendable {
     private let lock = NSLock()
-    private var occupied = false
+    private var occupied: Bool
     private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(initiallyOccupied: Bool = false) {
+        occupied = initiallyOccupied
+    }
 
     func acquire() async {
         await withCheckedContinuation { continuation in

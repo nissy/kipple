@@ -22,6 +22,7 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
     var isMonitoringActive = false
     var lastCopiedContent: String?
     var lastCopiedFromEditor: Bool?
+    var recognizedCopyHandler: ((String) async -> Bool)?
     var lastRecopiedItem: ClipItem?
 
     // Additional test properties
@@ -72,11 +73,13 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
         onHistoryChanged?(item)
     }
 
-    func copyRecognizedText(_ content: String) {
+    func copyRecognizedText(_ content: String) async -> Bool {
+        if let recognizedCopyHandler { return await recognizedCopyHandler(content) }
         copyToClipboard(content, fromEditor: false)
         if let index = history.firstIndex(where: { $0.content == content }) {
             history[index].metadata = ClipMetadata(source: .ocr)
         }
+        return true
     }
 
     func writeToClipboardOnly(_ content: String) {

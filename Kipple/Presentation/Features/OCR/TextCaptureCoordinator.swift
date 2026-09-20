@@ -23,6 +23,7 @@ final class TextCaptureCoordinator {
     private let screenCapturePermission: ScreenCapturePermissionDependencies
     private let imageCaptureService: any ScreenImageCapturing
     private let overlayFactory: ScreenSelectionOverlayFactory
+    private let errorPresenter: ((String) -> Void)?
 
     private var overlayController: (any ScreenSelectionOverlayControlling)?
     private var permissionMonitoringTask: Task<Void, Never>?
@@ -31,6 +32,7 @@ final class TextCaptureCoordinator {
     private var shouldResumeCaptureAfterPermission = false
 
     init(
+        errorPresenter: ((String) -> Void)? = nil,
         clipboardService: any ClipboardServiceProtocol,
         textRecognitionService: any TextRecognitionServiceProtocol,
         windowManager: WindowManaging,
@@ -46,6 +48,7 @@ final class TextCaptureCoordinator {
         self.screenCapturePermission = screenCapturePermission
         self.imageCaptureService = imageCaptureService
         self.overlayFactory = overlayFactory
+        self.errorPresenter = errorPresenter
     }
 
     deinit {
@@ -171,7 +174,7 @@ final class TextCaptureCoordinator {
         do {
             let text = try await textRecognitionService.recognizeText(from: image)
             try Task.checkCancellation()
-            handleRecognizedText(text)
+            await handleRecognizedText(text)
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
             Logger.shared.error("OCR failed with error: \(error.localizedDescription)")
@@ -184,7 +187,8 @@ final class TextCaptureCoordinator {
         }
     }
 
-    private func handleRecognizedText(_ text: String) {
+    private func handleRecognizedText(_ text: String) async {
+        guard !Task.isCancelled else { return }
         let trimmed = text.trimmingCharacters(in: .newlines)
 
         guard !trimmed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -198,12 +202,25 @@ final class TextCaptureCoordinator {
             return
         }
 
-        clipboardService.copyRecognizedText(trimmed)
+        let copied = await clipboardService.copyRecognizedText(trimmed)
+        guard !Task.isCancelled else { return }
+        guard copied else {
+            Logger.shared.error("Failed to copy recognized text to the clipboard.")
+            presentErrorAlert(message: NSLocalizedString(
+                "Could not copy the recognized text. Please try again.",
+                comment: "Error shown when OCR text cannot be copied"
+            ))
+            return
+        }
         windowManager.openMainWindow()
         windowManager.showCopiedNotification()
     }
 
     private func presentErrorAlert(message: String) {
+        if let errorPresenter {
+            errorPresenter(message)
+            return
+        }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = NSLocalizedString("OCR Error", comment: "Alert title for OCR failures")
@@ -288,8 +305,8 @@ extension TextCaptureCoordinator {
 
 #if DEBUG
 extension TextCaptureCoordinator {
-    func test_handleRecognizedText(_ text: String) {
-        handleRecognizedText(text)
+    func test_handleRecognizedText(_ text: String) async {
+        await handleRecognizedText(text)
     }
 
     func test_isAwaitingPermission() -> Bool {

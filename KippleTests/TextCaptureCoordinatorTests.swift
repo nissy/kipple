@@ -22,14 +22,14 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         try await super.tearDown()
     }
 
-    func testHandleRecognizedTextOpensMainWindow() {
+    func testHandleRecognizedTextOpensMainWindow() async {
         let coordinator = TextCaptureCoordinator(
             clipboardService: clipboardService,
             textRecognitionService: textRecognitionService,
             windowManager: windowManager
         )
 
-        coordinator.test_handleRecognizedText("Captured text")
+        await coordinator.test_handleRecognizedText("Captured text")
 
         XCTAssertTrue(clipboardService.copyToClipboardCalled)
         XCTAssertEqual(clipboardService.lastCopiedContent, "Captured text")
@@ -39,14 +39,126 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertTrue(windowManager.showCopiedNotificationCalled)
     }
 
-    func testCopyPreservesEmptyTableColumns() {
+    func testCopyPreservesEmptyTableColumns() async {
         let coordinator = TextCaptureCoordinator(
             clipboardService: clipboardService,
             textRecognitionService: textRecognitionService,
             windowManager: windowManager
         )
-        coordinator.test_handleRecognizedText("\tValue\t\nNext\t\t")
+        await coordinator.test_handleRecognizedText("\tValue\t\nNext\t\t")
         XCTAssertEqual(clipboardService.lastCopiedContent, "\tValue\t\nNext\t\t")
+    }
+
+    func testWaitsForClipboardWriteBeforeOpeningWindowAndNotifying() async throws {
+        let requested = expectation(description: "copy requested")
+        var completion: CheckedContinuation<Bool, Never>?
+        clipboardService.recognizedCopyHandler = { _ in
+            await withCheckedContinuation {
+                completion = $0
+                requested.fulfill()
+            }
+        }
+        let coordinator = TextCaptureCoordinator(
+            clipboardService: clipboardService, textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+        let task = Task { await coordinator.test_handleRecognizedText("OCR result") }
+        await fulfillment(of: [requested], timeout: 1)
+        XCTAssertFalse(windowManager.openMainWindowCalled)
+        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+        try XCTUnwrap(completion).resume(returning: true)
+        await task.value
+        XCTAssertTrue(windowManager.openMainWindowCalled)
+        XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+    }
+
+    func testFailedCopyShowsErrorWithoutSuccessNotification() async {
+        clipboardService.recognizedCopyHandler = { _ in false }
+        var errors: [String] = []
+        let coordinator = TextCaptureCoordinator(
+            errorPresenter: { errors.append($0) },
+            clipboardService: clipboardService, textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+        await coordinator.test_handleRecognizedText("OCR result")
+        XCTAssertEqual(errors.count, 1)
+        XCTAssertFalse(windowManager.openMainWindowCalled)
+        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+    }
+
+    func testCancelledCopyDoesNotOpenWindowOrShowNotification() async throws {
+        let requested = expectation(description: "copy requested")
+        var completion: CheckedContinuation<Bool, Never>?
+        clipboardService.recognizedCopyHandler = { _ in
+            await withCheckedContinuation {
+                completion = $0
+                requested.fulfill()
+            }
+        }
+        var errors: [String] = []
+        let coordinator = TextCaptureCoordinator(
+            errorPresenter: { errors.append($0) },
+            clipboardService: clipboardService, textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+        let task = Task { await coordinator.test_handleRecognizedText("OCR result") }
+        await fulfillment(of: [requested], timeout: 1)
+        task.cancel()
+        try XCTUnwrap(completion).resume(returning: true)
+        await task.value
+        XCTAssertTrue(errors.isEmpty)
+        XCTAssertFalse(windowManager.openMainWindowCalled)
+        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+    }
+
+    func testRealAdapterCopiesBeforeOpeningWindowAfterColdStartup() async throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let repository = MockClipboardRepository()
+        let started = expectation(description: "initial history load started")
+        await repository.suspendLoad { started.fulfill() }
+        let service = ModernClipboardService(testRepository: repository, loadOnStartup: true) { text in
+            pasteboard.clearContents()
+            return pasteboard.setString(text, forType: .string) ? pasteboard.changeCount : -1
+        }
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let content = "OCR startup result"
+        var errors: [String] = []
+        windowManager.onOpen = { XCTAssertEqual(pasteboard.string(forType: .string), content) }
+        let coordinator = TextCaptureCoordinator(
+            errorPresenter: { errors.append($0) },
+            clipboardService: adapter, textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+        let task = Task { await coordinator.test_handleRecognizedText(content) }
+        await fulfillment(of: [started], timeout: 1)
+        XCTAssertNil(pasteboard.string(forType: .string))
+        XCTAssertNotEqual(adapter.currentClipboardContent, content)
+        XCTAssertFalse(windowManager.openMainWindowCalled)
+        await repository.resumeLoad()
+        await task.value
+        XCTAssertEqual(pasteboard.string(forType: .string), content)
+        XCTAssertEqual(adapter.history.first?.content, content)
+        XCTAssertEqual(adapter.history.first?.metadata?.source, .ocr)
+        XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+        XCTAssertTrue(errors.isEmpty)
+    }
+
+    func testRealAdapterPropagatesPasteboardFailure() async {
+        let service = ModernClipboardService(testRepository: MockClipboardRepository()) { _ in -1 }
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        var errors: [String] = []
+        let coordinator = TextCaptureCoordinator(
+            errorPresenter: { errors.append($0) },
+            clipboardService: adapter, textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+        await coordinator.test_handleRecognizedText("Failed recognized text")
+        XCTAssertEqual(errors.count, 1)
+        XCTAssertTrue(adapter.history.isEmpty)
+        XCTAssertNotEqual(adapter.currentClipboardContent, "Failed recognized text")
+        XCTAssertFalse(windowManager.openMainWindowCalled)
+        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
     }
 
     func testSelectionWaitsForImageBeforeRecognizingAndCopying() async throws {
@@ -296,8 +408,10 @@ private final class SuspendedImageCaptureService: ScreenImageCapturing {
 private final class SpyWindowManager: WindowManaging {
     private(set) var openMainWindowCalled = false
     private(set) var showCopiedNotificationCalled = false
+    var onOpen: (() -> Void)?
 
     func openMainWindow() {
+        onOpen?()
         openMainWindowCalled = true
     }
 

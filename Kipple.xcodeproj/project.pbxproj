@@ -209,6 +209,7 @@
 		E8E5335B01694ACF79DE96E2 /* MCPLocalTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1583C506E680B82932041796 /* MCPLocalTransportTests.swift */; };
 		EB49D860628367B9F51E6F0D /* SettingsSidebarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B70F6D565F5E4D7DBB160D /* SettingsSidebarItem.swift */; };
 		ECF960991E35A8A70CF5093F /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0A937AF0219AC13A31FBBD /* AboutView.swift */; };
+		ED7B067922A1CB27D8D48041 /* ModernClipboardColdStartupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FCE36DB0987A068EC77C351 /* ModernClipboardColdStartupTests.swift */; };
 		F09D930768983860F965E45A /* MainViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91778173C4E051ADCDEA9E05 /* MainViewModel.swift */; };
 		F3C9555AFCA3FCDC61FC0A13 /* ModernClipboardServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6805FAF51BA5FFDDC8167C46 /* ModernClipboardServiceProtocol.swift */; };
 		F54B58C44D8D8457403D5AD6 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 6752AEBCD45E494DC76F703C /* libsqlite3.tbd */; };
@@ -298,6 +299,7 @@
 		2AC27626F1475139B9F815EB /* SimpleLineNumberRulerView+LineNumbers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SimpleLineNumberRulerView+LineNumbers.swift"; sourceTree = "<group>"; };
 		2AEC637E64E4C116C5997AE9 /* LaunchAtLoginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginTests.swift; sourceTree = "<group>"; };
 		2C9313A736408C85DBBA98F8 /* MainViewModelSaveEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewModelSaveEditorTests.swift; sourceTree = "<group>"; };
+		2FCE36DB0987A068EC77C351 /* ModernClipboardColdStartupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardColdStartupTests.swift; sourceTree = "<group>"; };
 		306656767496DF766095D811 /* ModernClipboardServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceTests.swift; sourceTree = "<group>"; };
 		3130A617C51A0E02B110D8B5 /* ClipboardRepositoryProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardRepositoryProtocol.swift; sourceTree = "<group>"; };
 		313C2DE548F71294936CF09C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -1116,6 +1118,7 @@
 				1E7DC09A0AED6030C1368BAC /* MCPRegistrationTests.swift */,
 				532A16DC134106532D9E8B00 /* MCPValidationTests.swift */,
 				B807238F686CDDF52D3249BA /* MetadataPreservationTests.swift */,
+				2FCE36DB0987A068EC77C351 /* ModernClipboardColdStartupTests.swift */,
 				BC48D2F668FB9434E6169962 /* ModernClipboardHashCleanupTests.swift */,
 				9B327CFF33804D2F84C6E6E5 /* ModernClipboardHashResetTests.swift */,
 				97E383759C2BA7CA63D0A153 /* ModernClipboardMetadataAccuracyTests.swift */,
@@ -1480,6 +1483,7 @@
 				68CC7D8C02BD04A0939B67F8 /* MenuBarAppTests.swift in Sources */,
 				8B5B3FFA343C47F70C242427 /* MetadataPreservationTests.swift in Sources */,
 				86996318823139ECAB61B80D /* MockClipboardService.swift in Sources */,
+				ED7B067922A1CB27D8D48041 /* ModernClipboardColdStartupTests.swift in Sources */,
 				D56C6FDFDC04DD3D0CFD549C /* ModernClipboardHashCleanupTests.swift in Sources */,
 				B4D0F7700866E4CDFCF4EEF9 /* ModernClipboardHashResetTests.swift in Sources */,
 				BB32A7DAC45088B04E6F1610 /* ModernClipboardMetadataAccuracyTests.swift in Sources */,
@@ -1678,7 +1682,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 2.2.2;
+				MARKETING_VERSION = 2.2.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1790,7 +1794,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 2.2.2;
+				MARKETING_VERSION = 2.2.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = Kipple;
