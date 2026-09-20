@@ -275,6 +275,4 @@
 "AI is added to items received through MCP." = "AI is added to items received through MCP.";
 "Deleting a category keeps the history and its other categories." = "Deleting a category keeps the history and its other categories.";
 "Could not delete the category. Please try again." = "Could not delete the category. Please try again.";
-"Added via MCP" = "Added via MCP";
-"Captured with OCR" = "Captured with OCR";
 "Open item details to view all categories." = "Right-click and open Item details to view all categories.";

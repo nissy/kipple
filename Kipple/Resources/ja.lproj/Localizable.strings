@@ -275,6 +275,4 @@
 "AI is added to items received through MCP." = "AIはMCP経由で受け取った履歴に付きます。";
 "Deleting a category keeps the history and its other categories." = "カテゴリを削除しても、履歴と他のカテゴリは残ります。";
 "Could not delete the category. Please try again." = "カテゴリを削除できませんでした。再度お試しください。";
-"Added via MCP" = "MCP経由で追加";
-"Captured with OCR" = "OCRで取り込み";
 "Open item details to view all categories." = "右クリックの「項目の詳細」で全カテゴリを確認できます。";

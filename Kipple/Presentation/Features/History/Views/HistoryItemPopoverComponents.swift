@@ -34,12 +34,6 @@ struct ClipboardItemPopover: View {
             if let title = item.title {
                 Text(verbatim: title).font(.headline).padding([.top, .horizontal], 16)
             }
-            if item.metadata?.sources.contains(.mcp) == true {
-                Text("Added via MCP").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
-            }
-            if item.metadata?.sources.contains(.ocr) == true {
-                Text("Captured with OCR").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
-            }
             headerSection(for: item)
                 .padding(16)
 

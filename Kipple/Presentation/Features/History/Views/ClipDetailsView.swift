@@ -28,12 +28,6 @@ struct ClipDetailsView: View {
                     let categories = categoryStore.categories(for: item)
                     CategoryLabelsView(categories: categories.isEmpty ? [categoryStore.noneCategory()] : categories)
                 }
-                if item.metadata?.sources.contains(.mcp) == true {
-                    Text("Added via MCP").font(.caption).foregroundStyle(.secondary)
-                }
-                if item.metadata?.sources.contains(.ocr) == true {
-                    Text("Captured with OCR").font(.caption).foregroundStyle(.secondary)
-                }
                 if let createdAt = item.metadata?.createdAt {
                     LabeledContent("Registered") { Text(createdAt, format: .dateTime) }
                 }
