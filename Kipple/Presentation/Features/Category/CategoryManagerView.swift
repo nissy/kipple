@@ -25,7 +25,7 @@ private enum CategoryManagerLayout {
 }
 
 private enum CategoryManagerAppearance {
-    static let builtInColor = Color.secondary.opacity(0.55)
+    static let builtInColor = Color.secondary
 }
 
 struct CategoryManagerView: View {
@@ -33,6 +33,8 @@ struct CategoryManagerView: View {
     @ObservedObject private var appSettings = AppSettings.shared
     @Environment(\.dismiss) private var dismiss
 
+    @State private var deletionError = false
+    @State private var isDeleting = false
     @State private var name: String = ""
     @State private var symbol: String = UserCategoryStore.availableSymbols.first ?? "tag"
 
@@ -45,7 +47,12 @@ struct CategoryManagerView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Manage Categories").font(.headline)
 
-            // 各カテゴリ列にフィルタ表示チェックを配置（設定から移動）
+            Text("URL, OCR and AI are automatic categories. You can change them on each item.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("AI is added to items received through MCP.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Deleting a category keeps the history and its other categories.")
+                .font(.caption).foregroundStyle(.secondary)
 
             HStack(spacing: CategoryManagerLayout.columnSpacing) {
                 TextField("Name", text: $name)
@@ -112,7 +119,6 @@ struct CategoryManagerView: View {
                     HStack(spacing: CategoryManagerLayout.columnSpacing) {
                         iconSelector(for: category)
                             .frame(width: CategoryManagerLayout.iconColumnWidth, alignment: .leading)
-                        let builtInKind = store.builtInKind(for: category.id)
                         let isBuiltIn = store.isBuiltIn(category.id)
                         if isBuiltIn {
                             Text(category.name)
@@ -130,12 +136,11 @@ struct CategoryManagerView: View {
                             .toggleStyle(.checkbox)
                             .labelsHidden()
                             .frame(width: CategoryManagerLayout.toggleColumnWidth, alignment: .center)
-                            .disabled(builtInKind == .url)
 
                         if !isBuiltIn {
                             Button(
                                 role: .destructive,
-                                action: { deleteCategoryAndReassign(category) },
+                                action: { deleteCategories([category]) },
                                 label: {
                                     Image(systemName: "trash")
                                         .font(.system(size: 12, weight: .medium))
@@ -167,14 +172,14 @@ struct CategoryManagerView: View {
                                 }
                             }
                             Button("Delete", role: .destructive) {
-                                deleteCategoryAndReassign(category)
+                                deleteCategories([category])
                             }
                         }
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         if !store.isBuiltIn(category.id) {
                             Button(role: .destructive) {
-                                deleteCategoryAndReassign(category)
+                                deleteCategories([category])
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -182,20 +187,20 @@ struct CategoryManagerView: View {
                     }
                 }
                 .onDelete { indexSet in
-                    for index in indexSet {
-                        let cat = store.all()[index]
-                        if !store.isBuiltIn(cat.id) {
-                            deleteCategoryAndReassign(cat)
-                        }
-                    }
+                    let categories = indexSet.map { store.all()[$0] }.filter { !store.isBuiltIn($0.id) }
+                    deleteCategories(categories)
                 }
             }
 
+            if deletionError {
+                Text("Could not delete the category. Please try again.").foregroundStyle(.red).font(.caption)
+            }
             HStack {
                 Spacer()
                 Button("Close") { dismiss() }
             }
         }
+        .disabled(isDeleting)
         .padding(16)
         .frame(minWidth: CategoryManagerView.minimumWidth, minHeight: CategoryManagerLayout.minimumHeight)
     }
@@ -241,6 +246,10 @@ private extension CategoryManagerView {
                     get: { appSettings.filterCategoryURL },
                     set: { appSettings.filterCategoryURL = $0 }
                 )
+            case .ocr:
+                return Binding(get: { appSettings.filterCategoryOCR }, set: { appSettings.filterCategoryOCR = $0 })
+            case .ai:
+                return Binding(get: { appSettings.filterCategoryAI }, set: { appSettings.filterCategoryAI = $0 })
             case .none:
                 return Binding(
                     get: { appSettings.filterCategoryNone },
@@ -254,17 +263,20 @@ private extension CategoryManagerView {
         )
     }
 
-    func deleteCategoryAndReassign(_ category: UserCategory) {
-        let targetId = category.id
-        let noneId = store.noneCategoryId()
-        let adapter = ModernClipboardServiceAdapter.shared
+    func deleteCategories(_ categories: [UserCategory]) {
+        guard !isDeleting else { return }
+        isDeleting = true
+        deletionError = false
         Task { @MainActor in
-            let items = adapter.history.filter { $0.userCategoryId == targetId }
-            for var item in items {
-                item.userCategoryId = noneId
-                await adapter.updateItem(item)
+            defer { isDeleting = false }
+            do {
+                for category in categories {
+                    try await ModernClipboardServiceAdapter.shared.removeCategoryDefinition(category.id)
+                    store.remove(id: category.id)
+                }
+            } catch {
+                deletionError = true
             }
-            store.remove(id: targetId)
         }
     }
 }

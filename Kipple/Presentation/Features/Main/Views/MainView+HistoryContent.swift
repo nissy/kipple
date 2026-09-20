@@ -10,23 +10,6 @@ extension MainView {
     // 履歴とピン留めセクションのコンテンツ
     @ViewBuilder
     var historyAndPinnedContent: some View {
-        let enabledCategories = [
-            ClipItemCategory.url
-        ]
-            .filter { isCategoryFilterEnabled($0) }
-
-        let customCategories: [UserCategory] = {
-            var list = userCategoryStore.userDefinedFilters()
-            if appSettings.filterCategoryNone {
-                var noneCategory = userCategoryStore.noneCategory()
-                if noneCategory.name != "None" {
-                    noneCategory.name = "None"
-                }
-                list.insert(noneCategory, at: 0)
-            }
-            return list
-        }()
-
         let queueLoopToggleHandler: () -> Void = {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                 viewModel.toggleQueueRepetition()
@@ -59,20 +42,14 @@ extension MainView {
             onDelete: { item in
                 viewModel.deleteItemSync(item)
             },
-            onCategoryFilter: { category in
-                viewModel.toggleCategoryFilter(category)
-            },
-            onChangeUserCategory: { item, catId in
-                Task { @MainActor in
-                    var updated = item
-                    updated.userCategoryId = catId
-                    if let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter {
-                        await adapter.updateItem(updated)
-                    }
+            onChangeUserCategory: { item, categoryID, enabled in
+                guard let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter else {
+                    throw MCPFailure.unavailable
                 }
+                try await adapter.setCategory(itemID: item.id, categoryID: categoryID, enabled: enabled)
             },
             onOpenCategoryManager: { presentCategoryManager() },
-            selectedCategory: $viewModel.selectedCategory,
+            categoryFilter: $viewModel.categoryFilter,
             searchText: $viewModel.searchText,
             onLoadMore: { item in
                 viewModel.loadMoreHistoryIfNeeded(currentItem: item)
@@ -81,10 +58,6 @@ extension MainView {
             isLoadingMore: viewModel.isLoadingMoreHistory,
             isPinnedFilterActive: viewModel.isPinnedFilterActive,
             onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
-            availableCategories: enabledCategories,
-            customCategories: customCategories,
-            selectedUserCategoryId: viewModel.selectedUserCategoryId,
-            onToggleUserCategoryFilter: { viewModel.toggleUserCategoryFilter($0) },
             pasteMode: viewModel.pasteMode,
             queueBadgeProvider: viewModel.queueBadge(for:),
             queueSelectionPreview: viewModel.queueSelectionPreview,
@@ -93,5 +66,15 @@ extension MainView {
             onToggleQueueLoop: queueLoopToggleHandler
         )
         .id(historyRefreshID)
+        .environment(\.categoryPopoverChanged, CategoryPopoverAction { itemID, presented in
+            if presented {
+                requestPreventAutoClose(.categoryPopover(itemID))
+                if let itemID { viewModel.categoryEditingItemID = itemID }
+                historyHoverResetRequest = HistoryHoverResetRequest()
+            } else {
+                if viewModel.categoryEditingItemID == itemID { viewModel.categoryEditingItemID = nil }
+                releasePreventAutoClose(.categoryPopover(itemID))
+            }
+        })
     }
 }

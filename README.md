@@ -74,6 +74,7 @@ Queue is useful for forms, repetitive data entry, and moving several values betw
 Screen Text Capture lets you select an area of the screen and extract text with macOS Vision OCR.
 
 Recognized text is copied to the clipboard and saved to history. OCR processing happens on your Mac.
+Paragraph breaks are preserved, and recognized tables are copied as tab-separated text for spreadsheets.
 
 ### Paste on Selection
 
@@ -102,7 +103,8 @@ Kipple does not send your clipboard history to external services.
 
 ## Requirements
 
-- macOS 14.0 or later
+- Mac with Apple silicon (M1 or later)
+- macOS 27.0 or later
 
 ## License
 

@@ -90,6 +90,27 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
+    func copyRecognizedText(_ content: String) {
+        pendingClipboardContent = content
+        currentClipboardContent = content
+        enqueueClipboardOperation { [self] generation in
+            await modernService.copyToClipboard(content, fromEditor: false, source: .ocr) {
+                await self.isCurrentOperation(generation)
+            }
+            await refreshHistory()
+        }
+    }
+
+    func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
+        try await modernService.setCategory(itemID: itemID, categoryID: categoryID, enabled: enabled)
+        await refreshHistory()
+    }
+
+    func removeCategoryDefinition(_ id: UUID) async throws {
+        try await modernService.removeCategoryDefinition(id)
+        await refreshHistory()
+    }
+
     @discardableResult
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         let items = await modernService.addEditorItems(contents)

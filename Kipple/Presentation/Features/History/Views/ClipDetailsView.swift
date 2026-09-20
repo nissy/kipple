@@ -3,6 +3,7 @@ import SwiftUI
 struct ClipDetailsView: View {
     let itemID: UUID
     @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
+    @ObservedObject private var categoryStore = UserCategoryStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var title: String
     @State private var errorMessage = ""
@@ -22,6 +23,11 @@ struct ClipDetailsView: View {
             if let item = currentItem {
                 TextField("Title", text: $title)
                 LabeledContent("Source", value: item.sourceApp ?? "Unknown")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Categories").font(.caption).foregroundStyle(.secondary)
+                    let categories = categoryStore.categories(for: item)
+                    CategoryLabelsView(categories: categories.isEmpty ? [categoryStore.noneCategory()] : categories)
+                }
                 if let createdAt = item.metadata?.createdAt {
                     LabeledContent("Registered") { Text(createdAt, format: .dateTime) }
                 }

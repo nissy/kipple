@@ -262,3 +262,17 @@
 "Paste this JSON into an AI client's MCP configuration." = "Paste this JSON into an AI client's MCP configuration.";
 "Up to 80,000 characters per item." = "Up to 80,000 characters per item.";
 "Local programs running as your user can add text while MCP is enabled." = "Local programs running as your user can add text while MCP is enabled.";
+"Uncategorized" = "Uncategorized";
+"Edit categories" = "Edit categories";
+"Select multiple categories. Automatic categories can also be removed." = "Select multiple categories. Automatic categories can also be removed.";
+"Could not save categories. Please try again." = "Could not save categories. Please try again.";
+"Filter by categories" = "Filter by categories";
+"Match" = "Match";
+"Match all" = "Match all";
+"Match any" = "Match any";
+"Search and pinned filters apply together." = "Search and pinned filters apply together.";
+"URL, OCR and AI are automatic categories. You can change them on each item." = "URL, OCR and AI are automatic categories. You can change them on each item.";
+"AI is added to items received through MCP." = "AI is added to items received through MCP.";
+"Deleting a category keeps the history and its other categories." = "Deleting a category keeps the history and its other categories.";
+"Could not delete the category. Please try again." = "Could not delete the category. Please try again.";
+"Open item details to view all categories." = "Right-click and open Item details to view all categories.";

@@ -66,8 +66,8 @@ final class UserCategoryStore: ObservableObject {
     }()
 
     // ビルトインカテゴリ（削除不可）
-    private static let builtInNoneID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
-    private static let builtInURLID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+    private static let builtInNoneID = BuiltInCategory.none
+    private static let builtInURLID = BuiltInCategory.url
     private static var builtInNone: UserCategory {
         UserCategory(
             id: builtInNoneID,
@@ -84,17 +84,25 @@ final class UserCategoryStore: ObservableObject {
             isFilterEnabled: true
         )
     }
-    private static var builtIns: [UserCategory] { [builtInNone, builtInURL] }
+    private static var builtIns: [UserCategory] {
+        [
+            builtInNone, builtInURL,
+            UserCategory(id: BuiltInCategory.ocr, name: "OCR", iconSystemName: "text.viewfinder"),
+            UserCategory(id: BuiltInCategory.ai, name: "AI", iconSystemName: "sparkles")
+        ]
+    }
 
     func noneCategory() -> UserCategory { Self.builtInNone }
     func noneCategoryId() -> UUID { Self.builtInNoneID }
     func urlCategory() -> UserCategory { Self.builtInURL }
     func urlCategoryId() -> UUID { Self.builtInURLID }
 
-    enum BuiltInKind { case none, url }
+    enum BuiltInKind { case none, url, ocr, ai }
     func builtInKind(for id: UUID) -> BuiltInKind? {
         if id == Self.builtInNoneID { return BuiltInKind.none }
         if id == Self.builtInURLID { return .url }
+        if id == BuiltInCategory.ocr { return .ocr }
+        if id == BuiltInCategory.ai { return .ai }
         return nil
     }
 
@@ -102,6 +110,23 @@ final class UserCategoryStore: ObservableObject {
 
     /// すべて（ビルトイン＋ユーザ定義）
     func all() -> [UserCategory] { Self.builtIns + categories }
+
+    func assignable() -> [UserCategory] { all().filter { $0.id != BuiltInCategory.none } }
+
+    func categories(for item: ClipItem) -> [UserCategory] {
+        let ids = item.categoryIDs
+        return assignable().filter { ids.contains($0.id) }
+    }
+
+    func isFilterEnabled(_ category: UserCategory) -> Bool {
+        switch builtInKind(for: category.id) {
+        case .some(.none): return AppSettings.shared.filterCategoryNone
+        case .url: return AppSettings.shared.filterCategoryURL
+        case .ocr: return AppSettings.shared.filterCategoryOCR
+        case .ai: return AppSettings.shared.filterCategoryAI
+        case nil: return category.isFilterEnabled
+        }
+    }
 
     /// ユーザ定義のみ
     func userDefined() -> [UserCategory] { categories }
@@ -123,7 +148,13 @@ final class UserCategoryStore: ObservableObject {
         Self.resolvedIconName(category.iconSystemName)
     }
 
+    func iconName(for categories: [UserCategory]) -> String {
+        if categories.count > 1 { return "square.stack" }
+        return iconName(for: categories.first ?? noneCategory())
+    }
+
     func add(name: String, iconSystemName: String) {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let symbol = UserCategoryStore.availableSymbols.contains(iconSystemName)
             ? iconSystemName : "tag"
         let new = UserCategory(name: name.trimmingCharacters(in: .whitespacesAndNewlines),

@@ -227,7 +227,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     func copyToClipboard(
-        _ content: String, fromEditor: Bool, shouldCopy: @Sendable () async -> Bool
+        _ content: String,
+        fromEditor: Bool,
+        source: ClipMetadata.Source? = nil,
+        shouldCopy: @Sendable () async -> Bool
     ) async {
         let generation = copyGeneration
         await mutationGate.acquire()
@@ -258,7 +261,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 : metadata.windowTitle,
             bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
             processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
-            isFromEditor: fromEditor
+            isFromEditor: fromEditor,
+            metadata: source.map { ClipMetadata(createdAt: Date(), source: $0) }
         )
         // Preserve the history identity and details when copying the same text.
         if let existing = history.first(where: { $0.content == content }) {
@@ -1103,6 +1107,32 @@ extension ModernClipboardService {
         item.metadata = metadata
         var candidate = history
         candidate[index] = item
+        try await saveHistory(candidate)
+        history = candidate
+        markHistoryChanged()
+        notifyHistoryObservers()
+    }
+
+    func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard let index = history.firstIndex(where: { $0.id == itemID }) else { throw MCPFailure.invalidInput }
+        var candidate = history
+        candidate[index].setCategory(categoryID, enabled: enabled)
+        try await saveHistory(candidate)
+        history = candidate
+        markHistoryChanged()
+        notifyHistoryObservers()
+    }
+
+    func removeCategoryDefinition(_ id: UUID) async throws {
+        guard id != BuiltInCategory.none, !BuiltInCategory.automatic.contains(id) else {
+            throw MCPFailure.invalidInput
+        }
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        var candidate = history
+        for index in candidate.indices { candidate[index].removeCategoryDefinition(id) }
         try await saveHistory(candidate)
         history = candidate
         markHistoryChanged()

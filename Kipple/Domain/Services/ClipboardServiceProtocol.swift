@@ -17,6 +17,7 @@ protocol ClipboardServiceProtocol: AnyObject {
     func startMonitoring()
     func stopMonitoring()
     func copyToClipboard(_ content: String, fromEditor: Bool)
+    func copyRecognizedText(_ content: String)
     func writeToClipboardOnly(_ content: String)
     @discardableResult
     func addEditorItems(_ contents: [String]) async -> [ClipItem]

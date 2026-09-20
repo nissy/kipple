@@ -34,9 +34,6 @@ struct ClipboardItemPopover: View {
             if let title = item.title {
                 Text(verbatim: title).font(.headline).padding([.top, .horizontal], 16)
             }
-            if item.metadata?.source == .mcp {
-                Text("Added by AI").font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
-            }
             headerSection(for: item)
                 .padding(16)
 
@@ -64,22 +61,10 @@ struct ClipboardItemPopover: View {
     }
 
     private func headerSection(for item: ClipItem) -> some View {
-        let categoryInfo = displayCategory(for: item)
+        let categories = categoryStore.categories(for: item)
 
-        return HStack {
-            HStack(spacing: 6) {
-                Image(systemName: categoryInfo.icon)
-                    .font(.system(size: 12))
-                    .foregroundColor(categoryInfo.color)
-                Text(verbatim: categoryInfo.name)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(MainViewMetrics.TextColor.primary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .kippleControlSurface(in: Capsule(), isEnabled: true)
-
-            Spacer()
+        return VStack(alignment: .leading, spacing: 10) {
+            CategoryLabelsView(categories: categories.isEmpty ? [categoryStore.noneCategory()] : categories, isPreview: true)
 
             if item.sourceApp != nil || item.windowTitle != nil {
                 VStack(alignment: .trailing, spacing: 2) {
@@ -91,6 +76,9 @@ struct ClipboardItemPopover: View {
                             Text(localizedAppName(appName))
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(MainViewMetrics.TextColor.primary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .help(appName)
                         }
                     }
 
@@ -107,6 +95,7 @@ struct ClipboardItemPopover: View {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
@@ -133,57 +122,6 @@ struct ClipboardItemPopover: View {
             }
 
             Spacer()
-        }
-    }
-
-    private struct DisplayCategoryInfo {
-        let name: String
-        let icon: String
-        let color: Color
-    }
-
-    private func displayCategory(for item: ClipItem) -> DisplayCategoryInfo {
-        if let categoryId = item.userCategoryId,
-           let category = categoryStore.category(id: categoryId) {
-            if let kind = categoryStore.builtInKind(for: category.id) {
-                switch kind {
-                case .none:
-                    return DisplayCategoryInfo(
-                        name: category.name,
-                        icon: categoryStore.iconName(for: category),
-                        color: .gray
-                    )
-                case .url:
-                    return DisplayCategoryInfo(
-                        name: category.name,
-                        icon: categoryStore.iconName(for: category),
-                        color: .blue
-                    )
-                }
-            } else {
-                return DisplayCategoryInfo(
-                    name: category.name,
-                    icon: categoryStore.iconName(for: category),
-                    color: Color.accentColor
-                )
-            }
-        }
-
-        // Fallback to automatic classification
-        switch item.category {
-        case .url:
-            return DisplayCategoryInfo(
-                name: String(localized: "URL"),
-                icon: "link",
-                color: .blue
-            )
-        case .all:
-            let none = categoryStore.noneCategory()
-            return DisplayCategoryInfo(
-                name: none.name,
-                icon: categoryStore.iconName(for: none),
-                color: .gray
-            )
         }
     }
 

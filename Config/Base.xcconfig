@@ -12,7 +12,6 @@ INFOPLIST_KEY_CFBundleVersion = $(CURRENT_PROJECT_VERSION)
 CFBundleShortVersionString = $(MARKETING_VERSION)
 CFBundleVersion = $(CURRENT_PROJECT_VERSION)
 
-// Architecture settings for Universal Binary
-ARCHS = $(ARCHS_STANDARD)
-VALID_ARCHS = x86_64 arm64
+// Architecture settings for Apple silicon
+ARCHS = arm64
 ONLY_ACTIVE_ARCH = NO

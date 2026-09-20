@@ -1,134 +1,102 @@
 import SwiftUI
 
+struct CategoryPopoverAction {
+    var handler: @MainActor (UUID?, Bool) -> Void
+
+    @MainActor func callAsFunction(_ id: UUID?, _ presented: Bool) { handler(id, presented) }
+}
+
+extension EnvironmentValues {
+    @Entry var categoryPopoverChanged = CategoryPopoverAction { _, _ in }
+}
+
 struct HistoryCategoryMenu: View {
     let item: ClipItem
     let isSelected: Bool
-    let onChangeCategory: ((UUID?) -> Void)?
+    let onChangeCategory: ((UUID, Bool) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
-
-    private let store = UserCategoryStore.shared
-    @State private var isHovered = false
+    @ObservedObject private var store = UserCategoryStore.shared
+    @Environment(\.categoryPopoverChanged) private var presentationChanged
+    @State private var isPresented = false
+    @State private var isSaving = false
+    @State private var saveError = false
 
     var body: some View {
-        Menu(content: menuContent) {
-            menuLabel
-        }
-        .menuIndicator(.hidden)
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .frame(
-            width: KippleButtonMetrics.historyCategoryButtonSize,
-            height: KippleButtonMetrics.historyCategoryButtonSize
-        )
-        .background(categoryAffordance)
-        .contentShape(Circle())
-        .onHover { hovering in
-            isHovered = hovering
-        }
-    }
-
-    @ViewBuilder
-    private func menuContent() -> some View {
-        let currentUserCategoryId = item.userCategoryId
-        let noneCategory = store.noneCategory()
-        let noneId = store.noneCategoryId()
-        let isNoneSelected =
-            (currentUserCategoryId == nil && item.category != .url) ||
-            currentUserCategoryId == noneId
+        let categories = store.categories(for: item)
         Button {
-            onChangeCategory?(noneId)
+            presentationChanged(item.id, true)
+            isPresented = true
         } label: {
-            categoryMenuRow(
-                name: noneCategory.name,
-                systemImage: store.iconName(for: noneCategory),
-                selected: isNoneSelected
-            )
-        }
-
-        let urlCategory = store.urlCategory()
-        let urlId = store.urlCategoryId()
-        let isURLSelected =
-            (currentUserCategoryId == nil && item.category == .url) ||
-            currentUserCategoryId == urlId
-        Button {
-            onChangeCategory?(urlId)
-        } label: {
-            categoryMenuRow(
-                name: urlCategory.name,
-                systemImage: store.iconName(for: urlCategory),
-                selected: isURLSelected
-            )
-        }
-
-        let userDefinedCategories = store.userDefined()
-        if !userDefinedCategories.isEmpty {
-            Divider()
-            ForEach(userDefinedCategories) { cat in
-                Button {
-                    onChangeCategory?(cat.id)
-                } label: {
-                    categoryMenuRow(
-                        name: cat.name,
-                        systemImage: store.iconName(for: cat),
-                        selected: item.userCategoryId == cat.id
-                    )
-                }
-            }
-        }
-
-        if onOpenCategoryManager != nil {
-            Divider()
-            Button("Manage Categories…") {
-                onOpenCategoryManager?()
-            }
-        }
-    }
-
-    private var menuLabel: some View {
-        let current = store.category(id: item.userCategoryId)
-        let iconName = current.map { store.iconName(for: $0) } ?? item.category.icon
-        return ZStack {
-            Image(systemName: iconName)
+            Image(systemName: store.iconName(for: categories))
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(categoryIconForeground)
                 .frame(
-                    width: KippleButtonMetrics.historyCategoryIconSize,
-                    height: KippleButtonMetrics.historyCategoryIconSize
+                    width: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                    height: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                    alignment: .center
                 )
+                .overlay(alignment: .bottomTrailing) {
+                    if categories.count > 1 {
+                        Text("\(categories.count)")
+                            .font(.system(size: 8, weight: .bold))
+                            .padding(2)
+                            .background(.background, in: Circle())
+                    }
+                }
         }
-        .frame(
-            width: KippleButtonMetrics.historyCategoryButtonSize,
-            height: KippleButtonMetrics.historyCategoryButtonSize
-        )
-        .contentShape(Circle())
-    }
-
-    private var categoryAffordance: some View {
-        Circle()
-            .fill(
-                isSelected || isHovered
-                ? KippleButtonAppearance.inactivePillFill
-                : Color.clear
-            )
-    }
-
-    private var categoryIconForeground: Color {
-        isSelected ? .primary : KippleButtonAppearance.inactiveForeground
-    }
-
-    private func categoryMenuRow(name: String, systemImage: String, selected: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundColor(KippleButtonAppearance.inactiveForeground)
-            Text(verbatim: name)
-                .font(.system(size: 12))
-            Spacer()
-            if selected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .semibold))
-            }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? .primary : .secondary)
+        .accessibilityLabel(Text("Edit categories"))
+        .accessibilityValue(Text(verbatim: categoryNames(categories)))
+        .help(categoryNames(categories))
+        .popover(isPresented: $isPresented, arrowEdge: .trailing) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Edit categories").font(.headline)
+                Text("Select multiple categories. Automatic categories can also be removed.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(store.assignable()) { category in
+                            Toggle(isOn: Binding(
+                                get: { item.categoryIDs.contains(category.id) },
+                                set: { enabled in update(category.id, enabled: enabled) }
+                            )) {
+                                Label(category.name, systemImage: store.iconName(for: category))
+                            }
+                            .toggleStyle(.checkbox)
+                            .disabled(isSaving || onChangeCategory == nil)
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(2)
+                }.frame(maxHeight: 280)
+                if saveError {
+                    Text("Could not save categories. Please try again.").font(.caption).foregroundStyle(.red)
+                }
+                Divider()
+                HStack {
+                    Button("Manage Categories…") {
+                        onOpenCategoryManager?()
+                        isPresented = false
+                    }
+                    Spacer()
+                    Button("Done") { isPresented = false }.keyboardShortcut(.defaultAction)
+                }
+            }.padding(16).frame(width: 300)
         }
-        .padding(.vertical, 2)
+        .onChange(of: isPresented) { _, presented in
+            if !presented { presentationChanged(item.id, false) }
+        }
+        .onDisappear { if isPresented { presentationChanged(item.id, false) } }
+    }
+
+    private func update(_ id: UUID, enabled: Bool) {
+        isSaving = true
+        saveError = false
+        Task { @MainActor in
+            defer { isSaving = false }
+            do { try await onChangeCategory?(id, enabled) } catch { saveError = true }
+        }
+    }
+
+    private func categoryNames(_ categories: [UserCategory]) -> String {
+        categories.isEmpty ? store.noneCategory().name : categories.map(\.name).joined(separator: ", ")
     }
 }

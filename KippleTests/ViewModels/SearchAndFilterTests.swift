@@ -46,7 +46,7 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
         viewModel.toggleCategoryFilter(.url)
         XCTAssertEqual(viewModel.filteredHistory.count, 1)
         XCTAssertEqual(viewModel.filteredHistory.first?.category, .url)
-        XCTAssertEqual(viewModel.selectedCategory, .url)
+        XCTAssertEqual(viewModel.categoryFilter.ids, [BuiltInCategory.url])
     }
 
     func testCategoryFilterAllResetsSelection() {
@@ -55,7 +55,7 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
 
         viewModel.toggleCategoryFilter(.all)
 
-        XCTAssertNil(viewModel.selectedCategory)
+        XCTAssertTrue(viewModel.categoryFilter.ids.isEmpty)
         XCTAssertEqual(viewModel.filteredHistory.count, mockClipboardService.history.count)
     }
 
@@ -71,9 +71,9 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
 
     func testToggleCategoryFilterClearsSelection() {
         viewModel.toggleCategoryFilter(.url)
-        XCTAssertEqual(viewModel.selectedCategory, .url)
+        XCTAssertEqual(viewModel.categoryFilter.ids, [BuiltInCategory.url])
         viewModel.toggleCategoryFilter(.url)
-        XCTAssertNil(viewModel.selectedCategory)
+        XCTAssertTrue(viewModel.categoryFilter.ids.isEmpty)
     }
 
     // MARK: - Performance

@@ -72,6 +72,13 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
         onHistoryChanged?(item)
     }
 
+    func copyRecognizedText(_ content: String) {
+        copyToClipboard(content, fromEditor: false)
+        if let index = history.firstIndex(where: { $0.content == content }) {
+            history[index].metadata = ClipMetadata(source: .ocr)
+        }
+    }
+
     func writeToClipboardOnly(_ content: String) {
         writeToClipboardOnlyCalled = true
         lastCopiedContent = content

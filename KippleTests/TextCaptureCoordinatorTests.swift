@@ -33,9 +33,90 @@ final class TextCaptureCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(clipboardService.copyToClipboardCalled)
         XCTAssertEqual(clipboardService.lastCopiedContent, "Captured text")
+        XCTAssertEqual(clipboardService.history.first?.metadata?.source, .ocr)
         XCTAssertEqual(clipboardService.lastCopiedFromEditor, false)
         XCTAssertTrue(windowManager.openMainWindowCalled)
         XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+    }
+
+    func testCopyPreservesEmptyTableColumns() {
+        let coordinator = TextCaptureCoordinator(
+            clipboardService: clipboardService,
+            textRecognitionService: textRecognitionService,
+            windowManager: windowManager
+        )
+        coordinator.test_handleRecognizedText("\tValue\t\nNext\t\t")
+        XCTAssertEqual(clipboardService.lastCopiedContent, "\tValue\t\nNext\t\t")
+    }
+
+    func testSelectionWaitsForImageBeforeRecognizingAndCopying() async throws {
+        let overlay = StubOverlayController()
+        let capture = SuspendedImageCaptureService()
+        let coordinator = makeCaptureCoordinator(overlay: overlay, capture: capture)
+        let captureRequested = expectation(description: "capture requested")
+        capture.onCapture = { captureRequested.fulfill() }
+        textRecognitionService.result = "Captured table\tValue"
+
+        coordinator.startCaptureFlow()
+        overlay.selectionHandler?(CGRect(x: 0, y: 0, width: 100, height: 100), try XCTUnwrap(NSScreen.main))
+        await fulfillment(of: [captureRequested], timeout: 1)
+        XCTAssertEqual(textRecognitionService.callCount, 0)
+        XCTAssertFalse(clipboardService.copyToClipboardCalled)
+
+        let task = try XCTUnwrap(coordinator.test_captureTask())
+        capture.complete(with: try makeCaptureImage())
+        await task.value
+        XCTAssertEqual(textRecognitionService.callCount, 1)
+        XCTAssertEqual(clipboardService.lastCopiedContent, "Captured table\tValue")
+        XCTAssertTrue(windowManager.openMainWindowCalled)
+    }
+
+    func testRestartDiscardsResultFromCancelledCapture() async throws {
+        let overlay = StubOverlayController()
+        let capture = SuspendedImageCaptureService()
+        let coordinator = makeCaptureCoordinator(overlay: overlay, capture: capture)
+        let captureRequested = expectation(description: "capture requested")
+        capture.onCapture = { captureRequested.fulfill() }
+
+        coordinator.startCaptureFlow()
+        overlay.selectionHandler?(CGRect(x: 0, y: 0, width: 100, height: 100), try XCTUnwrap(NSScreen.main))
+        await fulfillment(of: [captureRequested], timeout: 1)
+        let task = try XCTUnwrap(coordinator.test_captureTask())
+        coordinator.startCaptureFlow()
+        capture.complete(with: try makeCaptureImage())
+        await task.value
+
+        XCTAssertEqual(textRecognitionService.callCount, 0)
+        XCTAssertFalse(clipboardService.copyToClipboardCalled)
+        XCTAssertFalse(windowManager.openMainWindowCalled)
+        XCTAssertEqual(overlay.presentCallCount, 2)
+    }
+
+    private func makeCaptureCoordinator(
+        overlay: StubOverlayController, capture: SuspendedImageCaptureService
+    ) -> TextCaptureCoordinator {
+        TextCaptureCoordinator(
+            clipboardService: clipboardService,
+            textRecognitionService: textRecognitionService,
+            windowManager: windowManager,
+            screenCapturePermission: .init(
+                preflight: { true }, request: { true }, openPermissionTab: {}, openSystemSettings: {},
+                pollingIntervalNanoseconds: 10_000_000
+            ),
+            imageCaptureService: capture
+        ) { selection, cancel in
+            overlay.selectionHandler = selection
+            overlay.cancelHandler = cancel
+            return overlay
+        }
+    }
+
+    private func makeCaptureImage() throws -> CGImage {
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: 2, height: 2, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        return try XCTUnwrap(context.makeImage())
     }
 
     func testStartCaptureFlowWhenPermissionGrantedPresentsOverlay() {
@@ -184,8 +265,30 @@ final class TextCaptureCoordinatorTests: XCTestCase {
 
 @MainActor
 private final class DummyTextRecognitionService: TextRecognitionServiceProtocol {
+    var result = ""
+    private(set) var callCount = 0
+
     func recognizeText(from image: CGImage) async throws -> String {
-        ""
+        callCount += 1
+        return result
+    }
+}
+
+@MainActor
+private final class SuspendedImageCaptureService: ScreenImageCapturing {
+    var onCapture: (() -> Void)?
+    private var continuation: CheckedContinuation<CGImage, Never>?
+
+    func captureImage(from rect: CGRect, on screen: NSScreen) async throws -> CGImage {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            onCapture?()
+        }
+    }
+
+    func complete(with image: CGImage) {
+        continuation?.resume(returning: image)
+        continuation = nil
     }
 }
 
