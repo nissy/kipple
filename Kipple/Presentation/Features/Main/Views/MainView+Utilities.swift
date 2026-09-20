@@ -8,6 +8,12 @@
 import SwiftUI
 import AppKit
 
+enum MainViewPreventAutoCloseReason: Hashable {
+    case pinRelease
+    case quitConfirmation
+    case categoryManager
+    case categoryPopover(UUID?)
+}
 extension MainView {
     var titleBarControls: some View {
         HStack(alignment: .top) {
@@ -174,6 +180,13 @@ extension MainView {
     func requestPreventAutoClose(_ reason: MainViewPreventAutoCloseReason) {
         activePreventAutoCloseReasons.insert(reason)
         onSetPreventAutoClose?(true)
+    }
+
+    var isCategoryPopoverPresented: Bool {
+        activePreventAutoCloseReasons.contains {
+            if case .categoryPopover = $0 { return true }
+            return false
+        }
     }
 
     func releasePreventAutoClose(_ reason: MainViewPreventAutoCloseReason) {

@@ -33,6 +33,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(clipboardService.copyToClipboardCalled)
         XCTAssertEqual(clipboardService.lastCopiedContent, "Captured text")
+        XCTAssertEqual(clipboardService.history.first?.metadata?.source, .ocr)
         XCTAssertEqual(clipboardService.lastCopiedFromEditor, false)
         XCTAssertTrue(windowManager.openMainWindowCalled)
         XCTAssertTrue(windowManager.showCopiedNotificationCalled)

@@ -8,12 +8,6 @@ import SwiftUI
 import AppKit
 import Combine
 
-enum MainViewPreventAutoCloseReason: Hashable {
-    case pinRelease
-    case quitConfirmation
-    case categoryManager
-}
-
 struct MainView: View {
     @EnvironmentObject var viewModel: MainViewModel
     @State var selectedHistoryItem: ClipItem?
@@ -314,6 +308,7 @@ extension MainView {
                 keyDownMonitor = nil
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                if isCategoryPopoverPresented { return event }
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let saveModifiers = NSEvent.ModifierFlags(
                     rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)

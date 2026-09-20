@@ -95,6 +95,18 @@ final class AppSettings: ObservableObject {
     // Category Filter Settings
     @AppStorage("filterCategoryURL") private var storedFilterCategoryURL: Bool = true
     @AppStorage("filterCategoryNone") private var storedFilterCategoryNone: Bool = false
+    @AppStorage("filterCategoryOCR") private var storedFilterCategoryOCR: Bool = true
+    @AppStorage("filterCategoryAI") private var storedFilterCategoryAI: Bool = true
+
+    var filterCategoryOCR: Bool {
+        get { storedFilterCategoryOCR }
+        set { objectWillChange.send(); storedFilterCategoryOCR = newValue }
+    }
+
+    var filterCategoryAI: Bool {
+        get { storedFilterCategoryAI }
+        set { objectWillChange.send(); storedFilterCategoryAI = newValue }
+    }
     
     var filterCategoryURL: Bool {
         get { storedFilterCategoryURL }

@@ -45,7 +45,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let processID: Int32?
     let isFromEditor: Bool?
     var metadata: ClipMetadata?
-    // User-defined category
+    // Legacy single category, retained for reading existing history.
     var userCategoryId: UUID?
     
     // パフォーマンス最適化用の静的フォーマッタ

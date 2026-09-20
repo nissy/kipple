@@ -198,7 +198,7 @@ final class TextCaptureCoordinator {
             return
         }
 
-        clipboardService.copyToClipboard(trimmed, fromEditor: false)
+        clipboardService.copyRecognizedText(trimmed)
         windowManager.openMainWindow()
         windowManager.showCopiedNotification()
     }

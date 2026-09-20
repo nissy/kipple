@@ -12,7 +12,7 @@ struct HistoryListView: View {
     let onSelectItem: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
-    let onChangeUserCategory: ((ClipItem, UUID?) -> Void)?
+    let onChangeUserCategory: ((ClipItem, UUID, Bool) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
@@ -60,9 +60,8 @@ struct HistoryListView: View {
                                     onDelete?(item)
                                 }
                             } : nil,
-                            onCategoryTap: nil,
-                            onChangeCategory: onChangeUserCategory != nil ? { catId in
-                                onChangeUserCategory?(item, catId)
+                            onChangeCategory: onChangeUserCategory != nil ? { catId, enabled in
+                                try await onChangeUserCategory?(item, catId, enabled)
                             } : nil,
                             onOpenCategoryManager: onOpenCategoryManager,
                             historyFont: historyFont,
@@ -87,7 +86,6 @@ struct HistoryListView: View {
                             .padding(.vertical, 10)
                     }
                 }
-                .padding(.horizontal, MainViewMetrics.HistoryColumns.horizontalInset)
                 .padding(.vertical, 4)
                 .background {
                     ScrollPositionObserver(
@@ -97,6 +95,7 @@ struct HistoryListView: View {
                     .allowsHitTesting(false)
                 }
             }
+            .contentMargins(.horizontal, 0, for: .scrollContent)
             .onChange(of: copyScrollRequest?.id) { _, _ in
                 handleCopyScrollRequest(with: proxy)
             }

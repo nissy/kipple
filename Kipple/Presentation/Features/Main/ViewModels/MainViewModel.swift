@@ -34,8 +34,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let searchText: String
         let showOnlyURLs: Bool
         let showOnlyPinned: Bool
-        let selectedCategory: ClipItemCategory?
-        let selectedUserCategoryId: UUID?
+        let categoryFilter: CategoryFilter
         let isPinnedFilterActive: Bool
     }
 
@@ -71,8 +70,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             applyFilters()
         }
     }
-    @Published var selectedCategory: ClipItemCategory?
-    @Published var selectedUserCategoryId: UUID?
+    @Published var categoryFilter = CategoryFilter() {
+        didSet { if !isFilterMutating { applyFilters() } }
+    }
+    @Published var categoryEditingItemID: UUID? {
+        didSet { applyFilters() }
+    }
     @Published var isPinnedFilterActive: Bool = false
     @Published private(set) var pasteMode: PasteMode = .clipboard
     @Published private(set) var pasteQueue: [UUID] = []
@@ -263,20 +266,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
-        let selectedUserCategory = selectedUserCategoryId
-        let activeCategory = selectedCategory
         let requireURLsOnly = showOnlyURLs
         let requirePinnedOnly = showOnlyPinned || isPinnedFilterActive
 
-        let categoryStore = UserCategoryStore.shared
-        let noneCategoryId = categoryStore.noneCategoryId()
-        let urlCategoryId = categoryStore.urlCategoryId()
-        let filterByURLCategory = (selectedUserCategory == nil) && (activeCategory == .url)
-
         // Fast-path: no filters and no queue ordering → avoid O(n) filter
         let noFiltersActive = !hasSearchQuery &&
-                              selectedUserCategory == nil &&
-                              activeCategory == nil &&
+                              categoryFilter.ids.isEmpty &&
                               !requireURLsOnly &&
                               !requirePinnedOnly
 
@@ -288,23 +283,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             // 安価な判定（Bool/UUID 比較）で早期 return し、最後に expensive な
             // localizedCaseInsensitiveContains を評価して総コストを下げる
             filtered = items.filter { item in
+                if item.id == categoryEditingItemID { return true }
                 if requirePinnedOnly && !item.isPinned {
                     return false
                 }
-                if let userCatId = selectedUserCategory {
-                    if userCatId == noneCategoryId {
-                        if let assignedId = item.userCategoryId, assignedId != userCatId {
-                            return false
-                        }
-                    } else if item.userCategoryId != userCatId {
-                        return false
-                    }
-                }
-                if filterByURLCategory || requireURLsOnly {
-                    if !itemBelongsToURLCategory(item, urlCategoryId: urlCategoryId) {
-                        return false
-                    }
-                }
+                if !categoryFilter.includes(item) { return false }
+                if requireURLsOnly && !item.categoryIDs.contains(BuiltInCategory.url) { return false }
                 if hasSearchQuery && !item.matchesSearch(searchQuery) { return false }
                 return true
             }
@@ -319,8 +303,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             searchText: searchText,
             showOnlyURLs: showOnlyURLs,
             showOnlyPinned: showOnlyPinned,
-            selectedCategory: selectedCategory,
-            selectedUserCategoryId: selectedUserCategoryId,
+            categoryFilter: categoryFilter,
             isPinnedFilterActive: isPinnedFilterActive
         )
         let shouldResetPagination = lastPaginationFilterState != paginationFilterState || currentHistoryLimit == 0
@@ -660,37 +643,18 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
     
-    /// カテゴリフィルタの切り替え
     func toggleCategoryFilter(_ category: ClipItemCategory) {
-        if category == .all {
-            // "All" カテゴリはフィルタをクリア
-            selectedCategory = nil
-            selectedUserCategoryId = nil
-        } else if selectedCategory == category {
-            selectedCategory = nil
-        } else {
-            selectedCategory = category
-            // ユーザカテゴリフィルタは排他
-            selectedUserCategoryId = nil
-        }
-        updateFilteredItems(clipboardService.history, animated: true)
+        if category == .all { categoryFilter.ids = [] } else { categoryFilter.toggle(BuiltInCategory.url) }
     }
-    
+
     /// ピンフィルタの切り替え
     func togglePinnedFilter() {
         isPinnedFilterActive.toggle()
         updateFilteredItems(clipboardService.history, animated: true)
     }
 
-    /// ユーザカテゴリフィルタの切り替え（内製カテゴリとは排他）
     func toggleUserCategoryFilter(_ id: UUID) {
-        if selectedUserCategoryId == id {
-            selectedUserCategoryId = nil
-        } else {
-            selectedUserCategoryId = id
-            selectedCategory = nil
-        }
-        updateFilteredItems(clipboardService.history, animated: true)
+        categoryFilter.toggle(id)
     }
 
     private func resetFiltersAfterCopy() {
@@ -713,12 +677,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             showOnlyPinned = false
             didMutate = true
         }
-        if selectedCategory != nil {
-            selectedCategory = nil
-            didMutate = true
-        }
-        if selectedUserCategoryId != nil {
-            selectedUserCategoryId = nil
+        if !categoryFilter.ids.isEmpty {
+            categoryFilter.ids = []
             didMutate = true
         }
         if isPinnedFilterActive {
@@ -907,13 +867,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private let filterAnimationThreshold = 120
-
-    private func itemBelongsToURLCategory(_ item: ClipItem, urlCategoryId: UUID) -> Bool {
-        if let userCategoryId = item.userCategoryId {
-            return userCategoryId == urlCategoryId
-        }
-        return item.category == .url
-    }
 
     private func applyQueueOrdering(to items: [ClipItem]) -> [ClipItem] {
         guard !pasteQueue.isEmpty else { return items }

@@ -65,7 +65,7 @@ NC = \033[0m # No Color
 .PHONY: build archive package dmg notarize notarize-status notarize-staple release clean-release appstore appstore-archive appstore-export appstore-upload
 
 # Utility targets
-.PHONY: generate run clean clean-all
+.PHONY: generate run stop clean clean-all
 
 #===============================================================================
 # DEFAULT & HELP
@@ -80,6 +80,7 @@ help: ## Show this help message
 	@echo "  $(GREEN)make generate$(NC)      Generate Xcode project from project.yml"
 	@echo "  $(GREEN)make build-dev$(NC)     Build and run development version"
 	@echo "  $(GREEN)make run$(NC)           Build and run development version"
+	@echo "  $(GREEN)make stop$(NC)          Stop running Kipple instances"
 	@echo "  $(GREEN)make test$(NC)          Run all tests"
 	@echo "  $(GREEN)make lint$(NC)          Run SwiftLint"
 	@echo "  $(GREEN)make clean-dev$(NC)     Clean development build"
@@ -140,12 +141,7 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		STAGING_DIR=$$(mktemp -d "$(DEV_BUILD_DIR)/.install-XXXXXX") || exit 1; \
 		cp -R "$$BUILD_PATH/$(PROJECT_NAME).app" "$$STAGING_DIR/" || exit 1; \
 		echo "$(YELLOW)Checking for existing $(PROJECT_NAME) processes…$(NC)"; \
-		EXISTING_PIDS=$$(pgrep -x $(PROJECT_NAME) || true); \
-		if [ -n "$$EXISTING_PIDS" ]; then \
-			echo "$(YELLOW)Stopping existing processes: $$EXISTING_PIDS$(NC)"; \
-			pkill -x $(PROJECT_NAME) || true; \
-			sleep 2; \
-		fi; \
+		bash Scripts/stop_app.sh "$(PROJECT_NAME)" || exit 1; \
 		if [ -d "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" ]; then \
 			mv "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" "$$STAGING_DIR/previous.app" || exit 1; \
 		fi; \
@@ -158,10 +154,16 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		rm -rf "$$STAGING_DIR"; \
 		echo "$(GREEN)Development build available at: $(DEV_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
 		echo "$(BLUE)Starting development version…$(NC)"; \
-		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" || true; \
+		open "$(DEV_BUILD_DIR)/$(PROJECT_NAME).app" || exit 1; \
+	else \
+		echo "$(RED)Error: Built application not found$(NC)"; \
+		exit 1; \
 	fi
 
 run: build-dev ## Build and run development version
+
+stop: ## Stop all running instances of Kipple for the current user
+	@bash Scripts/stop_app.sh "$(PROJECT_NAME)"
 
 #===============================================================================
 # PRODUCTION BUILD TARGETS
