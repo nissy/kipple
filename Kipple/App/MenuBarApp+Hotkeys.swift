@@ -4,6 +4,30 @@ import ApplicationServices
 // MARK: - Hotkey Handling
 
 extension MenuBarApp {
+    func setupPlainTextPasteHotkey() {
+        guard let adapter = clipboardService as? ModernClipboardServiceAdapter else { return }
+        let controller = PlainTextPasteController(clipboardService: adapter)
+        controller.onPermissionRequired = { [weak self] in
+            self?.windowManager.openSettings(tab: .permission)
+            let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
+        controller.onFailure = { failure in
+            let alert = NSAlert()
+            alert.messageText = NSLocalizedString("Paste", comment: "Paste failure")
+            let message = failure == .historyUnavailable
+                ? "Clipboard history could not be loaded. Pasting was cancelled without changing the clipboard."
+                : "Could not paste. Select an editable text field in the destination app, then try again."
+            alert.informativeText = NSLocalizedString(message, comment: "Paste failure")
+            alert.runModal()
+        }
+        plainTextPasteController = controller
+        windowManager.pasteController = controller
+        let hotkey = PlainTextPasteHotkey.shared
+        hotkey.onTrigger = { [weak controller] in controller?.paste() }
+        hotkey.register()
+    }
+
     @objc func handleHotkeyNotification() {
         Task { @MainActor [weak self] in
             self?.openMainWindow()

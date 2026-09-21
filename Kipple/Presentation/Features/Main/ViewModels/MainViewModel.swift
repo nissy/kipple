@@ -79,6 +79,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var isPinnedFilterActive: Bool = false
     @Published private(set) var pasteMode: PasteMode = .clipboard
     @Published private(set) var pasteQueue: [UUID] = []
+    private(set) var pasteQueueEpoch: UInt64 = 0
+    var onQueuePasteRequested: (() -> Void)?
     @Published private(set) var queueSelectionPreview: Set<UUID> = []
     @Published private(set) var clipboardEditorMode: ClipboardEditorMode = .display
     @Published private(set) var clipboardUpdatedWhileEditing = false
@@ -700,11 +702,17 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // MARK: - Paste Queue Management
 
+    func connectPasteController(_ controller: PlainTextPasteController) {
+        controller.queue = self
+        onQueuePasteRequested = { [weak controller] in controller?.paste(removingFormatting: false) }
+    }
+
     func queueSelection(items: [ClipItem], anchor: ClipItem?) {
         guard canUsePasteQueue else { return }
         guard isQueueModeActive else { return }
         guard !items.isEmpty else { return }
 
+        pasteQueueEpoch &+= 1
         let wasQueueEmpty = pasteQueue.isEmpty
         var updatedQueue = pasteQueue
         for item in items {
@@ -855,6 +863,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     func resetPasteQueue() {
         guard !pasteQueue.isEmpty || pasteMode != .clipboard else { return }
+        pasteQueueEpoch &+= 1
         pasteQueue = []
         pasteMode = .clipboard
         lastQueueAnchorID = nil
@@ -892,12 +901,13 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         guard canUsePasteQueue else { return }
         guard !isPasteMonitorActive else { return }
         let started = pasteMonitor.start { [weak self] in
-            Task { @MainActor in
-                await self?.handlePasteCommandDetected()
-            }
+            self?.onQueuePasteRequested?()
         }
         if started {
             isPasteMonitorActive = true
+        } else {
+            resetPasteQueue()
+            NSSound.beep()
         }
     }
 
@@ -907,35 +917,25 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         isPasteMonitorActive = false
     }
 
-    private func handlePasteCommandDetected() async {
-        guard !pasteQueue.isEmpty else {
-            stopPasteMonitoring()
-            return
-        }
-
+    func didSendQueuedPaste(_ item: ClipItem) {
+        guard pasteQueue.first == item.id else { return }
         let wasQueueToggle = pasteMode == .queueToggle
         let completedID = pasteQueue.removeFirst()
+        expectedQueueHeadID = completedID
+        applyHistoryItemToEditor(item)
 
         if wasQueueToggle {
             pasteQueue.append(completedID)
         }
 
         if pasteQueue.isEmpty {
-            if !wasQueueToggle {
-                await clipboardService.clearSystemClipboard()
-                applyClipboardContentToEditor(nil)
-            }
             resetPasteQueue()
             return
         }
 
         updateFilteredItems(clipboardService.history)
-
-        if pasteQueue.isEmpty {
-            stopPasteMonitoring()
-        } else {
-            prepareNextQueueClipboard()
-        }
+        // Keep the just-pasted representations available for delayed readers.
+        // The next explicit paste request prepares its own item before sending Command+V.
     }
 
     private func prepareNextQueueClipboard() {
@@ -965,9 +965,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 }
 
-extension MainViewModel {
+extension MainViewModel: PasteQueueCoordinating {
     var canUsePasteQueue: Bool {
-        pasteMonitor.hasInputMonitoringPermission
+        pasteMonitor.hasPermission
     }
 
     var canUseScreenTextCapture: Bool {
@@ -1008,6 +1008,7 @@ extension MainViewModel {
             queueSelectionPreview = []
             return
         }
+        pasteQueueEpoch &+= 1
 
         let initialQueue = shiftSelectionInitialQueue
         let initialSet = Set(initialQueue)
@@ -1035,6 +1036,7 @@ extension MainViewModel {
     }
 
     private func toggleSingleItemSelection(_ item: ClipItem) {
+        pasteQueueEpoch &+= 1
         var updatedQueue = pasteQueue
         if let index = updatedQueue.firstIndex(of: item.id) {
             updatedQueue.remove(at: index)

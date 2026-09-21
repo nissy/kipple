@@ -147,6 +147,10 @@
 "Data can be cleared at any time" = "いつでもデータを削除できます";
 "Queue" = "Queue";
 "Queue paste mode" = "キューペーストモード";
+"Paste" = "貼り付け";
+"Clipboard history could not be loaded. Pasting was cancelled without changing the clipboard." = "履歴を読み込めなかったため、クリップボードを変更せずに貼り付けを中止しました。";
+"Paste on selection, plain text paste, and queue paste" = "選択時の貼り付け・書式なし貼り付け・キューペースト";
+"Why: Lets Kipple send paste commands to the frontmost app. Input stays on device." = "用途: Kippleから手前のアプリへ貼り付け操作を送るために必要です。入力は端末内で処理します。";
 "Queue position %d" = "キューの位置 %d";
 "Quick Editor" = "ライブエディタ";
 "Live Editor" = "ライブエディタ";
@@ -281,3 +285,15 @@
 "Source window" = "ウインドウ";
 "Copied at" = "コピー日時";
 "%@ characters" = "%@文字";
+"Pasting" = "貼り付け";
+"Paste clipboard contents" = "通常の貼り付け";
+"Paste as Plain Text" = "書式なしで貼り付け";
+"Plain text paste clears clipboard formatting. Select the history item again to restore formatting." = "書式なしで貼り付けた後は、通常の貼り付けも書式なしになります。履歴から選び直すと元の書式に戻ります。";
+"Plain text paste requires Accessibility permission." = "書式なしの貼り付けにはアクセシビリティの許可が必要です。";
+"Allow Accessibility access to configure and use plain text paste." = "設定・使用するにはアクセシビリティの許可が必要です。";
+"Open Permission Settings" = "権限の設定を開く";
+"Click the shortcut field to change it. Clear disables the shortcut." = "入力欄をクリックしてキーを押すと変更できます。「クリア」で無効にできます。";
+"Include Command, Control, or Option in the shortcut." = "Command・Control・Optionのいずれかと組み合わせてください。";
+"This shortcut is already in use. Your previous shortcut has been kept." = "このキーは既に使われています。元のショートカットを維持しました。";
+"Could not paste. Select an editable text field in the destination app, then try again." = "貼り付けを実行できませんでした。貼り付け先アプリの入力欄を選択して、もう一度お試しください。";
+"The plain text shortcut is unavailable. Check for a conflicting shortcut in another app." = "ショートカットを登録できません。他のアプリで同じキーが使われていないか確認してください。";

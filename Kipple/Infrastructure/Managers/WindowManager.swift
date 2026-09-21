@@ -175,6 +175,11 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var settingsCoordinator: SettingsToolbarController?
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
+    var pasteController: PlainTextPasteController? {
+        didSet {
+            if let pasteController { mainViewModel?.connectPasteController(pasteController) }
+        }
+    }
     private let lastActiveAppTracker: LastActiveAppTracking
     private let titleBarState = MainWindowTitleBarState()
     private var titleBarLeftHostingView: NSHostingView<MainViewTitleBarAccessory>?
@@ -401,6 +406,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         // MainViewModelを作成または再利用
         let viewModel = mainViewModel ?? MainViewModel()
         mainViewModel = viewModel
+        if let pasteController { viewModel.connectPasteController(pasteController) }
         syncTitleBarQueueState()
         
         let contentView = MainView(

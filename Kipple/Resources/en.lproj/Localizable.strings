@@ -147,6 +147,10 @@
 "Data can be cleared at any time" = "Data can be cleared at any time";
 "Queue" = "Queue";
 "Queue paste mode" = "Queue paste mode";
+"Paste" = "Paste";
+"Clipboard history could not be loaded. Pasting was cancelled without changing the clipboard." = "Clipboard history could not be loaded. Pasting was cancelled without changing the clipboard.";
+"Paste on selection, plain text paste, and queue paste" = "Paste on selection, plain text paste, and queue paste";
+"Why: Lets Kipple send paste commands to the frontmost app. Input stays on device." = "Why: Lets Kipple send paste commands to the frontmost app. Input stays on device.";
 "Queue position %d" = "Queue position %d";
 "Quick Editor" = "Live Editor";
 "Live Editor" = "Live Editor";
@@ -281,3 +285,15 @@
 "Source window" = "Window";
 "Copied at" = "Copied at";
 "%@ characters" = "%@ characters";
+"Pasting" = "Pasting";
+"Paste clipboard contents" = "Normal paste";
+"Paste as Plain Text" = "Paste as Plain Text";
+"Plain text paste clears clipboard formatting. Select the history item again to restore formatting." = "After pasting as plain text, normal paste also uses plain text. Select the history item again to restore its formatting.";
+"Plain text paste requires Accessibility permission." = "Plain text paste requires Accessibility permission.";
+"Allow Accessibility access to configure and use plain text paste." = "Allow Accessibility access to configure and use plain text paste.";
+"Open Permission Settings" = "Open Permission Settings";
+"Click the shortcut field to change it. Clear disables the shortcut." = "Click the shortcut field to change it. Clear disables the shortcut.";
+"Include Command, Control, or Option in the shortcut." = "Include Command, Control, or Option in the shortcut.";
+"This shortcut is already in use. Your previous shortcut has been kept." = "This shortcut is already in use. Your previous shortcut has been kept.";
+"Could not paste. Select an editable text field in the destination app, then try again." = "Could not paste. Select an editable text field in the destination app, then try again.";
+"The plain text shortcut is unavailable. Check for a conflicting shortcut in another app." = "The plain text shortcut is unavailable. Check for a conflicting shortcut in another app.";

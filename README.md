@@ -67,6 +67,10 @@ Queue lets you paste multiple history items in a chosen order.
 
 Turn on Queue, select clips from history, then press `Command + V` repeatedly. Kipple advances to the next queued item after each paste. Loop mode can repeat the queue.
 
+Use the plain text paste shortcut (default: `Control + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Queue paste requires Accessibility permission.
+
+Change or clear the plain text paste shortcut in **Settings → General → Pasting**. Accessibility permission is required to edit and use this shortcut; the settings show a link to the permission settings when access is missing. Revoking access stops the shortcut and keeps your chosen keys for when access is granted again.
+
 Queue is useful for forms, repetitive data entry, and moving several values between apps without copying each item manually.
 
 ### Screen Text Capture

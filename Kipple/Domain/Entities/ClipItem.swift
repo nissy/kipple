@@ -45,6 +45,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
     let processID: Int32?
     let isFromEditor: Bool?
     var metadata: ClipMetadata?
+    var richText: ClipboardRichText?
     // Legacy single category, retained for reading existing history.
     var userCategoryId: UUID?
     
@@ -106,7 +107,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         processID: Int32? = nil,
         isFromEditor: Bool = false,
         userCategoryId: UUID? = nil,
-        metadata: ClipMetadata? = nil
+        metadata: ClipMetadata? = nil,
+        richText: ClipboardRichText? = nil
     ) {
         self.id = UUID()
         self.content = content
@@ -120,6 +122,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.isFromEditor = isFromEditor
         self.userCategoryId = userCategoryId
         self.metadata = metadata ?? ClipMetadata(createdAt: timestamp, source: isFromEditor ? .editor : .clipboard)
+        self.richText = richText
     }
     
     init(
@@ -134,7 +137,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         processID: Int32?,
         isFromEditor: Bool?,
         userCategoryId: UUID? = nil,
-        metadata: ClipMetadata? = nil
+        metadata: ClipMetadata? = nil,
+        richText: ClipboardRichText? = nil
     ) {
         self.id = id
         self.content = content
@@ -148,6 +152,7 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.isFromEditor = isFromEditor
         self.userCategoryId = userCategoryId
         self.metadata = metadata
+        self.richText = richText
     }
     
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
@@ -162,7 +167,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
         lhs.processID == rhs.processID &&
         lhs.isFromEditor == rhs.isFromEditor &&
         lhs.userCategoryId == rhs.userCategoryId &&
-        lhs.metadata == rhs.metadata
+        lhs.metadata == rhs.metadata &&
+        lhs.richText == rhs.richText
     }
     
     // 行数を計算

@@ -21,13 +21,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private var history: [ClipItem] = []
     private let mutationGate: AsyncMutationGate
-    private let clipboardWriter: @MainActor @Sendable (String) -> Int
+    private let clipboardWriter: @MainActor @Sendable (ClipItem) -> Int
     private var copyGeneration: UInt64 = 0
     private var isRepositoryReady = false
     private var pollingTask: Task<Void, Never>?
     private let state = ClipboardState()
     private var lastEventTime = Date()
     private var lastChangeCount = 0
+    private var initialClipboardChangeCount: Int?
     // ポーリング間隔（アクティブ時は短めにして遅延を減らす）
     private var currentInterval: TimeInterval = 0.12
     private let minInterval: TimeInterval = 0.08
@@ -54,7 +55,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     init(
         testRepository: ClipboardRepositoryProtocol,
         loadOnStartup: Bool = false,
-        clipboardWriter: @escaping @MainActor @Sendable (String) -> Int = writeSystemClipboard
+        clipboardWriter: @escaping @MainActor @Sendable (ClipItem) -> Int = writeSystemClipboard
     ) {
         mutationGate = AsyncMutationGate(initiallyOccupied: loadOnStartup)
         self.clipboardWriter = clipboardWriter
@@ -77,6 +78,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         defer { mutationGate.release() }
         maxHistoryItems = await MainActor.run { AppSettings.shared.maxHistoryItems }
         lastChangeCount = await Self.currentPasteboardChangeCount()
+        initialClipboardChangeCount = lastChangeCount
         if repository == nil {
             await initializeRepository()
         }
@@ -331,7 +333,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 }
             }
         } else {
-            let draft = ClipItem(content: content, isFromEditor: true)
+            let richText = await MainActor.run {
+                NSPasteboard.general.string(forType: .string) == content
+                    ? ClipboardRichText(pasteboard: .general) : nil
+            }
+            let draft = ClipItem(content: content, isFromEditor: true, richText: richText)
             newChangeCount = await writeClipboardItem(draft)
         }
 
@@ -397,6 +403,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await state.setInternalCopy(true)
         await state.setFromEditor(item.isFromEditor ?? false)
 
+        let newItem = recordHistoryRecopy(item)
+        // Keep pasteboard access on MainActor; its type cache must not be read concurrently.
+        let newChangeCount = await writeClipboardItem(newItem)
+        guard await recordClipboardWrite(newChangeCount) else { return }
+    }
+
+    @discardableResult
+    private func recordHistoryRecopy(_ item: ClipItem) -> ClipItem {
         // Preserve all metadata from the original item but update timestamp
         var newItem = item
         newItem.timestamp = Date()  // Update timestamp to current time
@@ -428,11 +442,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         markHistoryChanged()
         saveSubject.send(())
 
-        // Keep pasteboard access on MainActor; its type cache must not be read concurrently.
-        let newChangeCount = await writeClipboardItem(newItem)
-
-        // Record the expected changeCount for this internal operation
-        guard await recordClipboardWrite(newChangeCount) else { return }
+        return newItem
     }
 
     func clearSystemClipboard() async {
@@ -624,10 +634,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private func checkClipboard() async {
         await mutationGate.acquire()
         defer { mutationGate.release() }
+        await checkClipboardWhileLocked()
+    }
+
+    private func checkClipboardWhileLocked(forceCapture: Bool = false) async {
         guard isRepositoryReady else { return }
         let changeCount = await Self.currentPasteboardChangeCount()
 
-        guard changeCount != lastChangeCount else { return }
+        guard forceCapture || changeCount != lastChangeCount else { return }
 
         if await shouldSkipChange(for: changeCount) { return }
 
@@ -636,8 +650,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Get clipboard content
         let fetchStartedAt = PerformanceTrace.nowMicros()
-        let content = await Self.readStringFromPasteboard()
-        guard var item = await fetchClipboardItem(content) else { return }
+        let captured = await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            return (pasteboard.string(forType: .string), ClipboardRichText(pasteboard: pasteboard), pasteboard.changeCount)
+        }
+        // A copy arriving between the change-count check and capture must be retried as a whole.
+        guard captured.2 == changeCount else { return }
+        guard var item = await fetchClipboardItem(captured.0) else { return }
+        item.richText = captured.1
         PerformanceTrace.event(
             "pasteboard_change_detected",
             atMicros: detectedAt,
@@ -1093,6 +1113,43 @@ actor ClipboardState {
 }
 
 extension ModernClipboardService {
+    /// Save the original representations before stripping them from the system clipboard.
+    /// The operation returns its own write count so monitoring never replaces the rich history with plain text.
+    /// Returns false when the original clipboard cannot be backed up safely.
+    func performClipboardPaste(
+        of queuedItem: ClipItem? = nil,
+        _ operation: @MainActor @Sendable (ClipItem, Int) -> Int?
+    ) async -> Bool {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard !Task.isCancelled else { return true }
+        // A failed initial load must not discard the only remaining copy of rich text.
+        guard !isMonitoringFlag || isRepositoryReady else { return false }
+        let expectedChangeCount = await Self.currentPasteboardChangeCount()
+        if isMonitoringFlag {
+            // Startup normally ignores the pre-existing clipboard; save it before the first plain-text paste.
+            await checkClipboardWhileLocked(forceCapture: initialClipboardChangeCount == expectedChangeCount)
+        }
+        let writtenChangeCount = await MainActor.run { () -> Int? in
+            let pasteboard = NSPasteboard.general
+            guard !Task.isCancelled, pasteboard.changeCount == expectedChangeCount else { return nil }
+            let item: ClipItem
+            if let queuedItem {
+                item = queuedItem
+            } else {
+                guard let content = pasteboard.string(forType: .string), !content.isEmpty else { return nil }
+                item = ClipItem(content: content)
+            }
+            return operation(item, expectedChangeCount)
+        }
+        if let writtenChangeCount {
+            updateLastChangeCount(writtenChangeCount)
+            _ = await recordClipboardWrite(writtenChangeCount)
+            if let queuedItem { recordHistoryRecopy(queuedItem) }
+        }
+        return true
+    }
+
     private func recordClipboardWrite(_ count: Int) async -> Bool {
         guard count >= 0 else {
             await state.setInternalCopy(false)
@@ -1111,18 +1168,15 @@ extension ModernClipboardService {
         let writer = clipboardWriter
         let count = await MainActor.run { () -> Int in
             guard !Task.isCancelled, shouldWrite() else { return -1 }
-            return writer(item.content)
+            return writer(item)
         }
         if count >= 0 { lastChangeCount = count }
         return count
     }
 
     @MainActor
-    private static func writeSystemClipboard(_ content: String) -> Int {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        guard pasteboard.setString(content, forType: .string) else { return -1 }
-        return pasteboard.changeCount
+    private static func writeSystemClipboard(_ item: ClipItem) -> Int {
+        ClipboardRichText.write(item, to: .general)
     }
 
     func previousReceipt(key: String) async throws -> MCPStoredReceipt? {

@@ -27,6 +27,11 @@ final class PasteQueueModeTests: XCTestCase {
             ClipItem(content: "Item \(index)")
         }
         viewModel.loadHistory()
+        viewModel.onQueuePasteRequested = { [weak viewModel, weak mockService] in
+            guard let item = viewModel?.nextQueuedItem() else { return }
+            mockService?.recopyFromHistory(item)
+            viewModel?.didSendQueuedPaste(item)
+        }
     }
 
     override func tearDown() async throws {
@@ -46,6 +51,25 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.pasteQueue, items.map(\.id))
         XCTAssertEqual(viewModel.queueBadge(for: items[0]), 1)
         XCTAssertEqual(viewModel.queueBadge(for: items[1]), 2)
+    }
+
+    func testPlainTextPasteAdvancesQueueExactlyOnce() async {
+        let items = Array(mockService.history.prefix(2))
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.last)
+        viewModel.didSendQueuedPaste(items[0])
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(viewModel.pasteQueue, [items[1].id])
+        XCTAssertEqual(mockService.currentClipboardContent, items[0].content)
+    }
+
+    func testUnrelatedPlainTextPasteDoesNotAdvanceQueue() async {
+        let items = Array(mockService.history.prefix(2))
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.last)
+        viewModel.didSendQueuedPaste(ClipItem(content: "External clipboard"))
+        for _ in 0..<10 { await Task.yield() }
+        XCTAssertEqual(viewModel.pasteQueue, items.map(\.id))
     }
 
     func testEnqueueIgnoresDuplicatesAndAppends() {
@@ -275,7 +299,7 @@ final class PasteQueueModeTests: XCTestCase {
     }
 
     func testQueueSelectionIgnoredWhenPermissionMissing() {
-        pasteMonitor.hasInputMonitoringPermission = false
+        pasteMonitor.hasPermission = false
         let items = Array(mockService.history.prefix(2))
 
         viewModel.toggleQueueMode()
@@ -365,7 +389,7 @@ final class PasteQueueModeTests: XCTestCase {
         await Task.yield()
 
         XCTAssertEqual(viewModel.pasteQueue, [items[1].id])
-        XCTAssertEqual(mockService.lastRecopiedItem?.id, items[1].id)
+        XCTAssertEqual(mockService.lastRecopiedItem?.id, items[0].id)
     }
 
     func testPasteCommandCyclesQueueInToggleMode() async {
@@ -379,7 +403,7 @@ final class PasteQueueModeTests: XCTestCase {
         await Task.yield()
 
         XCTAssertEqual(viewModel.pasteQueue, [items[1].id, items[0].id])
-        XCTAssertEqual(mockService.lastRecopiedItem?.id, items[1].id)
+        XCTAssertEqual(mockService.lastRecopiedItem?.id, items[0].id)
     }
 
     func testResetPasteQueueClearsStateAndStopsMonitoring() {
@@ -418,7 +442,7 @@ final class PasteQueueModeTests: XCTestCase {
         XCTAssertEqual(viewModel.history.prefix(2).map(\.id), [items[2].id, items[0].id])
     }
 
-    func testQueueOnceCompletionClearsClipboard() async {
+    func testQueueOnceCompletionKeepsLastClipboardForDelayedReaders() async {
         let items = Array(mockService.history.prefix(2))
 
         viewModel.toggleQueueMode()
@@ -432,10 +456,10 @@ final class PasteQueueModeTests: XCTestCase {
 
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
-        XCTAssertNil(mockService.currentClipboardContent)
+        XCTAssertEqual(mockService.currentClipboardContent, items[1].content)
     }
 
-    func testQueueOnceCompletionClearsLiveEditorDisplay() async {
+    func testQueueOnceCompletionKeepsLiveEditorInSyncWithClipboard() async {
         let items = Array(mockService.history.prefix(1))
 
         viewModel.toggleQueueMode()
@@ -448,8 +472,8 @@ final class PasteQueueModeTests: XCTestCase {
 
         XCTAssertTrue(viewModel.pasteQueue.isEmpty)
         XCTAssertEqual(viewModel.pasteMode, .clipboard)
-        XCTAssertEqual(viewModel.editorText, "")
-        XCTAssertNil(viewModel.currentClipboardContent)
+        XCTAssertEqual(viewModel.editorText, items[0].content)
+        XCTAssertEqual(viewModel.currentClipboardContent, items[0].content)
     }
 
     func testManualCopyClearsQueueAndReturnsToClipboardMode() {
@@ -513,11 +537,10 @@ final class PasteQueueModeTests: XCTestCase {
 private final class MockPasteCommandMonitor: PasteCommandMonitoring {
     private var handler: (() -> Void)?
     private(set) var isMonitoring = false
-    private(set) var permissionRequestCount = 0
-    var hasInputMonitoringPermission: Bool = true
+    var hasPermission: Bool = true
 
     func start(handler: @escaping () -> Void) -> Bool {
-        guard hasInputMonitoringPermission else { return false }
+        guard hasPermission else { return false }
         self.handler = handler
         isMonitoring = true
         return true
@@ -526,12 +549,6 @@ private final class MockPasteCommandMonitor: PasteCommandMonitoring {
     func stop() {
         handler = nil
         isMonitoring = false
-    }
-
-    @discardableResult
-    func requestInputMonitoringPermission() -> Bool {
-        permissionRequestCount += 1
-        return hasInputMonitoringPermission
     }
 
     func simulatePasteCommand() {

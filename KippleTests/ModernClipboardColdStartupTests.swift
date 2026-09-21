@@ -86,7 +86,7 @@ final class ModernClipboardColdStartupTests: XCTestCase {
     private func makeService(repository: MockClipboardRepository, pasteboard: NSPasteboard) -> ModernClipboardService {
         ModernClipboardService(testRepository: repository, loadOnStartup: true) { content in
             pasteboard.clearContents()
-            return pasteboard.setString(content, forType: .string) ? pasteboard.changeCount : -1
+            return pasteboard.setString(content.content, forType: .string) ? pasteboard.changeCount : -1
         }
     }
 }

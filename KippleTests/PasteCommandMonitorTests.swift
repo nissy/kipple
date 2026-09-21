@@ -1,104 +1,36 @@
-//
-//  PasteCommandMonitorTests.swift
-//  KippleTests
-//
-//  Created by Kipple on 2026/08/01.
-//
-
 import XCTest
-import CoreGraphics
 @testable import Kipple
 
+@MainActor
 final class PasteCommandMonitorTests: XCTestCase {
-    private let selfPID: pid_t = 1234
-    private let otherPID: pid_t = 5678
-    private let keyCodeV: Int64 = 9
-
-    func testCommandVTriggersPaste() {
-        XCTAssertTrue(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: keyCodeV,
-                flags: [.maskCommand],
-                targetPID: otherPID,
-                sourceUserData: 0,
-                currentPID: selfPID
-            )
-        )
+    func testQueueShortcutRequiresAccessibility() {
+        let monitor = PasteCommandMonitor { false }
+        XCTAssertFalse(monitor.start { XCTFail("Untrusted shortcut must not run") })
     }
 
-    func testCommandVWithExtraModifierStillTriggers() {
-        // キーリピートや Cmd+Shift 等の複合でも現行仕様どおり発火する
-        XCTAssertTrue(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: keyCodeV,
-                flags: [.maskCommand, .maskShift],
-                targetPID: otherPID,
-                sourceUserData: 0,
-                currentPID: selfPID
-            )
-        )
+    func testOnlyRegisteredQueueShortcutInvokesHandler() {
+        let monitor = PasteCommandMonitor { true }
+        defer { monitor.stop() }
+        var requests = 0
+        XCTAssertTrue(monitor.start { requests += 1 })
+        XCTAssertFalse(monitor.handleHotKey(signature: 0x4B505054, id: 1))
+        XCTAssertFalse(monitor.handleHotKey(signature: 0x4B505151, id: 2))
+        XCTAssertTrue(monitor.handleHotKey(signature: 0x4B505151, id: 1))
+        XCTAssertEqual(requests, 1)
+        monitor.stop()
+        XCTAssertFalse(monitor.handleHotKey(signature: 0x4B505151, id: 1))
+        XCTAssertEqual(requests, 1)
     }
 
-    func testUnknownTargetPIDTriggers() {
-        // target PID が取れない (0) 場合は発火側に倒す
-        XCTAssertTrue(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: keyCodeV,
-                flags: [.maskCommand],
-                targetPID: 0,
-                sourceUserData: 0,
-                currentPID: selfPID
-            )
-        )
-    }
-
-    func testNonCommandKeyDownDoesNotTrigger() {
-        XCTAssertFalse(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: keyCodeV,
-                flags: [],
-                targetPID: otherPID,
-                sourceUserData: 0,
-                currentPID: selfPID
-            )
-        )
-    }
-
-    func testOtherKeyCodeDoesNotTrigger() {
-        XCTAssertFalse(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: 8, // 'c'
-                flags: [.maskCommand],
-                targetPID: otherPID,
-                sourceUserData: 0,
-                currentPID: selfPID
-            )
-        )
-    }
-
-    func testSelfTargetedEventDoesNotTrigger() {
-        // Kipple 自身 (検索フィールド等) へのペーストではキューを進めない
-        XCTAssertFalse(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: keyCodeV,
-                flags: [.maskCommand],
-                targetPID: selfPID,
-                sourceUserData: 0,
-                currentPID: selfPID
-            )
-        )
-    }
-
-    func testSyntheticAutoPasteEventDoesNotTrigger() {
-        // AutoPasteController が合成した Cmd+V ではキューを進めない
-        XCTAssertFalse(
-            PasteCommandMonitor.shouldTriggerPaste(
-                keyCode: keyCodeV,
-                flags: [.maskCommand],
-                targetPID: otherPID,
-                sourceUserData: SyntheticPasteEvent.sourceUserData,
-                currentPID: selfPID
-            )
-        )
+    func testStoppingQueueReleasesCommandVAndAllowsRestart() {
+        let first = PasteCommandMonitor { true }
+        let second = PasteCommandMonitor { true }
+        defer { first.stop(); second.stop() }
+        XCTAssertTrue(first.start {})
+        XCTAssertFalse(second.start {}, "A reserved shortcut must report the conflict")
+        first.stop()
+        XCTAssertTrue(second.start {})
+        second.stop()
+        XCTAssertTrue(first.start {})
     }
 }

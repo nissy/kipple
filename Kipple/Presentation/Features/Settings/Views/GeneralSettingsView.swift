@@ -9,15 +9,20 @@ import SwiftUI
 import AppKit
 
 struct GeneralSettingsView: View {
+    var onOpenPermissions: () -> Void
     @AppStorage("autoLaunchAtLogin") private var autoLaunchAtLogin = false
     @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 0
     @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
     @AppStorage("windowAnimation") private var windowAnimation: String = "none"
     @ObservedObject private var appSettings = AppSettings.shared
+    @ObservedObject private var plainTextHotkey = PlainTextPasteHotkey.shared
 
     @State private var tempKeyCode: UInt16 = 0
     @State private var tempModifierFlags: NSEvent.ModifierFlags = []
     @State private var selectedLanguage: AppSettings.LanguageOption = .system
+    @State private var plainTextKeyCode: UInt16 = 9
+    @State private var plainTextModifiers: NSEvent.ModifierFlags = [.control, .shift]
+    @State private var plainTextHotkeyError: PlainTextPasteHotkey.ConfigurationError?
 
     var body: some View {
         ScrollView {
@@ -25,6 +30,7 @@ struct GeneralSettingsView: View {
                 languageSection
                 startupSection
                 openKippleSection
+                pasteSection
                 windowAnimationSection
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
@@ -34,9 +40,21 @@ struct GeneralSettingsView: View {
             tempKeyCode = UInt16(hotkeyKeyCode)
             tempModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(hotkeyModifierFlags))
             selectedLanguage = appSettings.appLanguage
+            plainTextHotkey.refreshPermission()
+            loadPlainTextHotkey()
         }
         .onChange(of: selectedLanguage) { _, newValue in
             appSettings.appLanguage = newValue
+        }
+        .onChange(of: plainTextHotkey.hasAccessibilityPermission) { _, _ in
+            plainTextHotkeyError = nil
+            loadPlainTextHotkey()
+        }
+        .task {
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                plainTextHotkey.refreshPermission()
+            }
         }
     }
 
@@ -93,6 +111,66 @@ struct GeneralSettingsView: View {
                 .frame(width: 200)
                 .labelsHidden()
             }
+        }
+    }
+
+    private var pasteSection: some View {
+        SettingsGroup("Pasting") {
+            SettingsRow(label: "Paste clipboard contents") { Text("⌘V") }
+            SettingsRow(label: "Paste as Plain Text") {
+                HotkeyRecorderField(
+                    keyCode: $plainTextKeyCode,
+                    modifierFlags: $plainTextModifiers,
+                    onCommit: updatePlainTextHotkey
+                )
+                .disabled(!plainTextHotkey.hasAccessibilityPermission)
+                .help("Click the shortcut field to change it. Clear disables the shortcut.")
+            }
+            if !plainTextHotkey.hasAccessibilityPermission {
+                Text("Allow Accessibility access to configure and use plain text paste.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Permission Settings", action: onOpenPermissions)
+                    .controlSize(.small)
+            } else if let plainTextHotkeyError {
+                Text(plainTextHotkeyErrorMessage(plainTextHotkeyError))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if plainTextHotkey.registrationFailed {
+                Text("The plain text shortcut is unavailable. Check for a conflicting shortcut in another app.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(
+                "Plain text paste clears clipboard formatting. Select the history item again to restore formatting."
+            )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func loadPlainTextHotkey() {
+        plainTextKeyCode = plainTextHotkey.shortcut.keyCode
+        plainTextModifiers = plainTextHotkey.shortcut.modifiers
+    }
+
+    private func updatePlainTextHotkey(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        plainTextHotkeyError = plainTextHotkey.apply(keyCode: keyCode, modifiers: modifiers)
+        loadPlainTextHotkey()
+    }
+
+    private func plainTextHotkeyErrorMessage(_ error: PlainTextPasteHotkey.ConfigurationError) -> LocalizedStringKey {
+        switch error {
+        case .permissionRequired:
+            "Allow Accessibility access to configure and use plain text paste."
+        case .modifierRequired:
+            "Include Command, Control, or Option in the shortcut."
+        case .shortcutUnavailable:
+            "This shortcut is already in use. Your previous shortcut has been kept."
         }
     }
 

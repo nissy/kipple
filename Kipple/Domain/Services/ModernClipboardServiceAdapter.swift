@@ -108,6 +108,22 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         return copied && !Task.isCancelled
     }
 
+    func performClipboardPaste(
+        of queuedItem: ClipItem? = nil,
+        _ operation: @escaping @MainActor @Sendable (ClipItem, Int) -> Int?
+    ) async -> Bool {
+        var backupAvailable = true
+        await enqueueClipboardOperation { [self] generation in
+            guard isCurrentOperation(generation) else { return }
+            backupAvailable = await modernService.performClipboardPaste(of: queuedItem) { item, changeCount in
+                guard self.isCurrentOperation(generation), !Task.isCancelled else { return nil }
+                return operation(item, changeCount)
+            }
+            await refreshHistory()
+        }.value
+        return backupAvailable
+    }
+
     func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
         try await modernService.setCategory(itemID: itemID, categoryID: categoryID, enabled: enabled)
         await refreshHistory()

@@ -12,7 +12,6 @@ import ApplicationServices
 
 struct PermissionsSettingsView: View {
     @State private var hasScreenCapturePermission = CGPreflightScreenCaptureAccess()
-    @State private var hasInputMonitoringPermission = CGPreflightListenEventAccess()
     @State private var hasAccessibilityPermission = AXIsProcessTrusted()
     @State private var permissionPollingTimer: Timer?
 
@@ -20,7 +19,6 @@ struct PermissionsSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing) {
                 screenRecordingSection
-                inputMonitoringSection
                 accessibilitySection
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
@@ -86,45 +84,12 @@ struct PermissionsSettingsView: View {
         }
     }
 
-    private var inputMonitoringSection: some View {
-        SettingsGroup(
-            "Input Monitoring Permission",
-            includeTopDivider: true
-        ) {
-            featureRow("Queue paste mode")
-
-            SettingsRow(label: "Request Access") {
-                HStack(spacing: 10) {
-                    Button("Request Permission Again") {
-                        requestInputMonitoringPermission()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .tint(Color.accentColor)
-                    .disabled(hasInputMonitoringPermission)
-                    PermissionStatusBadge(isGranted: hasInputMonitoringPermission)
-                }
-            }
-
-            SettingsRow(label: "Overview") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Why: Lets the paste queue watch Command+V to advance items. Input stays on device.")
-                    Text("1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings.")
-                    Text("2. In System Settings → Privacy & Security → Input Monitoring, enable “Kipple”.")
-                    Text("3. Return to Kipple; the status badge switches to Granted automatically.")
-                }
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-            }
-        }
-    }
-
     private var accessibilitySection: some View {
         SettingsGroup(
             "Accessibility Permission",
             includeTopDivider: true
         ) {
-            featureRow("Paste on selection")
+            featureRow("Paste on selection, plain text paste, and queue paste")
 
             SettingsRow(label: "Request Access") {
                 HStack(spacing: 10) {
@@ -141,7 +106,7 @@ struct PermissionsSettingsView: View {
 
             SettingsRow(label: "Overview") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Why: Lets Paste on Selection send Command+V to the frontmost app. Input stays on device.")
+                    Text("Why: Lets Kipple send paste commands to the frontmost app. Input stays on device.")
                     Text("1. Click “Request Permission Again” to trigger the macOS prompt or jump to System Settings.")
                     Text("2. In System Settings → Privacy & Security → Accessibility, enable “Kipple”.")
                     Text("3. Return to Kipple; the status badge switches to Granted automatically.")
@@ -162,14 +127,6 @@ struct PermissionsSettingsView: View {
     }
 
     @MainActor
-    private func refreshInputMonitoringPermission() {
-        let granted = CGPreflightListenEventAccess()
-        if granted != hasInputMonitoringPermission {
-            hasInputMonitoringPermission = granted
-        }
-    }
-
-    @MainActor
     private func refreshAccessibilityPermission() {
         let granted = AXIsProcessTrusted()
         if granted != hasAccessibilityPermission {
@@ -180,7 +137,6 @@ struct PermissionsSettingsView: View {
     @MainActor
     private func refreshPermissions() {
         refreshScreenCapturePermission()
-        refreshInputMonitoringPermission()
         refreshAccessibilityPermission()
     }
 
@@ -199,28 +155,6 @@ struct PermissionsSettingsView: View {
         let didPrompt = CGRequestScreenCaptureAccess()
         if !didPrompt {
             openSystemSettings()
-        }
-    }
-
-    @MainActor
-    private func openInputMonitoringPreferences() {
-        startPermissionPolling()
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    @MainActor
-    private func requestInputMonitoringPermission() {
-        if hasInputMonitoringPermission {
-            openInputMonitoringPreferences()
-            return
-        }
-
-        startPermissionPolling()
-        let didPrompt = CGRequestListenEventAccess()
-        if !didPrompt {
-            openInputMonitoringPreferences()
         }
     }
 
@@ -268,7 +202,7 @@ struct PermissionsSettingsView: View {
 
 extension Notification.Name {
     static let screenRecordingPermissionRequested = Notification.Name("ScreenRecordingPermissionRequested")
-    static let inputMonitoringPermissionRequested = Notification.Name("InputMonitoringPermissionRequested")
+    static let queuePastePermissionRequested = Notification.Name("QueuePastePermissionRequested")
 }
 
 // MARK: - PermissionStatusBadge

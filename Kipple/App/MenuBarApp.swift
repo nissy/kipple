@@ -26,8 +26,9 @@ final class MenuBarApp: NSObject, ObservableObject {
     }()
     var textCaptureHotkeyManager: TextCaptureHotkeyManager?
     var textCaptureHotkeyObserver: NSObjectProtocol?
+    var plainTextPasteController: PlainTextPasteController?
     private var screenRecordingPermissionObserver: NSObjectProtocol?
-    private var inputMonitoringPermissionObserver: NSObjectProtocol?
+    private var queuePastePermissionObserver: NSObjectProtocol?
     
     // Properties for asynchronous termination handling
     private var isTerminating = false
@@ -80,6 +81,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.setupTextCaptureHotkey()
+            self.setupPlainTextPasteHotkey()
             self.startServices()
             DispatchQueue.main.async { [weak self] in
                 self?.windowManager.prewarmMainWindow()
@@ -101,17 +103,17 @@ final class MenuBarApp: NSObject, ObservableObject {
             }
         }
 
-        inputMonitoringPermissionObserver = NotificationCenter.default.addObserver(
-            forName: .inputMonitoringPermissionRequested,
+        queuePastePermissionObserver = NotificationCenter.default.addObserver(
+            forName: .queuePastePermissionRequested,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.windowManager.openSettings(tab: .permission)
-                // 初回はシステムのプロンプトを出し、出せない (既に拒否済み等) 場合は設定ペインへ誘導
-                if !CGRequestListenEventAccess() {
-                    self.openInputMonitoringPreferences()
+                let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+                if !AXIsProcessTrustedWithOptions(options) {
+                    self.openAccessibilityPreferences()
                 }
             }
         }
@@ -207,8 +209,8 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @MainActor
-    private func openInputMonitoringPreferences() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+    private func openAccessibilityPreferences() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
     }

@@ -119,7 +119,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         await repository.suspendLoad { started.fulfill() }
         let service = ModernClipboardService(testRepository: repository, loadOnStartup: true) { text in
             pasteboard.clearContents()
-            return pasteboard.setString(text, forType: .string) ? pasteboard.changeCount : -1
+            return pasteboard.setString(text.content, forType: .string) ? pasteboard.changeCount : -1
         }
         let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
         let content = "OCR startup result"
