@@ -1129,9 +1129,9 @@ actor ClipboardState {
 }
 
 extension ModernClipboardService {
-    /// Save the original representations before stripping them from the system clipboard.
-    /// The operation returns its own write count so monitoring never replaces the rich history with plain text.
-    /// Returns false when the original clipboard cannot be backed up safely.
+    /// Serialize a paste with pending copies and preserve the current clipboard in history before a queue write.
+    /// The operation returns the clipboard revision it used, whether or not it wrote a queued item.
+    /// Returns false when history or clipboard contents cannot be read safely.
     func performClipboardPaste(
         of queuedItem: ClipItem? = nil,
         _ operation: @MainActor @Sendable (ClipItem, Int) -> Int?
@@ -1159,7 +1159,7 @@ extension ModernClipboardService {
             } else {
                 guard let captured, captured.stamp.changeCount == expectedChangeCount,
                       let content = captured.text, !content.isEmpty else { return nil }
-                item = ClipItem(content: content)
+                item = ClipItem(content: content, richText: captured.richText)
             }
             return operation(item, expectedChangeCount)
         }

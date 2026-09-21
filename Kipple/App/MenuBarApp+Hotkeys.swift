@@ -24,6 +24,9 @@ extension MenuBarApp {
                 self?.windowManager.openSettings(tab: .permission)
             case .deliveryFailed:
                 message = "Could not paste. Select an editable text field in the destination app, then try again."
+            case .normalPasteUnavailable:
+                message = "Could not reserve ⌘V to switch paste formatting. "
+                    + "Check for a conflicting shortcut in another app."
             }
             alert.informativeText = NSLocalizedString(message, comment: "Paste failure")
             alert.runModal()
@@ -31,7 +34,10 @@ extension MenuBarApp {
         plainTextPasteController = controller
         windowManager.pasteController = controller
         let hotkey = PlainTextPasteHotkey.shared
-        hotkey.onTrigger = { [weak controller] in controller?.paste() }
+        hotkey.onTrigger = { [weak controller] in controller?.paste(using: .alternate) }
+        hotkey.onConfigurationChanged = { [weak controller] swapped, enabled in
+            controller?.configureShortcuts(swapsFormatting: swapped, enabled: enabled) ?? false
+        }
         hotkey.register()
     }
 

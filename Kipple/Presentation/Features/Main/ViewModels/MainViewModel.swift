@@ -47,6 +47,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     
     let clipboardService: any ClipboardServiceProtocol
     private let pasteMonitor: any PasteCommandMonitoring
+    private weak var pasteController: PlainTextPasteController?
     private let screenCapturePermissionCheck: () -> Bool
     private var cancellables = Set<AnyCancellable>()
     private var serviceCancellables = Set<AnyCancellable>()
@@ -703,8 +704,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     // MARK: - Paste Queue Management
 
     func connectPasteController(_ controller: PlainTextPasteController) {
+        pasteController = controller
         controller.queue = self
-        onQueuePasteRequested = { [weak controller] in controller?.paste(removingFormatting: false) }
+        controller.setQueuePasteMonitorActive(isPasteMonitorActive)
+        onQueuePasteRequested = { [weak controller] in controller?.paste(using: .normal) }
     }
 
     func queueSelection(items: [ClipItem], anchor: ClipItem?) {
@@ -900,12 +903,14 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private func startPasteMonitoringIfNeeded() {
         guard canUsePasteQueue else { return }
         guard !isPasteMonitorActive else { return }
+        pasteController?.setQueuePasteMonitorActive(true)
         let started = pasteMonitor.start { [weak self] in
             self?.onQueuePasteRequested?()
         }
         if started {
             isPasteMonitorActive = true
         } else {
+            pasteController?.setQueuePasteMonitorActive(false)
             resetPasteQueue()
             NSSound.beep()
         }
@@ -915,6 +920,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         guard isPasteMonitorActive else { return }
         pasteMonitor.stop()
         isPasteMonitorActive = false
+        pasteController?.setQueuePasteMonitorActive(false)
     }
 
     func didSendQueuedPaste(_ item: ClipItem) {

@@ -8,12 +8,13 @@ final class PlainTextPasteHotkey: ObservableObject {
     static let shared = PlainTextPasteHotkey()
     static let keyCodeDefaultsKey = "plainTextPasteHotkeyKeyCode"
     static let modifierDefaultsKey = "plainTextPasteHotkeyModifierFlags"
+    static let swapsFormattingDefaultsKey = "swapPasteFormatting"
 
     struct Shortcut: Equatable {
         var keyCode: UInt16
         var modifiers: NSEvent.ModifierFlags
 
-        static let defaultShortcut = Shortcut(keyCode: 9, modifiers: [.control, .shift])
+        static let defaultShortcut = Shortcut(keyCode: 9, modifiers: [.command, .shift])
         static let disabled = Shortcut(keyCode: 0, modifiers: [])
     }
 
@@ -27,7 +28,9 @@ final class PlainTextPasteHotkey: ObservableObject {
     @Published private(set) var hasAccessibilityPermission: Bool
     @Published private(set) var registrationFailed = false
     @Published private(set) var shortcut: Shortcut
+    @Published private(set) var swapsPasteFormatting = false
     var onTrigger: (() -> Void)?
+    var onConfigurationChanged: ((_ swapsFormatting: Bool, _ enabled: Bool) -> Bool)?
 
     private static let signature: OSType = 0x4B505054 // KPPT
     private let defaults: UserDefaults
@@ -54,10 +57,12 @@ final class PlainTextPasteHotkey: ObservableObject {
         } else {
             shortcut = .defaultShortcut
         }
+        swapsPasteFormatting = shortcut != .disabled && defaults.bool(forKey: Self.swapsFormattingDefaultsKey)
         guard observeChanges else { return }
         observe(Notification.Name("SuspendGlobalHotkeyCapture")) {
             $0.isCaptureSuspended = true
             $0.unregister()
+            $0.notifyConfigurationChanged()
         }
         observe(Notification.Name("ResumeGlobalHotkeyCapture")) {
             $0.isCaptureSuspended = false
@@ -72,6 +77,7 @@ final class PlainTextPasteHotkey: ObservableObject {
     func refreshPermission() { register() }
 
     func register() {
+        defer { notifyConfigurationChanged() }
         hasAccessibilityPermission = permissionCheck()
         guard hasAccessibilityPermission else {
             unregister()
@@ -87,6 +93,7 @@ final class PlainTextPasteHotkey: ObservableObject {
         hasAccessibilityPermission = permissionCheck()
         guard hasAccessibilityPermission else {
             unregister()
+            notifyConfigurationChanged()
             return .permissionRequired
         }
         let candidate = Shortcut(
@@ -102,11 +109,34 @@ final class PlainTextPasteHotkey: ObservableObject {
             return .shortcutUnavailable
         }
         shortcut = candidate
+        if candidate == .disabled {
+            swapsPasteFormatting = false
+            defaults.set(false, forKey: Self.swapsFormattingDefaultsKey)
+        }
         defaults.set(Int(candidate.keyCode), forKey: Self.keyCodeDefaultsKey)
         defaults.set(Int(candidate.modifiers.rawValue), forKey: Self.modifierDefaultsKey)
         registrationFailed = false
         if isCaptureSuspended { unregister() }
+        notifyConfigurationChanged()
         return nil
+    }
+
+    @discardableResult
+    func setSwapsPasteFormatting(_ swapped: Bool) -> ConfigurationError? {
+        refreshPermission()
+        guard hasAccessibilityPermission else { return .permissionRequired }
+        guard !swapped || isRegistered else { return .shortcutUnavailable }
+        guard onConfigurationChanged?(swapped, !isCaptureSuspended) != false else { return .shortcutUnavailable }
+        swapsPasteFormatting = swapped
+        defaults.set(swapped, forKey: Self.swapsFormattingDefaultsKey)
+        registrationFailed = false
+        return nil
+    }
+
+    private func notifyConfigurationChanged() {
+        let enabled = hasAccessibilityPermission && !isCaptureSuspended && (!swapsPasteFormatting || isRegistered)
+        guard let configured = onConfigurationChanged?(swapsPasteFormatting, enabled) else { return }
+        if isRegistered || shortcut == .disabled { registrationFailed = !configured }
     }
 
     private func conflictsWithBuiltInShortcut(_ candidate: Shortcut) -> Bool {
@@ -148,7 +178,7 @@ final class PlainTextPasteHotkey: ObservableObject {
 
     private func installHandler() -> Bool {
         guard eventHandler == nil else { return true }
-        // Trigger on release, so the held Control/Shift keys cannot affect the generated Cmd+V.
+        // Trigger on release, so held shortcut modifiers cannot affect the generated Cmd+V.
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
         let callback: EventHandlerUPP = { _, event, context in
             guard let context else { return OSStatus(eventNotHandledErr) }
@@ -178,7 +208,7 @@ final class PlainTextPasteHotkey: ObservableObject {
 
     func triggerIfPermitted() {
         refreshPermission()
-        guard isRegistered, !isCaptureSuspended, hasAccessibilityPermission else { return }
+        guard isRegistered, !registrationFailed, !isCaptureSuspended, hasAccessibilityPermission else { return }
         onTrigger?()
     }
 

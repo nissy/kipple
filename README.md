@@ -67,9 +67,13 @@ Queue lets you paste multiple history items in a chosen order.
 
 Turn on Queue, select clips from history, then press `Command + V` repeatedly. Kipple advances to the next queued item after each paste. Loop mode can repeat the queue.
 
-Use the plain text paste shortcut (default: `Control + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Queue paste requires **Device Control and Data Access** permission.
+Use the plain text paste shortcut (default: `Command + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Queue paste requires **Device Control and Data Access** permission.
 
 Change or clear the plain text paste shortcut in **Settings → General → Pasting**. Device Control and Data Access permission is required to edit and use this shortcut; the settings show a link to the permission settings when access is missing. Revoking access stops the shortcut and keeps your chosen keys for when access is granted again.
+
+Turn on **Swap paste formatting** in the same settings to make `Command + V` paste plain text and the other shortcut (default: `Command + Shift + V`) paste with formatting. This applies to normal and Queue modes. `Command + V` continues to paste images and files unchanged. Clearing the other shortcut also turns off swapping.
+
+In normal mode, Kipple temporarily retains the original clipboard, including formatting and app-specific data. After a plain text paste, use the formatting shortcut to paste the same copy with its original formatting. A new copy discards the retained data. This requires Kipple to be running and does not use timed restoration or the destination app’s plain text command. Pasting through a menu or mouse action uses the clipboard’s current format.
 
 Queue is useful for forms, repetitive data entry, and moving several values between apps without copying each item manually.
 

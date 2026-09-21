@@ -39,6 +39,7 @@
 		1C11991E12991872E97CE5A9 /* AutoPinSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2FB380E7244A02795ADCB17 /* AutoPinSettingsView.swift */; };
 		1C47AD62906E6AEA7116C89E /* HotkeyRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF0A9EA04C6D3DCB72F6EA5 /* HotkeyRecorderView.swift */; };
 		1DF7E8C1106493040EB3A0AD /* SwiftDataRepositoryComprehensiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB0F2C9F3E7E841B7C707C6 /* SwiftDataRepositoryComprehensiveTests.swift */; };
+		1EFC16A8E768C8C2B0831EC5 /* PasteboardSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B47E9E43F523DA4442D942 /* PasteboardSnapshot.swift */; };
 		1F77648DF25DA552B7428D5B /* ClipboardRichTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B738B1A2C5D1200FA250B2C7 /* ClipboardRichTextTests.swift */; };
 		20C367DB3064914202E02EFC /* UserCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704FBF789F27F0E1F5DA71F8 /* UserCategory.swift */; };
 		20F3BAF3289C6FFB5F9BB8C2 /* RecopyPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */; };
@@ -387,6 +388,7 @@
 		7FE7B470769C3B80E6053490 /* KippleMCPMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KippleMCPMain.swift; sourceTree = "<group>"; };
 		82BBA41B8922F853A4801C31 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = ja; path = ja.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		82D7E6D973077D2CD1A5C250 /* MainViewReactivateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewReactivateTests.swift; sourceTree = "<group>"; };
+		84B47E9E43F523DA4442D942 /* PasteboardSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardSnapshot.swift; sourceTree = "<group>"; };
 		86673766DAAA80021DEC9AB0 /* SimpleLineNumberRulerView+Drawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SimpleLineNumberRulerView+Drawing.swift"; sourceTree = "<group>"; };
 		866EF79DC1C4FABC144A5F04 /* LoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerTests.swift; sourceTree = "<group>"; };
 		867532273CB00F98FCD94839 /* HoverTrackingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoverTrackingView.swift; sourceTree = "<group>"; };
@@ -908,6 +910,7 @@
 				567246EC1BA056C7160D79E7 /* ApplicationTerminationController.swift */,
 				A9AF21D2BE07BBC5D9D31716 /* AutoPasteController.swift */,
 				AB7FE3650F28A6F405D210A8 /* ClipboardReader.swift */,
+				84B47E9E43F523DA4442D942 /* PasteboardSnapshot.swift */,
 				C1A72AF11D365FEA47FC549E /* PlainTextPasteController.swift */,
 				1B01ED0E79A9494F70A575FB /* ScreenRecordingPermissionOpener.swift */,
 				92200E04065F6864D989D001 /* SystemDiagnostics.swift */,
@@ -1436,6 +1439,7 @@
 				2C581D42AEE94E2481A305D4 /* OCRDocumentFormatter.swift in Sources */,
 				17954A7E29CEBEBA3F9F533A /* PasteCommandMonitor.swift in Sources */,
 				7B2ED209942FC3A472396FF0 /* PasteboardProviding.swift in Sources */,
+				1EFC16A8E768C8C2B0831EC5 /* PasteboardSnapshot.swift in Sources */,
 				45AD6ABE24D83994D0581BAD /* PerformanceTrace.swift in Sources */,
 				9E095EEA3349C139D0C2EBA1 /* PermissionsSettingsView.swift in Sources */,
 				76A989980B1929080EC61619 /* PlainTextPasteController.swift in Sources */,

@@ -21,7 +21,7 @@ struct GeneralSettingsView: View {
     @State private var tempModifierFlags: NSEvent.ModifierFlags = []
     @State private var selectedLanguage: AppSettings.LanguageOption = .system
     @State private var plainTextKeyCode: UInt16 = 9
-    @State private var plainTextModifiers: NSEvent.ModifierFlags = [.control, .shift]
+    @State private var plainTextModifiers: NSEvent.ModifierFlags = [.command, .shift]
     @State private var plainTextHotkeyError: PlainTextPasteHotkey.ConfigurationError?
 
     var body: some View {
@@ -129,8 +129,10 @@ struct GeneralSettingsView: View {
 
     private var pasteSection: some View {
         SettingsGroup("Pasting") {
-            SettingsRow(label: "Paste clipboard contents") { Text("⌘V") }
-            SettingsRow(label: "Paste as Plain Text") {
+            SettingsRow(label: plainTextHotkey.swapsPasteFormatting ? "Paste as Plain Text" : "Paste with Formatting") {
+                Text("⌘V")
+            }
+            SettingsRow(label: plainTextHotkey.swapsPasteFormatting ? "Paste with Formatting" : "Paste as Plain Text") {
                 HotkeyRecorderField(
                     keyCode: $plainTextKeyCode,
                     modifierFlags: $plainTextModifiers,
@@ -139,8 +141,16 @@ struct GeneralSettingsView: View {
                 .disabled(!plainTextHotkey.hasAccessibilityPermission)
                 .help("Click the shortcut field to change it. Clear disables the shortcut.")
             }
+            SettingsRow(
+                label: "Swap paste formatting",
+                isOn: Binding(
+                    get: { plainTextHotkey.swapsPasteFormatting },
+                    set: { plainTextHotkeyError = plainTextHotkey.setSwapsPasteFormatting($0) }
+                )
+            )
+            .disabled(!plainTextHotkey.hasAccessibilityPermission || plainTextHotkey.shortcut == .disabled)
             if !plainTextHotkey.hasAccessibilityPermission {
-                Text("Allow Device Control and Data Access to configure and use plain text paste.")
+                Text("Allow Device Control and Data Access to configure and use paste shortcuts.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -152,13 +162,16 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             } else if plainTextHotkey.registrationFailed {
-                Text("The plain text shortcut is unavailable. Check for a conflicting shortcut in another app.")
+                Text("The paste shortcut is unavailable. Check for a conflicting shortcut in another app.")
                     .font(.caption)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Text(
-                "Plain text paste clears clipboard formatting. Select the history item again to restore formatting."
+                LocalizedStringKey(
+                    "Kipple keeps the original formatting so you can choose either shortcut for each paste. "
+                        + "Menu and mouse paste use the clipboard’s current format."
+                )
             )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -179,7 +192,7 @@ struct GeneralSettingsView: View {
     private func plainTextHotkeyErrorMessage(_ error: PlainTextPasteHotkey.ConfigurationError) -> LocalizedStringKey {
         switch error {
         case .permissionRequired:
-            "Allow Device Control and Data Access to configure and use plain text paste."
+            "Allow Device Control and Data Access to configure and use paste shortcuts."
         case .modifierRequired:
             "Include Command, Control, or Option in the shortcut."
         case .shortcutUnavailable:

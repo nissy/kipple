@@ -22,10 +22,10 @@ final class PlainTextPasteHotkeyTests: XCTestCase {
         try await super.tearDown()
     }
 
-    func testDefaultIsControlShiftVWithoutWritingSettings() {
+    func testDefaultIsCommandShiftVWithoutWritingSettings() {
         defaults.removePersistentDomain(forName: suiteName)
         let manager = makeManager { false }
-        XCTAssertEqual(manager.shortcut, .defaultShortcut)
+        XCTAssertEqual(manager.shortcut, .init(keyCode: 9, modifiers: [.command, .shift]))
         XCTAssertNil(defaults.object(forKey: PlainTextPasteHotkey.keyCodeDefaultsKey))
         XCTAssertFalse(manager.hasAccessibilityPermission)
     }
@@ -156,6 +156,66 @@ final class PlainTextPasteHotkeyTests: XCTestCase {
         XCTAssertEqual(manager.apply(keyCode: 9, modifiers: .shift), .modifierRequired)
         XCTAssertEqual(manager.shortcut.keyCode, 40)
         XCTAssertTrue(manager.isRegistered)
+    }
+
+    func testSwappingRequiresPermissionAndSuccessfulCommandVReservation() {
+        var trusted = false
+        let manager = makeManager { trusted }
+        XCTAssertEqual(manager.setSwapsPasteFormatting(true), .permissionRequired)
+        XCTAssertFalse(manager.swapsPasteFormatting)
+        trusted = true
+        manager.onConfigurationChanged = { swapped, _ in !swapped }
+        XCTAssertEqual(manager.setSwapsPasteFormatting(true), .shortcutUnavailable)
+        XCTAssertFalse(manager.swapsPasteFormatting)
+        XCTAssertFalse(defaults.bool(forKey: PlainTextPasteHotkey.swapsFormattingDefaultsKey))
+    }
+
+    func testSwappingPersistsAndClearingTheAlternateShortcutTurnsItOff() {
+        let manager = makeManager()
+        XCTAssertNil(manager.setSwapsPasteFormatting(true))
+        XCTAssertTrue(manager.swapsPasteFormatting)
+        XCTAssertTrue(makeManager().swapsPasteFormatting)
+        XCTAssertNil(manager.apply(keyCode: 0, modifiers: []))
+        XCTAssertFalse(manager.swapsPasteFormatting)
+        XCTAssertFalse(makeManager().swapsPasteFormatting)
+        XCTAssertEqual(manager.setSwapsPasteFormatting(true), .shortcutUnavailable)
+    }
+
+    func testRecordingAndPermissionChangesSuspendSwappedCommandV() {
+        var trusted = true
+        let manager = makeManager(observeChanges: true) { trusted }
+        var lastConfiguration = (false, false)
+        manager.onConfigurationChanged = { swapped, enabled in lastConfiguration = (swapped, enabled); return true }
+        XCTAssertNil(manager.setSwapsPasteFormatting(true))
+        XCTAssertTrue(lastConfiguration.0 && lastConfiguration.1)
+        NotificationCenter.default.post(name: Notification.Name("SuspendGlobalHotkeyCapture"), object: nil)
+        XCTAssertTrue(lastConfiguration.0)
+        XCTAssertFalse(lastConfiguration.1)
+        NotificationCenter.default.post(name: Notification.Name("ResumeGlobalHotkeyCapture"), object: nil)
+        XCTAssertTrue(lastConfiguration.0 && lastConfiguration.1)
+        trusted = false
+        manager.refreshPermission()
+        XCTAssertTrue(manager.swapsPasteFormatting)
+        XCTAssertFalse(lastConfiguration.1)
+        trusted = true
+        manager.refreshPermission()
+        XCTAssertTrue(lastConfiguration.0 && lastConfiguration.1)
+    }
+
+    func testResolvedCommandVConflictAllowsShortcutToTriggerAgain() {
+        defaults.set(true, forKey: PlainTextPasteHotkey.swapsFormattingDefaultsKey)
+        let manager = makeManager()
+        var available = false
+        var triggers = 0
+        manager.onConfigurationChanged = { _, _ in available }
+        manager.onTrigger = { triggers += 1 }
+        manager.triggerIfPermitted()
+        XCTAssertTrue(manager.registrationFailed)
+        XCTAssertEqual(triggers, 0)
+        available = true
+        manager.triggerIfPermitted()
+        XCTAssertFalse(manager.registrationFailed)
+        XCTAssertEqual(triggers, 1)
     }
 
     private func makeManager(

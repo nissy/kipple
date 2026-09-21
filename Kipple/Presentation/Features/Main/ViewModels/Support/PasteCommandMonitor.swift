@@ -4,7 +4,7 @@ import Carbon
 
 @MainActor
 protocol PasteCommandMonitoring: AnyObject {
-    /// Reserves Command+V until the queue item is ready to paste.
+    /// Reserves Command+V for queue paste, formatting recovery, or plain text as the default paste.
     func start(handler: @escaping () -> Void) -> Bool
     func stop()
     var hasPermission: Bool { get }
@@ -32,7 +32,7 @@ final class PasteCommandMonitor: PasteCommandMonitoring {
             GetEventDispatcherTarget(), 0, &hotKey
         )
         guard status == noErr, hotKey != nil else {
-            Logger.shared.warning("Queue paste shortcut registration failed: \(status)")
+            Logger.shared.warning("Paste shortcut registration failed: \(status)")
             stop()
             return false
         }

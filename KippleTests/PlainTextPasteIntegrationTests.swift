@@ -38,7 +38,7 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
             clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in
                 received.append(NSPasteboard.general.string(forType: .string) ?? "")
                 return true
-            }
+            }, normalPasteMonitor: RecoveryPasteMonitor()
         )
         viewModel.connectPasteController(controller)
         for (index, plain) in styles.enumerated() {
@@ -86,7 +86,7 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
                     read.fulfill()
                 }
                 return true
-            }
+            }, normalPasteMonitor: RecoveryPasteMonitor()
         )
         viewModel.connectPasteController(controller)
         controller.paste(into: 101)
@@ -107,7 +107,7 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
             clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in
                 XCTFail("Paste must stop when the original formatting cannot be saved")
                 return true
-            }
+            }, normalPasteMonitor: RecoveryPasteMonitor()
         )
         var failures: [PlainTextPasteController.Failure] = []
         controller.onFailure = { failures.append($0) }
@@ -135,7 +135,7 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
             clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in
                 pasted.append(NSPasteboard.general.string(forType: .string) ?? "<empty>")
                 return true
-            }
+            }, normalPasteMonitor: RecoveryPasteMonitor()
         )
         let mcpCopy = Task { await service.copyMCPConfiguration("New MCP content") { true } }
         try await Task.sleep(for: .milliseconds(40))
@@ -150,6 +150,75 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
         controller.paste(into: 101)
         await controller.waitForPendingPastes()
         XCTAssertEqual(pasted, ["New MCP content"])
+    }
+
+    func testLastPlainQueueItemHandsCommandVBackToFormattingRecovery() async throws {
+        let item = try putStyledItem("Last queue item")
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [item], loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let viewModel = MainViewModel(clipboardService: adapter, pasteMonitor: IntegrationPasteCommandMonitor())
+        let recovery = RecoveryPasteMonitor()
+        let controller = PlainTextPasteController(
+            clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in true },
+            normalPasteMonitor: recovery
+        )
+        viewModel.connectPasteController(controller)
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: [item], anchor: item)
+        await adapter.flushPendingAdapterOperationForTesting()
+        controller.paste(into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(viewModel.pasteQueue, [])
+        XCTAssertNil(ClipboardRichText(pasteboard: .general))
+        XCTAssertTrue(recovery.isMonitoring, "The completed queue must hand Command+V to formatting recovery")
+        controller.paste(into: 101, removingFormatting: false)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(ClipboardRichText(pasteboard: .general), item.richText)
+        XCTAssertFalse(recovery.isMonitoring)
+    }
+
+    func testSwappedQueueShortcutsKeepTheirRolesAfterQueueCompletes() async throws {
+        let items = try ["Queue plain", "Queue rich"].map(putStyledItem)
+        let repository = MockClipboardRepository()
+        await repository.configure(items: items, loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let queueMonitor = IntegrationPasteCommandMonitor()
+        let viewModel = MainViewModel(clipboardService: adapter, pasteMonitor: queueMonitor)
+        let normalMonitor = RecoveryPasteMonitor()
+        let controller = PlainTextPasteController(
+            clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in true },
+            normalPasteMonitor: normalMonitor
+        )
+        XCTAssertTrue(controller.configureShortcuts(swapsFormatting: true))
+        viewModel.connectPasteController(controller)
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: items, anchor: items.last)
+        await adapter.flushPendingAdapterOperationForTesting()
+        XCTAssertTrue(queueMonitor.isMonitoring)
+        XCTAssertFalse(normalMonitor.isMonitoring, "The queue must own Command+V exclusively")
+        controller.paste(using: .normal, into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), items[0].content)
+        XCTAssertNil(ClipboardRichText(pasteboard: .general))
+        controller.paste(using: .alternate, into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(viewModel.pasteQueue, [])
+        XCTAssertEqual(ClipboardRichText(pasteboard: .general), items[1].richText)
+        XCTAssertFalse(queueMonitor.isMonitoring)
+        XCTAssertTrue(normalMonitor.isMonitoring, "Command+V must stay plain even after the last rich queue item")
+        controller.paste(using: .normal, into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertNil(ClipboardRichText(pasteboard: .general))
+        controller.paste(using: .alternate, into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(ClipboardRichText(pasteboard: .general), items[1].richText)
     }
 
     private func putStyledItem(_ text: String) throws -> ClipItem {
