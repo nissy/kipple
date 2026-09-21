@@ -160,12 +160,16 @@ final class TextCaptureCoordinator {
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
             Logger.shared.error("Failed to capture image from selection: \(error.localizedDescription)")
-            presentErrorAlert(
-                message: NSLocalizedString(
-                    "Failed to capture the screen. Check Screen Recording permissions in System Settings.",
+            let message = screenCapturePermission.preflight()
+                ? NSLocalizedString(
+                    "Failed to capture the screen. Please try again.",
+                    comment: "Error shown when screen capture fails despite an available permission"
+                )
+                : NSLocalizedString(
+                    "Failed to capture the screen. Check Screen & System Audio Recording in System Settings.",
                     comment: "Error shown when screen recording permission prevents OCR capture"
                 )
-            )
+            presentErrorAlert(message: message)
             return
         }
 
@@ -285,7 +289,15 @@ extension TextCaptureCoordinator {
         @MainActor
         static var live: ScreenCapturePermissionDependencies {
             ScreenCapturePermissionDependencies(
-                preflight: { CGPreflightScreenCaptureAccess() },
+                preflight: {
+                    let granted = CGPreflightScreenCaptureAccess()
+                    SystemDiagnostics.permissions(
+                        screenCapture: granted,
+                        accessibility: AXIsProcessTrusted(),
+                        clipboard: NSPasteboard.general.accessBehavior
+                    )
+                    return granted
+                },
                 request: { CGRequestScreenCaptureAccess() },
                 openPermissionTab: {
                     NotificationCenter.default.post(

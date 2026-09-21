@@ -189,6 +189,10 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
         // No-op for mock
     }
 
+    func saveBeforeTermination() async throws {
+        await flushPendingSaves()
+    }
+
     // Helper methods for testing
     func addTestItem(_ content: String, isPinned: Bool = false, sourceApp: String? = nil) {
         var item = ClipItem(content: content, sourceApp: sourceApp)

@@ -65,9 +65,13 @@ targets:
         ENABLE_PREVIEWS: YES
       configs:
         Debug:
-          CODE_SIGN_IDENTITY: "-"
-          CODE_SIGNING_REQUIRED: NO
-          CODE_SIGNING_ALLOWED: NO
+          # Use a stable identity so TCC permissions survive development rebuilds.
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          CODE_SIGNING_REQUIRED: YES
+          CODE_SIGNING_ALLOWED: YES
+          # Keep the existing development storage and local MCP socket outside the sandbox.
+          CODE_SIGN_ENTITLEMENTS: ""
         Release:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
@@ -102,9 +106,11 @@ targets:
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
       configs:
         Debug:
-          CODE_SIGN_IDENTITY: "-"
-          CODE_SIGNING_REQUIRED: NO
-          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          CODE_SIGNING_REQUIRED: YES
+          CODE_SIGNING_ALLOWED: YES
+          CODE_SIGN_ENTITLEMENTS: ""
 
   KippleTests:
     type: bundle.unit-test
@@ -122,9 +128,10 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: $(TEST_PRODUCT_BUNDLE_IDENTIFIER)
         PRODUCT_MODULE_NAME: KippleTests
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
-        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Developer ID Application"
+        CODE_SIGNING_REQUIRED: YES
+        CODE_SIGNING_ALLOWED: YES
 
 
 schemes:

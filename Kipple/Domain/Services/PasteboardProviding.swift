@@ -22,7 +22,7 @@ final class SystemPasteboard: PasteboardProviding {
     }
 
     func string() -> String? {
-        return NSPasteboard.general.string(forType: .string)
+        return ClipboardReader.shared.read()?.text
     }
 
     func setString(_ string: String) {

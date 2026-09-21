@@ -2,7 +2,6 @@ import Foundation
 import SwiftData
 
 @Model
-@available(macOS 14.0, *)
 final class ClipItemModel {
     @Attribute(.unique) var id: UUID
     var content: String
@@ -91,7 +90,6 @@ final class ClipItemModel {
 
 // MARK: - Batch Operations Helper
 
-@available(macOS 14.0, *)
 extension ModelContext {
     func batchDelete<T: PersistentModel>(
         _ type: T.Type,

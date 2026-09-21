@@ -10,7 +10,7 @@ import AppKit
 
 struct GeneralSettingsView: View {
     var onOpenPermissions: () -> Void
-    @AppStorage("autoLaunchAtLogin") private var autoLaunchAtLogin = false
+    @ObservedObject private var launchAtLogin = LaunchAtLogin.shared
     @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 0
     @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
     @AppStorage("windowAnimation") private var windowAnimation: String = "none"
@@ -37,6 +37,7 @@ struct GeneralSettingsView: View {
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
+            launchAtLogin.checkStatus()
             tempKeyCode = UInt16(hotkeyKeyCode)
             tempModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(hotkeyModifierFlags))
             selectedLanguage = appSettings.appLanguage
@@ -45,6 +46,9 @@ struct GeneralSettingsView: View {
         }
         .onChange(of: selectedLanguage) { _, newValue in
             appSettings.appLanguage = newValue
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            launchAtLogin.checkStatus()
         }
         .onChange(of: plainTextHotkey.hasAccessibilityPermission) { _, _ in
             plainTextHotkeyError = nil
@@ -78,10 +82,19 @@ struct GeneralSettingsView: View {
         SettingsGroup("Startup") {
             SettingsRow(
                 label: "Launch at login",
-                isOn: $autoLaunchAtLogin
+                isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.setEnabled($0) })
             )
-            .onChange(of: autoLaunchAtLogin) { _, newValue in
-                LaunchAtLogin.shared.isEnabled = newValue
+            if launchAtLogin.status == .requiresApproval {
+                SettingsRow(
+                    label: "Approval required",
+                    description: "Allow Kipple in Login Items to launch at login."
+                ) {
+                    Button("Open System Settings") { launchAtLogin.openSystemSettings() }
+                }
+            } else if launchAtLogin.status == .notFound {
+                Text("The login item could not be found. Move Kipple to Applications and try again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -127,7 +140,7 @@ struct GeneralSettingsView: View {
                 .help("Click the shortcut field to change it. Clear disables the shortcut.")
             }
             if !plainTextHotkey.hasAccessibilityPermission {
-                Text("Allow Accessibility access to configure and use plain text paste.")
+                Text("Allow Device Control and Data Access to configure and use plain text paste.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -166,7 +179,7 @@ struct GeneralSettingsView: View {
     private func plainTextHotkeyErrorMessage(_ error: PlainTextPasteHotkey.ConfigurationError) -> LocalizedStringKey {
         switch error {
         case .permissionRequired:
-            "Allow Accessibility access to configure and use plain text paste."
+            "Allow Device Control and Data Access to configure and use plain text paste."
         case .modifierRequired:
             "Include Command, Control, or Option in the shortcut."
         case .shortcutUnavailable:

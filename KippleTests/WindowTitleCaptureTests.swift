@@ -9,7 +9,6 @@ import XCTest
 import AppKit
 @testable import Kipple
 
-@available(macOS 14.0, *)
 @MainActor
 final class WindowTitleCaptureTests: XCTestCase {
     private var service: ModernClipboardService!

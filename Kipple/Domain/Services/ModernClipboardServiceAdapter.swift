@@ -242,8 +242,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func flushPendingSaves() async {
-        // Delegate to the modern service
+        await pendingOperationTask?.value
         await modernService.flushPendingSaves()
+    }
+
+    func saveBeforeTermination() async throws {
+        let wasMonitoring = await modernService.isMonitoring()
+        await modernService.stopMonitoring()
+        do {
+            await pendingOperationTask?.value
+            try await modernService.saveBeforeTermination()
+        } catch {
+            if wasMonitoring { await modernService.startMonitoring() }
+            throw error
+        }
     }
 
     func searchHistory(_ query: String) -> [ClipItem] {

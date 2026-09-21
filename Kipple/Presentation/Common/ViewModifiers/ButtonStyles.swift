@@ -95,21 +95,6 @@ enum KippleButtonAppearance {
 }
 
 extension View {
-    @ViewBuilder
-    func kippleGlassPanel(
-        cornerRadius: CGFloat = 20,
-        fillOpacity _: Double = 0.26,
-        strokeOpacity _: Double = 0,
-        highlightOpacity _: Double = 0.08
-    ) -> some View {
-        if #available(macOS 26.0, *) {
-            self
-        } else {
-            self
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
-    }
-
     func kippleSubtleControl<S: Shape>(
         in shape: S,
         isActive: Bool = false,
@@ -127,11 +112,9 @@ extension View {
             .opacity(isEnabled ? 1.0 : 0.38)
     }
 
-    @ViewBuilder
     func kippleLiquidGlass<S: Shape>(
         in shape: S,
         tint: Color? = nil,
-        fallbackFill: Color = .clear,
         strokeColor: Color = .clear,
         strokeWidth: CGFloat = 0,
         shadowColor: Color = Color.black.opacity(0.08),
@@ -139,66 +122,28 @@ extension View {
         shadowY: CGFloat = 0,
         interactive: Bool = false
     ) -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .glassEffect(kippleGlass(tint: tint, interactive: interactive), in: shape)
-                .overlay(shape.stroke(strokeColor, lineWidth: strokeWidth))
-                .shadow(color: shadowColor, radius: shadowRadius, y: shadowY)
-        } else {
-            self
-                .background(.regularMaterial, in: shape)
-                .background(fallbackFill, in: shape)
-                .overlay(shape.stroke(strokeColor, lineWidth: strokeWidth))
-                .shadow(color: shadowColor, radius: shadowRadius, y: shadowY)
-        }
+        self
+            .glassEffect(kippleGlass(tint: tint, interactive: interactive), in: shape)
+            .overlay(shape.stroke(strokeColor, lineWidth: strokeWidth))
+            .shadow(color: shadowColor, radius: shadowRadius, y: shadowY)
     }
 
-    @ViewBuilder
     func kippleLiquidControlGroup<S: Shape>(in shape: S, isEnabled: Bool = true) -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .glassEffect(.clear, in: shape)
-                .overlay(shape.stroke(Color.primary.opacity(0.025), lineWidth: 0.5))
-                .opacity(isEnabled ? 1.0 : 0.42)
-        } else {
-            self
-                .background(.regularMaterial, in: shape)
-                .opacity(isEnabled ? 1.0 : 0.42)
-        }
+        self
+            .glassEffect(.clear, in: shape)
+            .overlay(shape.stroke(Color.primary.opacity(0.025), lineWidth: 0.5))
+            .opacity(isEnabled ? 1.0 : 0.42)
     }
 
-    @ViewBuilder
     func kippleControlSurface<S: Shape>(
         in shape: S,
         isActive: Bool = false,
         isEnabled: Bool = true
     ) -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .glassEffect(.clear.interactive(isEnabled), in: shape)
-                .overlay(shape.stroke(Color.primary.opacity(isActive ? 0.03 : 0.02), lineWidth: 0.5))
-                .opacity(isEnabled ? 1.0 : 0.42)
-        } else {
-            let opacity = isActive ? 0.18 : 0.12
-            self
-                .background(.regularMaterial, in: shape)
-                .background(Color.primary.opacity(opacity), in: shape)
-                .opacity(isEnabled ? 1.0 : 0.42)
-        }
-    }
-
-    @ViewBuilder
-    func kippleLiquidWindowBackground() -> some View {
-        if #available(macOS 26.0, *) {
-            self
-        } else {
-            self
-                .background {
-                    Rectangle()
-                        .fill(.regularMaterial)
-                        .ignoresSafeArea()
-                }
-        }
+        self
+            .glassEffect(.clear.interactive(isEnabled), in: shape)
+            .overlay(shape.stroke(Color.primary.opacity(isActive ? 0.03 : 0.02), lineWidth: 0.5))
+            .opacity(isEnabled ? 1.0 : 0.42)
     }
 
     @ViewBuilder
@@ -251,7 +196,6 @@ private struct KippleSystemCircleButtonStyle: ButtonStyle {
     }
 }
 
-@available(macOS 26.0, *)
 private func kippleGlass(tint: Color?, interactive: Bool) -> Glass {
     var glass = Glass.clear
     if let tint {

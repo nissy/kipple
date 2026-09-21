@@ -5,7 +5,6 @@ import SwiftData
 // Snapshot of the schema before rich-text history, used to verify migration.
 enum LegacyClipboardSchema {
     @Model
-    @available(macOS 14.0, *)
     final class ClipItemModel {
         @Attribute(.unique) var id: UUID
         var content: String

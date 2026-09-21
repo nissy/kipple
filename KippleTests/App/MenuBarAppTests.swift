@@ -40,29 +40,28 @@ final class MenuBarAppIntegrationTests: XCTestCase {
         let app = makeMenuBarApp()
         defer { resetTextCaptureHotkey() }
 
-        await app.startServicesAsync()
-
-        // Then: Clipboard monitoring is active
-        let isMonitoring = await app.isClipboardMonitoring()
-        XCTAssertTrue(isMonitoring, "Clipboard monitoring should be started")
+        app.startServices()
+        let started = expectation(description: "Clipboard monitoring starts asynchronously")
+        let observation = Task {
+            while !Task.isCancelled {
+                if await app.isClipboardMonitoring() { started.fulfill(); return }
+                do { try await Task.sleep(for: .milliseconds(10)) } catch { return }
+            }
+        }
+        await fulfillment(of: [started], timeout: 2)
+        observation.cancel()
     }
 
     @MainActor
-   func testSavesDataOnTermination() async throws {
-        let app = makeMenuBarApp()
-        defer { resetTextCaptureHotkey() }
-
-        await app.startServicesAsync()
-
-        // Add test data
-        app.clipboardService.copyToClipboard("Test data for termination", fromEditor: true)
-
-        // When: App performs termination (saves data)
-        await app.performTermination()
-
-        // Then: Data is saved (no assertion - just ensures no crash)
-        // The performTermination helper method only saves data, doesn't stop services
-        XCTAssertTrue(true, "Data save completed without errors")
+    func testSavesDataOnTermination() async throws {
+        let repository = MockClipboardRepository()
+        let writer: @MainActor @Sendable (ClipItem) -> Int = { _ in 1 }
+        let service = ModernClipboardService(testRepository: repository, clipboardWriter: writer)
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        adapter.copyToClipboard("Test data for termination", fromEditor: true)
+        try await adapter.saveBeforeTermination()
+        let saved = try await repository.loadAll()
+        XCTAssertEqual(saved.map(\.content), ["Test data for termination"])
     }
 
     // MARK: - Window Management Tests

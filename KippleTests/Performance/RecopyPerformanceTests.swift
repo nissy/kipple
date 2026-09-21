@@ -7,7 +7,6 @@ import XCTest
 import AppKit
 @testable import Kipple
 
-@available(macOS 14.0, *)
 @MainActor
 final class RecopyPerformanceTests: XCTestCase {
     private struct MeasurementStats {

@@ -6,34 +6,10 @@
 	<array>
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
-			<string>NSPrivacyAccessedAPICategoryClipboard</string>
-			<key>NSPrivacyAccessedAPITypeReasons</key>
-			<array>
-				<string>PB3.1</string>
-			</array>
-		</dict>
-		<dict>
-			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
-			</array>
-		</dict>
-		<dict>
-			<key>NSPrivacyAccessedAPIType</key>
-			<string>NSPrivacyAccessedAPICategoryScreenCapture</string>
-			<key>NSPrivacyAccessedAPITypeReasons</key>
-			<array>
-				<string>SCR1</string>
-			</array>
-		</dict>
-		<dict>
-			<key>NSPrivacyAccessedAPIType</key>
-			<string>NSPrivacyAccessedAPICategoryAccessibility</string>
-			<key>NSPrivacyAccessedAPITypeReasons</key>
-			<array>
-				<string>ACC1</string>
 			</array>
 		</dict>
 	</array>

@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
 
-@available(macOS 14.0, *)
 actor SwiftDataRepository: ClipboardRepositoryProtocol {
     private let container: ModelContainer
 
@@ -263,7 +262,6 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
     }
 }
 
-@available(macOS 14.0, *)
 private extension ClipItemModel {
     func update(with item: ClipItem) {
         content = item.content

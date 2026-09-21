@@ -12,12 +12,19 @@ extension MenuBarApp {
             let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
             _ = AXIsProcessTrustedWithOptions(options)
         }
-        controller.onFailure = { failure in
+        controller.onFailure = { [weak self] failure in
             let alert = NSAlert()
             alert.messageText = NSLocalizedString("Paste", comment: "Paste failure")
-            let message = failure == .historyUnavailable
-                ? "Clipboard history could not be loaded. Pasting was cancelled without changing the clipboard."
-                : "Could not paste. Select an editable text field in the destination app, then try again."
+            let message: String
+            switch failure {
+            case .historyUnavailable:
+                message = "Clipboard history could not be loaded. Pasting was cancelled without changing the clipboard."
+            case .clipboardUnavailable:
+                message = "Clipboard contents could not be read. Check Clipboard Access in Settings → Permission."
+                self?.windowManager.openSettings(tab: .permission)
+            case .deliveryFailed:
+                message = "Could not paste. Select an editable text field in the destination app, then try again."
+            }
             alert.informativeText = NSLocalizedString(message, comment: "Paste failure")
             alert.runModal()
         }
@@ -102,6 +109,11 @@ extension MenuBarApp {
             guard let self else { return }
 
             let screenPermissionGranted = CGPreflightScreenCaptureAccess()
+            SystemDiagnostics.permissions(
+                screenCapture: screenPermissionGranted,
+                accessibility: AXIsProcessTrusted(),
+                clipboard: NSPasteboard.general.accessBehavior
+            )
 
             guard screenPermissionGranted else {
                 Logger.shared.warning("Screen Text Capture blocked: screen recording permission not granted.")

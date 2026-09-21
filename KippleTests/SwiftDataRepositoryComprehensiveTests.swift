@@ -2,7 +2,6 @@ import XCTest
 import SwiftData
 @testable import Kipple
 
-@available(macOS 14.0, *)
 @MainActor
 final class SwiftDataRepositoryComprehensiveTests: XCTestCase, @unchecked Sendable {
     private var repository: SwiftDataRepository!

@@ -42,7 +42,6 @@ private final class RoundedMaskContainerView: NSView {
     }
 }
 
-@available(macOS 26.0, *)
 private final class MainGlassContentController<Content: View>: NSViewController {
     private let hostingController: NSHostingController<Content>
 
@@ -83,54 +82,6 @@ private final class MainGlassContentController<Content: View>: NSViewController 
             glassView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             glassView.topAnchor.constraint(equalTo: container.topAnchor),
             glassView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-        ])
-
-        view = container
-    }
-}
-
-private final class MainMaterialContentController<Content: View>: NSViewController {
-    private let hostingController: NSHostingController<Content>
-
-    init(rootView: Content) {
-        hostingController = NSHostingController(rootView: rootView)
-        hostingController.sizingOptions = []
-        super.init(nibName: nil, bundle: nil)
-        addChild(hostingController)
-    }
-
-    @available(*, unavailable)
-    required init?(coder _: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func loadView() {
-        let container = RoundedMaskContainerView(cornerRadius: KippleGlassMetrics.windowCornerRadius)
-
-        let materialView = NSVisualEffectView()
-        materialView.blendingMode = .behindWindow
-        materialView.material = .popover
-        materialView.state = .active
-        materialView.translatesAutoresizingMaskIntoConstraints = false
-        materialView.wantsLayer = true
-        materialView.layer?.cornerRadius = KippleGlassMetrics.windowCornerRadius
-        materialView.layer?.cornerCurve = .continuous
-        materialView.layer?.masksToBounds = true
-
-        hostingController.view.wantsLayer = true
-        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        materialView.addSubview(hostingController.view)
-        container.addSubview(materialView)
-        NSLayoutConstraint.activate([
-            materialView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            materialView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            materialView.topAnchor.constraint(equalTo: container.topAnchor),
-            materialView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            hostingController.view.leadingAnchor.constraint(equalTo: materialView.leadingAnchor),
-            hostingController.view.trailingAnchor.constraint(equalTo: materialView.trailingAnchor),
-            hostingController.view.topAnchor.constraint(equalTo: materialView.topAnchor),
-            hostingController.view.bottomAnchor.constraint(equalTo: materialView.bottomAnchor)
         ])
 
         view = container
@@ -438,11 +389,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         )
         .environmentObject(viewModel)
         
-        if #available(macOS 26.0, *) {
-            mainWindow = MainGlassWindow(contentViewController: MainGlassContentController(rootView: contentView))
-        } else {
-            mainWindow = MainGlassWindow(contentViewController: MainMaterialContentController(rootView: contentView))
-        }
+        mainWindow = MainGlassWindow(contentViewController: MainGlassContentController(rootView: contentView))
         return mainWindow
     }
     

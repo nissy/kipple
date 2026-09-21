@@ -3,7 +3,6 @@ import SwiftData
 import Combine
 @testable import Kipple
 
-@available(macOS 14.0, *)
 @MainActor
 final class IntegrationTests: XCTestCase, @unchecked Sendable {
     private var clipboardService: ModernClipboardService!

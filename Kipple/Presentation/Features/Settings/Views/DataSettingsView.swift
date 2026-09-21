@@ -69,7 +69,8 @@ struct DataSettingsView: View {
                                 ),
                                 formatter: makeNumberFormatter(minimum: 10, maximum: 1000)
                             )
-                            .textFieldStyle(.roundedBorder)
+                            .textFieldStyle(.bordered)
+                            .textInputBorderShape(.roundedRectangle)
                             .frame(width: 80)
                             .onChange(of: maxHistoryItems) { _, newValue in
                                 updateHistoryLimit(newValue)
@@ -98,7 +99,8 @@ struct DataSettingsView: View {
                                 ),
                                 formatter: makeNumberFormatter(minimum: 1, maximum: 100)
                             )
-                            .textFieldStyle(.roundedBorder)
+                            .textFieldStyle(.bordered)
+                            .textInputBorderShape(.roundedRectangle)
                             .frame(width: 80)
                             
                             Stepper(
@@ -326,7 +328,7 @@ private struct ScreenTextCaptureSettingsView: View {
                     } else {
                         Text(
                             LocalizedStringKey(
-                                "Enable Screen Recording permission to configure the text capture shortcut."
+                                "Allow Screen & System Audio Recording to configure the text capture shortcut."
                             )
                         )
                         .font(.system(size: 11))
@@ -366,8 +368,6 @@ private struct ScreenTextCaptureSettingsView: View {
         if hasScreenCapturePermission {
             captureHotkeyErrorKey = nil
             updateCaptureHotkey()
-        } else {
-            disableCaptureHotkey()
         }
     }
 
@@ -375,10 +375,8 @@ private struct ScreenTextCaptureSettingsView: View {
     private func updateCaptureHotkey() {
         let manager = TextCaptureHotkeyManager.shared
 
-        guard hasScreenCapturePermission else {
-            disableCaptureHotkey()
-            return
-        }
+        // Permission changes must not erase the saved shortcut. Capture checks permission when invoked.
+        guard hasScreenCapturePermission else { return }
 
         let keyCode = tempCaptureKeyCode
         let modifiers = tempCaptureModifierFlags
@@ -429,7 +427,6 @@ private struct ScreenTextCaptureSettingsView: View {
                 loadCaptureHotkeyState()
             } else {
                 captureHotkeyErrorKey = nil
-                disableCaptureHotkey()
             }
         }
     }

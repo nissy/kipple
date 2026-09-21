@@ -32,11 +32,7 @@ final class GlassWindowContentController<Content: View>: NSViewController {
     }
 
     override func loadView() {
-        if #available(macOS 26.0, *) {
-            view = makeGlassContainer()
-        } else {
-            view = makeMaterialContainer()
-        }
+        view = makeGlassContainer()
     }
 
     func hostedFittingSize(fallback: NSSize) -> NSSize {
@@ -47,7 +43,6 @@ final class GlassWindowContentController<Content: View>: NSViewController {
         return fitting
     }
 
-    @available(macOS 26.0, *)
     private func makeGlassContainer() -> NSView {
         let container = makeRoundedContainer()
         let glassView = NSGlassEffectView()
@@ -64,27 +59,6 @@ final class GlassWindowContentController<Content: View>: NSViewController {
         glassView.contentView = hostingController.view
         container.addSubview(glassView)
         pin(glassView, to: container)
-        return container
-    }
-
-    private func makeMaterialContainer() -> NSView {
-        let container = makeRoundedContainer()
-        let materialView = NSVisualEffectView()
-        materialView.blendingMode = .behindWindow
-        materialView.material = .popover
-        materialView.state = .active
-        materialView.translatesAutoresizingMaskIntoConstraints = false
-        materialView.wantsLayer = true
-        materialView.layer?.cornerRadius = cornerRadius
-        materialView.layer?.cornerCurve = .continuous
-        materialView.layer?.masksToBounds = true
-
-        prepareHostedView()
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        materialView.addSubview(hostingController.view)
-        container.addSubview(materialView)
-        pin(materialView, to: container)
-        pin(hostingController.view, to: materialView)
         return container
     }
 

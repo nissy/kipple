@@ -9,7 +9,7 @@ enum RepositoryProvider {
         if let overrideRepository {
             return overrideRepository
         }
-        // Use SwiftData exclusively (macOS 14.0+ only)
+        // Use SwiftData exclusively.
         do {
             return try SwiftDataRepository.make()
         } catch {

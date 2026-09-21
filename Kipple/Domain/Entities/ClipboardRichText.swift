@@ -8,8 +8,8 @@ struct ClipboardRichText: Codable, Equatable, Sendable {
     private static let supportedTypes: [NSPasteboard.PasteboardType] = [.rtf, .rtfd, .html]
 
     @MainActor
-    init?(pasteboard: NSPasteboard) {
-        guard let text = pasteboard.string(forType: .string),
+    init?(pasteboard: NSPasteboard, text: String? = nil) {
+        guard let text = text ?? pasteboard.string(forType: .string),
               let entries = pasteboard.pasteboardItems else { return nil }
         var items: [[String: Data]] = []
         var hasFormatting = false

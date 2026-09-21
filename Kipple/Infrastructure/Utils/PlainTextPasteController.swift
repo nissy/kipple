@@ -16,6 +16,7 @@ protocol PasteQueueCoordinating: AnyObject {
 final class PlainTextPasteController {
     enum Failure {
         case historyUnavailable
+        case clipboardUnavailable
         case deliveryFailed
     }
 
@@ -109,7 +110,12 @@ final class PlainTextPasteController {
             NotificationCenter.default.post(name: .clipboardPasteSent, object: sentItem.content)
         }
         // A modal explanation must not keep clipboard monitoring and new copies waiting.
-        if !backupAvailable { onFailure?(.historyUnavailable) } else if failed { onFailure?(.deliveryFailed) }
+        if !backupAvailable {
+            let reader = ClipboardReader.shared
+            onFailure?(reader.accessBehavior == .alwaysDeny || reader.readFailed ? .clipboardUnavailable : .historyUnavailable)
+        } else if failed {
+            onFailure?(.deliveryFailed)
+        }
     }
 
     #if DEBUG

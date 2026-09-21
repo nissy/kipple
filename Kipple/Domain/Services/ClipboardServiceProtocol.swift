@@ -29,6 +29,7 @@ protocol ClipboardServiceProtocol: AnyObject {
     func deleteItem(_ item: ClipItem)
     func deleteItem(_ item: ClipItem) async
     func flushPendingSaves() async
+    func saveBeforeTermination() async throws
 }
 
 @MainActor

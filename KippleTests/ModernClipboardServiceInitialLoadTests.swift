@@ -157,12 +157,17 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
     private var requestedLimitHistory: [Int] = []
     private var loadDelayNanoseconds: UInt64 = 0
     private var remainingLoadFailures = 0
+    private var remainingWriteFailures = 0
     private var onLoad: (@Sendable () -> Void)?
     private var shouldSuspendLoad = false
     private var loadContinuation: CheckedContinuation<Void, Never>?
 
     func failNextLoads(_ count: Int) {
         remainingLoadFailures = count
+    }
+
+    func failNextWrites(_ count: Int) {
+        remainingWriteFailures = count
     }
 
     func suspendLoad(onLoad: @escaping @Sendable () -> Void) {
@@ -234,6 +239,10 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
     }
 
     func applyChanges(inserted: [ClipItem], updated: [ClipItem], removed: [UUID]) async throws {
+        if remainingWriteFailures > 0 {
+            remainingWriteFailures -= 1
+            throw CocoaError(.fileWriteOutOfSpace)
+        }
         if !removed.isEmpty {
             storage.removeAll { removed.contains($0.id) }
         }

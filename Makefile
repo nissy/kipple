@@ -33,6 +33,7 @@ APPSTORE_EXPORT_OPTIONS = $(PROD_BUILD_DIR)/AppStoreExportOptions.plist
 DEVELOPMENT_TEAM ?= R7LKF73J2W
 PRODUCT_BUNDLE_IDENTIFIER ?= com.nissy.Kipple
 TEST_BUNDLE_IDENTIFIER ?= com.nissy.KippleTests
+DEV_CODE_SIGN_IDENTITY ?= Developer ID Application
 APPLE_DISTRIBUTION_IDENTITY ?= Apple Distribution
 APPLE_INSTALLER_IDENTITY ?= 3rd Party Mac Developer Installer
 APP_STORE_CONNECT_APPLE_ID ?= $(APPLE_ID)
@@ -121,6 +122,7 @@ generate: ## Generate Xcode project from project.yml
 build-dev: generate ## Build and run development version (keeps permissions)
 	@echo "$(BLUE)Building $(PROJECT_NAME) for development…$(NC)"
 	@echo "$(YELLOW)Team ID: $(DEVELOPMENT_TEAM)$(NC)"
+	@echo "$(YELLOW)Signing identity: $(DEV_CODE_SIGN_IDENTITY)$(NC)"
 	@mkdir -p $(DEV_BUILD_DIR)
 	xcodebuild -project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
@@ -130,9 +132,10 @@ build-dev: generate ## Build and run development version (keeps permissions)
 		-xcconfig Config/Version.xcconfig \
 		DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) \
 		APP_PRODUCT_BUNDLE_IDENTIFIER="$(PRODUCT_BUNDLE_IDENTIFIER)" \
-		CODE_SIGN_IDENTITY="-" \
-		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO \
+		CODE_SIGN_STYLE=Manual \
+		CODE_SIGN_IDENTITY="$(DEV_CODE_SIGN_IDENTITY)" \
+		CODE_SIGNING_REQUIRED=YES \
+		CODE_SIGNING_ALLOWED=YES \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		build
 	@echo "$(GREEN)Copying to dev directory…$(NC)"
@@ -211,9 +214,6 @@ test: generate ## Run all tests
 		-destination $(DESTINATION) \
 		-resultBundlePath build/TestResults \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
-		CODE_SIGN_IDENTITY="" \
-		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests
 	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/Debug/Kipple.app/Contents/Helpers/KippleMCP"
@@ -234,9 +234,6 @@ test-coverage: generate ## Run tests with coverage report
 		-resultBundlePath build/TestResults \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		-enableCodeCoverage YES \
-		CODE_SIGN_IDENTITY="" \
-		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests
 
@@ -252,9 +249,6 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		-scheme $(SCHEME) \
 		-destination $(DESTINATION) \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
-		CODE_SIGN_IDENTITY="" \
-		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests/$(TEST)
 

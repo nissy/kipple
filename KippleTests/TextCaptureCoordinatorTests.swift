@@ -204,15 +204,58 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(overlay.presentCallCount, 2)
     }
 
+    func testCaptureFailureWithPermissionShowsRetryInsteadOfPermissionAdvice() async throws {
+        try await assertCaptureFailure(
+            permissionGranted: true,
+            expectedMessage: "Failed to capture the screen. Please try again."
+        )
+    }
+
+    func testCaptureFailureAfterPermissionRevocationShowsPermissionAdvice() async throws {
+        try await assertCaptureFailure(
+            permissionGranted: false,
+            expectedMessage: "Failed to capture the screen. Check Screen & System Audio Recording in System Settings."
+        )
+    }
+
+    private func assertCaptureFailure(permissionGranted: Bool, expectedMessage: String) async throws {
+        let overlay = StubOverlayController()
+        let capture = SuspendedImageCaptureService()
+        var granted = true
+        var errors: [String] = []
+        let coordinator = makeCaptureCoordinator(
+            overlay: overlay, capture: capture,
+            permissionCheck: { granted }, errorPresenter: { errors.append($0) }
+        )
+        let captureRequested = expectation(description: "capture requested")
+        capture.onCapture = { captureRequested.fulfill() }
+        coordinator.startCaptureFlow()
+        overlay.selectionHandler?(CGRect(x: 0, y: 0, width: 100, height: 100), try XCTUnwrap(NSScreen.main))
+        await fulfillment(of: [captureRequested], timeout: 1)
+        let task = try XCTUnwrap(coordinator.test_captureTask())
+        granted = permissionGranted
+        capture.fail(with: NSError(domain: "TextCaptureCoordinatorTests", code: 1))
+        await task.value
+
+        XCTAssertEqual(errors, [NSLocalizedString(expectedMessage, comment: "")])
+        XCTAssertEqual(textRecognitionService.callCount, 0)
+        XCTAssertFalse(clipboardService.copyToClipboardCalled)
+        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+    }
+
     private func makeCaptureCoordinator(
-        overlay: StubOverlayController, capture: SuspendedImageCaptureService
+        overlay: StubOverlayController,
+        capture: SuspendedImageCaptureService,
+        permissionCheck: @escaping () -> Bool = { true },
+        errorPresenter: ((String) -> Void)? = nil
     ) -> TextCaptureCoordinator {
         TextCaptureCoordinator(
+            errorPresenter: errorPresenter,
             clipboardService: clipboardService,
             textRecognitionService: textRecognitionService,
             windowManager: windowManager,
             screenCapturePermission: .init(
-                preflight: { true }, request: { true }, openPermissionTab: {}, openSystemSettings: {},
+                preflight: permissionCheck, request: { true }, openPermissionTab: {}, openSystemSettings: {},
                 pollingIntervalNanoseconds: 10_000_000
             ),
             imageCaptureService: capture
@@ -389,10 +432,10 @@ private final class DummyTextRecognitionService: TextRecognitionServiceProtocol 
 @MainActor
 private final class SuspendedImageCaptureService: ScreenImageCapturing {
     var onCapture: (() -> Void)?
-    private var continuation: CheckedContinuation<CGImage, Never>?
+    private var continuation: CheckedContinuation<CGImage, any Error>?
 
     func captureImage(from rect: CGRect, on screen: NSScreen) async throws -> CGImage {
-        await withCheckedContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             onCapture?()
         }
@@ -400,6 +443,11 @@ private final class SuspendedImageCaptureService: ScreenImageCapturing {
 
     func complete(with image: CGImage) {
         continuation?.resume(returning: image)
+        continuation = nil
+    }
+
+    func fail(with error: any Error) {
+        continuation?.resume(throwing: error)
         continuation = nil
     }
 }

@@ -56,7 +56,8 @@ struct CategoryManagerView: View {
 
             HStack(spacing: CategoryManagerLayout.columnSpacing) {
                 TextField("Name", text: $name)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.bordered)
+                    .textInputBorderShape(.roundedRectangle)
                     .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth)
 
                 Menu {
@@ -65,7 +66,7 @@ struct CategoryManagerView: View {
                             symbol = s
                         } label: {
                             Label(s, systemImage: s)
-                                .labelStyle(.iconOnly)
+                                .labelStyle(.titleAndIcon)
                                 .accessibilityLabel(Text(s))
                         }
                     }
@@ -165,7 +166,7 @@ struct CategoryManagerView: View {
                                         action: { store.changeIcon(id: category.id, to: s) },
                                         label: {
                                             Label(s, systemImage: s)
-                                                .labelStyle(.iconOnly)
+                                                .labelStyle(.titleAndIcon)
                                                 .accessibilityLabel(Text(s))
                                         }
                                     )

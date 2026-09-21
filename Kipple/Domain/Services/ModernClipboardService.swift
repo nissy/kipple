@@ -22,12 +22,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var history: [ClipItem] = []
     private let mutationGate: AsyncMutationGate
     private let clipboardWriter: @MainActor @Sendable (ClipItem) -> Int
+    private let clipboardReader: ClipboardReader?
     private var copyGeneration: UInt64 = 0
     private var isRepositoryReady = false
     private var pollingTask: Task<Void, Never>?
     private let state = ClipboardState()
     private var lastEventTime = Date()
     private var lastChangeCount = 0
+    private var lastClipboardAccessRevision: UInt64 = 0
     private var initialClipboardChangeCount: Int?
     // ポーリング間隔（アクティブ時は短めにして遅延を減らす）
     private var currentInterval: TimeInterval = 0.12
@@ -55,10 +57,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     init(
         testRepository: ClipboardRepositoryProtocol,
         loadOnStartup: Bool = false,
-        clipboardWriter: @escaping @MainActor @Sendable (ClipItem) -> Int = writeSystemClipboard
+        clipboardWriter: @escaping @MainActor @Sendable (ClipItem) -> Int = writeSystemClipboard,
+        clipboardReader: ClipboardReader? = nil
     ) {
         mutationGate = AsyncMutationGate(initiallyOccupied: loadOnStartup)
         self.clipboardWriter = clipboardWriter
+        self.clipboardReader = clipboardReader
         repository = testRepository
         isRepositoryReady = !loadOnStartup
         if loadOnStartup {
@@ -71,13 +75,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Reserve the mutation gate before publishing the service, so startup always runs first.
         mutationGate = AsyncMutationGate(initiallyOccupied: true)
         clipboardWriter = Self.writeSystemClipboard
+        clipboardReader = nil
         Task { await initializeService() }
     }
 
     private func initializeService() async {
         defer { mutationGate.release() }
         maxHistoryItems = await MainActor.run { AppSettings.shared.maxHistoryItems }
-        lastChangeCount = await Self.currentPasteboardChangeCount()
+        let observation = await MainActor.run { (clipboardReader ?? .shared).observation }
+        lastChangeCount = observation.changeCount
+        lastClipboardAccessRevision = observation.accessRevision
         initialClipboardChangeCount = lastChangeCount
         if repository == nil {
             await initializeRepository()
@@ -334,8 +341,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             }
         } else {
             let richText = await MainActor.run {
-                NSPasteboard.general.string(forType: .string) == content
-                    ? ClipboardRichText(pasteboard: .general) : nil
+                let snapshot = (clipboardReader ?? .shared).read()
+                return snapshot?.text == content ? snapshot?.richText : nil
             }
             let draft = ClipItem(content: content, isFromEditor: true, richText: richText)
             newChangeCount = await writeClipboardItem(draft)
@@ -343,13 +350,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         guard await recordClipboardWrite(newChangeCount) else { return }
         updateLastChangeCount(newChangeCount)
-    }
-
-    @MainActor
-    private static func readStringFromPasteboard() -> String? {
-        autoreleasepool {
-            NSPasteboard.general.string(forType: .string)
-        }
     }
 
     @MainActor
@@ -571,7 +571,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Status and Configuration
 
     func getCurrentClipboardContent() async -> String? {
-        await Self.readStringFromPasteboard()
+        await MainActor.run { (clipboardReader ?? .shared).read()?.text }
     }
 
     func getCurrentInterval() async -> TimeInterval {
@@ -637,27 +637,30 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await checkClipboardWhileLocked()
     }
 
-    private func checkClipboardWhileLocked(forceCapture: Bool = false) async {
-        guard isRepositoryReady else { return }
-        let changeCount = await Self.currentPasteboardChangeCount()
+    @discardableResult
+    private func checkClipboardWhileLocked(forceCapture: Bool = false) async -> Bool {
+        guard isRepositoryReady else { return false }
+        let observation = await MainActor.run { (clipboardReader ?? .shared).observation }
+        let changeCount = observation.changeCount
 
-        guard forceCapture || changeCount != lastChangeCount else { return }
+        guard forceCapture || changeCount != lastChangeCount
+                || observation.accessRevision != lastClipboardAccessRevision else { return true }
 
-        if await shouldSkipChange(for: changeCount) { return }
+        if await shouldSkipChange(for: changeCount) { return true }
 
         let detectedAt = PerformanceTrace.nowMicros()
-        lastChangeCount = changeCount
 
         // Get clipboard content
         let fetchStartedAt = PerformanceTrace.nowMicros()
         let captured = await MainActor.run {
-            let pasteboard = NSPasteboard.general
-            return (pasteboard.string(forType: .string), ClipboardRichText(pasteboard: pasteboard), pasteboard.changeCount)
+            (clipboardReader ?? .shared).read()
         }
         // A copy arriving between the change-count check and capture must be retried as a whole.
-        guard captured.2 == changeCount else { return }
-        guard var item = await fetchClipboardItem(captured.0) else { return }
-        item.richText = captured.1
+        guard let captured, captured.stamp.changeCount == changeCount else { return false }
+        lastChangeCount = changeCount
+        lastClipboardAccessRevision = captured.stamp.accessRevision
+        guard var item = await fetchClipboardItem(captured.text) else { return true }
+        item.richText = captured.richText
         PerformanceTrace.event(
             "pasteboard_change_detected",
             atMicros: detectedAt,
@@ -681,6 +684,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Reset flags
         await state.setFromEditor(false)
+        return true
     }
 
     private func addToHistory(_ item: ClipItem) {
@@ -865,6 +869,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func flushPendingSaves() async {
         await persistHistoryDiff()
+    }
+
+    func saveBeforeTermination() async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        try Task.checkCancellation()
+        try await saveHistory(history)
+        try Task.checkCancellation()
     }
 
     // MARK: - App Info
@@ -1054,6 +1066,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
 #if DEBUG
 extension ModernClipboardService {
+    func checkClipboardForTesting() async {
+        await checkClipboard()
+    }
+
     func addExternalClipboardItemForTesting(_ content: String, copiedAt: Date = Date()) async {
         var item = ClipItem(
             content: content,
@@ -1128,8 +1144,12 @@ extension ModernClipboardService {
         let expectedChangeCount = await Self.currentPasteboardChangeCount()
         if isMonitoringFlag {
             // Startup normally ignores the pre-existing clipboard; save it before the first plain-text paste.
-            await checkClipboardWhileLocked(forceCapture: initialClipboardChangeCount == expectedChangeCount)
+            guard await checkClipboardWhileLocked(
+                forceCapture: initialClipboardChangeCount == expectedChangeCount
+            ) else { return false }
         }
+        let captured = await MainActor.run { (clipboardReader ?? .shared).read() }
+        guard queuedItem != nil || captured != nil else { return false }
         let writtenChangeCount = await MainActor.run { () -> Int? in
             let pasteboard = NSPasteboard.general
             guard !Task.isCancelled, pasteboard.changeCount == expectedChangeCount else { return nil }
@@ -1137,7 +1157,8 @@ extension ModernClipboardService {
             if let queuedItem {
                 item = queuedItem
             } else {
-                guard let content = pasteboard.string(forType: .string), !content.isEmpty else { return nil }
+                guard let captured, captured.stamp.changeCount == expectedChangeCount,
+                      let content = captured.text, !content.isEmpty else { return nil }
                 item = ClipItem(content: content)
             }
             return operation(item, expectedChangeCount)
