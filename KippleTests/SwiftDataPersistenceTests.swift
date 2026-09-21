@@ -2,7 +2,6 @@ import XCTest
 @testable import Kipple
 
 /// Regression tests for SwiftData persistence to ensure updates and deletions work correctly
-@available(macOS 14.0, *)
 @MainActor
 final class SwiftDataPersistenceTests: XCTestCase {
     private var repository: SwiftDataRepository!

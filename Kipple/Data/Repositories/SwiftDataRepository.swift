@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
 
-@available(macOS 14.0, *)
 actor SwiftDataRepository: ClipboardRepositoryProtocol {
     private let container: ModelContainer
 
@@ -211,7 +210,8 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 processId: item.processID,
                 isFromEditor: item.isFromEditor ?? false,
                 userCategoryId: item.userCategoryId,
-                metadata: item.metadata
+                metadata: item.metadata,
+                richText: item.richText
             )
             context.insert(model)
         }
@@ -244,7 +244,8 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 processId: item.processID,
                 isFromEditor: item.isFromEditor ?? false,
                 userCategoryId: item.userCategoryId,
-                metadata: item.metadata
+                metadata: item.metadata,
+                richText: item.richText
             ))
         }
     }
@@ -261,7 +262,6 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
     }
 }
 
-@available(macOS 14.0, *)
 private extension ClipItemModel {
     func update(with item: ClipItem) {
         content = item.content
@@ -275,5 +275,6 @@ private extension ClipItemModel {
         isFromEditor = item.isFromEditor ?? false
         userCategoryId = item.userCategoryId
         metadataData = item.metadata.flatMap { try? JSONEncoder().encode($0) }
+        richTextData = item.richText.flatMap { try? JSONEncoder().encode($0) }
     }
 }

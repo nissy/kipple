@@ -90,7 +90,6 @@ final class AppSettings: ObservableObject {
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
     
     // Launch Settings
-    @AppStorage("autoLaunchAtLogin") var autoLaunchAtLogin: Bool = false
     
     // Category Filter Settings
     @AppStorage("filterCategoryURL") private var storedFilterCategoryURL: Bool = true

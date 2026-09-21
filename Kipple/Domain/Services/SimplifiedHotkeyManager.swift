@@ -17,7 +17,6 @@ final class SimplifiedHotkeyManager {
     private var localEventMonitor: Any?
     private var isEnabled: Bool = true
     private var startGeneration: UInt64 = 0
-    private var hasInputMonitoringPermission = false
     private var hotKeyRef: EventHotKeyRef?
     private var isHotKeyRegistered = false
     @MainActor private static var hotKeyEventHandler: EventHandlerRef?
@@ -98,23 +97,6 @@ final class SimplifiedHotkeyManager {
         return description
     }
 
-    /// Check if we have Input Monitoring permission
-    private func checkInputMonitoringPermission() {
-        if isRunningTests {
-            hasInputMonitoringPermission = true
-            return
-        }
-        // Test if global monitoring is working by checking if we can create a test monitor
-        let testMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { _ in }
-        if let monitor = testMonitor {
-            NSEvent.removeMonitor(monitor)
-            hasInputMonitoringPermission = true
-        } else {
-            hasInputMonitoringPermission = false
-            Logger.shared.warning("Input Monitoring permission: NOT GRANTED - Global hotkey will only work when Kipple is active")
-        }
-    }
-
     // MARK: - Private Methods
 
     private func startMonitoring() {
@@ -143,7 +125,8 @@ final class SimplifiedHotkeyManager {
                 self.isHotKeyRegistered = true
             }
 
-            // Try to add global monitor (requires Input Monitoring permission)
+            // Registration failure fallback. Global key monitoring requires accessibility access;
+            // RegisterEventHotKey above does not require it.
             self.globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 self?.handleKeyEvent(event)
             }
@@ -161,9 +144,6 @@ final class SimplifiedHotkeyManager {
                 }
                 return event
             }
-
-            // Check if we have Input Monitoring permission
-            self.checkInputMonitoringPermission()
         }
     }
 

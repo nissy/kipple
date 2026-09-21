@@ -8,7 +8,6 @@
 import XCTest
 @testable import Kipple
 
-@available(macOS 14.0, *)
 @MainActor
 final class RecopyHistoryUpdateTests: XCTestCase {
     private var service: ModernClipboardService!

@@ -9,15 +9,20 @@ import SwiftUI
 import AppKit
 
 struct GeneralSettingsView: View {
-    @AppStorage("autoLaunchAtLogin") private var autoLaunchAtLogin = false
+    var onOpenPermissions: () -> Void
+    @ObservedObject private var launchAtLogin = LaunchAtLogin.shared
     @AppStorage("hotkeyKeyCode") private var hotkeyKeyCode: Int = 0
     @AppStorage("hotkeyModifierFlags") private var hotkeyModifierFlags: Int = 0
     @AppStorage("windowAnimation") private var windowAnimation: String = "none"
     @ObservedObject private var appSettings = AppSettings.shared
+    @ObservedObject private var plainTextHotkey = PlainTextPasteHotkey.shared
 
     @State private var tempKeyCode: UInt16 = 0
     @State private var tempModifierFlags: NSEvent.ModifierFlags = []
     @State private var selectedLanguage: AppSettings.LanguageOption = .system
+    @State private var plainTextKeyCode: UInt16 = 9
+    @State private var plainTextModifiers: NSEvent.ModifierFlags = [.command, .shift]
+    @State private var plainTextHotkeyError: PlainTextPasteHotkey.ConfigurationError?
 
     var body: some View {
         ScrollView {
@@ -25,18 +30,35 @@ struct GeneralSettingsView: View {
                 languageSection
                 startupSection
                 openKippleSection
+                pasteSection
                 windowAnimationSection
             }
             .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding)
             .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         }
         .onAppear {
+            launchAtLogin.checkStatus()
             tempKeyCode = UInt16(hotkeyKeyCode)
             tempModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(hotkeyModifierFlags))
             selectedLanguage = appSettings.appLanguage
+            plainTextHotkey.refreshPermission()
+            loadPlainTextHotkey()
         }
         .onChange(of: selectedLanguage) { _, newValue in
             appSettings.appLanguage = newValue
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            launchAtLogin.checkStatus()
+        }
+        .onChange(of: plainTextHotkey.hasAccessibilityPermission) { _, _ in
+            plainTextHotkeyError = nil
+            loadPlainTextHotkey()
+        }
+        .task {
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                plainTextHotkey.refreshPermission()
+            }
         }
     }
 
@@ -60,10 +82,19 @@ struct GeneralSettingsView: View {
         SettingsGroup("Startup") {
             SettingsRow(
                 label: "Launch at login",
-                isOn: $autoLaunchAtLogin
+                isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.setEnabled($0) })
             )
-            .onChange(of: autoLaunchAtLogin) { _, newValue in
-                LaunchAtLogin.shared.isEnabled = newValue
+            if launchAtLogin.status == .requiresApproval {
+                SettingsRow(
+                    label: "Approval required",
+                    description: "Allow Kipple in Login Items to launch at login."
+                ) {
+                    Button("Open System Settings") { launchAtLogin.openSystemSettings() }
+                }
+            } else if launchAtLogin.status == .notFound {
+                Text("The login item could not be found. Move Kipple to Applications and try again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -93,6 +124,79 @@ struct GeneralSettingsView: View {
                 .frame(width: 200)
                 .labelsHidden()
             }
+        }
+    }
+
+    private var pasteSection: some View {
+        SettingsGroup("Pasting") {
+            SettingsRow(label: plainTextHotkey.swapsPasteFormatting ? "Paste as Plain Text" : "Paste with Formatting") {
+                Text("⌘V")
+            }
+            SettingsRow(label: plainTextHotkey.swapsPasteFormatting ? "Paste with Formatting" : "Paste as Plain Text") {
+                HotkeyRecorderField(
+                    keyCode: $plainTextKeyCode,
+                    modifierFlags: $plainTextModifiers,
+                    onCommit: updatePlainTextHotkey
+                )
+                .disabled(!plainTextHotkey.hasAccessibilityPermission)
+                .help("Click the shortcut field to change it. Clear disables the shortcut.")
+            }
+            SettingsRow(
+                label: "Swap paste formatting",
+                isOn: Binding(
+                    get: { plainTextHotkey.swapsPasteFormatting },
+                    set: { plainTextHotkeyError = plainTextHotkey.setSwapsPasteFormatting($0) }
+                )
+            )
+            .disabled(!plainTextHotkey.hasAccessibilityPermission || plainTextHotkey.shortcut == .disabled)
+            if !plainTextHotkey.hasAccessibilityPermission {
+                Text("Allow Device Control and Data Access to configure and use paste shortcuts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Permission Settings", action: onOpenPermissions)
+                    .controlSize(.small)
+            } else if let plainTextHotkeyError {
+                Text(plainTextHotkeyErrorMessage(plainTextHotkeyError))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if plainTextHotkey.registrationFailed {
+                Text("The paste shortcut is unavailable. Check for a conflicting shortcut in another app.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(
+                LocalizedStringKey(
+                    "Kipple keeps the original formatting so you can choose either shortcut for each paste. "
+                        + "Menu and mouse paste use the clipboard’s current format."
+                )
+            )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func loadPlainTextHotkey() {
+        plainTextKeyCode = plainTextHotkey.shortcut.keyCode
+        plainTextModifiers = plainTextHotkey.shortcut.modifiers
+    }
+
+    private func updatePlainTextHotkey(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        plainTextHotkeyError = plainTextHotkey.apply(keyCode: keyCode, modifiers: modifiers)
+        loadPlainTextHotkey()
+    }
+
+    private func plainTextHotkeyErrorMessage(_ error: PlainTextPasteHotkey.ConfigurationError) -> LocalizedStringKey {
+        switch error {
+        case .permissionRequired:
+            "Allow Device Control and Data Access to configure and use paste shortcuts."
+        case .modifierRequired:
+            "Include Command, Control, or Option in the shortcut."
+        case .shortcutUnavailable:
+            "This shortcut is already in use. Your previous shortcut has been kept."
         }
     }
 

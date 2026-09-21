@@ -240,7 +240,6 @@ extension MainView {
             }
         }
         .padding(.top, titleBarHeight)
-        .kippleLiquidWindowBackground()
         .frame(minWidth: 300, maxWidth: .infinity)
         .overlay(alignment: .top) { titleBarControls }
         .overlay(

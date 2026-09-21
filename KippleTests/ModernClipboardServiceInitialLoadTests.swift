@@ -156,6 +156,30 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
     private var storage: [ClipItem] = []
     private var requestedLimitHistory: [Int] = []
     private var loadDelayNanoseconds: UInt64 = 0
+    private var remainingLoadFailures = 0
+    private var remainingWriteFailures = 0
+    private var onLoad: (@Sendable () -> Void)?
+    private var shouldSuspendLoad = false
+    private var loadContinuation: CheckedContinuation<Void, Never>?
+
+    func failNextLoads(_ count: Int) {
+        remainingLoadFailures = count
+    }
+
+    func failNextWrites(_ count: Int) {
+        remainingWriteFailures = count
+    }
+
+    func suspendLoad(onLoad: @escaping @Sendable () -> Void) {
+        shouldSuspendLoad = true
+        self.onLoad = onLoad
+    }
+
+    func resumeLoad() {
+        shouldSuspendLoad = false
+        loadContinuation?.resume()
+        loadContinuation = nil
+    }
 
     func configure(items: [ClipItem], loadDelay: UInt64) {
         storage = items.sorted { $0.timestamp > $1.timestamp }
@@ -174,6 +198,16 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
 
     func load(limit: Int) async throws -> [ClipItem] {
         requestedLimitHistory.append(limit)
+        if shouldSuspendLoad {
+            await withCheckedContinuation { continuation in
+                loadContinuation = continuation
+                onLoad?()
+            }
+        }
+        if remainingLoadFailures > 0 {
+            remainingLoadFailures -= 1
+            throw CocoaError(.fileReadCorruptFile)
+        }
         if loadDelayNanoseconds > 0 {
             try await Task.sleep(nanoseconds: loadDelayNanoseconds)
         }
@@ -205,6 +239,10 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
     }
 
     func applyChanges(inserted: [ClipItem], updated: [ClipItem], removed: [UUID]) async throws {
+        if remainingWriteFailures > 0 {
+            remainingWriteFailures -= 1
+            throw CocoaError(.fileWriteOutOfSpace)
+        }
         if !removed.isEmpty {
             storage.removeAll { removed.contains($0.id) }
         }

@@ -71,7 +71,7 @@ struct SettingsView: View {
     private var tabContent: some View {
         switch activeTab {
         case .general:
-            GeneralSettingsView()
+            GeneralSettingsView { viewModel.selectedTab = .permission }
         case .editor:
             EditorSettingsView()
         case .clipboard:

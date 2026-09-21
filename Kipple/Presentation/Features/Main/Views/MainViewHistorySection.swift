@@ -125,12 +125,6 @@ struct MainViewHistorySection: View {
         .padding(.horizontal, MainViewMetrics.HistoryColumns.sectionHorizontalPadding
                  + MainViewMetrics.HistoryColumns.horizontalInset)
         .padding(.vertical, 6)
-        .kippleGlassPanel(
-            cornerRadius: 20,
-            fillOpacity: 0.30,
-            strokeOpacity: 0,
-            highlightOpacity: 0.05
-        )
     }
 
     @ViewBuilder

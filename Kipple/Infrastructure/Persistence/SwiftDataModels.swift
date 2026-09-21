@@ -2,7 +2,6 @@ import Foundation
 import SwiftData
 
 @Model
-@available(macOS 14.0, *)
 final class ClipItemModel {
     @Attribute(.unique) var id: UUID
     var content: String
@@ -16,6 +15,7 @@ final class ClipItemModel {
     var isFromEditor: Bool
     var userCategoryId: UUID?
     var metadataData: Data?
+    @Attribute(.externalStorage) var richTextData: Data?
 
     init(
         id: UUID = UUID(),
@@ -29,7 +29,8 @@ final class ClipItemModel {
         processId: Int32? = nil,
         isFromEditor: Bool = false,
         userCategoryId: UUID? = nil,
-        metadata: ClipMetadata? = nil
+        metadata: ClipMetadata? = nil,
+        richText: ClipboardRichText? = nil
     ) {
         self.id = id
         self.content = content
@@ -43,6 +44,7 @@ final class ClipItemModel {
         self.isFromEditor = isFromEditor
         self.userCategoryId = userCategoryId
         self.metadataData = metadata.flatMap { try? JSONEncoder().encode($0) }
+        self.richTextData = richText.flatMap { try? JSONEncoder().encode($0) }
     }
 
     convenience init(from clipItem: ClipItem) {
@@ -58,7 +60,8 @@ final class ClipItemModel {
             processId: clipItem.processID,
             isFromEditor: clipItem.isFromEditor ?? false,
             userCategoryId: clipItem.userCategoryId,
-            metadata: clipItem.metadata
+            metadata: clipItem.metadata,
+            richText: clipItem.richText
         )
     }
 
@@ -75,7 +78,8 @@ final class ClipItemModel {
             processID: processId,
             isFromEditor: isFromEditor,
             userCategoryId: userCategoryId,
-            metadata: metadataData.flatMap { try? JSONDecoder().decode(ClipMetadata.self, from: $0) }
+            metadata: metadataData.flatMap { try? JSONDecoder().decode(ClipMetadata.self, from: $0) },
+            richText: richTextData.flatMap { try? JSONDecoder().decode(ClipboardRichText.self, from: $0) }
         )
     }
 
@@ -86,7 +90,6 @@ final class ClipItemModel {
 
 // MARK: - Batch Operations Helper
 
-@available(macOS 14.0, *)
 extension ModelContext {
     func batchDelete<T: PersistentModel>(
         _ type: T.Type,

@@ -26,12 +26,23 @@ final class MenuBarApp: NSObject, ObservableObject {
     }()
     var textCaptureHotkeyManager: TextCaptureHotkeyManager?
     var textCaptureHotkeyObserver: NSObjectProtocol?
+    var plainTextPasteController: PlainTextPasteController?
     private var screenRecordingPermissionObserver: NSObjectProtocol?
-    private var inputMonitoringPermissionObserver: NSObjectProtocol?
+    private var queuePastePermissionObserver: NSObjectProtocol?
     
-    // Properties for asynchronous termination handling
-    private var isTerminating = false
-    private var terminationWorkItem: DispatchWorkItem?
+    private lazy var terminationController = ApplicationTerminationController(
+        save: { [weak self] in
+            guard let self else { throw CancellationError() }
+            MCPIntegration.shared.stop()
+            try await clipboardService.saveBeforeTermination()
+        },
+        reply: { NSApplication.shared.reply(toApplicationShouldTerminate: $0) },
+        onFailure: { [weak self] failure in
+            MCPIntegration.shared.restart()
+            SystemDiagnostics.failure("terminationCancelled", error: failure)
+            DispatchQueue.main.async { self?.showTerminationFailure() }
+        }
+    )
     
     // Detect whether we are running in a test environment
     private static var isTestEnvironment: Bool {
@@ -55,6 +66,11 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Skip heavy initialization when running unit tests
         guard !Self.isTestEnvironment else { return }
 
+        SystemDiagnostics.permissions(
+            screenCapture: CGPreflightScreenCaptureAccess(),
+            accessibility: AXIsProcessTrusted(),
+            clipboard: NSPasteboard.general.accessBehavior
+        )
         observePermissionRequests()
 
         // Set up notification for SimplifiedHotkeyManager
@@ -80,6 +96,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.setupTextCaptureHotkey()
+            self.setupPlainTextPasteHotkey()
             self.startServices()
             DispatchQueue.main.async { [weak self] in
                 self?.windowManager.prewarmMainWindow()
@@ -101,17 +118,17 @@ final class MenuBarApp: NSObject, ObservableObject {
             }
         }
 
-        inputMonitoringPermissionObserver = NotificationCenter.default.addObserver(
-            forName: .inputMonitoringPermissionRequested,
+        queuePastePermissionObserver = NotificationCenter.default.addObserver(
+            forName: .queuePastePermissionRequested,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.windowManager.openSettings(tab: .permission)
-                // 初回はシステムのプロンプトを出し、出せない (既に拒否済み等) 場合は設定ペインへ誘導
-                if !CGRequestListenEventAccess() {
-                    self.openInputMonitoringPreferences()
+                let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+                if !AXIsProcessTrustedWithOptions(options) {
+                    self.openAccessibilityPreferences()
                 }
             }
         }
@@ -207,59 +224,20 @@ final class MenuBarApp: NSObject, ObservableObject {
     }
     
     @MainActor
-    private func openInputMonitoringPreferences() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+    private func openAccessibilityPreferences() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
     }
     
-    private func performAsyncTermination() {
-        
-        // Timeout handler (maximum 2 seconds)
-        let timeoutWorkItem = DispatchWorkItem { [weak self] in
-            Logger.shared.error("⚠️ Save operation timed out, forcing quit")
-            self?.forceTerminate()
-        }
-        self.terminationWorkItem = timeoutWorkItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: timeoutWorkItem)
-        
-        // Execute the save work asynchronously
-        Task {
-            // Flush any debounced saves immediately
-            await clipboardService.flushPendingSaves()
-
-            // Cancel the watchdog timeout
-            self.terminationWorkItem?.cancel()
-            
-            // Finish termination on the main thread
-            await MainActor.run { [weak self] in
-                self?.completeTermination()
-            }
-        }
-    }
-    
-    private func completeTermination() {
-        
-        clipboardService.stopMonitoring()
-        
-        // cleanup method was removed in Swift 6.2 migration
-        
-        // Allow the application to terminate
-        NSApplication.shared.reply(toApplicationShouldTerminate: true)
-    }
-    
-    private func forceTerminate() {
-        
-        // Force termination when the timeout fires
-        DispatchQueue.main.async { [weak self] in
-            
-            self?.clipboardService.stopMonitoring()
-            // cleanup method was removed in Swift 6.2 migration
-            
-            // Allow the application to terminate immediately
-            
-            NSApplication.shared.reply(toApplicationShouldTerminate: true)
-        }
+    private func showTerminationFailure() {
+        let alert = NSAlert()
+        alert.messageText = appSettings.localizedString("Kipple could not finish saving")
+        alert.informativeText = appSettings.localizedString(
+            "Quitting was cancelled to keep your history. Please try quitting again after saving finishes."
+        )
+        alert.addButton(withTitle: appSettings.localizedString("OK"))
+        alert.runModal()
     }
 }
 
@@ -290,25 +268,7 @@ extension MenuBarApp {
 // MARK: - NSApplicationDelegate
 extension MenuBarApp: NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        
-        // Allow immediate termination during tests
-        if Self.isTestEnvironment {
-            return .terminateNow
-        }
-        
-        // If termination is already in progress
-        if isTerminating {
-            Logger.shared.warning("Already terminating, this should not happen!")
-            // Permit immediate termination if previous async work is stuck
-            return .terminateNow
-        }
-        
-        // Begin the asynchronous termination flow
-        isTerminating = true
-        performAsyncTermination()
-        
-        // Cancel termination for now (will reply later)
-        return .terminateCancel
+        terminationController.requestTermination()
     }
     
     func applicationWillTerminate(_ notification: Notification) {

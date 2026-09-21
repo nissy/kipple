@@ -182,14 +182,9 @@ final class HistoryPopoverManager {
         controller.view.layer?.masksToBounds = true
         controller.view.translatesAutoresizingMaskIntoConstraints = false
 
-        if #available(macOS 26.0, *) {
-            installGlass(controller, in: panel)
-        } else {
-            installMaterial(controller, in: panel)
-        }
+        installGlass(controller, in: panel)
     }
 
-    @available(macOS 26.0, *)
     private func installGlass(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
         let container = GlassContainerView(cornerRadius: 18)
         let glassView = NSGlassEffectView()
@@ -204,25 +199,6 @@ final class HistoryPopoverManager {
         glassView.contentView = controller.view
         container.addSubview(glassView)
         pin(glassView, to: container)
-        panel.contentView = container
-        panel.contentViewController = nil
-    }
-
-    private func installMaterial(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
-        let container = GlassContainerView(cornerRadius: 18)
-        let materialView = NSVisualEffectView()
-        materialView.blendingMode = .behindWindow
-        materialView.material = .popover
-        materialView.state = .active
-        materialView.translatesAutoresizingMaskIntoConstraints = false
-        materialView.wantsLayer = true
-        materialView.layer?.cornerRadius = 18
-        materialView.layer?.cornerCurve = .continuous
-        materialView.layer?.masksToBounds = true
-        materialView.addSubview(controller.view)
-        container.addSubview(materialView)
-        pin(materialView, to: container)
-        pin(controller.view, to: materialView)
         panel.contentView = container
         panel.contentViewController = nil
     }

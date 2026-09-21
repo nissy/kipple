@@ -5,52 +5,59 @@
 //  Created by Kipple on 2025/06/28.
 //
 
+import Combine
 import Foundation
 import ServiceManagement
 
 @MainActor
-final class LaunchAtLogin {
+final class LaunchAtLogin: ObservableObject {
     static let shared = LaunchAtLogin()
-    
-    private init() {}
+
+    @Published private(set) var status: SMAppService.Status
+    private let readStatus: () -> SMAppService.Status
+    private let register: () throws -> Void
+    private let unregister: () throws -> Void
+
+    init(
+        readStatus: @escaping () -> SMAppService.Status = { SMAppService.mainApp.status },
+        register: @escaping () throws -> Void = { try SMAppService.mainApp.register() },
+        unregister: @escaping () throws -> Void = { try SMAppService.mainApp.unregister() }
+    ) {
+        self.readStatus = readStatus
+        self.register = register
+        self.unregister = unregister
+        status = readStatus()
+    }
     
     var isEnabled: Bool {
-        get { SMAppService.mainApp.status == .enabled }
+        get { status == .enabled || status == .requiresApproval }
         set { setEnabled(newValue) }
     }
     
     func setEnabled(_ enabled: Bool) {
+        checkStatus()
         do {
             if enabled {
-                if SMAppService.mainApp.status == .enabled {
-                    return
-                }
-
-                try SMAppService.mainApp.register()
-            } else {
-                if SMAppService.mainApp.status != .enabled {
-                    return
-                }
-
-                try SMAppService.mainApp.unregister()
+                if !isEnabled { try register() }
+            } else if status != .notRegistered {
+                try unregister()
             }
-
-            // 設定を同期
-            UserDefaults.standard.set(enabled, forKey: "autoLaunchAtLogin")
         } catch {
-            let action = enabled ? "enable" : "disable"
-            Logger.shared.error("Failed to \(action) launch at login: \(error.localizedDescription)")
-
-            // エラーの詳細をユーザーに通知
+            SystemDiagnostics.failure("launchAtLogin", error: error)
             NotificationCenter.default.post(
                 name: NSNotification.Name("LaunchAtLoginError"),
                 object: nil,
                 userInfo: ["error": error.localizedDescription]
             )
         }
+        checkStatus()
     }
     
     func checkStatus() {
-        _ = SMAppService.mainApp.status
+        status = readStatus()
+    }
+
+    func openSystemSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 }

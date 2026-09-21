@@ -9,6 +9,7 @@ import SwiftUI
 import Carbon
 
 struct HotkeyRecorderView: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var keyCode: Int
     @Binding var modifierFlags: Int
     let placeholder: String
@@ -32,6 +33,7 @@ struct HotkeyRecorderView: NSViewRepresentable {
     }
     
     private func updateTextField(_ textField: NSTextField) {
+        textField.isEnabled = isEnabled
         let modifierFlagsValue = NSEvent.ModifierFlags(rawValue: UInt(modifierFlags))
         
         if keyCode == 0 && modifierFlagsValue.isEmpty {
@@ -87,8 +89,10 @@ struct HotkeyRecorderView: NSViewRepresentable {
 }
 
 struct HotkeyRecorderField: View {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var keyCode: UInt16
     @Binding var modifierFlags: NSEvent.ModifierFlags
+    var onCommit: ((UInt16, NSEvent.ModifierFlags) -> Void)?
     @State private var isRecording = false
     
     var body: some View {
@@ -114,6 +118,7 @@ struct HotkeyRecorderField: View {
                         .stroke(isRecording ? Color.blue : Color(NSColor.separatorColor), lineWidth: 1)
                 )
                 .onTapGesture {
+                    guard isEnabled else { return }
                     isRecording = true
                     NotificationCenter.default.post(
                         name: NSNotification.Name("SuspendGlobalHotkeyCapture"),
@@ -122,8 +127,10 @@ struct HotkeyRecorderField: View {
                 }
 
             Button("Clear") {
+                guard isEnabled else { return }
                 keyCode = 0
                 modifierFlags = .init()
+                onCommit?(0, [])
                 isRecording = false
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ResumeGlobalHotkeyCapture"),
@@ -138,7 +145,12 @@ struct HotkeyRecorderField: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(4)
         }
-        .background(KeyEventHandler(isRecording: $isRecording, keyCode: $keyCode, modifierFlags: $modifierFlags))
+        .background(KeyEventHandler(
+            isRecording: $isRecording, keyCode: $keyCode, modifierFlags: $modifierFlags, onCommit: onCommit
+        ))
+        .onChange(of: isEnabled) { _, enabled in
+            if !enabled { isRecording = false }
+        }
         .onChange(of: isRecording) { _, recording in
             if !recording {
                 NotificationCenter.default.post(
@@ -160,16 +172,24 @@ struct HotkeyRecorderField: View {
 }
 
 struct KeyEventHandler: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var isRecording: Bool
     @Binding var keyCode: UInt16
     @Binding var modifierFlags: NSEvent.ModifierFlags
+    var onCommit: ((UInt16, NSEvent.ModifierFlags) -> Void)?
     
     func makeNSView(context: Context) -> NSView {
         let view = KeyCaptureView()
+        configure(view)
+        return view
+    }
+
+    private func configure(_ view: KeyCaptureView) {
         view.onKeyDown = { event in
-            if isRecording {
+            if isEnabled && isRecording {
                 keyCode = event.keyCode
                 modifierFlags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+                onCommit?(keyCode, modifierFlags)
                 isRecording = false
                 NotificationCenter.default.post(name: NSNotification.Name("ResumeGlobalHotkeyCapture"), object: nil)
                 return true
@@ -181,12 +201,12 @@ struct KeyEventHandler: NSViewRepresentable {
                 isRecording = false
             }
         }
-        return view
     }
     
     func updateNSView(_ nsView: NSView, context: Context) {
         if let view = nsView as? KeyCaptureView {
-            view.isActive = isRecording
+            configure(view)
+            view.isActive = isEnabled && isRecording
         }
     }
 }
@@ -230,7 +250,7 @@ final class KeyCaptureView: NSView {
     }
     
     override func keyDown(with event: NSEvent) {
-        if onKeyDown?(event) ?? false {
+        if isActive, onKeyDown?(event) ?? false {
             return
         }
         super.keyDown(with: event)

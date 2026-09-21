@@ -13,7 +13,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     // MARK: - Properties
 
-    private let modernService = ModernClipboardService.shared
+    private let modernService: ModernClipboardService
     private let refreshGate = AsyncMutationGate()
     private var refreshTask: Task<Void, Never>?
     private var operationGeneration: UInt64 = 0
@@ -31,7 +31,8 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     // MARK: - Initialization
 
-    private init() {
+    init(modernService: ModernClipboardService = .shared, refreshPeriodically: Bool = true) {
+        self.modernService = modernService
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(historyDidChange(_:)),
@@ -41,7 +42,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         NotificationCenter.default.addObserver(
             self, selector: #selector(mcpWillCopy(_:)), name: .mcpWillCopy, object: nil
         )
-        startPeriodicRefresh()
+        if refreshPeriodically { startPeriodicRefresh() }
     }
 
     @objc private func mcpWillCopy(_ notification: Notification) {
@@ -90,15 +91,37 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
-    func copyRecognizedText(_ content: String) {
-        pendingClipboardContent = content
-        currentClipboardContent = content
-        enqueueClipboardOperation { [self] generation in
-            await modernService.copyToClipboard(content, fromEditor: false, source: .ocr) {
-                await self.isCurrentOperation(generation)
+    func copyRecognizedText(_ content: String) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        var copied = false
+        let task = enqueueClipboardOperation { [self] generation in
+            copied = await modernService.copyToClipboard(content, fromEditor: false, source: .ocr) {
+                await self.isCurrentOperation(generation) && !Task.isCancelled
             }
             await refreshHistory()
         }
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        return copied && !Task.isCancelled
+    }
+
+    func performClipboardPaste(
+        of queuedItem: ClipItem? = nil,
+        _ operation: @escaping @MainActor @Sendable (ClipItem, Int) -> Int?
+    ) async -> Bool {
+        var backupAvailable = true
+        await enqueueClipboardOperation { [self] generation in
+            guard isCurrentOperation(generation) else { return }
+            backupAvailable = await modernService.performClipboardPaste(of: queuedItem) { item, changeCount in
+                guard self.isCurrentOperation(generation), !Task.isCancelled else { return nil }
+                return operation(item, changeCount)
+            }
+            await refreshHistory()
+        }.value
+        return backupAvailable
     }
 
     func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
@@ -219,8 +242,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func flushPendingSaves() async {
-        // Delegate to the modern service
+        await pendingOperationTask?.value
         await modernService.flushPendingSaves()
+    }
+
+    func saveBeforeTermination() async throws {
+        let wasMonitoring = await modernService.isMonitoring()
+        await modernService.stopMonitoring()
+        do {
+            await pendingOperationTask?.value
+            try await modernService.saveBeforeTermination()
+        } catch {
+            if wasMonitoring { await modernService.startMonitoring() }
+            throw error
+        }
     }
 
     func searchHistory(_ query: String) -> [ClipItem] {

@@ -51,7 +51,7 @@ enum MCPProtocolConfig {
 
     static func socketURL() throws -> URL {
 #if DEBUG
-        // Unsigned development builds cannot use the signed App Group container.
+        // Development builds keep storage and their socket separate from the sandboxed release.
         // Test hosts must not replace the running development app's listener.
         let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
             NSClassFromString("XCTest") != nil

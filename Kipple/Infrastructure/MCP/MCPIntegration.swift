@@ -50,6 +50,7 @@ final class MCPIntegration: ObservableObject {
                 }
                 status = "MCP ready"
             } catch {
+                SystemDiagnostics.failure("mcpListenerStart", error: error)
                 if isActive(expected) { status = "MCP unavailable" }
             }
         }

@@ -67,6 +67,14 @@ Queue lets you paste multiple history items in a chosen order.
 
 Turn on Queue, select clips from history, then press `Command + V` repeatedly. Kipple advances to the next queued item after each paste. Loop mode can repeat the queue.
 
+Use the plain text paste shortcut (default: `Command + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Queue paste requires **Device Control and Data Access** permission.
+
+Change or clear the plain text paste shortcut in **Settings → General → Pasting**. Device Control and Data Access permission is required to edit and use this shortcut; the settings show a link to the permission settings when access is missing. Revoking access stops the shortcut and keeps your chosen keys for when access is granted again.
+
+Turn on **Swap paste formatting** in the same settings to make `Command + V` paste plain text and the other shortcut (default: `Command + Shift + V`) paste with formatting. This applies to normal and Queue modes. `Command + V` continues to paste images and files unchanged. Clearing the other shortcut also turns off swapping.
+
+In normal mode, Kipple temporarily retains the original clipboard, including formatting and app-specific data. After a plain text paste, use the formatting shortcut to paste the same copy with its original formatting. A new copy discards the retained data. This requires Kipple to be running and does not use timed restoration or the destination app’s plain text command. Pasting through a menu or mouse action uses the clipboard’s current format.
+
 Queue is useful for forms, repetitive data entry, and moving several values between apps without copying each item manually.
 
 ### Screen Text Capture
@@ -79,6 +87,23 @@ Paragraph breaks are preserved, and recognized tables are copied as tab-separate
 ### Paste on Selection
 
 Paste on Selection can paste a selected history item directly into the previously active app. This is useful when you want one-click selection and paste behavior.
+
+## Permissions on macOS 27 or later
+
+Open **Kipple Settings → Permission** to check access and open the matching page in **System Settings → Privacy & Security**.
+
+| Permission | Used for |
+| --- | --- |
+| Screen & System Audio Recording | Screen Text Capture (OCR) and retrieving source window names. Kipple captures still images; it does not record audio. |
+| Device Control and Data Access | Sending paste commands for Queue, Paste on Selection, and plain text paste. |
+
+Enable **Kipple** on the corresponding page. Return to Kipple to check the permission status. If macOS requests a restart or the status remains Not Granted, quit and reopen Kipple. If it is still Not Granted, remove the old Kipple entry from that permission list, add the Kipple.app you are currently using, and enable it again. This may be necessary after changing the app's signing identity or switching between installed and development copies.
+
+Clipboard history, search, and copying history items do not require these permissions. Input Monitoring and Automation permissions are not required. MCP communicates through a local Unix socket and does not require Local Network permission.
+
+Clipboard reading is controlled separately by macOS. **Settings → Permission → Clipboard Access** shows the current policy and lets you retry a failed read. If macOS asks, allow access; if blocked, review Kipple under Privacy & Security. Changing the policy to allow reading resumes capture without requiring another copy. Kipple does not repeatedly retry the same denied read.
+
+Launch at login reflects the actual macOS registration state. If approval is pending, use the displayed link to Login Items; turning the toggle off also removes a pending registration.
 
 ## Privacy
 
@@ -105,6 +130,12 @@ Kipple does not send your clipboard history to external services.
 
 - Mac with Apple silicon (M1 or later)
 - macOS 27.0 or later
+
+## Development
+
+`make run` builds and launches the development app, signing it with a **Developer ID Application** certificate. Install Xcode, XcodeGen, and the signing certificate with its private key first. To use another certificate, specify `make run DEV_CODE_SIGN_IDENTITY="Apple Development" DEVELOPMENT_TEAM=YOUR_TEAM_ID`.
+
+Keep the signing identity consistent between builds. Unsigned or ad-hoc builds can appear as Not Granted even when Kipple is enabled in System Settings. Changing the signing identity may require granting permissions again and restarting Kipple.
 
 ## License
 

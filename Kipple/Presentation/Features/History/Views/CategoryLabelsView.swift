@@ -52,7 +52,7 @@ struct CategoryLabelsView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                     Text(verbatim: category.name)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                         .truncationMode(.tail)

@@ -1,20 +1,11 @@
 #if DEBUG
 
 extension MenuBarApp {
-    func startServicesAsync() async {
-        startServices()
-    }
-
     func isClipboardMonitoring() async -> Bool {
         if let modernService = clipboardService as? ModernClipboardServiceAdapter {
             return await modernService.isMonitoring()
         }
         return true
-    }
-
-    func performTermination() async {
-        // Extract the async work from performAsyncTermination so tests can await completion.
-        await clipboardService.flushPendingSaves()
     }
 
     func registerHotkeys() async {
