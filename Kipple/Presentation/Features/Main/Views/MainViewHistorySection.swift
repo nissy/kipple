@@ -16,7 +16,6 @@ struct MainViewHistorySection: View {
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
     let onSelectItem: (ClipItem) -> Void
-    let onLongPressItem: (ClipItem) -> Void
     let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
@@ -37,6 +36,7 @@ struct MainViewHistorySection: View {
     let isQueueLoopActive: Bool
     let canToggleQueueLoop: Bool
     let onToggleQueueLoop: () -> Void
+    let queueReorder: QueueReorderActions?
     @ObservedObject private var fontManager = FontManager.shared
     @State private var canScrollToTop = false
 
@@ -48,7 +48,6 @@ struct MainViewHistorySection: View {
         copyScrollRequest: Binding<HistoryCopyScrollRequest?>,
         hoverResetRequest: Binding<HistoryHoverResetRequest?>,
         onSelectItem: @escaping (ClipItem) -> Void,
-        onLongPressItem: @escaping (ClipItem) -> Void,
         onOpenItem: ((ClipItem) -> Void)? = nil,
         onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
         onTogglePin: @escaping (ClipItem) -> Void,
@@ -67,7 +66,8 @@ struct MainViewHistorySection: View {
         queueSelectionPreview: Set<UUID>,
         isQueueLoopActive: Bool,
         canToggleQueueLoop: Bool,
-        onToggleQueueLoop: @escaping () -> Void
+        onToggleQueueLoop: @escaping () -> Void,
+        queueReorder: QueueReorderActions? = nil
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
@@ -76,7 +76,6 @@ struct MainViewHistorySection: View {
         self._copyScrollRequest = copyScrollRequest
         self._hoverResetRequest = hoverResetRequest
         self.onSelectItem = onSelectItem
-        self.onLongPressItem = onLongPressItem
         self.onOpenItem = onOpenItem
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.onTogglePin = onTogglePin
@@ -96,6 +95,7 @@ struct MainViewHistorySection: View {
         self.isQueueLoopActive = isQueueLoopActive
         self.canToggleQueueLoop = canToggleQueueLoop
         self.onToggleQueueLoop = onToggleQueueLoop
+        self.queueReorder = queueReorder
     }
 
     var body: some View {
@@ -111,7 +111,6 @@ struct MainViewHistorySection: View {
                 pasteMode: pasteMode,
                 historyFont: Font(fontManager.historyFont),
                 onSelectItem: onSelectItem,
-                onLongPressItem: onLongPressItem,
                 onTogglePin: onTogglePin,
                 onDelete: onDelete,
                 onChangeUserCategory: onChangeUserCategory,
@@ -123,7 +122,8 @@ struct MainViewHistorySection: View {
                 isLoadingMore: isLoadingMore,
                 canScrollToTop: $canScrollToTop,
                 copyScrollRequest: $copyScrollRequest,
-                hoverResetRequest: $hoverResetRequest
+                hoverResetRequest: $hoverResetRequest,
+                queueReorder: queueReorder
             )
         }
         .padding(.horizontal, MainViewMetrics.HistoryColumns.sectionHorizontalPadding

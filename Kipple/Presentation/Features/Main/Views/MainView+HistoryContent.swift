@@ -25,22 +25,6 @@ extension MainView {
             copyScrollRequest: $historyCopyScrollRequest,
             hoverResetRequest: $historyHoverResetRequest,
             onSelectItem: handleItemSelection,
-            onLongPressItem: { item in
-                guard viewModel.canUsePasteQueue else {
-                    NotificationCenter.default.post(
-                        name: .queuePastePermissionRequested,
-                        object: nil
-                    )
-                    return
-                }
-                guard !viewModel.isQueueModeActive else { return }
-                AutoPasteController.shared.cancelPendingPaste()
-                historyHoverResetRequest = HistoryHoverResetRequest()
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                    viewModel.startQueueMode(with: item)
-                }
-                syncTitleBarState()
-            },
             onOpenItem: { item in
                 guard item.isActionable else { return }
                 item.performAction()
@@ -79,7 +63,16 @@ extension MainView {
             queueSelectionPreview: viewModel.queueSelectionPreview,
             isQueueLoopActive: viewModel.pasteMode == .queueToggle,
             canToggleQueueLoop: viewModel.canUsePasteQueue,
-            onToggleQueueLoop: queueLoopToggleHandler
+            onToggleQueueLoop: queueLoopToggleHandler,
+            queueReorder: QueueReorderActions(
+                begin: beginQueueDrag(itemID:),
+                isValid: viewModel.isQueueReorderValid
+            ) { session, target in
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                    _ = viewModel.commitQueueReorder(session, target: target)
+                }
+                syncTitleBarState()
+            }
         )
         .id(historyRefreshID)
         .environment(\.categoryPopoverChanged, CategoryPopoverAction { itemID, presented in
@@ -92,5 +85,15 @@ extension MainView {
                 releasePreventAutoClose(.categoryPopover(itemID))
             }
         })
+    }
+
+    private func beginQueueDrag(itemID: UUID) -> QueueReorderSession? {
+        guard viewModel.canUsePasteQueue else {
+            NotificationCenter.default.post(name: .queuePastePermissionRequested, object: nil)
+            return nil
+        }
+        guard let session = viewModel.beginQueueReorder(itemID: itemID) else { return nil }
+        AutoPasteController.shared.cancelPendingPaste()
+        return session
     }
 }

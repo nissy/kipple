@@ -19,7 +19,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         case editing
     }
 
-    enum PasteMode {
+    enum PasteMode: Equatable {
         case clipboard
         case queueOnce
         case queueToggle
@@ -703,6 +703,48 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     // MARK: - Paste Queue Management
 
+    func beginQueueReorder(itemID: UUID) -> QueueReorderSession? {
+        guard canUsePasteQueue,
+              pasteController?.hasPendingPastes != true,
+              !isShiftSelecting, pendingShiftSelection.isEmpty,
+              filteredHistory.contains(where: { $0.id == itemID }) else { return nil }
+        return QueueReorderSession(
+            itemID: itemID, queue: pasteQueue, epoch: pasteQueueEpoch,
+            copyEpoch: (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch,
+            pasteboardChangeCount: NSPasteboard.general.changeCount, mode: pasteMode,
+            searchText: searchText, categoryFilter: categoryFilter,
+            filterFlags: [showOnlyURLs, showOnlyPinned, isPinnedFilterActive],
+            filteredIDs: filteredHistory.map(\.id)
+        )
+    }
+
+    func isQueueReorderValid(_ session: QueueReorderSession) -> Bool {
+        beginQueueReorder(itemID: session.itemID) == session
+    }
+
+    @discardableResult
+    func commitQueueReorder(_ session: QueueReorderSession, target: QueueReorderTarget) -> Bool {
+        guard isQueueReorderValid(session),
+              let reordered = target.applying(to: session), reordered != pasteQueue else { return false }
+        if let targetID = target.itemID, !filteredHistory.contains(where: { $0.id == targetID }) { return false }
+        pasteQueueEpoch &+= 1
+        pasteQueue = reordered
+        if !isQueueModeActive {
+            discardClipboardEditorChanges()
+            pasteMode = .queueOnce
+        }
+        lastQueueAnchorID = session.itemID
+        shouldResetAnchorOnNextShiftSelection = true
+        pendingShiftSelection = []
+        queueSelectionPreview = []
+        shiftSelectionInitialQueue = []
+        updateFilteredItems(clipboardService.history)
+        startPasteMonitoringIfNeeded()
+        // A slow paste receiver may still be reading the previously sent item.
+        // Only the next explicit paste request prepares the new queue head.
+        return true
+    }
+
     func connectPasteController(_ controller: PlainTextPasteController) {
         pasteController = controller
         controller.queue = self
@@ -836,12 +878,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     func nextQueuedItem() -> ClipItem? {
         guard let firstID = pasteQueue.first else { return nil }
         return clipboardService.history.first { $0.id == firstID }
-    }
-
-    func startQueueMode(with item: ClipItem) {
-        guard canUsePasteQueue, !isQueueModeActive else { return }
-        toggleQueueMode()
-        queueSelection(items: [item], anchor: item)
     }
 
     func toggleQueueMode() {

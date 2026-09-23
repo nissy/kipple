@@ -16,7 +16,8 @@ struct HistoryItemView: View {
     let isQueuePreviewed: Bool
     let isScrollLocked: Bool
     let onTap: () -> Void
-    let onLongPress: (() -> Void)?
+    let onQueueDrag: ((CGSize) -> Void)?
+    let onQueueLongPress: (() -> Void)?
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
     // ユーザカテゴリ変更/管理
@@ -37,6 +38,8 @@ struct HistoryItemView: View {
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
     @State private var currentAnchorView: NSView?
+    @GestureState private var isQueueDragGestureActive = false
+    @State private var hasStartedQueueDrag = false
 
     init(
         item: ClipItem,
@@ -46,7 +49,8 @@ struct HistoryItemView: View {
         isQueuePreviewed: Bool,
         isScrollLocked: Bool,
         onTap: @escaping () -> Void,
-        onLongPress: (() -> Void)? = nil,
+        onQueueDrag: ((CGSize) -> Void)? = nil,
+        onQueueLongPress: (() -> Void)? = nil,
         onTogglePin: @escaping () -> Void,
         onDelete: (() -> Void)?,
         onChangeCategory: ((UUID, Bool) async throws -> Void)?,
@@ -64,7 +68,8 @@ struct HistoryItemView: View {
         self.isQueuePreviewed = isQueuePreviewed
         self.isScrollLocked = isScrollLocked
         self.onTap = onTap
-        self.onLongPress = onLongPress
+        self.onQueueDrag = onQueueDrag
+        self.onQueueLongPress = onQueueLongPress
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onChangeCategory = onChangeCategory
@@ -95,6 +100,9 @@ struct HistoryItemView: View {
         .sheet(isPresented: $showingDetails) { ClipDetailsView(item: item) }
         .onChange(of: hoverResetSignal) { _, _ in
             resetHoverState()
+        }
+        .onChange(of: isQueueDragGestureActive) { _, active in
+            if !active { hasStartedQueueDrag = false }
         }
         .onChange(of: isScrollLocked) { _, locked in
             if locked {
@@ -172,6 +180,7 @@ struct HistoryItemView: View {
                     alignment: .center
                 )
                 .contentShape(Circle())
+                .gesture(selectionGesture)
                 .help(
                     Text(
                         String(
@@ -245,19 +254,38 @@ struct HistoryItemView: View {
     }
 
     private var selectionGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.5)
+        queueSelectionGesture
             .exclusively(before: TapGesture())
             .onEnded { value in
-                switch value {
-                case .first(true):
-                    closePopover()
-                    onLongPress?()
-                case .second:
-                    handleTap()
-                default:
-                    break
-                }
+                hasStartedQueueDrag = false
+                if case .second = value { handleTap() }
             }
+    }
+
+    private var queueSelectionGesture: AnyGesture<Void> {
+        let drag = DragGesture(minimumDistance: 6)
+            .updating($isQueueDragGestureActive) { _, active, _ in active = true }
+            .onChanged { value in
+                guard !hasStartedQueueDrag else { return }
+                closePopover()
+                hasStartedQueueDrag = true
+                onQueueDrag?(value.translation)
+            }
+        if let onQueueLongPress {
+            return AnyGesture(
+                LongPressGesture(minimumDuration: 0.5, maximumDistance: 6)
+                    .onEnded { _ in
+                        guard NSEvent.modifierFlags.isDisjoint(with: [.shift, .command, .option, .control]) else {
+                            return
+                        }
+                        closePopover()
+                        onQueueLongPress()
+                    }
+                    .exclusively(before: drag)
+                    .map { _ in () }
+            )
+        }
+        return AnyGesture(drag.map { _ in () })
     }
 
     private var titleBadge: some View {
