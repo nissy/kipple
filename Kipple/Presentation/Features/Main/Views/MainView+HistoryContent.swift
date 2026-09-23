@@ -25,6 +25,22 @@ extension MainView {
             copyScrollRequest: $historyCopyScrollRequest,
             hoverResetRequest: $historyHoverResetRequest,
             onSelectItem: handleItemSelection,
+            onLongPressItem: { item in
+                guard viewModel.canUsePasteQueue else {
+                    NotificationCenter.default.post(
+                        name: .queuePastePermissionRequested,
+                        object: nil
+                    )
+                    return
+                }
+                guard !viewModel.isQueueModeActive else { return }
+                AutoPasteController.shared.cancelPendingPaste()
+                historyHoverResetRequest = HistoryHoverResetRequest()
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                    viewModel.startQueueMode(with: item)
+                }
+                syncTitleBarState()
+            },
             onOpenItem: { item in
                 guard item.isActionable else { return }
                 item.performAction()

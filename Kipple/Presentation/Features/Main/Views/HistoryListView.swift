@@ -10,6 +10,7 @@ struct HistoryListView: View {
     let pasteMode: MainViewModel.PasteMode
     let historyFont: Font
     let onSelectItem: (ClipItem) -> Void
+    let onLongPressItem: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     let onChangeUserCategory: ((ClipItem, UUID, Bool) async throws -> Void)?
@@ -51,6 +52,9 @@ struct HistoryListView: View {
                             isScrollLocked: isScrollLocked,
                             onTap: {
                                 onSelectItem(item)
+                            },
+                            onLongPress: {
+                                onLongPressItem(item)
                             },
                             onTogglePin: {
                                 onTogglePin(item)

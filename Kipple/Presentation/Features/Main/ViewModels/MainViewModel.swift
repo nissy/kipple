@@ -838,6 +838,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         return clipboardService.history.first { $0.id == firstID }
     }
 
+    func startQueueMode(with item: ClipItem) {
+        guard canUsePasteQueue, !isQueueModeActive else { return }
+        toggleQueueMode()
+        queueSelection(items: [item], anchor: item)
+    }
+
     func toggleQueueMode() {
         guard canUsePasteQueue else {
             resetPasteQueue()

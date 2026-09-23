@@ -16,6 +16,7 @@ struct MainViewHistorySection: View {
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
     let onSelectItem: (ClipItem) -> Void
+    let onLongPressItem: (ClipItem) -> Void
     let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
@@ -47,6 +48,7 @@ struct MainViewHistorySection: View {
         copyScrollRequest: Binding<HistoryCopyScrollRequest?>,
         hoverResetRequest: Binding<HistoryHoverResetRequest?>,
         onSelectItem: @escaping (ClipItem) -> Void,
+        onLongPressItem: @escaping (ClipItem) -> Void,
         onOpenItem: ((ClipItem) -> Void)? = nil,
         onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
         onTogglePin: @escaping (ClipItem) -> Void,
@@ -74,6 +76,7 @@ struct MainViewHistorySection: View {
         self._copyScrollRequest = copyScrollRequest
         self._hoverResetRequest = hoverResetRequest
         self.onSelectItem = onSelectItem
+        self.onLongPressItem = onLongPressItem
         self.onOpenItem = onOpenItem
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.onTogglePin = onTogglePin
@@ -108,6 +111,7 @@ struct MainViewHistorySection: View {
                 pasteMode: pasteMode,
                 historyFont: Font(fontManager.historyFont),
                 onSelectItem: onSelectItem,
+                onLongPressItem: onLongPressItem,
                 onTogglePin: onTogglePin,
                 onDelete: onDelete,
                 onChangeUserCategory: onChangeUserCategory,

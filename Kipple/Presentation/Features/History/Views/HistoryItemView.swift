@@ -16,6 +16,7 @@ struct HistoryItemView: View {
     let isQueuePreviewed: Bool
     let isScrollLocked: Bool
     let onTap: () -> Void
+    let onLongPress: (() -> Void)?
     let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
     // ユーザカテゴリ変更/管理
@@ -45,6 +46,7 @@ struct HistoryItemView: View {
         isQueuePreviewed: Bool,
         isScrollLocked: Bool,
         onTap: @escaping () -> Void,
+        onLongPress: (() -> Void)? = nil,
         onTogglePin: @escaping () -> Void,
         onDelete: (() -> Void)?,
         onChangeCategory: ((UUID, Bool) async throws -> Void)?,
@@ -62,6 +64,7 @@ struct HistoryItemView: View {
         self.isQueuePreviewed = isQueuePreviewed
         self.isScrollLocked = isScrollLocked
         self.onTap = onTap
+        self.onLongPress = onLongPress
         self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onChangeCategory = onChangeCategory
@@ -122,7 +125,7 @@ struct HistoryItemView: View {
         ZStack {
             backgroundView
                 .contentShape(Rectangle())
-                .onTapGesture { handleTap() }
+                .gesture(selectionGesture)
 
             HistoryColumnsRow(showsQueue: queueBadge != nil) {
                 queueBadgeView
@@ -238,7 +241,23 @@ struct HistoryItemView: View {
             .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture { handleTap() }
+            .gesture(selectionGesture)
+    }
+
+    private var selectionGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.5)
+            .exclusively(before: TapGesture())
+            .onEnded { value in
+                switch value {
+                case .first(true):
+                    closePopover()
+                    onLongPress?()
+                case .second:
+                    handleTap()
+                default:
+                    break
+                }
+            }
     }
 
     private var titleBadge: some View {

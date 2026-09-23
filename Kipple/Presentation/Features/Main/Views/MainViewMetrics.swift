@@ -62,9 +62,9 @@ enum MainViewMetrics {
 
     enum HistoryQueueBadge {
         static let font: Font = .system(size: 11, weight: .semibold)
-        static let activeFill = KippleButtonAppearance.inactivePillFill
-        static let inactiveFill = Color.clear
-        static let activeForeground = TextColor.primary
+        static let activeFill = AnyShapeStyle(KippleButtonAppearance.circleFill(isActive: true))
+        static let inactiveFill = AnyShapeStyle(Color.clear)
+        static let activeForeground = KippleButtonAppearance.activeForeground
         static let inactiveForeground = KippleButtonAppearance.inactiveForeground
     }
 
