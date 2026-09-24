@@ -20,6 +20,115 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
         try await verifyQueueSequence(styles: [false, true, false], repeats: true)
     }
 
+    func testDraggingFirstItemIntoEmptyQueuePreparesClipboardOnlyWhenPasting() async throws {
+        try await verifyDragStartsQueue(startsInQueueMode: true)
+    }
+
+    func testDraggingFromNormalModeStartsQueueAndPreparesClipboardOnlyWhenPasting() async throws {
+        try await verifyDragStartsQueue(startsInQueueMode: false)
+    }
+
+    private func verifyDragStartsQueue(startsInQueueMode: Bool) async throws {
+        let item = try putStyledItem("Drag into empty queue")
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [item], loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let monitor = IntegrationPasteCommandMonitor()
+        let model = MainViewModel(clipboardService: adapter, pasteMonitor: monitor)
+        var received: [String] = []
+        let controller = PlainTextPasteController(
+            clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in
+                received.append(NSPasteboard.general.string(forType: .string) ?? "")
+                return true
+            }, normalPasteMonitor: RecoveryPasteMonitor()
+        )
+        model.connectPasteController(controller)
+        if startsInQueueMode { model.toggleQueueMode() }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("Previous clipboard", forType: .string)
+        let changeCount = NSPasteboard.general.changeCount
+        let session = try XCTUnwrap(model.beginQueueReorder(itemID: item.id))
+        XCTAssertEqual(model.pasteMode, startsInQueueMode ? .queueOnce : .clipboard)
+        XCTAssertTrue(model.commitQueueReorder(session, target: .end))
+        XCTAssertEqual(model.pasteMode, .queueOnce)
+        XCTAssertTrue(monitor.isMonitoring)
+        XCTAssertEqual(NSPasteboard.general.changeCount, changeCount)
+        controller.paste(into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(received, [item.content])
+        XCTAssertTrue(model.pasteQueue.isEmpty)
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), item.content)
+    }
+
+    func testRecopyingSameHistoryItemCancelsNormalModeDrag() async throws {
+        let item = try putStyledItem("Same history item")
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [item], loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let model = MainViewModel(clipboardService: adapter, pasteMonitor: IntegrationPasteCommandMonitor())
+        let session = try XCTUnwrap(model.beginQueueReorder(itemID: item.id))
+        adapter.recopyFromHistory(item)
+        await adapter.flushPendingAdapterOperationForTesting()
+        XCTAssertEqual(model.filteredHistory.map(\.id), session.filteredIDs)
+        XCTAssertNotEqual(NSPasteboard.general.changeCount, session.pasteboardChangeCount)
+        XCTAssertFalse(model.isQueueReorderValid(session))
+        XCTAssertFalse(model.commitQueueReorder(session, target: .end))
+        XCTAssertTrue(model.pasteQueue.isEmpty)
+        XCTAssertEqual(model.pasteMode, .clipboard)
+        let pending = try XCTUnwrap(model.beginQueueReorder(itemID: item.id))
+        NotificationCenter.default.post(name: .mcpWillCopy, object: nil)
+        XCTAssertFalse(model.commitQueueReorder(pending, target: .end), "MCP invalidates before clipboard writes")
+        XCTAssertEqual(model.pasteMode, .clipboard)
+    }
+
+    func testReorderWaitsForPasteAndPreservesSlowReceiverContents() async throws {
+        let items = try ["Reorder A", "Reorder B", "Reorder C"].map(putStyledItem)
+        let repository = MockClipboardRepository()
+        await repository.configure(items: items, loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let model = MainViewModel(clipboardService: adapter, pasteMonitor: IntegrationPasteCommandMonitor())
+        model.toggleQueueMode()
+        model.queueSelection(items: items, anchor: items.last)
+        await adapter.flushPendingAdapterOperationForTesting()
+        var received: [String] = []
+        let controller = PlainTextPasteController(
+            clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in
+                received.append(NSPasteboard.general.string(forType: .string) ?? "")
+                return true
+            }, normalPasteMonitor: RecoveryPasteMonitor()
+        )
+        model.connectPasteController(controller)
+        let pending = try XCTUnwrap(model.beginQueueReorder(itemID: items[2].id))
+        let target = QueueReorderTarget(itemID: items[1].id, insertAfter: false)
+        controller.paste(into: 101)
+        XCTAssertTrue(controller.hasPendingPastes)
+        XCTAssertNil(model.beginQueueReorder(itemID: items[2].id))
+        XCTAssertFalse(model.commitQueueReorder(pending, target: target))
+        await controller.waitForPendingPastes()
+        XCTAssertFalse(controller.hasPendingPastes)
+        XCTAssertEqual(model.pasteQueue, [items[1].id, items[2].id])
+        let session = try XCTUnwrap(model.beginQueueReorder(itemID: items[2].id))
+        let changeCount = NSPasteboard.general.changeCount
+        XCTAssertTrue(model.commitQueueReorder(session, target: target))
+        try await Task.sleep(for: .milliseconds(650))
+        XCTAssertEqual(NSPasteboard.general.changeCount, changeCount)
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), items[0].content)
+        controller.paste(into: 101)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(received, [items[0].content, items[2].content])
+        XCTAssertEqual(model.pasteQueue, [items[1].id])
+        model.resetPasteQueue()
+    }
+
     private func verifyQueueSequence(styles: [Bool], repeats: Bool) async throws {
         let items = try ["Queue A", "Queue B", "Queue C"].prefix(repeats ? 2 : 3).map(putStyledItem)
         let repository = MockClipboardRepository()

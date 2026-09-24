@@ -22,57 +22,22 @@ struct HistoryListView: View {
     @Binding var canScrollToTop: Bool
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
+    var queueReorder: QueueReorderActions?
     @State private var hoverResetSignal = UUID()
     @State private var isScrollLocked = false
     @StateObject private var hoverCoordinator = HistoryHoverCoordinator()
     @StateObject private var actionKeyMonitor = HistoryActionKeyMonitor()
+    @StateObject private var queueDrag = HistoryQueueDragController()
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 2, pinnedViews: []) {
                     ForEach(history, id: \.id) { item in
-                        let queueBadgeValue = HistoryQueueBadgeCalculator.queueBadgeValue(
-                            for: item,
-                            pasteMode: pasteMode,
-                            provider: queueBadgeProvider
-                        )
-                        let isClipboardItem = HistoryListView.isCurrentClipboardItem(
-                            item,
-                            currentID: currentClipboardItemID
-                        )
-
-                        HistoryItemView(
-                            item: item,
-                            isSelected: selectedHistoryItem?.id == item.id,
-                            isCurrentClipboardItem: isClipboardItem,
-                            queueBadge: queueBadgeValue,
-                            isQueuePreviewed: queueSelectionPreview.contains(item.id),
-                            isScrollLocked: isScrollLocked,
-                            onTap: {
-                                onSelectItem(item)
-                            },
-                            onTogglePin: {
-                                onTogglePin(item)
-                            },
-                            onDelete: onDelete != nil ? {
-                                withAnimation(.spring(response: 0.3)) {
-                                    onDelete?(item)
-                                }
-                            } : nil,
-                            onChangeCategory: onChangeUserCategory != nil ? { catId, enabled in
-                                try await onChangeUserCategory?(item, catId, enabled)
-                            } : nil,
-                            onOpenCategoryManager: onOpenCategoryManager,
-                            historyFont: historyFont,
-                            onOpenItem: onOpenItem.map { handler in
-                                { handler(item) }
-                            },
-                            onSplitEditorIntoHistory: onSplitEditorIntoHistory,
-                            hoverResetSignal: hoverResetSignal,
-                            hoverCoordinator: hoverCoordinator
-                        )
+                        historyRow(item)
                         .frame(height: 32)
+                        .opacity(queueDrag.itemID == item.id ? 0 : 1)
+                        .background(HistoryQueueDragAnchor(controller: queueDrag, itemID: item.id))
                         .transition(.opacity)
                         .animation(.easeInOut(duration: 0.2), value: item.isPinned)
                         .onAppear {
@@ -96,6 +61,12 @@ struct HistoryListView: View {
                 }
             }
             .contentMargins(.horizontal, 0, for: .scrollContent)
+            .overlay {
+                GeometryReader { _ in queueDragOverlay }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .clipped()
+            }
             .onChange(of: copyScrollRequest?.id) { _, _ in
                 handleCopyScrollRequest(with: proxy)
             }
@@ -112,6 +83,62 @@ struct HistoryListView: View {
             }
         }
         .environmentObject(actionKeyMonitor)
+        .onChange(of: queueDrag.itemID) { _, _ in
+            hoverCoordinator.clearHover()
+            hoverResetSignal = UUID()
+        }
+        .onDisappear { queueDrag.cancel() }
+    }
+
+    private func historyRow(_ item: ClipItem) -> some View {
+        HistoryItemView(
+            item: item,
+            isSelected: selectedHistoryItem?.id == item.id,
+            isCurrentClipboardItem: Self.isCurrentClipboardItem(item, currentID: currentClipboardItemID),
+            queueBadge: HistoryQueueBadgeCalculator.queueBadgeValue(
+                for: item, pasteMode: pasteMode, provider: queueBadgeProvider
+            ),
+            isQueuePreviewed: queueSelectionPreview.contains(item.id),
+            isScrollLocked: isScrollLocked || queueDrag.itemID != nil,
+            onTap: { onSelectItem(item) },
+            onQueueDrag: { translation in
+                queueDrag.begin(itemID: item.id, translation: translation)
+            },
+            onQueueLongPress: pasteMode == .clipboard ? {
+                queueReorder?.startQueue(itemID: item.id)
+            } : nil,
+            onTogglePin: { onTogglePin(item) },
+            onDelete: onDelete != nil ? {
+                withAnimation(.spring(response: 0.3)) { onDelete?(item) }
+            } : nil,
+            onChangeCategory: onChangeUserCategory != nil ? { categoryID, enabled in
+                try await onChangeUserCategory?(item, categoryID, enabled)
+            } : nil,
+            onOpenCategoryManager: onOpenCategoryManager,
+            historyFont: historyFont,
+            onOpenItem: onOpenItem.map { handler in { handler(item) } },
+            onSplitEditorIntoHistory: onSplitEditorIntoHistory,
+            hoverResetSignal: hoverResetSignal,
+            hoverCoordinator: hoverCoordinator
+        )
+    }
+
+    private var queueDragOverlay: some View {
+        ZStack(alignment: .topLeading) {
+            HistoryQueueDragAnchor(controller: queueDrag, actions: queueReorder, visibleIDs: history.map(\.id))
+            if let line = queueDrag.insertionFrame {
+                Rectangle().fill(Color.accentColor)
+                    .frame(width: line.width, height: line.height)
+                    .position(x: line.midX, y: line.midY)
+            }
+            if let item = history.first(where: { $0.id == queueDrag.itemID }) {
+                historyRow(item)
+                    .frame(width: queueDrag.previewFrame.width, height: queueDrag.previewFrame.height)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.15), radius: 5, y: 2)
+                    .position(x: queueDrag.previewFrame.midX, y: queueDrag.previewFrame.midY)
+            }
+        }
     }
 
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
