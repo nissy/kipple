@@ -216,7 +216,7 @@ final class TextCaptureCoordinator {
             ))
             return
         }
-        windowManager.openMainWindow()
+        windowManager.openMainWindow(preservingPosition: true)
         windowManager.showCopiedNotification()
     }
 

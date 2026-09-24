@@ -22,7 +22,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         try await super.tearDown()
     }
 
-    func testHandleRecognizedTextOpensMainWindow() async {
+    func testHandleRecognizedTextOpensMainWindowPreservingPosition() async {
         let coordinator = TextCaptureCoordinator(
             clipboardService: clipboardService,
             textRecognitionService: textRecognitionService,
@@ -36,6 +36,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(clipboardService.history.first?.metadata?.source, .ocr)
         XCTAssertEqual(clipboardService.lastCopiedFromEditor, false)
         XCTAssertTrue(windowManager.openMainWindowCalled)
+        XCTAssertEqual(windowManager.preservingPosition, true)
         XCTAssertTrue(windowManager.showCopiedNotificationCalled)
     }
 
@@ -455,12 +456,14 @@ private final class SuspendedImageCaptureService: ScreenImageCapturing {
 @MainActor
 private final class SpyWindowManager: WindowManaging {
     private(set) var openMainWindowCalled = false
+    private(set) var preservingPosition: Bool?
     private(set) var showCopiedNotificationCalled = false
     var onOpen: (() -> Void)?
 
-    func openMainWindow() {
+    func openMainWindow(preservingPosition: Bool) {
         onOpen?()
         openMainWindowCalled = true
+        self.preservingPosition = preservingPosition
     }
 
     func showCopiedNotification() {

@@ -122,6 +122,7 @@
 		7915190E49313A4EB5A9474C /* HistoryPopoverLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3794E8C4BD8C40F2E779C777 /* HistoryPopoverLifecycleTests.swift */; };
 		794F518FDEB520F7E63AFD2F /* TextRecognitionServiceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E17CD7D8F9335118F51BC88 /* TextRecognitionServiceProvider.swift */; };
 		7990B44BFC58A59419C41CFD /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54FE442129DA6DBFA679C63C /* MainView.swift */; };
+		7A7BCE1D7DAA9B68CF8DF3C6 /* WindowPositionRestorationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F931BA0FFEF14AA0E30E363 /* WindowPositionRestorationTests.swift */; };
 		7AC76604B7A45C2CF545D50C /* WindowTitleCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F42A2010CA96B6D224653DE2 /* WindowTitleCaptureTests.swift */; };
 		7B2ED209942FC3A472396FF0 /* PasteboardProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC46CFBB35AA2DC03AA70B4 /* PasteboardProviding.swift */; };
 		7B701DD215D63FEE75907027 /* MCPListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72F085EE21CEF14E7DF1675B /* MCPListener.swift */; };
@@ -289,6 +290,7 @@
 		06426214E3D8DA96749CAF3C /* OCRDocumentFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRDocumentFormatter.swift; sourceTree = "<group>"; };
 		0DF9FCF3609532B45FC45F36 /* ClipItemCategoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipItemCategoryTests.swift; sourceTree = "<group>"; };
 		0F5147540CFEA499BC47D2B4 /* InternalOperationFlagTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalOperationFlagTests.swift; sourceTree = "<group>"; };
+		0F931BA0FFEF14AA0E30E363 /* WindowPositionRestorationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPositionRestorationTests.swift; sourceTree = "<group>"; };
 		10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchableFontPicker.swift; sourceTree = "<group>"; };
 		11352CAF753DC8E9F7C402DA /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
 		11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWindowContentController.swift; sourceTree = "<group>"; };
@@ -1210,6 +1212,7 @@
 				7C6190145A61CBBB8D225A40 /* VisionTextRecognitionServiceTests.swift */,
 				345D0EB535CE8BC2BFEB706E /* WindowBehaviorTests.swift */,
 				9E12EDD1DC3948006995C1E5 /* WindowFocusReturnTests.swift */,
+				0F931BA0FFEF14AA0E30E363 /* WindowPositionRestorationTests.swift */,
 				A759EECD517059CB29529826 /* WindowSheetBehaviorTests.swift */,
 				F42A2010CA96B6D224653DE2 /* WindowTitleCaptureTests.swift */,
 				ABB9A126B039F62FCC2D8C6F /* App */,
@@ -1601,6 +1604,7 @@
 				05E9475551A6CDBB1428C324 /* VisionTextRecognitionServiceTests.swift in Sources */,
 				E681154B257159EEB2DFB185 /* WindowBehaviorTests.swift in Sources */,
 				88A5C2F541481D913156CB21 /* WindowFocusReturnTests.swift in Sources */,
+				7A7BCE1D7DAA9B68CF8DF3C6 /* WindowPositionRestorationTests.swift in Sources */,
 				C26FCF93B5E466C1812E30B3 /* WindowSheetBehaviorTests.swift in Sources */,
 				7AC76604B7A45C2CF545D50C /* WindowTitleCaptureTests.swift in Sources */,
 			);

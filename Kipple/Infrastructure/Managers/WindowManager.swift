@@ -90,7 +90,7 @@ private final class MainGlassContentController<Content: View>: NSViewController 
 
 @MainActor
 protocol WindowManaging: AnyObject {
-    func openMainWindow()
+    func openMainWindow(preservingPosition: Bool)
     func showCopiedNotification()
 }
 
@@ -225,7 +225,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     }
     
     @MainActor
-    func openMainWindow() {
+    func openMainWindow(preservingPosition: Bool = false) {
         let startedAt = PerformanceTrace.nowMicros()
         PerformanceTrace.event("main_window_open_requested")
         cancelPendingAppReactivation()
@@ -236,14 +236,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         if let existingWindow = mainWindow {
-            reopenExistingWindow(existingWindow, requestedAt: startedAt)
+            reopenExistingWindow(existingWindow, preservingPosition: preservingPosition, requestedAt: startedAt)
             return
         }
 
         openNewWindow(requestedAt: startedAt)
     }
 
-    private func reopenExistingWindow(_ window: NSWindow, requestedAt: Int64) {
+    private func reopenExistingWindow(_ window: NSWindow, preservingPosition: Bool, requestedAt: Int64) {
         let startedAt = PerformanceTrace.nowMicros()
         PerformanceTrace.event(
             "main_window_reopen_started",
@@ -253,6 +253,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
             ]
         )
         if window.isMiniaturized { window.deminiaturize(nil) }
+
+        if preservingPosition {
+            showExistingWindowInPlace(window)
+            completeOpen()
+            return
+        }
 
         let target = computeOriginAtCursor(for: window)
         if !window.isVisible {
@@ -265,6 +271,17 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
 
         completeOpen()
+    }
+
+    private func showExistingWindowInPlace(_ window: NSWindow) {
+        // OCR completion restores the existing frame without replaying the slide animation.
+        applyAnimationBehavior(style: "none", to: window)
+        bringWindowToFrontWithoutSystemAnimation(window) {
+            window.alphaValue = 1.0
+            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
+        }
+        focusOnEditor()
     }
 
     private func showHiddenExistingWindow(_ window: NSWindow, at target: NSPoint, startedAt: Int64) {
