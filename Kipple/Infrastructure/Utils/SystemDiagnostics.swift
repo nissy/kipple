@@ -33,6 +33,12 @@ enum SystemDiagnostics {
     static func identity() {
         guard !didLogIdentity else { return }
         didLogIdentity = true
+        DispatchQueue.global(qos: .utility).async {
+            logIdentity()
+        }
+    }
+
+    private static func logIdentity() {
         var code: SecCode?
         var staticCode: SecStaticCode?
         var info: CFDictionary?

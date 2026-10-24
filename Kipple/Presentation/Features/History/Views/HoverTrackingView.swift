@@ -36,15 +36,13 @@ final class TrackingOverlayView: NSView {
     var onHover: (Bool, NSView) -> Void
     private(set) var trackingArea: NSTrackingArea?
     private var cachedTrackingBounds: CGRect?
+    private var hoverNotificationID = 0
     var isScrollLocked: Bool = false {
         didSet {
-            if oldValue && !isScrollLocked {
-                // Scrollが解除され、マウスがまだ内部ならホバーを再送
-                if isMouseInside {
-                    onHover(true, self)
-                }
-            } else if !oldValue && isScrollLocked {
-                // ロック時はここでは何もしない（List側でクリア）
+            guard oldValue != isScrollLocked else { return }
+            hoverNotificationID &+= 1
+            if !isScrollLocked && isMouseInside {
+                scheduleHoverNotification(true)
             }
         }
     }
@@ -97,14 +95,14 @@ final class TrackingOverlayView: NSView {
     override func mouseEntered(with event: NSEvent) {
         isMouseInside = true
         if !isScrollLocked {
-            onHover(true, self)
+            scheduleHoverNotification(true)
         }
     }
 
     override func mouseExited(with event: NSEvent) {
         isMouseInside = false
         if !isScrollLocked {
-            onHover(false, self)
+            scheduleHoverNotification(false)
         }
     }
 
@@ -113,9 +111,22 @@ final class TrackingOverlayView: NSView {
     }
 
     override func removeFromSuperview() {
+        isMouseInside = false
+        hoverNotificationID &+= 1
         if !isScrollLocked {
-            onHover(false, self)
+            scheduleHoverNotification(false)
         }
         super.removeFromSuperview()
+    }
+
+    private func scheduleHoverNotification(_ hovering: Bool) {
+        hoverNotificationID &+= 1
+        let notificationID = hoverNotificationID
+        // SwiftUI can update the scroll lock or remove this view during a view update.
+        // Deliver only the latest hover state after that update has finished.
+        DispatchQueue.main.async { [self] in
+            guard notificationID == hoverNotificationID, !isScrollLocked else { return }
+            onHover(hovering, self)
+        }
     }
 }

@@ -23,6 +23,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
     private var cancellables = Set<AnyCancellable>()
     private let appSettings = AppSettings.shared
     private var localizationCancellable: AnyCancellable?
+    private var isWindowSizeUpdateScheduled = false
     private let minimumContentSize = NSSize(width: 430, height: 300)
     private lazy var toolbar: NSToolbar = {
         let toolbar = NSToolbar(identifier: Self.toolbarIdentifier)
@@ -44,10 +45,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.refreshLocalization()
-                self.updateWindowSize(animated: true)
-                DispatchQueue.main.async { [weak self] in
-                    self?.updateWindowSize(animated: true)
-                }
+                self.scheduleWindowSizeUpdate()
             }
     }
 
@@ -58,10 +56,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         toolbar.selectedItemIdentifier = viewModel.selectedTab.toolbarIdentifier
         window.contentMinSize = minimumContentSize
         refreshLocalization()
-        updateWindowSize(animated: false)
-        DispatchQueue.main.async { [weak self] in
-            self?.updateWindowSize(animated: false)
-        }
+        scheduleWindowSizeUpdate()
     }
 
     private func bindToViewModel() {
@@ -73,10 +68,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
                     self.toolbar.selectedItemIdentifier = tab.toolbarIdentifier
                 }
                 self.refreshLocalization()
-                self.updateWindowSize(animated: true)
-                DispatchQueue.main.async { [weak self] in
-                    self?.updateWindowSize(animated: true)
-                }
+                self.scheduleWindowSizeUpdate()
             }
             .store(in: &cancellables)
     }
@@ -150,7 +142,19 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         updateWindowTitle()
     }
 
-    private func updateWindowSize(animated: Bool) {
+    private func scheduleWindowSizeUpdate() {
+        guard !isWindowSizeUpdateScheduled else { return }
+        isWindowSizeUpdateScheduled = true
+        // Published changes can arrive during layout, before the new value is stored.
+        // Measure once on the next main-queue turn, after the current update completes.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isWindowSizeUpdateScheduled = false
+            self.updateWindowSize()
+        }
+    }
+
+    private func updateWindowSize() {
         guard let window = window else { return }
         guard let contentView = window.contentView else { return }
 
@@ -159,7 +163,7 @@ final class SettingsToolbarController: NSObject, NSToolbarDelegate {
         targetSize.width = max(targetSize.width, minimumContentSize.width)
         targetSize.height = max(targetSize.height, minimumContentSize.height)
 
-        let currentSize = window.frame.size
+        let currentSize = window.contentRect(forFrameRect: window.frame).size
         guard abs(currentSize.width - targetSize.width) > 0.5 ||
                 abs(currentSize.height - targetSize.height) > 0.5 else { return }
 
