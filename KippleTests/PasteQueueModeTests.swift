@@ -534,6 +534,61 @@ final class PasteQueueModeTests: XCTestCase {
     }
 }
 
+extension PasteQueueModeTests {
+    func testDroppingInNormalModeMakesDraggedItemFirstWithoutCopying() throws {
+        let item = mockService.history[3]
+        let copies = mockService.recopyFromHistoryCallCount
+        let session = try XCTUnwrap(viewModel.beginQueueReorder(itemID: item.id))
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+        XCTAssertTrue(viewModel.commitQueueReorder(session, target: .end))
+
+        XCTAssertEqual(viewModel.pasteMode, .queueOnce)
+        XCTAssertEqual(viewModel.pasteQueue, [item.id])
+        XCTAssertEqual(viewModel.queueBadge(for: item), 1)
+        XCTAssertEqual(viewModel.history.first?.id, item.id)
+        XCTAssertEqual(mockService.recopyFromHistoryCallCount, copies)
+        XCTAssertTrue(pasteMonitor.isMonitoring)
+    }
+
+    func testSelectionAfterDragStartsQueueAppendsToDraggedItem() throws {
+        let first = mockService.history[3]
+        let second = mockService.history[1]
+
+        let session = try XCTUnwrap(viewModel.beginQueueReorder(itemID: first.id))
+        XCTAssertTrue(viewModel.commitQueueReorder(session, target: .end))
+        viewModel.handleQueueSelection(for: second, modifiers: [])
+
+        XCTAssertEqual(viewModel.pasteQueue, [first.id, second.id])
+        XCTAssertEqual(viewModel.queueBadge(for: first), 1)
+        XCTAssertEqual(viewModel.queueBadge(for: second), 2)
+    }
+
+    func testDraggingInActiveLoopingQueueAppendsWithoutReplacingExistingItems() throws {
+        let items = Array(mockService.history.prefix(3))
+        viewModel.toggleQueueMode()
+        viewModel.queueSelection(items: Array(items.prefix(2)), anchor: items[1])
+        viewModel.toggleQueueRepetition()
+
+        let session = try XCTUnwrap(viewModel.beginQueueReorder(itemID: items[2].id))
+        XCTAssertEqual(viewModel.pasteQueue, [items[0].id, items[1].id])
+        XCTAssertTrue(viewModel.commitQueueReorder(session, target: .end))
+
+        XCTAssertEqual(viewModel.pasteMode, .queueToggle)
+        XCTAssertEqual(viewModel.pasteQueue, items.map(\.id))
+    }
+
+    func testNormalModeDragRejectedWhenPermissionMissing() {
+        pasteMonitor.hasPermission = false
+
+        XCTAssertNil(viewModel.beginQueueReorder(itemID: mockService.history[3].id))
+
+        XCTAssertEqual(viewModel.pasteMode, .clipboard)
+        XCTAssertTrue(viewModel.pasteQueue.isEmpty)
+        XCTAssertNil(mockService.lastRecopiedItem)
+        XCTAssertFalse(pasteMonitor.isMonitoring)
+    }
+}
+
 private final class MockPasteCommandMonitor: PasteCommandMonitoring {
     private var handler: (() -> Void)?
     private(set) var isMonitoring = false

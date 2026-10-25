@@ -36,6 +36,7 @@ struct MainViewHistorySection: View {
     let isQueueLoopActive: Bool
     let canToggleQueueLoop: Bool
     let onToggleQueueLoop: () -> Void
+    let queueReorder: QueueReorderActions?
     @ObservedObject private var fontManager = FontManager.shared
     @State private var canScrollToTop = false
 
@@ -65,7 +66,8 @@ struct MainViewHistorySection: View {
         queueSelectionPreview: Set<UUID>,
         isQueueLoopActive: Bool,
         canToggleQueueLoop: Bool,
-        onToggleQueueLoop: @escaping () -> Void
+        onToggleQueueLoop: @escaping () -> Void,
+        queueReorder: QueueReorderActions? = nil
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
@@ -93,6 +95,7 @@ struct MainViewHistorySection: View {
         self.isQueueLoopActive = isQueueLoopActive
         self.canToggleQueueLoop = canToggleQueueLoop
         self.onToggleQueueLoop = onToggleQueueLoop
+        self.queueReorder = queueReorder
     }
 
     var body: some View {
@@ -119,7 +122,8 @@ struct MainViewHistorySection: View {
                 isLoadingMore: isLoadingMore,
                 canScrollToTop: $canScrollToTop,
                 copyScrollRequest: $copyScrollRequest,
-                hoverResetRequest: $hoverResetRequest
+                hoverResetRequest: $hoverResetRequest,
+                queueReorder: queueReorder
             )
         }
         .padding(.horizontal, MainViewMetrics.HistoryColumns.sectionHorizontalPadding

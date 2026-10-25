@@ -3,6 +3,7 @@ import ApplicationServices
 
 extension Notification.Name {
     static let clipboardPasteSent = Notification.Name("KippleClipboardPasteSent")
+    static let clipboardPasteRequested = Notification.Name("KippleClipboardPasteRequested")
 }
 
 @MainActor
@@ -49,6 +50,7 @@ final class PlainTextPasteController {
     private var shortcutsEnabled = true
     private(set) var swapsPasteFormatting = false
     private var task: Task<Void, Never>?
+    var hasPendingPastes: Bool { task != nil }
     private var requestID: UInt64 = 0
     var onPermissionRequired: (() -> Void)?
     var onFailure: ((Failure) -> Void)?
@@ -94,6 +96,7 @@ final class PlainTextPasteController {
     private func paste(removingFormatting: Bool, allowsNonTextPaste: Bool) {
         discardReplacedOriginal()
         if NSApp.isActive {
+            NotificationCenter.default.post(name: .clipboardPasteRequested, object: self)
             let action = removingFormatting ? #selector(NSTextView.pasteAsPlainText(_:)) : #selector(NSTextView.paste(_:))
             NSApp.sendAction(action, to: nil, from: nil)
             return
@@ -108,6 +111,7 @@ final class PlainTextPasteController {
     }
 
     func paste(into target: pid_t, removingFormatting: Bool = true, allowsNonTextPaste: Bool = false) {
+        NotificationCenter.default.post(name: .clipboardPasteRequested, object: self)
         requestID &+= 1
         let currentRequestID = requestID
         let copyEpoch = clipboardService.copyEpoch
