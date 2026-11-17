@@ -26,22 +26,33 @@ final class ScreenSelectionOverlayController: NSObject, ScreenSelectionOverlayCo
     private var overlayWindows: [SelectionOverlayWindow] = []
     private let onSelection: SelectionHandler
     private let onCancel: CancelHandler
+    private let availableScreens: () -> [NSScreen]
     private var isActive = false
     private var cursorPushed = false
     private var cursorRefreshTasks: [Task<Void, Never>] = []
     private var keyDownMonitor: Any?
 
-    init(onSelection: @escaping SelectionHandler, onCancel: @escaping CancelHandler) {
+    init(
+        onSelection: @escaping SelectionHandler,
+        onCancel: @escaping CancelHandler,
+        availableScreens: @escaping () -> [NSScreen] = { NSScreen.screens }
+    ) {
         self.onSelection = onSelection
         self.onCancel = onCancel
+        self.availableScreens = availableScreens
     }
 
     func present() {
         guard !isActive else { return }
+        let screens = availableScreens()
+        guard !screens.isEmpty else {
+            onCancel()
+            return
+        }
         isActive = true
         NSApp.activate(ignoringOtherApps: true)
 
-        overlayWindows = NSScreen.screens.map { screen in
+        overlayWindows = screens.map { screen in
             let window = SelectionOverlayWindow(screen: screen)
             window.selectionDelegate = self
             window.orderFrontRegardless()

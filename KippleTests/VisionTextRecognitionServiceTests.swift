@@ -1,18 +1,65 @@
 import XCTest
 import AppKit
+import Vision
 @testable import Kipple
 
 @MainActor
 final class VisionTextRecognitionServiceTests: XCTestCase {
     func testRecognizesRenderedText() async throws {
-        let image = try makeImage(table: false)
+        let image = try makeImage()
         let service = VisionTextRecognitionService(recognitionLanguages: ["en"])
         let text = try await service.recognizeText(from: image)
         XCTAssertTrue(text.contains("Shopping List"), "Unexpected OCR result: \(text)")
     }
 
+    func testRecognizesSmallTextInTallSelection() async throws {
+        let image = try makeImage(height: 2160, fontSize: 14)
+        let service = VisionTextRecognitionService()
+
+        let text = try await service.recognizeText(from: image)
+
+        XCTAssertEqual(text, "Shopping List")
+    }
+
+    func testRecognitionFinishesWithoutWaitingForPrewarm() async throws {
+        let image = try makeImage()
+        let prewarmStarted = expectation(description: "prewarm started")
+        let prewarmCancelled = expectation(description: "prewarm cancellation reported")
+        let recognitionFinished = expectation(description: "recognition finished")
+        var resumePrewarm: CheckedContinuation<Void, Never>?
+        var prewarmWasCancelled = false
+        let recordCancellation: (VisionTextRecognitionService.RequestPhase) -> Void = { phase in
+            XCTAssertEqual(phase, .prewarm)
+            prewarmCancelled.fulfill()
+        }
+        let service = VisionTextRecognitionService(onCancellation: recordCancellation) { _, requestImage in
+            if requestImage !== image {
+                await withCheckedContinuation {
+                    resumePrewarm = $0
+                    prewarmStarted.fulfill()
+                }
+                prewarmWasCancelled = Task.isCancelled
+            }
+            return []
+        }
+
+        service.prewarm()
+        await fulfillment(of: [prewarmStarted], timeout: 2)
+
+        let recognition = Task {
+            _ = try await service.recognizeText(from: image)
+            recognitionFinished.fulfill()
+        }
+        await fulfillment(of: [recognitionFinished], timeout: 2)
+
+        try XCTUnwrap(resumePrewarm).resume()
+        await fulfillment(of: [prewarmCancelled], timeout: 2)
+        try await recognition.value
+        XCTAssertTrue(prewarmWasCancelled)
+    }
+
     func testRecognizesTableAsTSVWithSurroundingParagraphs() async throws {
-        let image = try makeImage(table: true)
+        let image = try makeImage(table: [["Product", "Quantity", "Price"], ["Apples", "Three", "200"], ["Oranges", "Two", "400"]])
         let service = VisionTextRecognitionService(recognitionLanguages: ["en"])
         let text = try await service.recognizeText(from: image)
         XCTAssertTrue(text.contains("Product\tQuantity\tPrice"), "Missing table structure: \(text)")
@@ -21,16 +68,53 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
         XCTAssertEqual(text.components(separatedBy: "Product").count, 2, "Table header was duplicated")
     }
 
+    func testRecognizesJapaneseAndEnglishInOneTable() async throws {
+        let image = NSImage(size: NSSize(width: 1000, height: 700), flipped: false) { bounds in
+            NSColor.white.setFill()
+            bounds.fill()
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 30), .foregroundColor: NSColor.black
+            ]
+            ("在庫確認" as NSString).draw(at: NSPoint(x: 50, y: 620), withAttributes: attributes)
+            self.drawTable(
+                [["品名", "Quantity", "Price"], ["りんご", "Three", "200"], ["Oranges", "Four", "400"]], attributes: attributes
+            )
+            ("Thank you for shopping." as NSString).draw(at: NSPoint(x: 50, y: 150), withAttributes: attributes)
+            return true
+        }
+        let input = try XCTUnwrap(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let text = try await VisionTextRecognitionService().recognizeText(from: input)
+        XCTAssertEqual(text, "在庫確認\n\n品名\tQuantity\tPrice\nりんご\tThree\t200\nOranges\tFour\t400\n\nThank you for shopping.")
+    }
+
     func testCancelledRecognitionDoesNotReturnText() async throws {
-        let image = try makeImage(table: false)
-        let service = VisionTextRecognitionService()
+        let image = try makeImage()
+        var phases: [VisionTextRecognitionService.RequestPhase] = []
+        let recordCancellation: (VisionTextRecognitionService.RequestPhase) -> Void = { phases.append($0) }
+        let service = VisionTextRecognitionService(onCancellation: recordCancellation)
         let task = Task { try await service.recognizeText(from: image) }
         task.cancel()
         do {
             _ = try await task.value
             XCTFail("Cancelled OCR must not return a result")
         } catch is CancellationError {
-            // Expected cancellation, without running recognition.
+            XCTAssertEqual(phases, [.recognition])
+        }
+    }
+
+    func testReportsCancellationThrownByVisionDuringRecognition() async throws {
+        let image = try makeImage()
+        var phases: [VisionTextRecognitionService.RequestPhase] = []
+        let recordCancellation: (VisionTextRecognitionService.RequestPhase) -> Void = { phases.append($0) }
+        let service = VisionTextRecognitionService(onCancellation: recordCancellation) { _, _ in
+            throw VisionError.requestCancelled("test cancellation")
+        }
+
+        do {
+            _ = try await service.recognizeText(from: image)
+            XCTFail("Expected Vision cancellation to be propagated")
+        } catch VisionError.requestCancelled {
+            XCTAssertEqual(phases, [.recognition])
         }
     }
 
@@ -103,9 +187,9 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
         grid.stroke()
     }
 
-    private func makeImage(table: Bool) throws -> CGImage {
+    private func makeImage(table: [[String]]? = nil, height: Int = 700, fontSize: CGFloat = 30) throws -> CGImage {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: 1000, pixelsHigh: 700,
+            bitmapDataPlanes: nil, pixelsWide: 1000, pixelsHigh: height,
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
         ))
@@ -114,20 +198,19 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
         NSGraphicsContext.current = context
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSColor.white.setFill()
-        NSRect(x: 0, y: 0, width: 1000, height: 700).fill()
+        NSRect(x: 0, y: 0, width: 1000, height: height).fill()
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 30), .foregroundColor: NSColor.black
+            .font: NSFont.systemFont(ofSize: fontSize), .foregroundColor: NSColor.black
         ]
-        ("Shopping List" as NSString).draw(at: NSPoint(x: 50, y: 620), withAttributes: attributes)
-        if table {
-            drawTable(attributes: attributes)
+        ("Shopping List" as NSString).draw(at: NSPoint(x: 50, y: height - 80), withAttributes: attributes)
+        if let table {
+            drawTable(table, attributes: attributes)
             ("Thank you for shopping." as NSString).draw(at: NSPoint(x: 50, y: 150), withAttributes: attributes)
         }
         return try XCTUnwrap(bitmap.cgImage)
     }
 
-    private func drawTable(attributes: [NSAttributedString.Key: Any]) {
-        let rows = [["Product", "Quantity", "Price"], ["Apples", "Three", "200"], ["Oranges", "Two", "400"]]
+    private func drawTable(_ rows: [[String]], attributes: [NSAttributedString.Key: Any]) {
         for (row, cells) in rows.enumerated() {
             for (column, text) in cells.enumerated() {
                 (text as NSString).draw(at: NSPoint(x: 65 + column * 280, y: 480 - row * 90), withAttributes: attributes)

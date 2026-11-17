@@ -108,6 +108,7 @@
 "Name" = "Name";
 "None" = "None";
 "OCR Error" = "OCR Error";
+"Recognizing text…" = "Recognizing text…";
 "Could not copy the recognized text. Please try again." = "Could not copy the recognized text. Please try again.";
 "OK" = "OK";
 "Open" = "Open";
