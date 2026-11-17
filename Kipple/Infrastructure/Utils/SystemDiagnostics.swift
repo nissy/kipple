@@ -24,6 +24,10 @@ enum SystemDiagnostics {
                String(describing: operation), error.domain, error.code)
     }
 
+    static func ocrCancellation(phase: String) {
+        os_log(.default, log: log, "ocrRequestCancelled phase=%{public}@", phase)
+    }
+
     static func clipboard(policy: NSPasteboard.AccessBehavior, readFailed: Bool) {
         os_log(.default, log: log, "clipboardPolicy=%ld readFailed=%{public}@",
                policy.rawValue, readFailed ? "true" : "false")

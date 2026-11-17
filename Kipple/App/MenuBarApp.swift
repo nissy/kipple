@@ -10,15 +10,20 @@ import Combine
 @MainActor
 final class MenuBarApp: NSObject, ObservableObject {
     private var statusBarItem: NSStatusItem?
+    private var isRecognizingText = false
     private let appSettings = AppSettings.shared
     private var cancellables = Set<AnyCancellable>()
     internal let clipboardService: any ClipboardServiceProtocol
     internal let windowManager = WindowManager()
     internal var hotkeyManager: Any
-    private lazy var textRecognitionService: any TextRecognitionServiceProtocol =
-        TextRecognitionServiceProvider.resolve()
+    private lazy var textRecognitionService = TextRecognitionServiceProvider.resolve()
     lazy var textCaptureCoordinator: TextCaptureCoordinator = {
         TextCaptureCoordinator(
+            recognitionProgress: { [weak self] isRecognizing in
+                guard let self, isRecognizingText != isRecognizing else { return }
+                isRecognizingText = isRecognizing
+                updateStatusBarImage()
+            },
             clipboardService: clipboardService,
             textRecognitionService: textRecognitionService,
             windowManager: windowManager
@@ -66,6 +71,7 @@ final class MenuBarApp: NSObject, ObservableObject {
         // Skip heavy initialization when running unit tests
         guard !Self.isTestEnvironment else { return }
 
+        textRecognitionService.prewarm()
         SystemDiagnostics.permissions(
             screenCapture: CGPreflightScreenCaptureAccess(),
             accessibility: AXIsProcessTrusted(),
@@ -137,8 +143,11 @@ final class MenuBarApp: NSObject, ObservableObject {
     private func observeLocalizationChanges() {
         appSettings.objectWillChange
             .receive(on: RunLoop.main)
+            .map { [appSettings] in appSettings.appLanguage }
+            .prepend(appSettings.appLanguage)
+            .removeDuplicates()
             .sink { [weak self] _ in
-                self?.refreshLocalizedStrings()
+                self?.updateStatusBarDescription()
             }
             .store(in: &cancellables)
     }
@@ -147,48 +156,38 @@ final class MenuBarApp: NSObject, ObservableObject {
         appSettings.localizedString(key)
     }
 
-    private func refreshLocalizedStrings() {
-        guard !Self.isTestEnvironment else { return }
-        if let button = statusBarItem?.button {
-            button.toolTip = nil
-            if let image = NSImage(
-                systemSymbolName: "doc.on.clipboard",
-                accessibilityDescription: localizedMenuString("Kipple")
-            ) {
-                image.size = NSSize(width: 18, height: 18)
-                image.isTemplate = true
-                button.image = image
-                button.imagePosition = .imageOnly
-            }
-        }
+    private func updateStatusBarDescription() {
+        guard let button = statusBarItem?.button else { return }
+        let status = isRecognizingText ? localizedMenuString("Recognizing text…") : nil
+        button.toolTip = status
+        button.setAccessibilityLabel(status ?? localizedMenuString("Kipple"))
+    }
+
+    private func updateStatusBarImage() {
+        guard let button = statusBarItem?.button else { return }
+        let image = NSImage(
+            systemSymbolName: isRecognizingText ? "hourglass" : "doc.on.clipboard", accessibilityDescription: nil
+        )
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        button.image = image
+        let imagePosition: NSControl.ImagePosition = image == nil ? .noImage : .imageOnly
+        if button.imagePosition != imagePosition { button.imagePosition = imagePosition }
+        let title = image == nil ? (isRecognizingText ? "⌛" : "📋") : ""
+        if button.title != title { button.title = title }
+        updateStatusBarDescription()
     }
     
     private func setupMenuBar() {
-        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        updateStatusBarImage()
 
         if let button = statusBarItem?.button {
-            button.title = "📋"
-            
-            if let image = NSImage(
-                systemSymbolName: "doc.on.clipboard",
-                accessibilityDescription: localizedMenuString("Kipple")
-            ) {
-                image.size = NSSize(width: 18, height: 18)
-                image.isTemplate = true
-                button.image = image
-                button.imagePosition = .imageOnly
-            }
-
-            button.toolTip = nil
             button.target = self
             button.action = #selector(openMainWindow)
             // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
-            // 初回はアクティベーション優先のためUpで送出（Downは誤作動の原因になる）
             button.sendAction(on: [.leftMouseUp])
         }
-
-        statusBarItem?.menu = nil
-        statusBarItem?.isVisible = true
     }
 
     func startServices() {

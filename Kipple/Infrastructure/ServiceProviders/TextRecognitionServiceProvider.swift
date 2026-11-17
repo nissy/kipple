@@ -2,7 +2,7 @@ import Foundation
 
 enum TextRecognitionServiceProvider {
     @MainActor
-    static func resolve() -> any TextRecognitionServiceProtocol {
+    static func resolve() -> VisionTextRecognitionService {
         VisionTextRecognitionService()
     }
 }

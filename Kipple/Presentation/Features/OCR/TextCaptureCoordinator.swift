@@ -24,6 +24,7 @@ final class TextCaptureCoordinator {
     private let imageCaptureService: any ScreenImageCapturing
     private let overlayFactory: ScreenSelectionOverlayFactory
     private let errorPresenter: ((String) -> Void)?
+    private let recognitionProgress: ((Bool) -> Void)?
 
     private var overlayController: (any ScreenSelectionOverlayControlling)?
     private var permissionMonitoringTask: Task<Void, Never>?
@@ -33,6 +34,7 @@ final class TextCaptureCoordinator {
 
     init(
         errorPresenter: ((String) -> Void)? = nil,
+        recognitionProgress: ((Bool) -> Void)? = nil,
         clipboardService: any ClipboardServiceProtocol,
         textRecognitionService: any TextRecognitionServiceProtocol,
         windowManager: WindowManaging,
@@ -49,6 +51,7 @@ final class TextCaptureCoordinator {
         self.imageCaptureService = imageCaptureService
         self.overlayFactory = overlayFactory
         self.errorPresenter = errorPresenter
+        self.recognitionProgress = recognitionProgress
     }
 
     deinit {
@@ -57,8 +60,7 @@ final class TextCaptureCoordinator {
     }
 
     func startCaptureFlow() {
-        captureTask?.cancel()
-        captureTask = nil
+        guard captureTask == nil, overlayController == nil else { return }
 
         guard screenCapturePermission.preflight() else {
             shouldResumeCaptureAfterPermission = true
@@ -75,14 +77,9 @@ final class TextCaptureCoordinator {
     }
 
     private func presentSelectionOverlay() {
-        overlayController?.cancel()
-        overlayController = nil
-
         let controller = overlayFactory(
             { [weak self] rect, screen in
-                Task { @MainActor [weak self] in
-                    self?.handleSelection(rect: rect, screen: screen)
-                }
+                self?.handleSelection(rect: rect, screen: screen)
             },
             { [weak self] in
                 self?.overlayController = nil
@@ -145,9 +142,10 @@ final class TextCaptureCoordinator {
     }
 
     private func handleSelection(rect: CGRect, screen: NSScreen) {
+        guard overlayController != nil, captureTask == nil else { return }
         overlayController = nil
-        captureTask?.cancel()
         captureTask = Task { [weak self] in
+            defer { self?.captureTask = nil }
             await self?.captureAndRecognize(rect: rect, screen: screen)
         }
     }
@@ -176,11 +174,11 @@ final class TextCaptureCoordinator {
         playShutterSound()
 
         do {
-            let text = try await textRecognitionService.recognizeText(from: image)
+            let text = try await recognizeText(from: image)
             try Task.checkCancellation()
             await handleRecognizedText(text)
         } catch {
-            guard !Task.isCancelled, !(error is CancellationError) else { return }
+            guard !Task.isCancelled else { return }
             Logger.shared.error("OCR failed with error: \(error.localizedDescription)")
             presentErrorAlert(
                 message: NSLocalizedString(
@@ -189,6 +187,20 @@ final class TextCaptureCoordinator {
                 )
             )
         }
+    }
+
+    private func recognizeText(from image: CGImage) async throws -> String {
+        guard let recognitionProgress else { return try await textRecognitionService.recognizeText(from: image) }
+        let progressTask = Task {
+            try await Task.sleep(for: .milliseconds(700))
+            try Task.checkCancellation()
+            recognitionProgress(true)
+        }
+        defer {
+            progressTask.cancel()
+            recognitionProgress(false)
+        }
+        return try await textRecognitionService.recognizeText(from: image)
     }
 
     private func handleRecognizedText(_ text: String) async {

@@ -108,6 +108,7 @@
 "Name" = "名前";
 "None" = "なし";
 "OCR Error" = "OCRエラー";
+"Recognizing text…" = "文字を認識中…";
 "Could not copy the recognized text. Please try again." = "認識したテキストをコピーできませんでした。もう一度お試しください。";
 "OK" = "OK";
 "Open" = "開く";
