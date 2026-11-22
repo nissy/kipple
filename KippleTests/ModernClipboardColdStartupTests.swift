@@ -83,6 +83,37 @@ final class ModernClipboardColdStartupTests: XCTestCase {
         XCTAssertTrue(history.isEmpty)
     }
 
+    func testInitialPartialHistoryDoesNotReorderExistingCategoryFilters() async throws {
+        let suite = "ColdStartupCategoryOrderTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserCategoryStore(defaults: defaults)
+        store.add(name: "Saved", iconSystemName: "tag", id: savedHistoryCategoryID)
+        let originalOrder = store.orderedForFiltering().map(\.id)
+        let saved = ClipItem(content: "Memo", userCategoryId: savedHistoryCategoryID)
+        let url = ClipItem(content: "https://example.com")
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [saved, url], loadDelay: 0)
+        let loadingRecent = expectation(description: "recent history load suspended")
+        await repository.suspendLoad { loadingRecent.fulfill() }
+        let service = ModernClipboardService(testRepository: repository, loadOnStartup: true, categoryStore: store)
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let model = MainViewModel(clipboardService: adapter, categoryStore: store)
+
+        await fulfillment(of: [loadingRecent], timeout: 1)
+        await adapter.refreshHistoryForTesting()
+        XCTAssertFalse(adapter.isHistoryLoaded)
+        XCTAssertEqual(model.historyCategoryIDs, [savedHistoryCategoryID])
+        XCTAssertEqual(store.orderedForFiltering().map(\.id), originalOrder)
+
+        await repository.resumeLoad()
+        await service.flushPendingSaves()
+        await adapter.refreshHistoryForTesting()
+        XCTAssertTrue(adapter.isHistoryLoaded)
+        XCTAssertEqual(model.historyCategoryIDs, [BuiltInCategory.url, savedHistoryCategoryID])
+        XCTAssertEqual(store.orderedForFiltering().map(\.id), originalOrder)
+    }
+
     private func makeService(repository: MockClipboardRepository, pasteboard: NSPasteboard) -> ModernClipboardService {
         ModernClipboardService(testRepository: repository, loadOnStartup: true) { content in
             pasteboard.clearContents()

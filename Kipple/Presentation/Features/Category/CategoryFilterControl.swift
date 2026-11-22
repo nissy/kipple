@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CategoryFilterControl: View {
     @Binding var selection: CategoryFilter
+    let historyCategoryIDs: Set<UUID>
     let onOpenManager: (() -> Void)?
     @ObservedObject private var store = UserCategoryStore.shared
     @ObservedObject private var settings = AppSettings.shared
@@ -11,7 +12,10 @@ struct CategoryFilterControl: View {
     private static let rowStride = MainViewMetrics.HistoryRows.height + MainViewMetrics.HistoryRows.spacing
 
     private var choices: [UserCategory] {
-        store.orderedForFiltering().filter { store.isFilterEnabled($0) || selection.ids.contains($0.id) }
+        store.orderedForFiltering().filter { category in
+            historyCategoryIDs.contains(category.id)
+                && (store.isFilterEnabled(category) || selection.ids.contains(category.id))
+        }
     }
 
     var body: some View {

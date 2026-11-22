@@ -25,6 +25,7 @@ struct MainViewHistorySection: View {
     let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     @Binding var categoryFilter: CategoryFilter
+    let historyCategoryIDs: Set<UUID>
     @Binding var searchText: String
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
@@ -52,6 +53,7 @@ struct MainViewHistorySection: View {
         onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)? = nil,
         onOpenCategoryManager: (() -> Void)? = nil,
         categoryFilter: Binding<CategoryFilter>,
+        historyCategoryIDs: Set<UUID>,
         searchText: Binding<String>,
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
@@ -76,6 +78,7 @@ struct MainViewHistorySection: View {
         self.onChangeUserCategory = onChangeUserCategory
         self.onOpenCategoryManager = onOpenCategoryManager
         self._categoryFilter = categoryFilter
+        self.historyCategoryIDs = historyCategoryIDs
         self._searchText = searchText
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
@@ -88,8 +91,12 @@ struct MainViewHistorySection: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: MainViewMetrics.HistoryFilterSidebar.contentSpacing) {
-            CategoryFilterControl(selection: $categoryFilter, onOpenManager: onOpenCategoryManager)
-                .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
+            CategoryFilterControl(
+                selection: $categoryFilter,
+                historyCategoryIDs: historyCategoryIDs,
+                onOpenManager: onOpenCategoryManager
+            )
+            .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
 
             VStack(spacing: 0) {
                 historyToolbar

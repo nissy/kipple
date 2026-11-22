@@ -11,6 +11,12 @@ extension Notification.Name {
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
+    struct HistorySnapshot {
+        let items: [ClipItem]
+        let revision: UInt64
+        let isLoaded: Bool
+    }
+
     // MARK: - Properties
 
     private var history: [ClipItem] = []
@@ -215,8 +221,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         history
     }
 
-    func getHistoryRevision() async -> UInt64 {
-        historyRevision
+    func getHistorySnapshot() -> HistorySnapshot {
+        HistorySnapshot(items: history, revision: historyRevision, isLoaded: isRepositoryReady)
     }
 
     func startMonitoring() async {

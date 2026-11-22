@@ -58,6 +58,80 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(viewModel.filteredHistory.count, mockClipboardService.history.count)
     }
 
+    func testCategoryFilterAvailabilityUsesHistoryOutsideVisiblePageAndSearch() {
+        let memo = ClipItem(content: "Memo")
+        let savedURL = ClipItem(
+            content: "https://example.com",
+            userCategoryId: savedHistoryCategoryID,
+            metadata: ClipMetadata(source: .ocr)
+        )
+        mockClipboardService.history = [memo, savedURL]
+        let pagedModel = MainViewModel(clipboardService: mockClipboardService, pageSize: 1)
+        let expectedIDs: Set = [BuiltInCategory.none, BuiltInCategory.url, BuiltInCategory.ocr, savedHistoryCategoryID]
+
+        XCTAssertEqual(pagedModel.history.map(\.id), [memo.id])
+        XCTAssertEqual(pagedModel.historyCategoryIDs, expectedIDs)
+
+        pagedModel.searchText = "Memo"
+        pagedModel.updateFilteredItems(mockClipboardService.history)
+        XCTAssertEqual(pagedModel.filteredHistory.map(\.id), [memo.id])
+        XCTAssertEqual(pagedModel.historyCategoryIDs, expectedIDs)
+    }
+
+    func testHistoryUpdateClearsOnlySelectedCategoriesThatBecomeEmpty() {
+        let memo = ClipItem(content: "Memo")
+        var savedURL = ClipItem(content: "https://example.com", userCategoryId: savedHistoryCategoryID)
+        mockClipboardService.history = [memo, savedURL]
+        viewModel.loadHistory()
+        viewModel.categoryFilter.ids = [BuiltInCategory.url, savedHistoryCategoryID]
+
+        savedURL.setCategory(BuiltInCategory.url, enabled: false)
+        mockClipboardService.history = [memo, savedURL]
+        mockClipboardService.onHistoryChanged?(memo)
+        XCTAssertEqual(viewModel.historyCategoryIDs, [BuiltInCategory.none, savedHistoryCategoryID])
+        XCTAssertEqual(viewModel.categoryFilter.ids, [savedHistoryCategoryID])
+        XCTAssertEqual(viewModel.history.map(\.id), [savedURL.id])
+
+        savedURL.setCategory(savedHistoryCategoryID, enabled: false)
+        mockClipboardService.history = [memo, savedURL]
+        mockClipboardService.onHistoryChanged?(memo)
+        XCTAssertEqual(viewModel.historyCategoryIDs, [BuiltInCategory.none])
+        XCTAssertTrue(viewModel.categoryFilter.ids.isEmpty)
+        XCTAssertEqual(viewModel.history.map(\.id), [memo.id, savedURL.id])
+    }
+
+    func testEmptyCategoryReturnsAtEndAndKeepsItsNewOrder() throws {
+        let suite = "CategoryFilterOrderTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserCategoryStore(defaults: defaults)
+        store.add(name: "Saved", iconSystemName: "tag", id: savedHistoryCategoryID)
+
+        let url = ClipItem(content: "https://example.com")
+        let ocr = ClipItem(content: "Captured text", metadata: ClipMetadata(source: .ocr))
+        let saved = ClipItem(content: "Memo", userCategoryId: savedHistoryCategoryID)
+        mockClipboardService.history = [url, ocr, saved]
+        let model = MainViewModel(clipboardService: mockClipboardService, categoryStore: store)
+        let initialOrder = [BuiltInCategory.url, BuiltInCategory.ocr, savedHistoryCategoryID]
+        func activeOrder(in store: UserCategoryStore) -> [UUID] {
+            store.orderedForFiltering().map(\.id).filter { model.historyCategoryIDs.contains($0) }
+        }
+        XCTAssertEqual(activeOrder(in: store), initialOrder)
+
+        mockClipboardService.history.removeFirst()
+        mockClipboardService.onHistoryChanged?(ocr)
+        XCTAssertEqual(activeOrder(in: store), [BuiltInCategory.ocr, savedHistoryCategoryID])
+
+        mockClipboardService.copyToClipboard(url.content, fromEditor: false)
+        let newOrder = [BuiltInCategory.ocr, savedHistoryCategoryID, BuiltInCategory.url]
+        XCTAssertEqual(activeOrder(in: store), newOrder)
+        XCTAssertEqual(activeOrder(in: UserCategoryStore(defaults: defaults)), newOrder)
+
+        store.moveFilter(BuiltInCategory.url, to: BuiltInCategory.ocr, among: newOrder)
+        mockClipboardService.copyToClipboard("https://example.net", fromEditor: false)
+        XCTAssertEqual(activeOrder(in: store), initialOrder)
+    }
+
     func testOCRHighlightTemporarilyRevealsHistoryWithoutChangingFilters() throws {
         let url = try XCTUnwrap(mockClipboardService.history.first)
         let ocr = ClipItem(content: "Captured text", metadata: ClipMetadata(source: .ocr))

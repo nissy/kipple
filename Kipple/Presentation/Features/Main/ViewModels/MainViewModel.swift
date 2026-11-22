@@ -39,6 +39,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     @Published var editorText: String
     
     let clipboardService: any ClipboardServiceProtocol
+    private let categoryStore: UserCategoryStore?
     private let pasteMonitor: any PasteCommandMonitoring
     private weak var pasteController: PlainTextPasteController?
     private let screenCapturePermissionCheck: () -> Bool
@@ -46,6 +47,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var serviceCancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
+    @Published private(set) var historyCategoryIDs: Set<UUID> = []
+    private var lastLoadedCategoryIDs: Set<UUID>?
     @Published private(set) var historyHighlightRequest: HistoryHighlightRequest?
     var filteredHistory: [ClipItem] = []
     @Published var searchText: String = "" {
@@ -109,6 +112,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
+        categoryStore: UserCategoryStore? = nil,
         pageSize: Int = 50,
         pasteMonitor: any PasteCommandMonitoring = PasteCommandMonitor(),
         screenCapturePermissionCheck: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }
@@ -116,6 +120,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         self.pageSize = max(1, pageSize)
         let resolvedService = clipboardService ?? ClipboardServiceProvider.resolve()
         self.clipboardService = resolvedService
+        self.categoryStore = categoryStore
         self.editorText = resolvedService.currentClipboardContent ?? ""
         self.editorSaveBaselineText = resolvedService.currentClipboardContent
         self.pasteMonitor = pasteMonitor
@@ -139,7 +144,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         // 初回読み込み。ModernClipboardServiceAdapter は bind 時の @Published 初期送出で同期されるため、
         // ここで重複フィルタリングしない。
         if !(resolvedService is ModernClipboardServiceAdapter) {
-            updateFilteredItems(self.clipboardService.history)
+            loadHistory()
         }
         currentClipboardContent = resolvedService.currentClipboardContent
     }
@@ -167,7 +172,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             guard let self else { return }
             let items = self.clipboardService.history
             self.handleExternalHistoryUpdate(items, newTopID: item.id)
-            self.updateFilteredItems(items)
+            self.updateHistory(items)
         }
     }
 
@@ -178,7 +183,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             .sink { [weak self] items in
                 guard let self = self else { return }
                 self.handleExternalHistoryUpdate(items, newTopID: items.first?.id)
-                self.updateFilteredItems(items)
+                self.updateHistory(items, isLoaded: service.isHistoryLoaded)
             }
             .store(in: &serviceCancellables)
 
@@ -190,7 +195,34 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     
     func loadHistory() {
-        let items = clipboardService.history
+        let isLoaded = (clipboardService as? ModernClipboardServiceAdapter)?.isHistoryLoaded ?? true
+        updateHistory(clipboardService.history, isLoaded: isLoaded)
+    }
+
+    private func updateHistory(_ items: [ClipItem], isLoaded: Bool = true) {
+        let categoryIDs = items.reduce(into: Set<UUID>()) { ids, item in
+            let itemIDs = item.categoryIDs
+            if itemIDs.isEmpty {
+                ids.insert(BuiltInCategory.none)
+            } else {
+                ids.formUnion(itemIDs)
+            }
+        }
+        if historyCategoryIDs != categoryIDs { historyCategoryIDs = categoryIDs }
+
+        if isLoaded {
+            if let lastLoadedCategoryIDs {
+                categoryStore?.moveFiltersToEnd(categoryIDs.subtracting(lastLoadedCategoryIDs))
+            }
+            lastLoadedCategoryIDs = categoryIDs
+
+            let selectedIDs = categoryFilter.ids.intersection(categoryIDs)
+            if categoryFilter.ids != selectedIDs {
+                isFilterMutating = true
+                categoryFilter.ids = selectedIDs
+                isFilterMutating = false
+            }
+        }
         updateFilteredItems(items)
     }
 

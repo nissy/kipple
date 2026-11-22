@@ -152,6 +152,13 @@ final class UserCategoryStore: ObservableObject {
         saveFilterOrder(updated)
     }
 
+    func moveFiltersToEnd(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        let order = orderedForFiltering().map(\.id)
+        let updated = order.filter { !ids.contains($0) } + order.filter { ids.contains($0) }
+        if updated != order { saveFilterOrder(updated) }
+    }
+
     func categories(for item: ClipItem) -> [UserCategory] {
         let ids = item.categoryIDs
         return assignable().filter { ids.contains($0.id) }

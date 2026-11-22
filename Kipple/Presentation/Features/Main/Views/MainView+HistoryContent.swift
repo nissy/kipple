@@ -38,6 +38,7 @@ extension MainView {
             },
             onOpenCategoryManager: { presentCategoryManager() },
             categoryFilter: $viewModel.categoryFilter,
+            historyCategoryIDs: viewModel.historyCategoryIDs,
             searchText: $viewModel.searchText,
             onLoadMore: { item in
                 viewModel.loadMoreHistoryIfNeeded(currentItem: item)

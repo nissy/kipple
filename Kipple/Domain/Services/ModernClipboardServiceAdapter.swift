@@ -21,6 +21,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private var pendingOperationTask: Task<Void, Never>?
     private var pendingClipboardContent: String?
     private var lastKnownHistoryRevision: UInt64?
+    private(set) var isHistoryLoaded = false
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -241,20 +242,20 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await refreshGate.acquire()
         defer { refreshGate.release() }
         let previousClipboardContent = currentClipboardContent
-        let newRevision = await modernService.getHistoryRevision()
         let newCurrentContent = await modernService.getCurrentClipboardContent()
+        let snapshot = await modernService.getHistorySnapshot()
 
-        let historyChanged = lastKnownHistoryRevision != newRevision
-
-        if historyChanged {
+        if lastKnownHistoryRevision != snapshot.revision || isHistoryLoaded != snapshot.isLoaded {
+            let newRevision = snapshot.revision
+            let newHistory = snapshot.items
             PerformanceTrace.event("adapter_refresh_started", revision: newRevision)
-            let newHistory = await modernService.getHistory()
             PerformanceTrace.event(
                 "adapter_history_will_publish",
                 content: newHistory.first?.content,
                 revision: newRevision,
                 count: newHistory.count
             )
+            isHistoryLoaded = snapshot.isLoaded
             history = newHistory
             lastKnownHistoryRevision = newRevision
             PerformanceTrace.event(
@@ -290,6 +291,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         refreshTask = nil
         pendingOperationTask?.cancel()
         pendingOperationTask = nil
+        isHistoryLoaded = false
         history = []
         currentClipboardContent = nil
         pendingClipboardContent = nil
