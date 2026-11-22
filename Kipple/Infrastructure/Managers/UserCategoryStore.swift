@@ -22,7 +22,7 @@ final class UserCategoryStore: ObservableObject {
     private let storageKey = "userCategories.v1"
     private static let filterOrderKey = "categoryFilterOrder.v1"
 
-    // 単色かつテキスト関連の推奨シンボル一覧
+    // カテゴリ編集で選べる単色シンボル一覧
     static let allowedSymbols: [String] = [
         // Documents & text
         "doc.text", "doc", "doc.richtext", "doc.append",
@@ -59,7 +59,43 @@ final class UserCategoryStore: ObservableObject {
 
         // Shapes useful for categorization
         "circle", "square", "triangle", "diamond", "octagon",
-        "circle.grid.2x2", "square.grid.3x3", "rhombus", "shield"
+        "circle.grid.2x2", "square.grid.3x3", "rhombus", "shield",
+
+        // Work & study
+        "briefcase", "building.2", "person.2", "graduationcap",
+        "book", "books.vertical", "newspaper", "chart.bar",
+
+        // Shopping & finance
+        "cart", "bag", "creditcard", "wallet.bifold",
+        "receipt", "banknote", "shippingbox", "gift",
+
+        // Technology & media
+        "laptopcomputer", "gearshape", "lock", "key",
+        "photo", "camera", "play.rectangle", "music.note",
+
+        // Travel & everyday use
+        "house", "heart", "airplane", "car",
+        "tram", "map", "location", "cup.and.saucer",
+
+        // Meetings & communication
+        "person.3", "video", "phone", "mic",
+        "bubble.left", "envelope.open", "megaphone", "person.crop.rectangle",
+
+        // Projects & follow-up
+        "list.bullet.clipboard", "calendar.badge.checkmark", "checkmark.seal", "hourglass",
+        "arrow.triangle.2.circlepath", "target", "rectangle.split.3x1", "exclamationmark.triangle",
+
+        // Reports & documents
+        "tablecells", "chart.pie", "chart.line.uptrend.xyaxis", "doc.on.doc",
+        "doc.text.magnifyingglass", "signature", "doc.badge.gearshape", "printer",
+
+        // Clients & operations
+        "person.text.rectangle", "person.crop.circle.badge.checkmark", "building.columns", "dollarsign.circle",
+        "percent", "tray.and.arrow.up", "tray", "headphones",
+
+        // Development & infrastructure
+        "server.rack", "externaldrive", "network", "arrow.triangle.branch",
+        "ant", "testtube.2", "lock.shield", "point.3.connected.trianglepath.dotted"
     ]
 
     static let availableSymbols: [String] = {
