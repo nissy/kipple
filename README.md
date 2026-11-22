@@ -11,8 +11,7 @@ It keeps your copied text searchable, editable, organized, and ready to paste ag
 
 [Download the latest release](https://github.com/nissy/kipple/releases/latest/download/Kipple.dmg)
 
-<img width="755" height="775" src="https://github.com/user-attachments/assets/4c4e2b1f-8055-43d8-82f6-25496d6975df" alt="Kipple main window" />
-
+<img width="735" height="881" src="https://github.com/user-attachments/assets/ff419919-fdb5-49ce-b7e5-1648e230b0e0" />
 ## Why Kipple?
 
 Kipple is more than a clipboard history list.
