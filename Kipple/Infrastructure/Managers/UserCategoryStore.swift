@@ -75,7 +75,7 @@ final class UserCategoryStore: ObservableObject {
         UserCategory(
             id: builtInNoneID,
             name: "None",
-            iconSystemName: "tag",
+            iconSystemName: "tag.slash",
             isFilterEnabled: false
         )
     }

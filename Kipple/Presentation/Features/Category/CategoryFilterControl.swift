@@ -107,6 +107,7 @@ struct CategoryFilterControl: View {
     }
 
     private func categoryLabel(_ category: UserCategory) -> Text {
+        if category.id == BuiltInCategory.none { return Text("Uncategorized") }
         if store.isBuiltIn(category.id) { return Text(LocalizedStringKey(category.name)) }
         return Text(verbatim: category.name)
     }
