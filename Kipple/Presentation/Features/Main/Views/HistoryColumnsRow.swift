@@ -15,7 +15,6 @@ struct HistoryColumnsRow<Queue: View, Content: View, Delete: View, Category: Vie
             category
         }
         .padding(.leading, MainViewMetrics.HistoryColumns.rowLeadingInset)
-        .padding(.trailing, MainViewMetrics.HistoryColumns.trailingControlInset)
         .frame(maxWidth: .infinity)
     }
 }

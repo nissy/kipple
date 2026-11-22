@@ -164,6 +164,11 @@ private final class FilterReorderView: NSView {
         let wasReordering = isReordering
         stopTracking()
         if wasReordering {
+            guard let viewport = enclosingScrollView?.contentView,
+                  viewport.visibleRect.contains(viewport.convert(event.locationInWindow, from: nil)) else {
+                input?.onFinish(nil)
+                return
+            }
             input?.onFinish(startLocation.y - event.locationInWindow.y)
         } else if bounds.contains(convert(event.locationInWindow, from: nil)) {
             input?.onClick()
@@ -192,10 +197,10 @@ struct HistoryFilterButton: View {
             Image(systemName: systemName)
                 .font(MainViewMetrics.HistoryFilterSidebar.iconFont)
                 .foregroundStyle(KippleButtonAppearance.foreground(isActive: isActive))
-                .frame(width: MainViewMetrics.HistoryFilterSidebar.width,
-                       height: MainViewMetrics.HistoryFilterSidebar.width)
+                .frame(width: MainViewMetrics.HistoryFilterIcon.diameter,
+                       height: MainViewMetrics.HistoryFilterIcon.diameter)
                 .background(KippleButtonAppearance.compactFill(isActive: isActive), in: Circle())
-                .frame(height: MainViewMetrics.HistoryRows.height)
+                .frame(width: MainViewMetrics.HistoryFilterSidebar.width, height: MainViewMetrics.HistoryRows.height)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

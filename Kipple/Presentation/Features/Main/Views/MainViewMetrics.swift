@@ -42,8 +42,8 @@ enum MainViewMetrics {
     }
 
     enum HistoryFilterSidebar {
-        static let width = HistoryColumns.rowControlSize
-        static let contentSpacing: CGFloat = 11
+        static let width = HistoryFilterIcon.diameter
+        static let contentSpacing = toolbarItemSpacing
         static let iconFont = TitleBar.iconFont
     }
 
@@ -58,13 +58,12 @@ enum MainViewMetrics {
         static let toolbarBottomPadding: CGFloat = 6
         static let rowLeadingInset: CGFloat = 8
         static let controlColumnWidth: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
-        static let trailingControlInset = (TitleBar.buttonSize - controlColumnWidth) / 2
         static let rowControlSize: CGFloat = KippleButtonMetrics.historyRowSize
-        static let rowCategorySize: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
+        static let rowCategoryWidth = HistoryFilterIcon.diameter
     }
 
     enum HistoryFilterIcon {
-        static let diameter: CGFloat = HistoryColumns.controlColumnWidth
+        static let diameter = TitleBar.buttonSize
         static let defaultFont: Font = .system(size: 10, weight: .medium)
     }
 

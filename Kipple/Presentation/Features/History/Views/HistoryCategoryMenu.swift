@@ -43,7 +43,7 @@ struct HistoryCategoryMenu: View {
                     }
                 }
                 .frame(
-                    width: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                    width: MainViewMetrics.HistoryColumns.rowCategoryWidth,
                     height: MainViewMetrics.HistoryColumns.controlColumnWidth,
                     alignment: .center
                 )
