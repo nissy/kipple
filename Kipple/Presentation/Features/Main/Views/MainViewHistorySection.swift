@@ -105,6 +105,7 @@ struct MainViewHistorySection: View {
             HistorySearchField(searchText: $searchText)
             scrollToTopButton
         }
+        .padding(.trailing, MainViewMetrics.HistoryColumns.trailingControlInset)
         .padding(.bottom, MainViewMetrics.HistoryColumns.toolbarBottomPadding)
     }
 

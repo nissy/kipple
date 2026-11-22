@@ -29,19 +29,24 @@ struct HistoryCategoryMenu: View {
         } label: {
             Image(systemName: store.iconName(for: categories))
                 .font(.system(size: 12, weight: .medium))
+                .overlay(alignment: .bottomTrailing) {
+                    if categories.count > 1 {
+                        let countLabel = Text("\(categories.count)")
+                            .font(.system(size: 8, weight: .bold))
+                            .fixedSize()
+                        if categories.count < 10 {
+                            countLabel.frame(width: 0, alignment: .leading)
+                                .offset(x: 1, y: 2)
+                        } else {
+                            countLabel.offset(y: 8)
+                        }
+                    }
+                }
                 .frame(
                     width: MainViewMetrics.HistoryColumns.controlColumnWidth,
                     height: MainViewMetrics.HistoryColumns.controlColumnWidth,
                     alignment: .center
                 )
-                .overlay(alignment: .bottomTrailing) {
-                    if categories.count > 1 {
-                        Text("\(categories.count)")
-                            .font(.system(size: 8, weight: .bold))
-                            .padding(2)
-                            .background(.background, in: Circle())
-                    }
-                }
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? .primary : .secondary)
