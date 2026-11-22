@@ -42,11 +42,11 @@ extension MainView {
             onDelete: { item in
                 viewModel.deleteItemSync(item)
             },
-            onChangeUserCategory: { item, categoryID, enabled in
+            onChangeUserCategory: { item, change in
                 guard let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter else {
                     throw MCPFailure.unavailable
                 }
-                try await adapter.setCategory(itemID: item.id, categoryID: categoryID, enabled: enabled)
+                try await adapter.updateCategories(itemID: item.id, change: change)
             },
             onOpenCategoryManager: { presentCategoryManager() },
             categoryFilter: $viewModel.categoryFilter,

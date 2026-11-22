@@ -16,8 +16,11 @@ final class UserCategoryStore: ObservableObject {
     @Published private(set) var categories: [UserCategory] = [] {
         didSet { persist() }
     }
+    @Published private var filterOrder: [UUID]
 
+    private let defaults: UserDefaults
     private let storageKey = "userCategories.v1"
+    private static let filterOrderKey = "categoryFilterOrder.v1"
 
     // 単色かつテキスト関連の推奨シンボル一覧
     static let allowedSymbols: [String] = [
@@ -106,12 +109,37 @@ final class UserCategoryStore: ObservableObject {
         return nil
     }
 
-    private init() { load() }
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        filterOrder = defaults.stringArray(forKey: Self.filterOrderKey)?.compactMap(UUID.init(uuidString:)) ?? []
+        load()
+    }
 
     /// すべて（ビルトイン＋ユーザ定義）
     func all() -> [UserCategory] { Self.builtIns + categories }
 
     func assignable() -> [UserCategory] { all().filter { $0.id != BuiltInCategory.none } }
+
+    func orderedForFiltering() -> [UserCategory] {
+        let categories = assignable() + [Self.builtInNone]
+        var remaining = Dictionary(categories.map { ($0.id, $0) }) { first, _ in first }
+        let ordered = filterOrder.compactMap { remaining.removeValue(forKey: $0) }
+        return ordered + categories.compactMap { remaining.removeValue(forKey: $0.id) }
+    }
+
+    func moveFilter(_ id: UUID, to target: UUID, among visibleIDs: [UUID]) {
+        let visible = Set(visibleIDs)
+        let order = orderedForFiltering().map(\.id)
+        var visibleOrder = order.filter { visible.contains($0) }
+        guard let from = visibleOrder.firstIndex(of: id), let to = visibleOrder.firstIndex(of: target),
+              from != to else { return }
+
+        let moved = visibleOrder.remove(at: from)
+        visibleOrder.insert(moved, at: to)
+        var reordered = visibleOrder.makeIterator()
+        let updated = order.map { visible.contains($0) ? (reordered.next() ?? $0) : $0 }
+        saveFilterOrder(updated)
+    }
 
     func categories(for item: ClipItem) -> [UserCategory] {
         let ids = item.categoryIDs
@@ -166,6 +194,7 @@ final class UserCategoryStore: ObservableObject {
     func remove(id: UUID) {
         guard !isBuiltIn(id) else { return }
         categories.removeAll { $0.id == id }
+        if filterOrder.contains(id) { saveFilterOrder(filterOrder.filter { $0 != id }) }
     }
 
     func rename(id: UUID, to name: String) {
@@ -186,17 +215,22 @@ final class UserCategoryStore: ObservableObject {
     }
 
     // MARK: - Persistence
+    private func saveFilterOrder(_ order: [UUID]) {
+        filterOrder = order
+        defaults.set(order.map(\.uuidString), forKey: Self.filterOrderKey)
+    }
+
     private func persist() {
         do {
             let data = try JSONEncoder().encode(categories)
-            UserDefaults.standard.set(data, forKey: storageKey)
+            defaults.set(data, forKey: storageKey)
         } catch {
             Logger.shared.error("Failed to save categories: \(error)")
         }
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+        guard let data = defaults.data(forKey: storageKey) else {
             categories = []
             return
         }

@@ -69,8 +69,7 @@ struct DataSettingsView: View {
                                 ),
                                 formatter: makeNumberFormatter(minimum: 10, maximum: 1000)
                             )
-                            .textFieldStyle(.bordered)
-                            .textInputBorderShape(.roundedRectangle)
+                            .kippleRoundedTextFieldStyle()
                             .frame(width: 80)
                             .onChange(of: maxHistoryItems) { _, newValue in
                                 updateHistoryLimit(newValue)
@@ -99,8 +98,7 @@ struct DataSettingsView: View {
                                 ),
                                 formatter: makeNumberFormatter(minimum: 1, maximum: 100)
                             )
-                            .textFieldStyle(.bordered)
-                            .textInputBorderShape(.roundedRectangle)
+                            .kippleRoundedTextFieldStyle()
                             .frame(width: 80)
                             
                             Stepper(

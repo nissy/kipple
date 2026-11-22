@@ -56,8 +56,7 @@ struct CategoryManagerView: View {
 
             HStack(spacing: CategoryManagerLayout.columnSpacing) {
                 TextField("Name", text: $name)
-                    .textFieldStyle(.bordered)
-                    .textInputBorderShape(.roundedRectangle)
+                    .kippleRoundedTextFieldStyle()
                     .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth)
 
                 Menu {

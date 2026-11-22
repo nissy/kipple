@@ -24,13 +24,13 @@ struct MainViewControlSection: View {
             controlButtons
             Spacer()
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
         .padding(.top, 6)
         .padding(.bottom, 2)
     }
 
     private var controlButtons: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: MainViewMetrics.toolbarItemSpacing) {
             editModeButton
             saveButton
             formatMenu

@@ -90,7 +90,7 @@ Paragraph breaks are preserved, and recognized tables are copied as tab-separate
 
 Paste on Selection can paste a selected history item directly into the previously active app. This is useful when you want one-click selection and paste behavior.
 
-## Permissions on macOS 27 or later
+## Permissions on macOS 26 or later
 
 Open **Kipple Settings → Permission** to check access and open the matching page in **System Settings → Privacy & Security**.
 
@@ -131,11 +131,13 @@ Kipple does not send your clipboard history to external services.
 ## Requirements
 
 - Mac with Apple silicon (M1 or later)
-- macOS 27.0 or later
+- macOS 26.0 or later
+
+macOS 26 support is provisional. Automated tests run on macOS 27; operation on a Mac running macOS 26 has not yet been verified.
 
 ## Development
 
-`make run` builds and launches the development app, signing it with a **Developer ID Application** certificate. Install Xcode, XcodeGen, and the signing certificate with its private key first. To use another certificate, specify `make run DEV_CODE_SIGN_IDENTITY="Apple Development" DEVELOPMENT_TEAM=YOUR_TEAM_ID`.
+`make run` builds and launches the development app, signing it with a **Developer ID Application** certificate. Install Xcode 27 or later (macOS 27 SDK), XcodeGen, and the signing certificate with its private key first. To use another certificate, specify `make run DEV_CODE_SIGN_IDENTITY="Apple Development" DEVELOPMENT_TEAM=YOUR_TEAM_ID`.
 
 Keep the signing identity consistent between builds. Unsigned or ad-hoc builds can appear as Not Granted even when Kipple is enabled in System Settings. Changing the signing identity may require granting permissions again and restarting Kipple.
 

@@ -250,6 +250,7 @@
 "Select multiple categories. Automatic categories can also be removed." = "複数選択できます。自動で付いたカテゴリも外せます。";
 "Could not save categories. Please try again." = "カテゴリを保存できませんでした。再度お試しください。";
 "Filter by categories" = "カテゴリで絞り込む";
+"Pinned only" = "ピン留めのみ";
 "Match" = "一致条件";
 "Match all" = "すべて含む";
 "Match any" = "いずれかを含む";

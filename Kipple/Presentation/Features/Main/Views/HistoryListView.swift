@@ -12,7 +12,7 @@ struct HistoryListView: View {
     let onSelectItem: (ClipItem) -> Void
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
-    let onChangeUserCategory: ((ClipItem, UUID, Bool) async throws -> Void)?
+    let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
@@ -32,10 +32,10 @@ struct HistoryListView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 2, pinnedViews: []) {
+                LazyVStack(spacing: MainViewMetrics.HistoryRows.spacing) {
                     ForEach(history, id: \.id) { item in
                         historyRow(item)
-                        .frame(height: 32)
+                        .frame(height: MainViewMetrics.HistoryRows.height)
                         .opacity(queueDrag.itemID == item.id ? 0 : 1)
                         .background(HistoryQueueDragAnchor(controller: queueDrag, itemID: item.id))
                         .transition(.opacity)
@@ -51,7 +51,7 @@ struct HistoryListView: View {
                             .padding(.vertical, 10)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, MainViewMetrics.HistoryRows.verticalPadding)
                 .background {
                     ScrollPositionObserver(
                         canScrollToTop: $canScrollToTop,
@@ -111,8 +111,8 @@ struct HistoryListView: View {
             onDelete: onDelete != nil ? {
                 withAnimation(.spring(response: 0.3)) { onDelete?(item) }
             } : nil,
-            onChangeCategory: onChangeUserCategory != nil ? { categoryID, enabled in
-                try await onChangeUserCategory?(item, categoryID, enabled)
+            onChangeCategory: onChangeUserCategory != nil ? { change in
+                try await onChangeUserCategory?(item, change)
             } : nil,
             onOpenCategoryManager: onOpenCategoryManager,
             historyFont: historyFont,

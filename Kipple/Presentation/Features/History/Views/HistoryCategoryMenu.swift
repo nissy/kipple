@@ -13,7 +13,7 @@ extension EnvironmentValues {
 struct HistoryCategoryMenu: View {
     let item: ClipItem
     let isSelected: Bool
-    let onChangeCategory: ((UUID, Bool) async throws -> Void)?
+    let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     @ObservedObject private var store = UserCategoryStore.shared
     @Environment(\.categoryPopoverChanged) private var presentationChanged
@@ -58,7 +58,7 @@ struct HistoryCategoryMenu: View {
                         ForEach(store.assignable()) { category in
                             Toggle(isOn: Binding(
                                 get: { item.categoryIDs.contains(category.id) },
-                                set: { enabled in update(category.id, enabled: enabled) }
+                                set: { enabled in update(.set(category.id, enabled: enabled)) }
                             )) {
                                 Label(category.name, systemImage: store.iconName(for: category))
                             }
@@ -77,7 +77,8 @@ struct HistoryCategoryMenu: View {
                         isPresented = false
                     }
                     Spacer()
-                    Button("Done") { isPresented = false }.keyboardShortcut(.defaultAction)
+                    Button("Clear") { update(.clear) }
+                        .disabled(item.categoryIDs.isEmpty || isSaving || onChangeCategory == nil)
                 }
             }.padding(16).frame(width: 300)
         }
@@ -87,12 +88,13 @@ struct HistoryCategoryMenu: View {
         .onDisappear { if isPresented { presentationChanged(item.id, false) } }
     }
 
-    private func update(_ id: UUID, enabled: Bool) {
+    private func update(_ change: ClipCategoryChange) {
+        guard let onChangeCategory, !isSaving else { return }
         isSaving = true
         saveError = false
         Task { @MainActor in
             defer { isSaving = false }
-            do { try await onChangeCategory?(id, enabled) } catch { saveError = true }
+            do { try await onChangeCategory(change) } catch { saveError = true }
         }
     }
 

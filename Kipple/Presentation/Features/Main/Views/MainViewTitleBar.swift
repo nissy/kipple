@@ -46,13 +46,12 @@ struct MainViewTitleBarAccessory: View {
     
     var body: some View {
         titleBarButtons
-            .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(Color.clear)
     }
 
     private var titleBarButtons: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MainViewMetrics.toolbarItemSpacing) {
             if state.showsQueueButton {
                 queueButton
             }

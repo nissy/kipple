@@ -54,6 +54,32 @@ final class MultipleCategoryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(filter.ids, [BuiltInCategory.url])
     }
 
+    @MainActor
+    func testFilterOrderPersistsWhileHiddenCategoriesKeepTheirSlots() throws {
+        let suite = "CategoryFilterOrderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = UserCategoryStore(defaults: defaults)
+        store.add(name: "Memo", iconSystemName: "doc.text")
+        let memo = try XCTUnwrap(store.userDefined().first?.id)
+        let url = BuiltInCategory.url
+        let ocr = BuiltInCategory.ocr
+        let ai = BuiltInCategory.ai
+        let none = BuiltInCategory.none
+        XCTAssertEqual(store.orderedForFiltering().map(\.id), [url, ocr, ai, memo, none])
+
+        store.moveFilter(memo, to: url, among: [url, memo, none])
+        XCTAssertEqual(store.orderedForFiltering().map(\.id), [memo, ocr, ai, url, none])
+
+        let reopened = UserCategoryStore(defaults: defaults)
+        XCTAssertEqual(reopened.orderedForFiltering().map(\.id), [memo, ocr, ai, url, none])
+        reopened.moveFilter(none, to: memo, among: [memo, url, none])
+        XCTAssertEqual(reopened.orderedForFiltering().map(\.id), [none, ocr, ai, memo, url])
+        reopened.remove(id: memo)
+        XCTAssertEqual(UserCategoryStore(defaults: defaults).orderedForFiltering().map(\.id), [none, ocr, ai, url])
+    }
+
     func testEditsSurviveRecopyMCPAndRestartWithoutReplacingOtherDetails() async throws {
         let repository = try SwiftDataRepository.make(inMemory: true)
         let service = ModernClipboardService(testRepository: repository)
@@ -100,6 +126,29 @@ final class MultipleCategoryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(before, after)
     }
 
+    func testClearingCategoriesPersistsAndPreservesOtherItemDetails() async throws {
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let custom = UUID()
+        let item = ClipItem(content: "https://example.com", isPinned: true, userCategoryId: custom,
+                            metadata: ClipMetadata(title: "Example", source: .ocr))
+        XCTAssertEqual(item.categoryIDs, [BuiltInCategory.url, BuiltInCategory.ocr, custom])
+        try await repository.save([item])
+
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        try await service.updateCategories(itemID: item.id, change: .clear)
+
+        let savedItems = try await repository.loadAll()
+        let saved = try XCTUnwrap(savedItems.first)
+        XCTAssertTrue(saved.categoryIDs.isEmpty)
+        XCTAssertEqual(saved.id, item.id)
+        XCTAssertEqual(saved.content, item.content)
+        XCTAssertEqual(saved.timestamp, item.timestamp)
+        XCTAssertTrue(saved.isPinned)
+        XCTAssertEqual(saved.title, item.title)
+        XCTAssertEqual(saved.metadata?.sources, item.metadata?.sources)
+    }
+
     func testConcurrentCategoryEditsAreMerged() async throws {
         let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
         await service.copyToClipboard("memo", fromEditor: false)
@@ -122,6 +171,10 @@ final class MultipleCategoryTests: XCTestCase, @unchecked Sendable {
         do {
             try await service.setCategory(itemID: item.id, categoryID: BuiltInCategory.ai, enabled: true)
             XCTFail("A failed save must be reported")
+        } catch { XCTAssertEqual(error as? MCPFailure, .persistence) }
+        do {
+            try await service.updateCategories(itemID: item.id, change: .clear)
+            XCTFail("A failed clear must be reported")
         } catch { XCTAssertEqual(error as? MCPFailure, .persistence) }
         do {
             try await service.removeCategoryDefinition(custom)

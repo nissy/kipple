@@ -87,7 +87,7 @@ Screen Text Capture では、画面上の範囲を選択して macOS Vision OCR 
 
 Paste on Selection を使うと、履歴項目を選んだときに、直前に使っていたアプリへ直接貼り付けられます。履歴選択と貼り付けをまとめたい場合に便利です。
 
-## macOS 27以降の権限
+## macOS 26以降の権限
 
 **Kippleの設定 → 権限**で許可状態を確認し、**システム設定 → プライバシーとセキュリティ**の該当画面を開けます。
 
@@ -128,11 +128,13 @@ Kipple はクリップボード履歴を外部サービスへ送信しません�
 ## Requirements
 
 - Apple Silicon（M1以降）搭載のMac
-- macOS 27.0 以降
+- macOS 26.0 以降
+
+macOS 26対応は暫定です。自動テストはmacOS 27で実施しており、macOS 26実機での動作確認は未実施です。
 
 ## 開発
 
-`make run` は **Developer ID Application** 証明書で署名した開発版をビルドして起動します。事前にXcode、XcodeGen、秘密鍵を含む署名証明書を用意してください。別の証明書を使う場合は、`make run DEV_CODE_SIGN_IDENTITY="Apple Development" DEVELOPMENT_TEAM=YOUR_TEAM_ID` のように指定できます。
+`make run` は **Developer ID Application** 証明書で署名した開発版をビルドして起動します。事前にXcode 27以降（macOS 27 SDK）、XcodeGen、秘密鍵を含む署名証明書を用意してください。別の証明書を使う場合は、`make run DEV_CODE_SIGN_IDENTITY="Apple Development" DEVELOPMENT_TEAM=YOUR_TEAM_ID` のように指定できます。
 
 ビルド間で署名の識別情報を統一してください。未署名・アドホック署名では、システム設定でKippleを有効にしても「未許可」になることがあります。署名を変更した場合は、権限の再許可とKippleの再起動が必要になることがあります。
 

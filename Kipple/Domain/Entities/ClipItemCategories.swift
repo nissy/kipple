@@ -13,6 +13,11 @@ struct CategoryOverrides: Codable, Equatable, Sendable {
     var removed: Set<UUID> = []
 }
 
+enum ClipCategoryChange: Sendable {
+    case set(UUID, enabled: Bool)
+    case clear
+}
+
 extension ClipItem {
     var automaticCategoryIDs: Set<UUID> {
         var result = Set<UUID>()
@@ -52,6 +57,15 @@ extension ClipItem {
         metadata = details
     }
 
+    mutating func clearCategories() {
+        var overrides = categoryOverrides
+        overrides.added.removeAll()
+        overrides.removed.formUnion(automaticCategoryIDs)
+        var details = metadata ?? ClipMetadata()
+        details.categoryOverrides = overrides
+        metadata = details
+    }
+
     mutating func removeCategoryDefinition(_ id: UUID) {
         var overrides = categoryOverrides
         overrides.added.remove(id)
@@ -67,6 +81,14 @@ struct CategoryFilter: Equatable {
     enum Match: String, CaseIterable { case all, any }
     var ids: Set<UUID> = []
     var match: Match = .all
+
+    mutating func select(_ id: UUID?) {
+        ids = id.map { [$0] } ?? []
+    }
+
+    mutating func toggleSingleSelection(_ id: UUID) {
+        select(ids == [id] ? nil : id)
+    }
 
     mutating func toggle(_ id: UUID) {
         if ids.remove(id) != nil { return }

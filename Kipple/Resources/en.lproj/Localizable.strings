@@ -250,6 +250,7 @@
 "Select multiple categories. Automatic categories can also be removed." = "Select multiple categories. Automatic categories can also be removed.";
 "Could not save categories. Please try again." = "Could not save categories. Please try again.";
 "Filter by categories" = "Filter by categories";
+"Pinned only" = "Pinned only";
 "Match" = "Match";
 "Match all" = "Match all";
 "Match any" = "Match any";

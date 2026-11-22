@@ -287,7 +287,7 @@ Queue・Paste on Selection・書式なし貼り付けで、貼り付け先のア
 
 ## 動作環境
 
-- macOS 27.0 以降
+- macOS 26.0 以降
 - Apple Silicon（M1以降）搭載のMac
 
 ## できないこと

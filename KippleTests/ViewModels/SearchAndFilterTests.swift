@@ -67,6 +67,34 @@ final class SearchAndFilterTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(viewModel.filteredHistory.allSatisfy { $0.isPinned })
     }
 
+    func testCategorySelectionAndPinnedFilterCanBeChangedIndependently() {
+        let pinnedURL = ClipItem(content: "https://example.com/pinned", isPinned: true)
+        let pinnedMemo = ClipItem(content: "Pinned memo", isPinned: true)
+        let otherMemo = ClipItem(content: "Other memo", isPinned: false)
+        mockClipboardService.history = [
+            pinnedURL, pinnedMemo, otherMemo,
+            ClipItem(content: "https://example.com/unpinned", isPinned: false)
+        ]
+        viewModel.updateFilteredItems(mockClipboardService.history)
+
+        viewModel.categoryFilter.toggleSingleSelection(BuiltInCategory.url)
+        viewModel.togglePinnedFilter()
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedURL.id])
+
+        viewModel.categoryFilter.toggleSingleSelection(BuiltInCategory.none)
+        XCTAssertEqual(viewModel.categoryFilter.ids, [BuiltInCategory.none])
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedMemo.id])
+
+        viewModel.togglePinnedFilter()
+        XCTAssertEqual(Set(viewModel.history.map(\.id)), [pinnedMemo.id, otherMemo.id])
+
+        viewModel.togglePinnedFilter()
+        viewModel.categoryFilter.toggleSingleSelection(BuiltInCategory.none)
+        XCTAssertTrue(viewModel.categoryFilter.ids.isEmpty)
+        XCTAssertTrue(viewModel.isPinnedFilterActive)
+        XCTAssertEqual(Set(viewModel.history.map(\.id)), [pinnedURL.id, pinnedMemo.id])
+    }
+
     // MARK: - Toggle Behavior
 
     func testToggleCategoryFilterClearsSelection() {

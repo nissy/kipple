@@ -27,8 +27,7 @@ struct AutoPinSettingsView: View {
                         ),
                         formatter: makeNumberFormatter(minimum: 3, maximum: 10)
                     )
-                        .textFieldStyle(.bordered)
-                        .textInputBorderShape(.roundedRectangle)
+                    .kippleRoundedTextFieldStyle()
                     .frame(width: 80)
 
                     Text("seconds")
@@ -62,8 +61,7 @@ struct AutoPinSettingsView: View {
                         ),
                         formatter: makeNumberFormatter(minimum: 3, maximum: 20)
                     )
-                            .textFieldStyle(.bordered)
-                            .textInputBorderShape(.roundedRectangle)
+                    .kippleRoundedTextFieldStyle()
                     .frame(width: 80)
 
                     Text("copies")

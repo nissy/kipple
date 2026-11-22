@@ -552,7 +552,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         titlebarContainer.addSubview(leftView, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
-            leftView.leadingAnchor.constraint(equalTo: titlebarContainer.leadingAnchor, constant: 6),
+            leftView.leadingAnchor.constraint(
+                equalTo: titlebarContainer.leadingAnchor, constant: MainViewMetrics.contentHorizontalInset
+            ),
             leftView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
             leftView.heightAnchor.constraint(equalToConstant: 34)
         ])
@@ -568,10 +570,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         titlebarContainer.addSubview(pinView, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
-            pinView.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor, constant: -6),
+            pinView.trailingAnchor.constraint(
+                equalTo: titlebarContainer.trailingAnchor, constant: -MainViewMetrics.contentHorizontalInset
+            ),
             pinView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
             pinView.heightAnchor.constraint(equalToConstant: 34),
-            pinView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34)
+            pinView.widthAnchor.constraint(equalToConstant: MainViewMetrics.TitleBar.buttonSize)
         ])
 
         titleBarLeftHostingView = leftView

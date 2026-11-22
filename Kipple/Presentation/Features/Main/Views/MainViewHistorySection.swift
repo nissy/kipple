@@ -21,7 +21,7 @@ struct MainViewHistorySection: View {
     let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     // 追加: ユーザカテゴリ変更/管理
-    let onChangeUserCategory: ((ClipItem, UUID, Bool) async throws -> Void)?
+    let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     @Binding var categoryFilter: CategoryFilter
     @Binding var searchText: String
@@ -52,7 +52,7 @@ struct MainViewHistorySection: View {
         onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
         onTogglePin: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
-        onChangeUserCategory: ((ClipItem, UUID, Bool) async throws -> Void)? = nil,
+        onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)? = nil,
         onOpenCategoryManager: (() -> Void)? = nil,
         categoryFilter: Binding<CategoryFilter>,
         searchText: Binding<String>,
@@ -99,103 +99,66 @@ struct MainViewHistorySection: View {
     }
 
     var body: some View {
-        return VStack(spacing: 0) {
-            historyToolbar
+        HStack(alignment: .top, spacing: MainViewMetrics.HistoryFilterSidebar.contentSpacing) {
+            filterSidebar
 
-            HistoryListView(
-                history: history,
-                selectedHistoryItem: selectedHistoryItem,
-                currentClipboardItemID: currentClipboardItemID,
-                queueBadgeProvider: queueBadgeProvider,
-                queueSelectionPreview: queueSelectionPreview,
-                pasteMode: pasteMode,
-                historyFont: Font(fontManager.historyFont),
-                onSelectItem: onSelectItem,
-                onTogglePin: onTogglePin,
-                onDelete: onDelete,
-                onChangeUserCategory: onChangeUserCategory,
-                onOpenCategoryManager: onOpenCategoryManager,
-                onOpenItem: onOpenItem,
-                onSplitEditorIntoHistory: onSplitEditorIntoHistory,
-                onLoadMore: onLoadMore,
-                hasMoreItems: hasMoreItems,
-                isLoadingMore: isLoadingMore,
-                canScrollToTop: $canScrollToTop,
-                copyScrollRequest: $copyScrollRequest,
-                hoverResetRequest: $hoverResetRequest,
-                queueReorder: queueReorder
-            )
+            VStack(spacing: 0) {
+                historyToolbar
+                historyList
+            }
         }
-        .padding(.horizontal, MainViewMetrics.HistoryColumns.sectionHorizontalPadding
-                 + MainViewMetrics.HistoryColumns.horizontalInset)
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
         .padding(.vertical, 6)
     }
 
-    @ViewBuilder
-    private var historyToolbar: some View {
-        historyToolbarContent
+    private var filterSidebar: some View {
+        VStack(spacing: 0) {
+            HistoryFilterButton(
+                systemName: isPinnedFilterActive ? "pin.fill" : "pin",
+                label: Text("Pinned only"),
+                isActive: isPinnedFilterActive,
+                iconFont: MainViewMetrics.HistoryFilterIcon.pinnedFont,
+                rotation: .degrees(isPinnedFilterActive ? 0 : -45),
+                action: onTogglePinnedFilter
+            )
+            CategoryFilterControl(selection: $categoryFilter, onOpenManager: onOpenCategoryManager)
+        }
+        .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
     }
 
-    private var historyToolbarContent: some View {
-        HistoryColumnsRow(showsQueue: pasteMode != .clipboard) {
-            queueLoopControl
-        } pin: {
-            pinnedFilterButton
-        } category: {
-            categoryFilterControl
-        } content: {
-            searchField
-        } trailing: {
+    private var historyToolbar: some View {
+        HStack(spacing: MainViewMetrics.HistoryColumns.spacing) {
+            HistorySearchField(searchText: $searchText)
+            if pasteMode != .clipboard { queueLoopControl }
             scrollToTopButton
         }
-        .padding(.top, MainViewMetrics.HistoryColumns.toolbarTopPadding)
         .padding(.bottom, MainViewMetrics.HistoryColumns.toolbarBottomPadding)
     }
 
-    private var pinnedFilterButton: some View {
-        Button {
-            onTogglePinnedFilter()
-        } label: {
-            circleFilterIcon(
-                iconName: isPinnedFilterActive ? "pin.fill" : "pin",
-                iconColor: KippleButtonAppearance.foreground(isActive: isPinnedFilterActive),
-                iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont,
-                rotation: isPinnedFilterActive ? 0 : -45,
-                isActive: isPinnedFilterActive
-            )
-        }
-        .kippleSystemCircleButton(
-            size: MainViewMetrics.HistoryFilterIcon.diameter,
-            isActive: isPinnedFilterActive
+    private var historyList: some View {
+        HistoryListView(
+            history: history,
+            selectedHistoryItem: selectedHistoryItem,
+            currentClipboardItemID: currentClipboardItemID,
+            queueBadgeProvider: queueBadgeProvider,
+            queueSelectionPreview: queueSelectionPreview,
+            pasteMode: pasteMode,
+            historyFont: Font(fontManager.historyFont),
+            onSelectItem: onSelectItem,
+            onTogglePin: onTogglePin,
+            onDelete: onDelete,
+            onChangeUserCategory: onChangeUserCategory,
+            onOpenCategoryManager: onOpenCategoryManager,
+            onOpenItem: onOpenItem,
+            onSplitEditorIntoHistory: onSplitEditorIntoHistory,
+            onLoadMore: onLoadMore,
+            hasMoreItems: hasMoreItems,
+            isLoadingMore: isLoadingMore,
+            canScrollToTop: $canScrollToTop,
+            copyScrollRequest: $copyScrollRequest,
+            hoverResetRequest: $hoverResetRequest,
+            queueReorder: queueReorder
         )
-        .frame(
-            width: MainViewMetrics.HistoryFilterIcon.diameter,
-            height: MainViewMetrics.HistoryFilterIcon.diameter
-        )
-        .help(
-            Text(
-                isPinnedFilterActive
-                ? String(localized: "Pinned only")
-                : String(localized: "Pins: All")
-            )
-        )
-    }
-
-    private var categoryFilterControl: some View {
-        CategoryFilterControl(selection: $categoryFilter, onOpenManager: onOpenCategoryManager)
-    }
-
-    private func toolbarFilterAffordance(isActive: Bool, isHovered: Bool) -> some View {
-        Circle()
-            .fill(
-                isActive || isHovered
-                ? KippleButtonAppearance.inactivePillFill
-                : Color.clear
-            )
-    }
-
-    private func toolbarFilterIconForeground(isActive: Bool) -> Color {
-        isActive ? .primary : KippleButtonAppearance.inactiveForeground
     }
 
     private var queueLoopControl: some View {
@@ -207,9 +170,7 @@ struct MainViewHistorySection: View {
                 iconColor: KippleButtonAppearance.foreground(
                     isActive: isQueueLoopActive,
                     isEnabled: canToggleQueueLoop
-                ),
-                iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont,
-                isActive: isQueueLoopActive
+                )
             )
         }
         .kippleSystemCircleButton(
@@ -225,18 +186,13 @@ struct MainViewHistorySection: View {
         .help(Text(String(localized: "Queue loop")))
     }
 
-    private var searchField: some View {
-        HistorySearchField(searchText: $searchText)
-    }
-
     private var scrollToTopButton: some View {
         Button {
             copyScrollRequest = HistoryCopyScrollRequest()
         } label: {
             circleFilterIcon(
                 iconName: "arrow.up.to.line",
-                iconColor: KippleButtonAppearance.foreground(isActive: false, isEnabled: canScrollToTop),
-                iconFont: MainViewMetrics.HistoryFilterIcon.defaultFont
+                iconColor: KippleButtonAppearance.inactiveForeground
             )
         }
         .kippleSystemCircleButton(
@@ -252,22 +208,13 @@ struct MainViewHistorySection: View {
         .accessibilityLabel(Text(String(localized: "history.scrollToTop")))
     }
 
-    private func circleFilterIcon(
-        iconName: String,
-        iconColor: Color,
-        iconFont: Font = MainViewMetrics.HistoryFilterIcon.defaultFont,
-        rotation: Double = 0,
-        isActive: Bool = false
-    ) -> some View {
-        ZStack {
-            Image(systemName: iconName)
-                .font(iconFont)
-                .foregroundColor(iconColor)
-                .rotationEffect(.degrees(rotation))
-                .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
-        }
-        .frame(width: MainViewMetrics.HistoryFilterIcon.diameter, height: MainViewMetrics.HistoryFilterIcon.diameter)
-        .contentShape(Circle())
+    private func circleFilterIcon(iconName: String, iconColor: Color) -> some View {
+        Image(systemName: iconName)
+            .font(MainViewMetrics.HistoryFilterIcon.defaultFont)
+            .foregroundStyle(iconColor)
+            .frame(width: MainViewMetrics.HistoryFilterIcon.diameter,
+                   height: MainViewMetrics.HistoryFilterIcon.diameter)
+            .contentShape(Circle())
     }
 }
 
@@ -281,7 +228,6 @@ private struct HistorySearchField: View {
             Image(systemName: "magnifyingglass")
                 .font(MainViewMetrics.HistorySearchField.iconFont)
                 .foregroundColor(KippleButtonAppearance.inactiveForeground)
-                .padding(.leading, 8)
 
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
@@ -301,10 +247,10 @@ private struct HistorySearchField: View {
                         .foregroundColor(KippleButtonAppearance.inactiveForeground)
                 })
                 .buttonStyle(PlainButtonStyle())
-                .padding(.trailing, 8)
                 .transition(.scale.combined(with: .opacity))
             }
         }
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity)
         .frame(height: MainViewMetrics.HistorySearchField.height)
         .contentShape(Rectangle())
@@ -312,11 +258,11 @@ private struct HistorySearchField: View {
             isSearchFocused = true
         }
         .background(
-            RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
+            RoundedRectangle(cornerRadius: KippleGlassMetrics.inputCornerRadius, style: .continuous)
                 .fill(Color(NSColor.textBackgroundColor).opacity(0.42))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: MainViewMetrics.HistorySearchField.height / 2, style: .continuous)
+            RoundedRectangle(cornerRadius: KippleGlassMetrics.inputCornerRadius, style: .continuous)
                 .stroke(Color.secondary.opacity(0.14), lineWidth: 0.5)
         )
     }

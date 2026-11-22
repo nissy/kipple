@@ -1225,11 +1225,18 @@ extension ModernClipboardService {
     }
 
     func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
+        try await updateCategories(itemID: itemID, change: .set(categoryID, enabled: enabled))
+    }
+
+    func updateCategories(itemID: UUID, change: ClipCategoryChange) async throws {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         guard let index = history.firstIndex(where: { $0.id == itemID }) else { throw MCPFailure.invalidInput }
         var candidate = history
-        candidate[index].setCategory(categoryID, enabled: enabled)
+        switch change {
+        case let .set(id, enabled): candidate[index].setCategory(id, enabled: enabled)
+        case .clear: candidate[index].clearCategories()
+        }
         try await saveHistory(candidate)
         history = candidate
         markHistoryChanged()

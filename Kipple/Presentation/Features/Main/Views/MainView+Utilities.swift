@@ -23,11 +23,10 @@ extension MainView {
 
             MainViewTitleBarPinButton(state: titleBarState)
                 .padding(.top, 4)
-                .padding(.trailing, 12)
         }
         .frame(height: titleBarHeight, alignment: .top)
         .padding(.top, 4)
-        .padding(.leading, 10)
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
     }
 
     // MARK: - Editor Helpers
