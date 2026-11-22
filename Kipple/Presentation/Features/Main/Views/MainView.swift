@@ -297,6 +297,9 @@ extension MainView {
             titleBarState.toggleQueueHandler = {
                 toggleQueueModeFromTitleBar()
             }
+            titleBarState.toggleQueueRepetitionHandler = {
+                toggleQueueRepetitionFromTitleBar()
+            }
             syncTitleBarState()
             userPreferredAlwaysOnTop = isAlwaysOnTop
             lastKnownEditorPosition = appSettings.editorPosition
@@ -379,6 +382,7 @@ extension MainView {
             titleBarState.toggleEditorHandler = nil
             titleBarState.startCaptureHandler = nil
             titleBarState.toggleQueueHandler = nil
+            titleBarState.toggleQueueRepetitionHandler = nil
             ignoreNextAutoCloseAfterQueueFinish = false
             pendingReactivateAfterQueueFinish = false
             if !activePreventAutoCloseReasons.isEmpty {
@@ -406,7 +410,8 @@ extension MainView {
                 viewModel.resetPasteQueue()
             }
         }
-        .onReceive(viewModel.$pasteMode) { _ in
+        .onReceive(viewModel.$pasteMode) { pasteMode in
+            titleBarState.pasteMode = pasteMode
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive

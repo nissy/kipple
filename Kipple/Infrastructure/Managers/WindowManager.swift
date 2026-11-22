@@ -870,15 +870,15 @@ final class WindowManager: NSObject, NSWindowDelegate {
               viewModel.isQueueModeActive else { return }
         guard viewModel.pasteQueue.isEmpty else { return }
         viewModel.resetPasteQueue()
-        titleBarState.isQueueActive = false
+        titleBarState.pasteMode = viewModel.pasteMode
     }
 
     private func syncTitleBarQueueState() {
         guard let viewModel = mainViewModel else {
-            titleBarState.isQueueActive = false
+            titleBarState.pasteMode = .clipboard
             return
         }
-        titleBarState.isQueueActive = viewModel.isQueueModeActive
+        titleBarState.pasteMode = viewModel.pasteMode
         titleBarState.isQueueEnabled = viewModel.canUsePasteQueue
     }
     

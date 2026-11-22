@@ -36,7 +36,7 @@ struct CategoryManagerView: View {
     @State private var deletionError = false
     @State private var isDeleting = false
     @State private var name: String = ""
-    @State private var symbol: String = UserCategoryStore.availableSymbols.first ?? "tag"
+    @State private var symbol = UserCategoryStore.availableSymbols.first ?? "tag"
 
     var body: some View {
         content
@@ -62,15 +62,7 @@ struct CategoryManagerView: View {
                     .frame(minWidth: CategoryManagerLayout.nameColumnMinWidth)
 
                 Menu {
-                    ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
-                        Button {
-                            symbol = s
-                        } label: {
-                            Label(s, systemImage: s)
-                                .labelStyle(.titleAndIcon)
-                                .accessibilityLabel(Text(s))
-                        }
-                    }
+                    iconOptions { symbol = $0 }
                 } label: {
                     Image(systemName: symbol)
                         .frame(width: 24, height: 24)
@@ -162,16 +154,7 @@ struct CategoryManagerView: View {
                     .contextMenu {
                         if !store.isBuiltIn(category.id) {
                             Menu("Change Icon") {
-                                ForEach(UserCategoryStore.availableSymbols, id: \.self) { s in
-                                    Button(
-                                        action: { store.changeIcon(id: category.id, to: s) },
-                                        label: {
-                                            Label(s, systemImage: s)
-                                                .labelStyle(.titleAndIcon)
-                                                .accessibilityLabel(Text(s))
-                                        }
-                                    )
-                                }
+                                iconOptions { store.changeIcon(id: category.id, to: $0) }
                             }
                             Button("Delete", role: .destructive) {
                                 deleteCategories([category])
@@ -210,6 +193,19 @@ struct CategoryManagerView: View {
 
 // MARK: - Helpers
 private extension CategoryManagerView {
+    func iconOptions(onSelect: @escaping (String) -> Void) -> some View {
+        ForEach(UserCategoryStore.availableSymbols, id: \.self) { symbol in
+            let title = appSettings.localizedString(UserCategoryStore.iconTitleKey(for: symbol))
+            Button {
+                onSelect(symbol)
+            } label: {
+                Label(title, systemImage: symbol)
+                    .labelStyle(.titleAndIcon)
+                    .accessibilityLabel(Text(title))
+            }
+        }
+    }
+
     @ViewBuilder
     func iconSelector(for category: UserCategory) -> some View {
         if store.isBuiltIn(category.id) {
@@ -219,15 +215,7 @@ private extension CategoryManagerView {
                 .foregroundColor(CategoryManagerAppearance.builtInColor)
         } else {
             Menu {
-                ForEach(UserCategoryStore.availableSymbols, id: \.self) { symbol in
-                    Button {
-                        store.changeIcon(id: category.id, to: symbol)
-                    } label: {
-                        Label(symbol, systemImage: symbol)
-                            .labelStyle(.titleAndIcon)
-                            .accessibilityLabel(Text(symbol))
-                    }
-                }
+                iconOptions { store.changeIcon(id: category.id, to: $0) }
             } label: {
                 Image(systemName: store.iconName(for: category))
                     .frame(width: 24, height: 24)

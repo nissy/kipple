@@ -55,6 +55,42 @@ final class MultipleCategoryTests: XCTestCase, @unchecked Sendable {
     }
 
     @MainActor
+    func testSavedCategoryKeepsAnIconRemovedFromThePicker() throws {
+        let suite = "CategoryIconsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let saved = UserCategory(name: "Travel", iconSystemName: "tram")
+        defaults.set(try JSONEncoder().encode([saved]), forKey: "userCategories.v1")
+
+        let store = UserCategoryStore(defaults: defaults)
+        let reopened = try XCTUnwrap(store.category(id: saved.id))
+        XCTAssertFalse(UserCategoryStore.availableSymbols.contains(saved.iconSystemName))
+        XCTAssertEqual(store.iconName(for: reopened), saved.iconSystemName)
+
+        store.changeIcon(id: saved.id, to: "graduationcap")
+        XCTAssertEqual(UserCategoryStore(defaults: defaults).category(id: saved.id)?.iconSystemName, "graduationcap")
+    }
+
+    @MainActor
+    func testCategoryIconMenuSymbolsHaveDistinctLocalizedTitles() throws {
+        let symbols = UserCategoryStore.availableSymbols
+        XCTAssertFalse(symbols.isEmpty)
+        XCTAssertEqual(Set(symbols).count, symbols.count)
+
+        let keys = symbols.map(UserCategoryStore.iconTitleKey(for:))
+        for language in ["ja", "en"] {
+            let path = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj"))
+            let bundle = try XCTUnwrap(Bundle(path: path))
+            let titles = keys.map { bundle.localizedString(forKey: $0, value: nil, table: nil) }
+            let missing = zip(keys, titles).filter { key, title in title.isEmpty || title == key }.map(\.0)
+
+            XCTAssertTrue(missing.isEmpty, "Missing \(language) icon names: \(missing)")
+            XCTAssertEqual(Set(titles).count, symbols.count, "Duplicate \(language) icon names")
+        }
+    }
+
+    @MainActor
     func testFilterOrderPersistsWhileHiddenCategoriesKeepTheirSlots() throws {
         let suite = "CategoryFilterOrderTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

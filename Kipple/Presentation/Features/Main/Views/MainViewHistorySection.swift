@@ -32,9 +32,6 @@ struct MainViewHistorySection: View {
     let pasteMode: MainViewModel.PasteMode
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
-    let isQueueLoopActive: Bool
-    let canToggleQueueLoop: Bool
-    let onToggleQueueLoop: () -> Void
     let queueReorder: QueueReorderActions?
     @ObservedObject private var fontManager = FontManager.shared
     @State private var canScrollToTop = false
@@ -62,9 +59,6 @@ struct MainViewHistorySection: View {
         pasteMode: MainViewModel.PasteMode,
         queueBadgeProvider: @escaping (ClipItem) -> Int?,
         queueSelectionPreview: Set<UUID>,
-        isQueueLoopActive: Bool,
-        canToggleQueueLoop: Bool,
-        onToggleQueueLoop: @escaping () -> Void,
         queueReorder: QueueReorderActions? = nil
     ) {
         self.history = history
@@ -89,9 +83,6 @@ struct MainViewHistorySection: View {
         self.pasteMode = pasteMode
         self.queueBadgeProvider = queueBadgeProvider
         self.queueSelectionPreview = queueSelectionPreview
-        self.isQueueLoopActive = isQueueLoopActive
-        self.canToggleQueueLoop = canToggleQueueLoop
-        self.onToggleQueueLoop = onToggleQueueLoop
         self.queueReorder = queueReorder
     }
 
@@ -112,7 +103,6 @@ struct MainViewHistorySection: View {
     private var historyToolbar: some View {
         HStack(spacing: MainViewMetrics.HistoryColumns.spacing) {
             HistorySearchField(searchText: $searchText)
-            if pasteMode != .clipboard { queueLoopControl }
             scrollToTopButton
         }
         .padding(.bottom, MainViewMetrics.HistoryColumns.toolbarBottomPadding)
@@ -143,31 +133,6 @@ struct MainViewHistorySection: View {
             onHighlightFinished: onHighlightFinished,
             queueReorder: queueReorder
         )
-    }
-
-    private var queueLoopControl: some View {
-        Button {
-            onToggleQueueLoop()
-        } label: {
-            circleFilterIcon(
-                iconName: "repeat",
-                iconColor: KippleButtonAppearance.foreground(
-                    isActive: isQueueLoopActive,
-                    isEnabled: canToggleQueueLoop
-                )
-            )
-        }
-        .kippleSystemCircleButton(
-            size: MainViewMetrics.HistoryFilterIcon.diameter,
-            isActive: isQueueLoopActive,
-            isEnabled: canToggleQueueLoop
-        )
-        .frame(
-            width: MainViewMetrics.HistoryFilterIcon.diameter,
-            height: MainViewMetrics.HistoryFilterIcon.diameter
-        )
-        .disabled(!canToggleQueueLoop)
-        .help(Text(String(localized: "Queue loop")))
     }
 
     private var scrollToTopButton: some View {

@@ -10,13 +10,6 @@ extension MainView {
     // 履歴セクションのコンテンツ
     @ViewBuilder
     var historyContent: some View {
-        let queueLoopToggleHandler: () -> Void = {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueRepetition()
-            }
-            syncTitleBarState()
-        }
-
         MainViewHistorySection(
             history: viewModel.history,
             currentClipboardContent: viewModel.currentClipboardContent,
@@ -54,9 +47,6 @@ extension MainView {
             pasteMode: viewModel.pasteMode,
             queueBadgeProvider: viewModel.queueBadge(for:),
             queueSelectionPreview: viewModel.queueSelectionPreview,
-            isQueueLoopActive: viewModel.pasteMode == .queueToggle,
-            canToggleQueueLoop: viewModel.canUsePasteQueue,
-            onToggleQueueLoop: queueLoopToggleHandler,
             queueReorder: QueueReorderActions(
                 begin: beginQueueDrag(itemID:),
                 isValid: viewModel.isQueueReorderValid
