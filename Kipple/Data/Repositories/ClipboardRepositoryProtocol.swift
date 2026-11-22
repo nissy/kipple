@@ -12,9 +12,19 @@ protocol ClipboardRepositoryProtocol: Sendable {
     func replaceAll(with items: [ClipItem]) async throws
     func load(limit: Int) async throws -> [ClipItem]
     func loadAll() async throws -> [ClipItem]
-    func loadPinned() async throws -> [ClipItem]
+    func loadItemIDs() async throws -> Set<UUID>
+    func loadCategorized() async throws -> [ClipItem]
     func delete(_ item: ClipItem) async throws
     func clear() async throws
-    func clear(keepPinned: Bool) async throws
     func applyChanges(inserted: [ClipItem], updated: [ClipItem], removed: [UUID]) async throws
+}
+
+extension ClipboardRepositoryProtocol {
+    func loadItemIDs() async throws -> Set<UUID> {
+        Set(try await loadAll().map(\.id))
+    }
+
+    func loadCategorized() async throws -> [ClipItem] {
+        try await loadAll().filter(\.hasCustomCategory)
+    }
 }

@@ -19,13 +19,13 @@ final class RecopyHistoryUpdateTests: XCTestCase {
         service = ModernClipboardService.shared
         await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
     }
 
     override func tearDown() async throws {
         // Clean up
         await service.resetForTesting()
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
 
         service = nil
         adapter = nil
@@ -106,24 +106,24 @@ final class RecopyHistoryUpdateTests: XCTestCase {
         XCTAssertFalse(updatedHistory[0].isFromEditor ?? true, "Metadata should be updated")
     }
 
-    func testRecopyPinnedItemStaysPinned() async throws {
-        // Given: Pinned item
-        await service.copyToClipboard("Pinned Item", fromEditor: false)
+    func testRecopyPreservesCustomCategory() async throws {
+        // Given: Categorized item
+        await service.copyToClipboard("Categorized Item", fromEditor: false)
         var history = await service.getHistory()
-        _ = await service.togglePin(for: history[0])
+        try await service.setCategory(itemID: history[0].id, categoryID: savedHistoryCategoryID, enabled: true)
 
         // Add more items
         await service.copyToClipboard("Item 2", fromEditor: false)
         await service.copyToClipboard("Item 3", fromEditor: false)
 
-        // When: Recopy the pinned item
-        await service.copyToClipboard("Pinned Item", fromEditor: false)
+        // When: Recopy the categorized item
+        await service.copyToClipboard("Categorized Item", fromEditor: false)
         await service.flushPendingSaves()
 
-        // Then: Item should move to top and stay pinned
+        // Then: Item should move to top and stay categorized
         history = await service.getHistory()
-        XCTAssertEqual(history[0].content, "Pinned Item", "Should move to top")
-        XCTAssertTrue(history[0].isPinned, "Should remain pinned")
+        XCTAssertEqual(history[0].content, "Categorized Item", "Should move to top")
+        XCTAssertTrue(history[0].hasCustomCategory, "Should remain categorized")
     }
 
     // MARK: - Edge Cases

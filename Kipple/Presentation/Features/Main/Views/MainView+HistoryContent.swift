@@ -7,16 +7,9 @@
 import SwiftUI
 
 extension MainView {
-    // 履歴とピン留めセクションのコンテンツ
+    // 履歴セクションのコンテンツ
     @ViewBuilder
-    var historyAndPinnedContent: some View {
-        let queueLoopToggleHandler: () -> Void = {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                viewModel.toggleQueueRepetition()
-            }
-            syncTitleBarState()
-        }
-
+    var historyContent: some View {
         MainViewHistorySection(
             history: viewModel.history,
             currentClipboardContent: viewModel.currentClipboardContent,
@@ -24,6 +17,8 @@ extension MainView {
             selectedHistoryItem: $selectedHistoryItem,
             copyScrollRequest: $historyCopyScrollRequest,
             hoverResetRequest: $historyHoverResetRequest,
+            highlightRequest: viewModel.historyHighlightRequest,
+            onHighlightFinished: viewModel.finishHighlightingHistoryItem,
             onSelectItem: handleItemSelection,
             onOpenItem: { item in
                 guard item.isActionable else { return }
@@ -32,38 +27,27 @@ extension MainView {
             onSplitEditorIntoHistory: { item in
                 splitHistoryItemIntoLines(item)
             },
-            onTogglePin: { item in
-                let wasPinned = item.isPinned
-                let newState = viewModel.togglePinSync(for: item)
-                if !wasPinned && !newState {
-                    showCopiedNotification(.pinLimitReached)
-                }
-            },
             onDelete: { item in
                 viewModel.deleteItemSync(item)
             },
-            onChangeUserCategory: { item, categoryID, enabled in
+            onChangeUserCategory: { item, change in
                 guard let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter else {
                     throw MCPFailure.unavailable
                 }
-                try await adapter.setCategory(itemID: item.id, categoryID: categoryID, enabled: enabled)
+                try await adapter.updateCategories(itemID: item.id, change: change)
             },
             onOpenCategoryManager: { presentCategoryManager() },
             categoryFilter: $viewModel.categoryFilter,
+            historyCategoryIDs: viewModel.historyCategoryIDs,
             searchText: $viewModel.searchText,
             onLoadMore: { item in
                 viewModel.loadMoreHistoryIfNeeded(currentItem: item)
             },
             hasMoreItems: viewModel.hasMoreHistory,
             isLoadingMore: viewModel.isLoadingMoreHistory,
-            isPinnedFilterActive: viewModel.isPinnedFilterActive,
-            onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
             pasteMode: viewModel.pasteMode,
             queueBadgeProvider: viewModel.queueBadge(for:),
             queueSelectionPreview: viewModel.queueSelectionPreview,
-            isQueueLoopActive: viewModel.pasteMode == .queueToggle,
-            canToggleQueueLoop: viewModel.canUsePasteQueue,
-            onToggleQueueLoop: queueLoopToggleHandler,
             queueReorder: QueueReorderActions(
                 begin: beginQueueDrag(itemID:),
                 isValid: viewModel.isQueueReorderValid

@@ -10,22 +10,20 @@ import Foundation
 @MainActor
 protocol ClipboardServiceProtocol: AnyObject {
     var history: [ClipItem] { get }
-    var pinnedItems: [ClipItem] { get }
     var currentClipboardContent: String? { get }
     var onHistoryChanged: ((ClipItem) -> Void)? { get set }
 
     func startMonitoring()
     func stopMonitoring()
     func copyToClipboard(_ content: String, fromEditor: Bool)
-    func copyRecognizedText(_ content: String) async -> Bool
+    func copyRecognizedText(_ content: String) async -> UUID?
     func writeToClipboardOnly(_ content: String)
     @discardableResult
     func addEditorItems(_ contents: [String]) async -> [ClipItem]
     func recopyFromHistory(_ item: ClipItem)
     func clearSystemClipboard() async
-    func clearAllHistory()
-    func clearHistory(keepPinned: Bool) async
-    func togglePin(for item: ClipItem) -> Bool
+    @discardableResult
+    func clearHistory(keepingCategories: Bool) async -> Result<Int, Error>
     func deleteItem(_ item: ClipItem)
     func deleteItem(_ item: ClipItem) async
     func flushPendingSaves() async

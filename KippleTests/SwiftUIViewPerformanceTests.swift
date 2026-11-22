@@ -22,7 +22,7 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
     func testListAnimationPerformance() async {
         // Given: A list with many items
         let items = (0..<100).map { index in
-            ClipItem(content: "Item \(index)", isPinned: index % 10 == 0)
+            ClipItem(content: "Item \(index)", userCategoryId: index % 10 == 0 ? savedHistoryCategoryID : nil)
         }
 
         // When: Measuring animation performance
@@ -89,16 +89,15 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
             for _ in 0..<10 {
                 _ = MainView()
                 _ = HistoryItemView(
-                    item: ClipItem(content: "Test", isPinned: false),
+                    item: ClipItem(content: "Test"),
                     isSelected: false,
                     isCurrentClipboardItem: false,
                     queueBadge: nil,
                     isQueuePreviewed: false,
                     isScrollLocked: false,
                     onTap: {},
-                    onTogglePin: {},
                     onDelete: {},
-                    onChangeCategory: { _, _ in },
+                    onChangeCategory: { _ in },
                     onOpenCategoryManager: {},
                     historyFont: .system(size: 13),
                     onOpenItem: nil,
@@ -120,7 +119,7 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
     func testLazyLoadingImplementation() async {
         // Given: Large dataset
         let items = (0..<1000).map { index in
-            ClipItem(content: "Item \(index)", isPinned: false)
+            ClipItem(content: "Item \(index)")
         }
 
         // When: Creating list view

@@ -25,8 +25,7 @@ struct ClipboardFontSettingsView: View {
             SettingsRow(label: "Font size") {
                 HStack {
                     TextField("", value: fontSizeBinding, formatter: makeFontSizeFormatter())
-                        .textFieldStyle(.bordered)
-                        .textInputBorderShape(.roundedRectangle)
+                        .kippleRoundedTextFieldStyle()
                         .frame(width: 50)
                     
                     Stepper("", value: fontSizeBinding, in: 10...24, step: 1)

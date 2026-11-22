@@ -12,17 +12,18 @@ import ApplicationServices
 
 struct DataSettingsView: View {
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 300
-    @AppStorage("maxPinnedItems") private var maxPinnedItems = 50
     @AppStorage("filterCategoryURL") private var filterCategoryURL = true
     @AppStorage("actionClickModifiers") private var actionClickModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
     @AppStorage("historySelectPaste") private var historySelectPaste = false
     @State private var showClearHistoryAlert = false
     @State private var showClearSuccessAlert = false
+    @State private var showClearErrorAlert = false
+    @State private var isClearingHistory = false
     @State private var clearedItemCount = 0
     @ObservedObject private var appSettings = AppSettings.shared
     
     private let clipboardService: any ClipboardServiceProtocol
-    
+
     @MainActor
     init(clipboardService: (any ClipboardServiceProtocol)? = nil) {
         if let service = clipboardService {
@@ -55,8 +56,6 @@ struct DataSettingsView: View {
                     }
                 }
 
-                AutoPinSettingsView()
-                
                 // Storage Limits Section
                 SettingsGroup("Storage Limits") {
                     SettingsRow(label: "Maximum history items") {
@@ -69,8 +68,7 @@ struct DataSettingsView: View {
                                 ),
                                 formatter: makeNumberFormatter(minimum: 10, maximum: 1000)
                             )
-                            .textFieldStyle(.bordered)
-                            .textInputBorderShape(.roundedRectangle)
+                            .kippleRoundedTextFieldStyle()
                             .frame(width: 80)
                             .onChange(of: maxHistoryItems) { _, newValue in
                                 updateHistoryLimit(newValue)
@@ -88,87 +86,40 @@ struct DataSettingsView: View {
                             .labelsHidden()
                         }
                     }
-                    
-                    SettingsRow(label: "Maximum pinned items") {
-                        HStack {
-                            TextField(
-                                "",
-                                value: Binding(
-                                    get: { Double(maxPinnedItems) },
-                                    set: { maxPinnedItems = Int(max(1, min(100, $0))) }
-                                ),
-                                formatter: makeNumberFormatter(minimum: 1, maximum: 100)
-                            )
-                            .textFieldStyle(.bordered)
-                            .textInputBorderShape(.roundedRectangle)
-                            .frame(width: 80)
-                            
-                            Stepper(
-                                "",
-                                value: Binding(
-                                    get: { Double(maxPinnedItems) },
-                                    set: { maxPinnedItems = Int($0) }
-                                ),
-                                in: 1...100,
-                                step: 1
-                            )
-                            .labelsHidden()
-                        }
-                    }
                 }
                 
                 // Data Management Section
                 SettingsGroup("Data Management") {
                     SettingsRow(
                         label: "Clear history",
-                        description: "Remove all clipboard history items (pinned items stay)"
+                        description: "Items in custom categories stay."
                     ) {
-                        HStack(spacing: 10) {
-                            Button(action: {
-                                showClearHistoryAlert = true
-                            }, label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "trash.fill")
-                                        .font(.system(size: 12))
-                                    Text("Clear All History")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .lineLimit(1)
-                                        .fixedSize()
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color.red, Color.red.opacity(0.8)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .cornerRadius(6)
-                                .shadow(color: Color.red.opacity(0.25), radius: 1, y: 1)
-                            })
-                            .buttonStyle(PlainButtonStyle())
-                            .disabled(clipboardService.history.isEmpty)
-
-                            Spacer(minLength: 12)
-
-                            VStack(alignment: .trailing, spacing: 2) {
-                                let unpinnedCount = clipboardService.history.filter { !$0.isPinned }.count
-                                let pinnedCount = clipboardService.history.filter { $0.isPinned }.count
-
-                                if unpinnedCount > 0 {
-                                    Text(localizedHistoryCountMessage(unpinnedCount))
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                                if pinnedCount > 0 {
-                                    Text(localizedPinnedCountMessage(pinnedCount))
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
+                        Button(action: {
+                            showClearHistoryAlert = true
+                        }, label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 12))
+                                Text("Clear History")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .lineLimit(1)
+                                    .fixedSize()
                             }
-                        }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.red, Color.red.opacity(0.8)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .cornerRadius(6)
+                            .shadow(color: Color.red.opacity(0.25), radius: 1, y: 1)
+                        })
+                        .buttonStyle(PlainButtonStyle())
+                        .disabled(isClearingHistory)
                     }
                 }
 
@@ -184,29 +135,32 @@ struct DataSettingsView: View {
                 clearHistory()
             }
         } message: {
-            let unpinnedCount = clipboardService.history.filter { !$0.isPinned }.count
-            let pinnedCount = clipboardService.history.filter { $0.isPinned }.count
-            Text(clearHistoryConfirmationMessage(unpinnedCount: unpinnedCount, pinnedCount: pinnedCount))
+            Text("history.clear.confirmation")
         }
         .alert("History Cleared", isPresented: $showClearSuccessAlert) {
             Button("OK") { }
         } message: {
             Text(clearHistorySuccessMessage(count: clearedItemCount))
         }
+        .alert("Could not clear history", isPresented: $showClearErrorAlert) {
+            Button("OK") { }
+        } message: {
+            Text("Please try clearing the history again.")
+        }
     }
     
     private func clearHistory() {
-        // 削除前の履歴アイテム数を記録（ピン留め以外）
-        let unpinnedItems = clipboardService.history.filter { !$0.isPinned }
-        clearedItemCount = unpinnedItems.count
+        guard !isClearingHistory else { return }
+        isClearingHistory = true
 
-        // 履歴をクリア（ピン留めアイテムは保持）
         Task {
-            await clipboardService.clearHistory(keepPinned: true)
-
-            // 成功アラートを表示
-            await MainActor.run {
+            defer { isClearingHistory = false }
+            switch await clipboardService.clearHistory(keepingCategories: true) {
+            case let .success(count):
+                clearedItemCount = count
                 showClearSuccessAlert = true
+            case .failure:
+                showClearErrorAlert = true
             }
         }
     }
@@ -228,51 +182,6 @@ struct DataSettingsView: View {
         formatter.generatesDecimalNumbers = false
         formatter.allowsFloats = false
         return formatter
-    }
-
-    private func localizedHistoryCountMessage(_ count: Int) -> String {
-        appSettings.localizedFormat(
-            "history.unpinnedCount",
-            comment: "Shows the number of items currently in history",
-            count
-        )
-    }
-
-    private func localizedPinnedCountMessage(_ count: Int) -> String {
-        appSettings.localizedFormat(
-            "history.pinnedCount",
-            comment: "Shows the number of pinned items",
-            count
-        )
-    }
-
-    private func clearHistoryConfirmationMessage(unpinnedCount: Int, pinnedCount: Int) -> String {
-        var components: [String] = [
-            appSettings.localizedFormat(
-                "history.clear.deleteCount",
-                comment: "Describes how many history items will be deleted",
-                unpinnedCount
-            )
-        ]
-
-        if pinnedCount > 0 {
-            components.append(
-                appSettings.localizedFormat(
-                    "history.clear.pinnedPreserved",
-                    comment: "Describes how many pinned items remain",
-                    pinnedCount
-                )
-            )
-        }
-
-        components.append(
-            appSettings.localizedString(
-                "history.clear.cannotUndo",
-                comment: "Warns that the action cannot be undone"
-            )
-        )
-
-        return components.joined(separator: " ")
     }
 
     private func clearHistorySuccessMessage(count: Int) -> String {
@@ -470,7 +379,8 @@ private struct PasteOnSelectionSettingsView: View {
                     .help(Text("Paste on selection description"))
 
                 if !hasAccessibilityPermission {
-                    Text(LocalizedStringKey("Paste on selection permission warning"))
+                    let permissionTitle = Text(AccessibilityPermissionLabel.title)
+                    Text("Use the Permission tab to grant \(permissionTitle) permission in System Settings.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }

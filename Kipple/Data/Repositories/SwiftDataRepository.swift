@@ -37,10 +37,10 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         }
     }
 
-    private func fetchIDs(_ context: ModelContext) -> [UUID] {
-        let descriptor = FetchDescriptor<ClipItemModel>()
-        let models = (try? context.fetch(descriptor)) ?? []
-        return models.map { $0.id }
+    private func fetchIDs(_ context: ModelContext) throws -> Set<UUID> {
+        var descriptor = FetchDescriptor<ClipItemModel>()
+        descriptor.propertiesToFetch = [\.id]
+        return Set(try context.fetch(descriptor).map(\.id))
     }
 
     // MARK: - ClipboardRepositoryProtocol
@@ -52,7 +52,7 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
 
     func replaceAll(with items: [ClipItem]) async throws {
         let context = makeContext()
-        let existingIDs = Set(fetchIDs(context))
+        let existingIDs = try fetchIDs(context)
         let newMap = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
 
         let inserted = newMap.values.filter { !existingIDs.contains($0.id) }
@@ -84,6 +84,10 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         return models.map { $0.toClipItem() }
     }
 
+    func loadItemIDs() async throws -> Set<UUID> {
+        try fetchIDs(makeContext())
+    }
+
     func delete(_ item: ClipItem) async throws {
         try await applyChanges(inserted: [], updated: [], removed: [item.id])
     }
@@ -91,23 +95,6 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
     func clear() async throws {
         let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>()
-        let models = try context.fetch(descriptor)
-        for model in models {
-            context.delete(model)
-        }
-        try saveIfNeeded(context)
-    }
-
-    func clear(keepPinned: Bool) async throws {
-        let context = makeContext()
-        let descriptor: FetchDescriptor<ClipItemModel>
-        if keepPinned {
-            descriptor = FetchDescriptor<ClipItemModel>(
-                predicate: #Predicate { entity in !entity.isPinned }
-            )
-        } else {
-            descriptor = FetchDescriptor<ClipItemModel>()
-        }
         let models = try context.fetch(descriptor)
         for model in models {
             context.delete(model)
@@ -124,23 +111,23 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         try await applyChanges(inserted: [], updated: [item], removed: [])
     }
 
-    func loadPinned() async throws -> [ClipItem] {
+    func loadCategorized() async throws -> [ClipItem] {
         let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>(
-            predicate: #Predicate { entity in entity.isPinned },
+            predicate: #Predicate { $0.userCategoryId != nil || $0.metadataData != nil },
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         let models = try context.fetch(descriptor)
-        return models.map { $0.toClipItem() }
+        return models.compactMap { $0.toCustomCategorizedClipItem() }
     }
 
     func deleteItemsOlderThan(_ date: Date) async throws {
         let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>(
-            predicate: #Predicate { entity in entity.timestamp < date && !entity.isPinned }
+            predicate: #Predicate { entity in entity.timestamp < date }
         )
         let models = try context.fetch(descriptor)
-        for model in models {
+        for model in models where !model.hasCustomCategory {
             context.delete(model)
         }
         try saveIfNeeded(context)
@@ -202,7 +189,6 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 id: item.id,
                 content: item.content,
                 timestamp: adjustedTimestamp,
-                isPinned: item.isPinned,
                 kind: item.kind,
                 appName: item.sourceApp,
                 windowTitle: item.windowTitle,
@@ -236,7 +222,6 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 id: item.id,
                 content: item.content,
                 timestamp: adjustedTimestamp,
-                isPinned: item.isPinned,
                 kind: item.kind,
                 appName: item.sourceApp,
                 windowTitle: item.windowTitle,
@@ -266,7 +251,6 @@ private extension ClipItemModel {
     func update(with item: ClipItem) {
         content = item.content
         timestamp = item.timestamp
-        isPinned = item.isPinned
         kindRawValue = item.kind.rawValue
         appName = item.sourceApp
         windowTitle = item.windowTitle

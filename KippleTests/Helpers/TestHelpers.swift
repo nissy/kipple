@@ -8,6 +8,8 @@
 import Foundation
 import XCTest
 
+let savedHistoryCategoryID = UUID(uuidString: "EBBC4529-F432-4D84-A9FC-D4614BB0FF95")!
+
 // テスト環境でのメインスレッドブロックを回避するヘルパー
 extension XCTestCase {
     /// UserDefaultsを安全にクリアする

@@ -15,9 +15,8 @@ protocol ModernClipboardServiceProtocol {
     func clearSystemClipboard() async
 
     // History management
-    func clearAllHistory() async
-    func clearHistory(keepPinned: Bool) async
-    func togglePin(for item: ClipItem) async -> Bool
+    @discardableResult
+    func clearHistory(keepingCategories: Bool) async -> Result<Int, Error>
     func deleteItem(_ item: ClipItem) async
     func updateItem(_ item: ClipItem) async
 

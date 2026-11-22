@@ -18,10 +18,9 @@ struct HistoryItemView: View {
     let onTap: () -> Void
     let onQueueDrag: ((CGSize) -> Void)?
     let onQueueLongPress: (() -> Void)?
-    let onTogglePin: () -> Void
     let onDelete: (() -> Void)?
     // ユーザカテゴリ変更/管理
-    let onChangeCategory: ((UUID, Bool) async throws -> Void)?
+    let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
     let onOpenItem: (() -> Void)?
@@ -51,9 +50,8 @@ struct HistoryItemView: View {
         onTap: @escaping () -> Void,
         onQueueDrag: ((CGSize) -> Void)? = nil,
         onQueueLongPress: (() -> Void)? = nil,
-        onTogglePin: @escaping () -> Void,
         onDelete: (() -> Void)?,
-        onChangeCategory: ((UUID, Bool) async throws -> Void)?,
+        onChangeCategory: ((ClipCategoryChange) async throws -> Void)?,
         onOpenCategoryManager: (() -> Void)?,
         historyFont: Font,
         onOpenItem: (() -> Void)?,
@@ -70,7 +68,6 @@ struct HistoryItemView: View {
         self.onTap = onTap
         self.onQueueDrag = onQueueDrag
         self.onQueueLongPress = onQueueLongPress
-        self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onChangeCategory = onChangeCategory
         self.onOpenCategoryManager = onOpenCategoryManager
@@ -137,14 +134,12 @@ struct HistoryItemView: View {
 
             HistoryColumnsRow(showsQueue: queueBadge != nil) {
                 queueBadgeView
-            } pin: {
-                pinButton
-            } category: {
-                categoryMenuView
             } content: {
                 historyText
-            } trailing: {
+            } delete: {
                 deleteButton
+            } category: {
+                categoryMenuView
             }
             .padding(.vertical, 4)
         }
@@ -202,37 +197,11 @@ struct HistoryItemView: View {
         } else if isQueuePreviewed {
             baseFill = AnyShapeStyle(Color.primary.opacity(0.035))
         } else {
-            baseFill = AnyShapeStyle(Color.primary.opacity(isHoverActive ? 0.026 : 0))
+            baseFill = AnyShapeStyle(Color.primary.opacity(isHoverActive ? 0.04 : 0.018))
         }
 
         return RoundedRectangle(cornerRadius: 10, style: .continuous)
             .fill(baseFill)
-    }
-
-    private var pinButton: some View {
-        ZStack {
-            Circle()
-                .fill(pinButtonBackground)
-            Image(systemName: pinButtonIcon)
-                .foregroundColor(pinButtonForeground)
-                .font(.system(size: 10, weight: .medium))
-                .rotationEffect(.degrees(pinButtonRotation))
-        }
-        .frame(
-            width: MainViewMetrics.HistoryColumns.rowControlSize,
-            height: MainViewMetrics.HistoryColumns.rowControlSize
-        )
-        .frame(
-            width: MainViewMetrics.HistoryColumns.controlColumnWidth,
-            height: MainViewMetrics.HistoryColumns.controlColumnWidth,
-            alignment: .center
-        )
-        .contentShape(Circle())
-        .onTapGesture {
-            closePopover()
-            onTogglePin()
-        }
-        .help(pinHelpText)
     }
 
     private var historyText: some View {
@@ -247,7 +216,6 @@ struct HistoryItemView: View {
             .truncationMode(.tail)
             .foregroundColor(isLinkActive ? linkColor : MainViewMetrics.TextColor.primary)
             .padding(.vertical, 3)
-            .padding(.horizontal, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .gesture(selectionGesture)
@@ -299,37 +267,30 @@ struct HistoryItemView: View {
             .fixedSize(horizontal: true, vertical: false)
     }
 
+    @ViewBuilder
     private var deleteButton: some View {
-        ZStack {
-            if let onDelete = onDelete, isHoverActive && !item.isPinned {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(KippleButtonAppearance.inactiveForeground)
-                    .frame(
-                        width: MainViewMetrics.HistoryColumns.rowControlSize,
-                        height: MainViewMetrics.HistoryColumns.rowControlSize
-                    )
-                    .contentShape(Circle())
-                    .help(deleteHelpText)
-                    .onTapGesture {
-                        closePopover()
-                        onDelete()
-                    }
-                    .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+        if let onDelete {
+            ZStack {
+                if isHoverActive && !item.hasCustomCategory {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(KippleButtonAppearance.inactiveForeground)
+                        .frame(
+                            width: MainViewMetrics.HistoryColumns.rowControlSize,
+                            height: MainViewMetrics.HistoryColumns.rowControlSize
+                        )
+                        .contentShape(Circle())
+                        .help(deleteHelpText)
+                        .onTapGesture {
+                            closePopover()
+                            onDelete()
+                        }
+                        .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+                }
             }
+            .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                   height: MainViewMetrics.HistoryColumns.controlColumnWidth)
         }
-        .frame(
-            width: MainViewMetrics.HistoryColumns.controlColumnWidth,
-            height: MainViewMetrics.HistoryColumns.controlColumnWidth,
-            alignment: .center
-        )
-    }
-
-    private var pinHelpText: String {
-        AppSettings.shared.localizedString(
-            item.isPinned ? "Unpin item" : "Pin item",
-            comment: "Tooltip for toggling pin state in history list"
-        )
     }
 
     private var deleteHelpText: String {
@@ -394,23 +355,6 @@ struct HistoryItemView: View {
         HistoryPopoverManager.shared.hide()
     }
 
-    // MARK: - Pin helper properties
-    var pinButtonBackground: Color {
-        KippleButtonAppearance.compactFill(isActive: item.isPinned)
-    }
-
-    var pinButtonIcon: String {
-        item.isPinned ? "pin.fill" : "pin"
-    }
-
-    var pinButtonForeground: Color {
-        KippleButtonAppearance.foreground(isActive: item.isPinned)
-    }
-
-    var pinButtonRotation: Double {
-        item.isPinned ? 0 : -45
-    }
-
     private var isHoverActive: Bool {
         isHovered && !isScrollLocked
     }
@@ -431,11 +375,6 @@ private extension HistoryItemView {
             isSelected: isSelected,
             onChangeCategory: onChangeCategory,
             onOpenCategoryManager: onOpenCategoryManager
-        )
-        .frame(
-            width: MainViewMetrics.HistoryColumns.controlColumnWidth,
-            height: MainViewMetrics.HistoryColumns.controlColumnWidth,
-            alignment: .center
         )
         .environment(\.categoryPopoverChanged, CategoryPopoverAction { id, presented in
             closePopover()

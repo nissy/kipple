@@ -13,7 +13,7 @@ extension EnvironmentValues {
 struct HistoryCategoryMenu: View {
     let item: ClipItem
     let isSelected: Bool
-    let onChangeCategory: ((UUID, Bool) async throws -> Void)?
+    let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     @ObservedObject private var store = UserCategoryStore.shared
     @Environment(\.categoryPopoverChanged) private var presentationChanged
@@ -29,19 +29,24 @@ struct HistoryCategoryMenu: View {
         } label: {
             Image(systemName: store.iconName(for: categories))
                 .font(.system(size: 12, weight: .medium))
+                .overlay(alignment: .bottomTrailing) {
+                    if categories.count > 1 {
+                        let countLabel = Text("\(categories.count)")
+                            .font(.system(size: 8, weight: .bold))
+                            .fixedSize()
+                        if categories.count < 10 {
+                            countLabel.frame(width: 0, alignment: .leading)
+                                .offset(x: 1, y: 2)
+                        } else {
+                            countLabel.offset(y: 8)
+                        }
+                    }
+                }
                 .frame(
-                    width: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                    width: MainViewMetrics.HistoryColumns.rowCategoryWidth,
                     height: MainViewMetrics.HistoryColumns.controlColumnWidth,
                     alignment: .center
                 )
-                .overlay(alignment: .bottomTrailing) {
-                    if categories.count > 1 {
-                        Text("\(categories.count)")
-                            .font(.system(size: 8, weight: .bold))
-                            .padding(2)
-                            .background(.background, in: Circle())
-                    }
-                }
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? .primary : .secondary)
@@ -58,7 +63,7 @@ struct HistoryCategoryMenu: View {
                         ForEach(store.assignable()) { category in
                             Toggle(isOn: Binding(
                                 get: { item.categoryIDs.contains(category.id) },
-                                set: { enabled in update(category.id, enabled: enabled) }
+                                set: { enabled in update(.set(category.id, enabled: enabled)) }
                             )) {
                                 Label(category.name, systemImage: store.iconName(for: category))
                             }
@@ -77,7 +82,8 @@ struct HistoryCategoryMenu: View {
                         isPresented = false
                     }
                     Spacer()
-                    Button("Done") { isPresented = false }.keyboardShortcut(.defaultAction)
+                    Button("Clear") { update(.clear) }
+                        .disabled(item.categoryIDs.isEmpty || isSaving || onChangeCategory == nil)
                 }
             }.padding(16).frame(width: 300)
         }
@@ -87,12 +93,13 @@ struct HistoryCategoryMenu: View {
         .onDisappear { if isPresented { presentationChanged(item.id, false) } }
     }
 
-    private func update(_ id: UUID, enabled: Bool) {
+    private func update(_ change: ClipCategoryChange) {
+        guard let onChangeCategory, !isSaving else { return }
         isSaving = true
         saveError = false
         Task { @MainActor in
             defer { isSaving = false }
-            do { try await onChangeCategory?(id, enabled) } catch { saveError = true }
+            do { try await onChangeCategory(change) } catch { saveError = true }
         }
     }
 

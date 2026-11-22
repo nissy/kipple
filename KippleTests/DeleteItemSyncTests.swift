@@ -23,13 +23,13 @@ final class DeleteItemSyncTests: XCTestCase {
         viewModel = MainViewModel(clipboardService: adapter)
         
         // Clear any existing data
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.stopMonitoring()
         await service.flushPendingSaves()
     }
     
     override func tearDown() async throws {
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.stopMonitoring()
         
         service = nil
@@ -42,7 +42,7 @@ final class DeleteItemSyncTests: XCTestCase {
     func testDeleteItemImmediatelyRemovesFromUI() async throws {
         // Given: Add items
         await service.copyToClipboard("Item 1", fromEditor: false)
-        await service.copyToClipboard("Item 2", fromEditor: false)
+        await service.copyToClipboard("https://example.com/deletable", fromEditor: false)
         await service.copyToClipboard("Item 3", fromEditor: false)
         await service.flushPendingSaves()
         
@@ -50,7 +50,8 @@ final class DeleteItemSyncTests: XCTestCase {
         try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
         
         XCTAssertEqual(viewModel.history.count, 3)
-        let itemToDelete = viewModel.history[1] // Item 2
+        let itemToDelete = viewModel.history[1]
+        XCTAssertEqual(itemToDelete.categoryIDs, [BuiltInCategory.url])
         
         // When: Delete item
         viewModel.deleteItemSync(itemToDelete)
@@ -93,29 +94,17 @@ final class DeleteItemSyncTests: XCTestCase {
         }
     }
     
-    func testDeletePinnedItem() async throws {
-        // Given: Add and pin an item
-        await service.copyToClipboard("Pinned Item", fromEditor: false)
-        await service.copyToClipboard("Regular Item", fromEditor: false)
-        await service.flushPendingSaves()
-        
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-        
-        // Pin the first item
-        let pinnedItem = viewModel.history[1]
-        _ = adapter.togglePin(for: pinnedItem)
-        
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        // When: Delete pinned item
-        viewModel.deleteItemSync(pinnedItem)
-        
-        // Wait for deletion
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-        
-        // Then: Pinned item should be deleted
-        XCTAssertEqual(viewModel.history.count, 1)
-        XCTAssertFalse(viewModel.history.contains { $0.id == pinnedItem.id },
-                      "Pinned item should be deleted")
+    func testDeleteWithOldSnapshotKeepsNewlyCategorizedItem() async throws {
+        await service.copyToClipboard("Categorized item", fromEditor: false)
+        await adapter.refreshHistoryForTesting()
+        let oldItem = try XCTUnwrap(viewModel.history.first)
+        XCTAssertFalse(oldItem.hasCustomCategory)
+        try await adapter.updateCategories(itemID: oldItem.id, change: .set(savedHistoryCategoryID, enabled: true))
+
+        await viewModel.deleteItem(oldItem)
+
+        let item = try XCTUnwrap(viewModel.history.first)
+        XCTAssertEqual(item.id, oldItem.id)
+        XCTAssertTrue(item.hasCustomCategory)
     }
 }

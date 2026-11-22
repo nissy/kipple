@@ -91,11 +91,10 @@ private final class MainGlassContentController<Content: View>: NSViewController 
 @MainActor
 protocol WindowManaging: AnyObject {
     func openMainWindow(preservingPosition: Bool)
-    func showCopiedNotification()
+    func highlightHistoryItem(_ itemID: UUID)
 }
 
 extension Notification.Name {
-    static let showCopiedNotification = Notification.Name("showCopiedNotification")
     static let mainWindowDidBecomeKey = Notification.Name("KippleMainWindowDidBecomeKey")
     static let mainWindowDidResignKey = Notification.Name("KippleMainWindowDidResignKey")
     static let mainWindowDidHide = Notification.Name("KippleMainWindowDidHide")
@@ -372,7 +371,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     @MainActor
     private func createMainWindow() -> NSWindow? {
         // MainViewModelを作成または再利用
-        let viewModel = mainViewModel ?? MainViewModel()
+        let viewModel = mainViewModel ?? MainViewModel(categoryStore: .shared)
         mainViewModel = viewModel
         if let pasteController { viewModel.connectPasteController(pasteController) }
         syncTitleBarQueueState()
@@ -552,7 +551,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         titlebarContainer.addSubview(leftView, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
-            leftView.leadingAnchor.constraint(equalTo: titlebarContainer.leadingAnchor, constant: 6),
+            leftView.leadingAnchor.constraint(
+                equalTo: titlebarContainer.leadingAnchor, constant: MainViewMetrics.contentHorizontalInset
+            ),
             leftView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
             leftView.heightAnchor.constraint(equalToConstant: 34)
         ])
@@ -568,10 +569,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
         titlebarContainer.addSubview(pinView, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
-            pinView.trailingAnchor.constraint(equalTo: titlebarContainer.trailingAnchor, constant: -6),
+            pinView.trailingAnchor.constraint(
+                equalTo: titlebarContainer.trailingAnchor, constant: -MainViewMetrics.contentHorizontalInset
+            ),
             pinView.topAnchor.constraint(equalTo: titlebarContainer.topAnchor, constant: 6),
             pinView.heightAnchor.constraint(equalToConstant: 34),
-            pinView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34)
+            pinView.widthAnchor.constraint(equalToConstant: MainViewMetrics.TitleBar.buttonSize)
         ])
 
         titleBarLeftHostingView = leftView
@@ -867,27 +870,23 @@ final class WindowManager: NSObject, NSWindowDelegate {
               viewModel.isQueueModeActive else { return }
         guard viewModel.pasteQueue.isEmpty else { return }
         viewModel.resetPasteQueue()
-        titleBarState.isQueueActive = false
+        titleBarState.pasteMode = viewModel.pasteMode
     }
 
     private func syncTitleBarQueueState() {
         guard let viewModel = mainViewModel else {
-            titleBarState.isQueueActive = false
+            titleBarState.pasteMode = .clipboard
             return
         }
-        titleBarState.isQueueActive = viewModel.isQueueModeActive
+        titleBarState.pasteMode = viewModel.pasteMode
         titleBarState.isQueueEnabled = viewModel.canUsePasteQueue
     }
     
     // MARK: - Public Methods
 
     @MainActor
-    func showCopiedNotification() {
-        // MainViewにコピー通知を表示する
-        // ウィンドウが開いている場合のみ通知を送信
-        if mainWindow != nil {
-            NotificationCenter.default.post(name: .showCopiedNotification, object: nil)
-        }
+    func highlightHistoryItem(_ itemID: UUID) {
+        mainViewModel?.highlightHistoryItem(itemID)
     }
     
     // MARK: - Settings Window

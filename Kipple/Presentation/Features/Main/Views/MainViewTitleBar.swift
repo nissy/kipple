@@ -16,12 +16,15 @@ final class MainWindowTitleBarState: ObservableObject {
     @Published var isCaptureEnabled: Bool = false
     @Published var showsQueueButton: Bool = false
     @Published var isQueueEnabled: Bool = false
-    @Published var isQueueActive: Bool = false
+    @Published var pasteMode: MainViewModel.PasteMode = .clipboard
+
+    var isQueueActive: Bool { pasteMode != .clipboard }
     
     var toggleAlwaysOnTopHandler: (() -> Void)?
     var toggleEditorHandler: (() -> Void)?
     var startCaptureHandler: (() -> Void)?
     var toggleQueueHandler: (() -> Void)?
+    var toggleQueueRepetitionHandler: (() -> Void)?
     
     func requestToggleAlwaysOnTop() {
         toggleAlwaysOnTopHandler?()
@@ -38,6 +41,10 @@ final class MainWindowTitleBarState: ObservableObject {
     func requestToggleQueue() {
         toggleQueueHandler?()
     }
+
+    func requestToggleQueueRepetition() {
+        toggleQueueRepetitionHandler?()
+    }
 }
 
 struct MainViewTitleBarAccessory: View {
@@ -46,15 +53,15 @@ struct MainViewTitleBarAccessory: View {
     
     var body: some View {
         titleBarButtons
-            .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(Color.clear)
     }
 
     private var titleBarButtons: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MainViewMetrics.toolbarItemSpacing) {
             if state.showsQueueButton {
                 queueButton
+                if state.isQueueActive { queueRepeatToggle }
             }
             if state.showsCaptureButton {
                 captureButton
@@ -122,6 +129,28 @@ private extension MainViewTitleBarAccessory {
         .overlay(permissionBadge(isActive: state.isQueueEnabled), alignment: .topTrailing)
         .focusable(false)
         .focusEffectDisabled()
+    }
+
+    var queueRepeatToggle: some View {
+        Toggle(isOn: Binding(
+            get: { state.pasteMode == .queueToggle },
+            set: { isEnabled in
+                if isEnabled != (state.pasteMode == .queueToggle) {
+                    state.requestToggleQueueRepetition()
+                }
+            }
+        )) {
+            Label(appSettings.localizedString("Repeat", comment: "Queue repeat toggle"), systemImage: "repeat")
+                .font(MainViewMetrics.TitleBar.iconFont)
+        }
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, 8)
+        .frame(height: MainViewMetrics.TitleBar.buttonSize)
+        .background(KippleButtonAppearance.inactivePillFill, in: Capsule())
+        .disabled(!state.isQueueEnabled)
+        .help(appSettings.localizedString("Queue loop", comment: "Tooltip for queue repeat toggle"))
     }
     
     var editorButton: some View {

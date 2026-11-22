@@ -211,7 +211,7 @@ extension MainView {
     private var mainContent: some View {
         VStack(spacing: 0) {
             if appSettings.editorPosition == "disabled" {
-                historyAndPinnedContent
+                historyContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // メインコンテンツ（分割ビュー）
@@ -226,14 +226,14 @@ extension MainView {
                         if appSettings.editorPosition == "top" {
                             editorSection
                         } else {
-                            historyAndPinnedContent
+                            historyContent
                         }
                     },
                     bottomContent: {
                         if appSettings.editorPosition == "bottom" {
                             editorSection
                         } else {
-                            historyAndPinnedContent
+                            historyContent
                         }
                     }
                 )
@@ -268,6 +268,9 @@ extension MainView {
         }
         .onReceive(NotificationCenter.default.publisher(for: .mainWindowDidHide)) { _ in
             viewModel.endClipboardEditingIfUnchanged()
+            if let highlight = viewModel.historyHighlightRequest {
+                viewModel.finishHighlightingHistoryItem(highlight.id)
+            }
             if historyCopyScrollRequest == nil { historyCopyScrollRequest = HistoryCopyScrollRequest() }
             historyHoverResetRequest = HistoryHoverResetRequest()
         }
@@ -293,6 +296,9 @@ extension MainView {
             }
             titleBarState.toggleQueueHandler = {
                 toggleQueueModeFromTitleBar()
+            }
+            titleBarState.toggleQueueRepetitionHandler = {
+                toggleQueueRepetitionFromTitleBar()
             }
             syncTitleBarState()
             userPreferredAlwaysOnTop = isAlwaysOnTop
@@ -376,15 +382,13 @@ extension MainView {
             titleBarState.toggleEditorHandler = nil
             titleBarState.startCaptureHandler = nil
             titleBarState.toggleQueueHandler = nil
+            titleBarState.toggleQueueRepetitionHandler = nil
             ignoreNextAutoCloseAfterQueueFinish = false
             pendingReactivateAfterQueueFinish = false
             if !activePreventAutoCloseReasons.isEmpty {
                 activePreventAutoCloseReasons.removeAll()
                 onSetPreventAutoClose?(false)
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
-            showCopiedNotification(.copied)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             if ignoreNextAutoCloseAfterQueueFinish {
@@ -406,7 +410,8 @@ extension MainView {
                 viewModel.resetPasteQueue()
             }
         }
-        .onReceive(viewModel.$pasteMode) { _ in
+        .onReceive(viewModel.$pasteMode) { pasteMode in
+            titleBarState.pasteMode = pasteMode
             enforceQueueAlwaysOnTopIfNeeded(
                 queueCount: viewModel.pasteQueue.count,
                 isQueueModeActive: viewModel.isQueueModeActive

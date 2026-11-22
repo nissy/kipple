@@ -11,10 +11,10 @@ extension Notification.Name {
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
-    private struct AutoPinCopySequence {
-        let content: String
-        let firstCopiedAt: Date
-        var count: Int
+    struct HistorySnapshot {
+        let items: [ClipItem]
+        let revision: UInt64
+        let isLoaded: Bool
     }
 
     // MARK: - Properties
@@ -37,6 +37,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private let maxInterval: TimeInterval = 0.25
     private var maxHistoryItems = 300  // Default value, will be updated from AppSettings
     private var isMonitoringFlag = false
+    private var categoryStore: UserCategoryStore?
+    private var definedCustomCategoryIDs: Set<UUID>?
 
     // Repository for persistence
     private var repository: ClipboardRepositoryProtocol?
@@ -45,7 +47,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var persistedSnapshot: [UUID: ClipItem] = [:]
     private var historyRevision: UInt64 = 0
     private var itemIDByContent: [String: UUID] = [:]
-    private var autoPinCopySequence: AutoPinCopySequence?
 
     // MARK: - Singleton
 
@@ -57,12 +58,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     init(
         testRepository: ClipboardRepositoryProtocol,
         loadOnStartup: Bool = false,
+        categoryStore: UserCategoryStore? = nil,
         clipboardWriter: @escaping @MainActor @Sendable (ClipItem) -> Int = writeSystemClipboard,
         clipboardReader: ClipboardReader? = nil
     ) {
         mutationGate = AsyncMutationGate(initiallyOccupied: loadOnStartup)
         self.clipboardWriter = clipboardWriter
         self.clipboardReader = clipboardReader
+        self.categoryStore = categoryStore
         repository = testRepository
         isRepositoryReady = !loadOnStartup
         if loadOnStartup {
@@ -76,11 +79,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         mutationGate = AsyncMutationGate(initiallyOccupied: true)
         clipboardWriter = Self.writeSystemClipboard
         clipboardReader = nil
-        Task { await initializeService() }
+        Task { await initializeService(categoryStore: UserCategoryStore.shared) }
     }
 
-    private func initializeService() async {
+    private func initializeService(categoryStore: UserCategoryStore? = nil) async {
         defer { mutationGate.release() }
+        if let categoryStore { self.categoryStore = categoryStore }
         maxHistoryItems = await MainActor.run { AppSettings.shared.maxHistoryItems }
         let observation = await MainActor.run { (clipboardReader ?? .shared).observation }
         lastChangeCount = observation.changeCount
@@ -129,46 +133,42 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         let previousHistory = history
 
         do {
-            let pinnedItems = try await repository.loadPinned()
-            history = pinnedItems
+            if let categoryStore {
+                definedCustomCategoryIDs = Set(await categoryStore.userDefined().map(\.id))
+            }
+            let categorizedItems = try await repository.loadCategorized()
+            history = categorizedItems.map(withDefinedCategories).filter(\.hasCustomCategory)
 
-            if !pinnedItems.isEmpty {
+            if !history.isEmpty {
                 rebuildContentLookup()
                 markHistoryChanged()
                 notifyHistoryObservers()
             }
 
-            let fetchLimit = await initialLoadLimit(pinnedCount: pinnedItems.count)
-
-            async let allItemsTask = repository.load(limit: fetchLimit)
-            let loadedItems = try await allItemsTask
-
-            let loadedByID = Dictionary(uniqueKeysWithValues: loadedItems.map { ($0.id, $0) })
-
-            var combinedByID = loadedByID
-
-            for pinned in pinnedItems {
-                combinedByID[pinned.id] = loadedByID[pinned.id] ?? pinned
+            let fetchLimit = max(0, maxHistoryItems) + history.count + 10
+            let recentItems = try await repository.load(limit: fetchLimit)
+            let combinedByID = Dictionary((categorizedItems + recentItems).map { ($0.id, $0) }) { _, latest in
+                latest
             }
-
             let combinedItems = combinedByID.values.sorted {
                 $0.timestamp > $1.timestamp
             }
 
-            history = combinedItems
-            let loadedIDs = Set(combinedItems.map(\.id))
+            history = combinedItems.map(withDefinedCategories)
             let wasTrimmed = trimHistory()
             rebuildContentLookup()
             markHistoryChanged()
 
-            if wasTrimmed {
+            let filledLoadWindow = recentItems.count == fetchLimit
+            if wasTrimmed || filledLoadWindow {
+                let storedIDs = filledLoadWindow ? try await repository.loadItemIDs() : Set(combinedByID.keys)
                 let retainedIDs = Set(history.map(\.id))
-                let removedIDs = loadedIDs.subtracting(retainedIDs)
+                let removedIDs = storedIDs.subtracting(retainedIDs)
                 if !removedIDs.isEmpty {
                     try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
                 }
             }
-            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
+            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, combinedByID[$0.id] ?? $0) })
             isRepositoryReady = true
             notifyHistoryObservers()
         } catch {
@@ -180,14 +180,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
     }
 
-    private func initialLoadLimit(pinnedCount: Int) async -> Int {
-        let configuredPinned = await MainActor.run {
-            AppSettings.shared.maxPinnedItems
-        }
-        let headroom = 10
-        let pinnedAllowance = max(configuredPinned, pinnedCount)
-        let computedLimit = maxHistoryItems + pinnedAllowance + headroom
-        return max(computedLimit, pinnedCount)
+    private func withDefinedCategories(_ item: ClipItem) -> ClipItem {
+        guard let definedCustomCategoryIDs else { return item }
+        var updated = item
+        updated.removeUndefinedCategories(definedIDs: definedCustomCategoryIDs)
+        return updated
     }
 
     private func persistHistoryDiff() async {
@@ -200,18 +197,20 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
     }
 
-    private func saveHistory(_ candidate: [ClipItem], record: MCPStoredReceipt? = nil) async throws {
+    private func saveHistory(
+        _ candidate: [ClipItem], record: MCPStoredReceipt? = nil, additionallyRemoving: Set<UUID> = []
+    ) async throws {
         guard isRepositoryReady, let repository else { throw MCPFailure.persistence }
         let items = candidate
         let current = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         let inserted = items.filter { persistedSnapshot[$0.id] == nil }
         let updated = items.filter { persistedSnapshot[$0.id] != nil && persistedSnapshot[$0.id] != $0 }
-        let removed = persistedSnapshot.keys.filter { current[$0] == nil }
+        let removed = additionallyRemoving.union(persistedSnapshot.keys.filter { current[$0] == nil })
         if let record {
             guard let repository = repository as? SwiftDataRepository else { throw MCPFailure.persistence }
-            try await repository.commitMCP(inserted: inserted, updated: updated, removed: removed, record: record)
-        } else if current != persistedSnapshot {
-            try await repository.applyChanges(inserted: inserted, updated: updated, removed: removed)
+            try await repository.commitMCP(inserted: inserted, updated: updated, removed: Array(removed), record: record)
+        } else if current != persistedSnapshot || !removed.isEmpty {
+            try await repository.applyChanges(inserted: inserted, updated: updated, removed: Array(removed))
         }
         persistedSnapshot = current
     }
@@ -222,8 +221,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         history
     }
 
-    func getHistoryRevision() async -> UInt64 {
-        historyRevision
+    func getHistorySnapshot() -> HistorySnapshot {
+        HistorySnapshot(items: history, revision: historyRevision, isLoaded: isRepositoryReady)
     }
 
     func startMonitoring() async {
@@ -261,16 +260,29 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         source: ClipMetadata.Source? = nil,
         shouldCopy: @Sendable () async -> Bool
     ) async -> Bool {
+        await copyHistoryItem(content, fromEditor: fromEditor, source: source, shouldCopy: shouldCopy) != nil
+    }
+
+    func copyRecognizedText(_ content: String, shouldCopy: @Sendable () async -> Bool) async -> UUID? {
+        await copyHistoryItem(content, fromEditor: false, source: .ocr, shouldCopy: shouldCopy)
+    }
+
+    private func copyHistoryItem(
+        _ content: String,
+        fromEditor: Bool,
+        source: ClipMetadata.Source?,
+        shouldCopy: @Sendable () async -> Bool
+    ) async -> UUID? {
         let generation = copyGeneration
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        guard generation == copyGeneration, !Task.isCancelled, await shouldCopy() else { return false }
+        guard generation == copyGeneration, !Task.isCancelled, await shouldCopy() else { return nil }
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedContent.isEmpty else { return false }
+        guard !trimmedContent.isEmpty else { return nil }
         if !isRepositoryReady {
             await loadHistoryWhileLocked()
         }
-        guard isRepositoryReady, !Task.isCancelled else { return false }
+        guard isRepositoryReady, !Task.isCancelled else { return nil }
 
         // Mark as internal copy to avoid re-adding to history
         await state.setInternalCopy(true)
@@ -286,7 +298,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         let metadata = fromEditor ? appInfo : await MainActor.run { sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState) }
         var item = ClipItem(
             content: content,
-            isPinned: false,
             kind: determineKind(for: content, isFromEditor: fromEditor),
             sourceApp: fromEditor ? "Kipple" : metadata.appName,
             windowTitle: fromEditor
@@ -304,15 +315,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
         guard generation == copyGeneration, !Task.isCancelled, await shouldCopy() else {
             _ = await recordClipboardWrite(-1)
-            return false
+            return nil
         }
         let newChangeCount = await writeClipboardItem(item)
 
         // Record the expected changeCount for this internal operation
-        guard await recordClipboardWrite(newChangeCount) else { return false }
+        guard await recordClipboardWrite(newChangeCount) else { return nil }
 
-        addToHistory(item)
-        return true
+        return addToHistory(item)
     }
 
     func writeToClipboardOnly(_ content: String) async {
@@ -418,18 +428,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         // Try to match by ID first to avoid expensive content comparisons
         if let existingIndex = history.firstIndex(where: { $0.id == item.id }) {
             let existingItem = history.remove(at: existingIndex)
-            if existingItem.isPinned { newItem.isPinned = true }
             newItem.userCategoryId = existingItem.userCategoryId
             newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
         } else if let duplicateIndex = indexOfExistingContent(item.content) {
-            // Preserve pin state and user category from any remaining duplicate content
+            // Preserve the user category from any remaining duplicate content
             let existingItem = history.remove(at: duplicateIndex)
-            if existingItem.isPinned { newItem.isPinned = true }
             newItem.userCategoryId = existingItem.userCategoryId
             newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
         }
 
         // Add item at the beginning with preserved metadata and new timestamp
+        newItem = withDefinedCategories(newItem)
         history.insert(newItem, at: 0)
 
         // Trim history to max size
@@ -468,74 +477,38 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     // MARK: - History Management
 
-    func clearAllHistory() async {
+    @discardableResult
+    func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        let pinnedItems = history.filter { $0.isPinned }
-        history = pinnedItems
-        autoPinCopySequence = nil
-        rebuildContentLookup()
+        if !isRepositoryReady { await loadHistoryWhileLocked() }
+        guard isRepositoryReady, let repository else { return .failure(MCPFailure.persistence) }
 
-        // Save updated history to repository
-        markHistoryChanged()
-        saveSubject.send(())
-        notifyHistoryObservers()
-    }
+        let retained = keepingCategories ? history.filter(\.hasCustomCategory) : []
+        let retainedIDs = Set(retained.map(\.id))
+        do {
+            let storedIDs = try await repository.loadItemIDs()
+            let removedIDs = storedIDs.subtracting(retainedIDs)
+            try await saveHistory(retained, additionallyRemoving: removedIDs)
 
-    func clearHistory(keepPinned: Bool) async {
-        await mutationGate.acquire()
-        defer { mutationGate.release() }
-        if keepPinned {
-            history = history.filter { $0.isPinned }
-        } else {
-            history.removeAll()
-        }
-        autoPinCopySequence = nil
-        rebuildContentLookup()
-
-        // Save updated history
-        markHistoryChanged()
-        saveSubject.send(())
-        notifyHistoryObservers()
-    }
-
-    func togglePin(for item: ClipItem) async -> Bool {
-        await mutationGate.acquire()
-        defer { mutationGate.release() }
-        if let index = history.firstIndex(where: { $0.id == item.id }) {
-            let currentlyPinned = history[index].isPinned
-
-            // If we're trying to pin (currently unpinned)
-            if !currentlyPinned {
-                // Check if we've reached the max pinned items limit
-                let currentPinnedCount = history.filter { $0.isPinned }.count
-                let maxPinnedItems = await MainActor.run { AppSettings.shared.maxPinnedItems }
-
-                if currentPinnedCount >= maxPinnedItems {
-                    // Exceeded limit, don't allow pinning
-                    Logger.shared.log("Cannot pin item: Maximum pinned items limit (\(maxPinnedItems)) reached", level: .warning)
-                    return false
-                }
-            }
-
-            // Toggle the pin status
-            history[index].isPinned.toggle()
-            let isPinned = history[index].isPinned
-
-            // Trigger save
+            let clearedCount = removedIDs.union(history.map(\.id)).subtracting(retainedIDs).count
+            history = retained
+            rebuildContentLookup()
             markHistoryChanged()
-            saveSubject.send(())
             notifyHistoryObservers()
-
-            return isPinned
+            return .success(clearedCount)
+        } catch {
+            Logger.shared.error("Failed to clear history: \(error)")
+            return .failure(error)
         }
-        return false
     }
 
     func deleteItem(_ item: ClipItem) async {
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        history.removeAll { $0.id == item.id }
+        guard let index = history.firstIndex(where: { $0.id == item.id }),
+              !history[index].hasCustomCategory else { return }
+        history.remove(at: index)
         rebuildContentLookup()
 
         // Trigger save
@@ -550,7 +523,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             var updated = item
             updated.metadata = (item.metadata ?? ClipMetadata()).inheritingDetails(from: history[index].metadata)
-            history[index] = updated
+            history[index] = withDefinedCategories(updated)
             rebuildContentLookup()
 
             // Trigger save
@@ -673,10 +646,6 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             details: ["fetchStartedAt": "\(fetchStartedAt)"]
         )
 
-        if await shouldAutoPinExternalCopy(content: item.content, copiedAt: Date()) {
-            item.isPinned = true
-        }
-
         // Always add to history - addToHistory handles duplicates by moving them to top
         addToHistory(item)
         lastEventTime = Date()
@@ -687,7 +656,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return true
     }
 
-    private func addToHistory(_ item: ClipItem) {
+    @discardableResult
+    private func addToHistory(_ item: ClipItem) -> UUID {
         let updateStartedAt = PerformanceTrace.nowMicros()
         PerformanceTrace.event(
             "history_update_started",
@@ -696,14 +666,13 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             count: history.count
         )
 
-        // Check if an item with same content exists and preserve its pin state
+        // Check if an item with same content exists and preserve its categories
         var newItem = item
         if let existingIndex = indexOfExistingContent(item.content) {
             let existingItem = history[existingIndex]
             newItem.id = existingItem.id
             newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
-            // Preserve pin state and user-assigned category from existing item
-            if existingItem.isPinned { newItem.isPinned = true }
+            // Preserve the user-assigned category from existing item
             newItem.userCategoryId = existingItem.userCategoryId
             // Remove the existing item
             history.remove(at: existingIndex)
@@ -734,66 +703,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             count: history.count
         )
         notifyHistoryObservers(content: newItem.content)
-    }
-
-    private func shouldAutoPinExternalCopy(content: String, copiedAt: Date) async -> Bool {
-        let settings = await MainActor.run {
-            (
-                isEnabled: AppSettings.shared.autoPinRepeatedCopyEnabled,
-                interval: AppSettings.shared.autoPinRepeatedCopyIntervalSeconds,
-                requiredCount: AppSettings.shared.autoPinRepeatedCopyCount,
-                maxPinnedItems: AppSettings.shared.maxPinnedItems
-            )
-        }
-
-        guard settings.isEnabled else {
-            autoPinCopySequence = nil
-            return false
-        }
-
-        let currentSequence: AutoPinCopySequence
-        if let sequence = autoPinCopySequence,
-           sequence.content == content,
-           copiedAt.timeIntervalSince(sequence.firstCopiedAt) <= TimeInterval(settings.interval) {
-            currentSequence = AutoPinCopySequence(
-                content: content,
-                firstCopiedAt: sequence.firstCopiedAt,
-                count: sequence.count + 1
-            )
-        } else {
-            currentSequence = AutoPinCopySequence(
-                content: content,
-                firstCopiedAt: copiedAt,
-                count: 1
-            )
-        }
-
-        guard currentSequence.count >= settings.requiredCount else {
-            autoPinCopySequence = currentSequence
-            return false
-        }
-
-        autoPinCopySequence = nil
-
-        if let existingIndex = indexOfExistingContent(content),
-           history[existingIndex].isPinned {
-            return true
-        }
-
-        let pinnedCount = history.reduce(into: 0) { count, item in
-            if item.isPinned {
-                count += 1
-            }
-        }
-        guard pinnedCount < settings.maxPinnedItems else {
-            Logger.shared.log(
-                "Cannot auto-pin item: Maximum pinned items limit (\(settings.maxPinnedItems)) reached",
-                level: .warning
-            )
-            return false
-        }
-
-        return true
+        return newItem.id
     }
 
     private func shouldSkipChange(for changeCount: Int) async -> Bool {
@@ -976,40 +886,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private func trimHistory() -> Bool {
         guard history.count > maxHistoryItems else { return false }
 
-        let totalPinned = history.reduce(into: 0) { count, item in
-            if item.isPinned { count += 1 }
-        }
-        let allowedPinned = min(totalPinned, maxHistoryItems)
-        let allowedUnpinned = max(0, maxHistoryItems - allowedPinned)
-
-        var trimmed: [ClipItem] = []
-        trimmed.reserveCapacity(maxHistoryItems)
-
-        var pinnedAdded = 0
-        var unpinnedAdded = 0
-
-        for item in history {
-            if item.isPinned {
-                if pinnedAdded < allowedPinned {
-                    trimmed.append(item)
-                    pinnedAdded += 1
-                }
-            } else if unpinnedAdded < allowedUnpinned {
-                trimmed.append(item)
-                unpinnedAdded += 1
-            }
-
-            if trimmed.count == maxHistoryItems {
-                break
-            }
-        }
-
-        if trimmed != history {
-            history = trimmed
+        var available = maxHistoryItems
+        let trimmed = history.filter { item in
+            if item.hasCustomCategory { return true }
+            guard available > 0 else { return false }
+            available -= 1
             return true
         }
-
-        return false
+        guard trimmed.count < history.count else { return false }
+        history = trimmed
+        return true
     }
 
     private func notifyHistoryObservers(content: String? = nil) {
@@ -1066,30 +952,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
 #if DEBUG
 extension ModernClipboardService {
+    func setCategoryStoreForTesting(_ store: UserCategoryStore) async {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        categoryStore = store
+        definedCustomCategoryIDs = Set(await store.userDefined().map(\.id))
+    }
+
     func checkClipboardForTesting() async {
         await checkClipboard()
-    }
-
-    func addExternalClipboardItemForTesting(_ content: String, copiedAt: Date = Date()) async {
-        var item = ClipItem(
-            content: content,
-            kind: determineKind(for: content, isFromEditor: false),
-            sourceApp: "External Source",
-            windowTitle: nil,
-            bundleIdentifier: "external.app",
-            processID: -1,
-            isFromEditor: false
-        )
-
-        if await shouldAutoPinExternalCopy(content: item.content, copiedAt: copiedAt) {
-            item.isPinned = true
-        }
-
-        addToHistory(item)
-    }
-
-    func resetAutoPinSequenceForTesting() async {
-        autoPinCopySequence = nil
     }
 
     func reloadHistoryForTesting() async {
@@ -1225,11 +1096,24 @@ extension ModernClipboardService {
     }
 
     func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
+        try await updateCategories(itemID: itemID, change: .set(categoryID, enabled: enabled))
+    }
+
+    func updateCategories(itemID: UUID, change: ClipCategoryChange) async throws {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         guard let index = history.firstIndex(where: { $0.id == itemID }) else { throw MCPFailure.invalidInput }
         var candidate = history
-        candidate[index].setCategory(categoryID, enabled: enabled)
+        switch change {
+        case let .set(id, enabled):
+            if enabled, BuiltInCategory.isCustom(id), let categoryStore {
+                let ids = Set(await categoryStore.userDefined().map(\.id))
+                guard ids.contains(id) else { throw MCPFailure.invalidInput }
+                definedCustomCategoryIDs = ids
+            }
+            candidate[index].setCategory(id, enabled: enabled)
+        case .clear: candidate[index].clearCategories()
+        }
         try await saveHistory(candidate)
         history = candidate
         markHistoryChanged()
@@ -1237,7 +1121,7 @@ extension ModernClipboardService {
     }
 
     func removeCategoryDefinition(_ id: UUID) async throws {
-        guard id != BuiltInCategory.none, !BuiltInCategory.automatic.contains(id) else {
+        guard BuiltInCategory.isCustom(id) else {
             throw MCPFailure.invalidInput
         }
         await mutationGate.acquire()
@@ -1246,7 +1130,9 @@ extension ModernClipboardService {
         for index in candidate.indices { candidate[index].removeCategoryDefinition(id) }
         try await saveHistory(candidate)
         history = candidate
+        definedCustomCategoryIDs?.remove(id)
         markHistoryChanged()
+        await categoryStore?.remove(id: id)
         notifyHistoryObservers()
     }
 

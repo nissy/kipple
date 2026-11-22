@@ -51,9 +51,9 @@ final class ModernClipboardColdStartupTests: XCTestCase {
 
     func testFailedInitialLoadRejectsCopyAndCanRecoverWithoutLosingSavedHistory() async throws {
         let repository = MockClipboardRepository()
-        var pinned = ClipItem(content: "Saved pinned item")
-        pinned.isPinned = true
-        await repository.configure(items: [pinned], loadDelay: 0)
+        var categorized = ClipItem(content: "Saved categorized item")
+        categorized.setCategory(savedHistoryCategoryID, enabled: true)
+        await repository.configure(items: [categorized], loadDelay: 0)
         await repository.failNextLoads(2)
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
@@ -65,13 +65,13 @@ final class ModernClipboardColdStartupTests: XCTestCase {
         XCTAssertTrue(partialHistory.isEmpty)
         await service.flushPendingSaves()
         let saved = try await repository.loadAll()
-        XCTAssertEqual(saved.map(\.id), [pinned.id])
+        XCTAssertEqual(saved.map(\.id), [categorized.id])
 
         let recovered = await service.copyToClipboard("OCR after recovery", fromEditor: false, source: .ocr) { true }
         XCTAssertTrue(recovered)
         let history = await service.getHistory()
         XCTAssertEqual(history.count, 2)
-        XCTAssertTrue(history.contains { $0.id == pinned.id })
+        XCTAssertTrue(history.contains { $0.id == categorized.id })
     }
 
     func testPasteboardWriteFailureIsReturnedWithoutAddingOCRHistory() async {
@@ -81,6 +81,37 @@ final class ModernClipboardColdStartupTests: XCTestCase {
         XCTAssertFalse(copied)
         let history = await service.getHistory()
         XCTAssertTrue(history.isEmpty)
+    }
+
+    func testInitialPartialHistoryDoesNotReorderExistingCategoryFilters() async throws {
+        let suite = "ColdStartupCategoryOrderTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = UserCategoryStore(defaults: defaults)
+        store.add(name: "Saved", iconSystemName: "tag", id: savedHistoryCategoryID)
+        let originalOrder = store.orderedForFiltering().map(\.id)
+        let saved = ClipItem(content: "Memo", userCategoryId: savedHistoryCategoryID)
+        let url = ClipItem(content: "https://example.com")
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [saved, url], loadDelay: 0)
+        let loadingRecent = expectation(description: "recent history load suspended")
+        await repository.suspendLoad { loadingRecent.fulfill() }
+        let service = ModernClipboardService(testRepository: repository, loadOnStartup: true, categoryStore: store)
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let model = MainViewModel(clipboardService: adapter, categoryStore: store)
+
+        await fulfillment(of: [loadingRecent], timeout: 1)
+        await adapter.refreshHistoryForTesting()
+        XCTAssertFalse(adapter.isHistoryLoaded)
+        XCTAssertEqual(model.historyCategoryIDs, [savedHistoryCategoryID])
+        XCTAssertEqual(store.orderedForFiltering().map(\.id), originalOrder)
+
+        await repository.resumeLoad()
+        await service.flushPendingSaves()
+        await adapter.refreshHistoryForTesting()
+        XCTAssertTrue(adapter.isHistoryLoaded)
+        XCTAssertEqual(model.historyCategoryIDs, [BuiltInCategory.url, savedHistoryCategoryID])
+        XCTAssertEqual(store.orderedForFiltering().map(\.id), originalOrder)
     }
 
     private func makeService(repository: MockClipboardRepository, pasteboard: NSPasteboard) -> ModernClipboardService {

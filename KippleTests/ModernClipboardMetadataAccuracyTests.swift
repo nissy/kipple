@@ -16,7 +16,7 @@ final class ModernClipboardMetadataAccuracyTests: XCTestCase {
         adapter = ModernClipboardServiceAdapter.shared
 
         // Clear history completely before each test
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.flushPendingSaves()
 
         // Wait a bit for everything to settle
@@ -25,7 +25,7 @@ final class ModernClipboardMetadataAccuracyTests: XCTestCase {
 
     override func tearDown() async throws {
         await service.stopMonitoring()
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.flushPendingSaves()
         try await super.tearDown()
     }
@@ -279,7 +279,7 @@ final class ModernClipboardMetadataAccuracyTests: XCTestCase {
         await service.copyToClipboard("Before clear", fromEditor: true)
 
         // Clear history
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
 
         // Add external content
         await service.copyToClipboard("After clear", fromEditor: false)

@@ -16,7 +16,6 @@ struct CopiedNotificationView: View {
         case trimmed
         case formatted
         case formatFailed(String)
-        case pinLimitReached
         
         var icon: String {
             switch self {
@@ -27,8 +26,6 @@ struct CopiedNotificationView: View {
             case .formatted:
                 return "text.alignleft"
             case .formatFailed:
-                return "exclamationmark.triangle.fill"
-            case .pinLimitReached:
                 return "exclamationmark.triangle.fill"
             }
         }
@@ -43,8 +40,6 @@ struct CopiedNotificationView: View {
                 return NSLocalizedString("editor.format.success", comment: "Format success notification")
             case .formatFailed(let message):
                 return message
-            case .pinLimitReached:
-                return "Pin limit reached"
             }
         }
         
@@ -54,7 +49,7 @@ struct CopiedNotificationView: View {
                 return Color(NSColor.controlAccentColor)
             case .formatted:
                 return Color.green
-            case .formatFailed, .pinLimitReached:
+            case .formatFailed:
                 return Color.orange
             }
         }

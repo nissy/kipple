@@ -23,11 +23,10 @@ extension MainView {
 
             MainViewTitleBarPinButton(state: titleBarState)
                 .padding(.top, 4)
-                .padding(.trailing, 12)
         }
         .frame(height: titleBarHeight, alignment: .top)
         .padding(.top, 4)
-        .padding(.leading, 10)
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
     }
 
     // MARK: - Editor Helpers
@@ -155,11 +154,8 @@ extension MainView {
         titleBarState.isEditorEnabled = isEditorEnabled
         titleBarState.showsCaptureButton = onStartTextCapture != nil
         titleBarState.isCaptureEnabled = (onStartTextCapture != nil) && viewModel.canUseScreenTextCapture
-        let canUseQueue = viewModel.canUsePasteQueue
-        let queueActive = viewModel.pasteMode != .clipboard
         titleBarState.showsQueueButton = true
-        titleBarState.isQueueEnabled = canUseQueue
-        titleBarState.isQueueActive = queueActive
+        titleBarState.isQueueEnabled = viewModel.canUsePasteQueue
     }
 
     func toggleQueueModeFromTitleBar() {
@@ -170,6 +166,11 @@ extension MainView {
             viewModel.toggleQueueMode()
         }
         syncTitleBarState()
+    }
+
+    func toggleQueueRepetitionFromTitleBar() {
+        guard viewModel.canUsePasteQueue else { return }
+        viewModel.toggleQueueRepetition()
     }
 
     func startCaptureFromTitleBar() {

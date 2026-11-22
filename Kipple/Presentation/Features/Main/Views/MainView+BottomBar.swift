@@ -15,7 +15,7 @@ extension MainView {
 
             bottomActionGroup
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
         .padding(.vertical, 8)
         .alert("quit.alert.title", isPresented: quitConfirmationBinding) {
             Button("quit.alert.cancel", role: .cancel) {
@@ -37,7 +37,7 @@ private extension MainView {
     }
 
     var bottomActionButtons: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: MainViewMetrics.toolbarItemSpacing) {
             bottomBarActionButton(
                 systemName: "info.circle",
                 helpKey: "About",

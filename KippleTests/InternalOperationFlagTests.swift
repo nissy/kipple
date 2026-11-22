@@ -22,13 +22,13 @@ final class InternalOperationFlagTests: XCTestCase {
         adapter = ModernClipboardServiceAdapter.shared
         
         // Clear any existing data
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.stopMonitoring()
         await service.flushPendingSaves()
     }
     
     override func tearDown() async throws {
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.stopMonitoring()
         
         service = nil

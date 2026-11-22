@@ -11,7 +11,7 @@ final class RichTextMigrationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("history.store")
         let original = ClipItem(
-            content: "Existing pinned history", isPinned: true, sourceApp: "Safari",
+            content: "Existing history", sourceApp: "Safari",
             metadata: ClipMetadata(title: "Existing title", source: .clipboard)
         )
         try autoreleasepool {
@@ -19,7 +19,7 @@ final class RichTextMigrationTests: XCTestCase {
             let configuration = ModelConfiguration(schema: schema, url: url)
             let container = try ModelContainer(for: schema, configurations: [configuration])
             let context = ModelContext(container)
-            context.insert(LegacyClipboardSchema.ClipItemModel(from: original))
+            context.insert(LegacyClipboardSchema.ClipItemModel(from: original, isPinned: true))
             try context.save()
         }
         let schema = Schema([ClipItemModel.self, MCPReceiptModel.self])

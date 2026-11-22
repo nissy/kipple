@@ -5,22 +5,22 @@ final class ClipItemEqualityTests: XCTestCase {
 
     func testEqualityWithDifferentContent() {
         // Given: Two items with different content
-        let item1 = ClipItem(content: "Content 1", isPinned: false)
-        let item2 = ClipItem(content: "Content 2", isPinned: false)
+        let item1 = ClipItem(content: "Content 1")
+        let item2 = ClipItem(content: "Content 2")
 
         // Then: They should NOT be equal
         XCTAssertNotEqual(item1, item2)
     }
 
-    func testEqualityWithPinStateChange() {
+    func testEqualityWithCategoryChange() {
         // Given: Same item
-        let item1 = ClipItem(content: "Test", isPinned: false)
+        let item1 = ClipItem(content: "Test")
 
-        // When: Create a copy and change pin state
+        // When: Create a copy and change category
         var item2 = item1
-        item2.isPinned = true
+        item2.setCategory(savedHistoryCategoryID, enabled: true)
 
-        // Then: They should NOT be equal due to different pin state
+        // Then: They should NOT be equal due to different category
         XCTAssertNotEqual(item1, item2)
     }
 
@@ -28,14 +28,12 @@ final class ClipItemEqualityTests: XCTestCase {
         // Given: Same item with different metadata
         let item1 = ClipItem(
             content: "Test",
-            isPinned: false,
             sourceApp: "App1",
             windowTitle: "Window1"
         )
 
         let item2 = ClipItem(
             content: item1.content,
-            isPinned: item1.isPinned,
             sourceApp: "App2",
             windowTitle: "Window2"
         )
@@ -48,7 +46,6 @@ final class ClipItemEqualityTests: XCTestCase {
         // Given: An item
         let item1 = ClipItem(
             content: "Test Content",
-            isPinned: true,
             sourceApp: "TestApp",
             windowTitle: "TestWindow",
             bundleIdentifier: "com.test.app",
@@ -66,14 +63,14 @@ final class ClipItemEqualityTests: XCTestCase {
     func testArrayComparisonDetectsChanges() {
         // Given: Array of items
         let originalItems = [
-            ClipItem(content: "Item 1", isPinned: false),
-            ClipItem(content: "Item 2", isPinned: false),
-            ClipItem(content: "Item 3", isPinned: true)
+            ClipItem(content: "Item 1"),
+            ClipItem(content: "Item 2"),
+            ClipItem(content: "Item 3", userCategoryId: savedHistoryCategoryID)
         ]
 
-        // When: Toggle pin state (create modified item)
+        // When: Add a category state (create modified item)
         var modifiedFirst = originalItems[0]
-        modifiedFirst.isPinned = true  // Changed
+        modifiedFirst.setCategory(savedHistoryCategoryID, enabled: true)  // Changed
         let modifiedItems = [
             modifiedFirst,
             originalItems[1],
@@ -87,15 +84,14 @@ final class ClipItemEqualityTests: XCTestCase {
     func testArrayComparisonWithContentUpdate() {
         // Given: Array of items
         let originalItems = [
-            ClipItem(content: "Original", isPinned: false)
+            ClipItem(content: "Original")
         ]
 
         // When: Update content (create modified item - note: content is immutable)
         // Since content is immutable, we create a new item
         let modifiedItems = [
             ClipItem(
-                content: "Updated",  // Changed
-                isPinned: originalItems[0].isPinned
+                content: "Updated"
             )
         ]
 

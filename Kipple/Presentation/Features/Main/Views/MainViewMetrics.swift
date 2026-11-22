@@ -8,6 +8,9 @@
 import SwiftUI
 
 enum MainViewMetrics {
+    static let contentHorizontalInset: CGFloat = 16
+    static let toolbarItemSpacing: CGFloat = 8
+
     enum TextColor {
         static let primary = Color(.sRGB, red: 0.2, green: 0.2, blue: 0.2, opacity: 1)
         static let primaryNSColor = NSColor(calibratedWhite: 0.2, alpha: 1)
@@ -35,29 +38,33 @@ enum MainViewMetrics {
     enum HistorySearchField {
         static let iconFont: Font = .system(size: 11, weight: .medium)
         static let clearIconFont: Font = .system(size: 11)
+        static let height = HistoryRows.height
+    }
+
+    enum HistoryFilterSidebar {
+        static let width = HistoryFilterIcon.diameter
+        static let contentSpacing = toolbarItemSpacing
+        static let iconFont = TitleBar.iconFont
+    }
+
+    enum HistoryRows {
         static let height: CGFloat = 32
+        static let spacing: CGFloat = 2
+        static let verticalPadding: CGFloat = 4
     }
 
     enum HistoryColumns {
-        static let sectionHorizontalPadding: CGFloat = 10
-        static let horizontalInset: CGFloat = 6
         static let spacing: CGFloat = 5
-        static let toolbarSpacing: CGFloat = spacing
-        static let toolbarTopPadding: CGFloat = 0
         static let toolbarBottomPadding: CGFloat = 6
+        static let rowLeadingInset: CGFloat = 8
         static let controlColumnWidth: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
         static let rowControlSize: CGFloat = KippleButtonMetrics.historyRowSize
-        static let rowCategorySize: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
+        static let rowCategoryWidth = HistoryFilterIcon.diameter
     }
 
     enum HistoryFilterIcon {
-        static let diameter: CGFloat = HistoryColumns.controlColumnWidth
+        static let diameter = TitleBar.buttonSize
         static let defaultFont: Font = .system(size: 10, weight: .medium)
-        static let pinnedFont: Font = .system(size: 10, weight: .medium)
-        static let categoryFont: Font = .system(size: 12, weight: .medium)
-        static func font(size: CGFloat, weight: Font.Weight = .medium) -> Font {
-            .system(size: size, weight: weight)
-        }
     }
 
     enum HistoryQueueBadge {

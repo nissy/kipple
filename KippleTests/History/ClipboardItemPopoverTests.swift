@@ -53,7 +53,6 @@ final class ClipboardItemPopoverTests: XCTestCase {
             id: id,
             content: content,
             timestamp: Date(),
-            isPinned: false,
             kind: .text,
             sourceApp: nil,
             windowTitle: nil,

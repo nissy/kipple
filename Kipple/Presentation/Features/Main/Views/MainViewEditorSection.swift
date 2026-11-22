@@ -58,7 +58,7 @@ struct MainViewEditorSection: View {
                     .stroke(editorFieldStrokeColor, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 16)
+            .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
             .padding(.top, 8)
             .padding(.bottom, 8)
         }
@@ -75,7 +75,7 @@ struct MainViewEditorSection: View {
 
             Spacer()
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset + 2)
         .padding(.top, 4)
         .padding(.bottom, 2)
     }

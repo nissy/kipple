@@ -37,7 +37,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(clipboardService.lastCopiedFromEditor, false)
         XCTAssertTrue(windowManager.openMainWindowCalled)
         XCTAssertEqual(windowManager.preservingPosition, true)
-        XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+        XCTAssertEqual(windowManager.highlightedHistoryItemIDs, clipboardService.history.map(\.id))
     }
 
     func testCopyPreservesEmptyTableColumns() async {
@@ -50,9 +50,9 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(clipboardService.lastCopiedContent, "\tValue\t\nNext\t\t")
     }
 
-    func testWaitsForClipboardWriteBeforeOpeningWindowAndNotifying() async throws {
+    func testWaitsForClipboardWriteBeforeOpeningWindowAndHighlighting() async throws {
         let requested = expectation(description: "copy requested")
-        var completion: CheckedContinuation<Bool, Never>?
+        var completion: CheckedContinuation<UUID?, Never>?
         clipboardService.recognizedCopyHandler = { _ in
             await withCheckedContinuation {
                 completion = $0
@@ -66,15 +66,16 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         let task = Task { await coordinator.test_handleRecognizedText("OCR result") }
         await fulfillment(of: [requested], timeout: 1)
         XCTAssertFalse(windowManager.openMainWindowCalled)
-        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
-        try XCTUnwrap(completion).resume(returning: true)
+        XCTAssertTrue(windowManager.highlightedHistoryItemIDs.isEmpty)
+        let itemID = UUID()
+        try XCTUnwrap(completion).resume(returning: itemID)
         await task.value
         XCTAssertTrue(windowManager.openMainWindowCalled)
-        XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+        XCTAssertEqual(windowManager.highlightedHistoryItemIDs, [itemID])
     }
 
-    func testFailedCopyShowsErrorWithoutSuccessNotification() async {
-        clipboardService.recognizedCopyHandler = { _ in false }
+    func testFailedCopyShowsErrorWithoutHighlightingHistory() async {
+        clipboardService.recognizedCopyHandler = { _ in nil }
         var errors: [String] = []
         let coordinator = TextCaptureCoordinator(
             errorPresenter: { errors.append($0) },
@@ -84,12 +85,12 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         await coordinator.test_handleRecognizedText("OCR result")
         XCTAssertEqual(errors.count, 1)
         XCTAssertFalse(windowManager.openMainWindowCalled)
-        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+        XCTAssertTrue(windowManager.highlightedHistoryItemIDs.isEmpty)
     }
 
-    func testCancelledCopyDoesNotOpenWindowOrShowNotification() async throws {
+    func testCancelledCopyDoesNotOpenWindowOrHighlightHistory() async throws {
         let requested = expectation(description: "copy requested")
-        var completion: CheckedContinuation<Bool, Never>?
+        var completion: CheckedContinuation<UUID?, Never>?
         clipboardService.recognizedCopyHandler = { _ in
             await withCheckedContinuation {
                 completion = $0
@@ -105,14 +106,14 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         let task = Task { await coordinator.test_handleRecognizedText("OCR result") }
         await fulfillment(of: [requested], timeout: 1)
         task.cancel()
-        try XCTUnwrap(completion).resume(returning: true)
+        try XCTUnwrap(completion).resume(returning: UUID())
         await task.value
         XCTAssertTrue(errors.isEmpty)
         XCTAssertFalse(windowManager.openMainWindowCalled)
-        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+        XCTAssertTrue(windowManager.highlightedHistoryItemIDs.isEmpty)
     }
 
-    func testRealAdapterCopiesBeforeOpeningWindowAfterColdStartup() async throws {
+    func testRealAdapterHighlightsStoredItemAfterColdStartupAndRepeatCopy() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
         let repository = MockClipboardRepository()
@@ -141,7 +142,15 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), content)
         XCTAssertEqual(adapter.history.first?.content, content)
         XCTAssertEqual(adapter.history.first?.metadata?.source, .ocr)
-        XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+        let originalID = try XCTUnwrap(adapter.history.first?.id)
+        XCTAssertEqual(windowManager.highlightedHistoryItemIDs, [originalID])
+
+        let otherResult = await adapter.copyRecognizedText("Different OCR result")
+        let otherID = try XCTUnwrap(otherResult)
+        await coordinator.test_handleRecognizedText(content)
+        XCTAssertNotEqual(originalID, otherID)
+        XCTAssertEqual(adapter.history.map(\.id), [originalID, otherID])
+        XCTAssertEqual(windowManager.highlightedHistoryItemIDs, [originalID, originalID])
         XCTAssertTrue(errors.isEmpty)
     }
 
@@ -159,7 +168,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertTrue(adapter.history.isEmpty)
         XCTAssertNotEqual(adapter.currentClipboardContent, "Failed recognized text")
         XCTAssertFalse(windowManager.openMainWindowCalled)
-        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+        XCTAssertTrue(windowManager.highlightedHistoryItemIDs.isEmpty)
     }
 
     func testSelectionWaitsForImageBeforeRecognizingAndCopying() async throws {
@@ -228,7 +237,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(progressUpdates, [true, false])
         XCTAssertEqual(textRecognitionService.callCount, 1)
         XCTAssertEqual(clipboardService.lastCopiedContent, "Captured text")
-        XCTAssertTrue(windowManager.showCopiedNotificationCalled)
+        XCTAssertEqual(windowManager.highlightedHistoryItemIDs, clipboardService.history.map(\.id))
         XCTAssertNil(coordinator.test_captureTask())
 
         coordinator.startCaptureFlow()
@@ -271,7 +280,7 @@ final class TextCaptureCoordinatorTests: XCTestCase {
         XCTAssertEqual(errors, [NSLocalizedString(expectedMessage, comment: "")])
         XCTAssertEqual(textRecognitionService.callCount, 0)
         XCTAssertFalse(clipboardService.copyToClipboardCalled)
-        XCTAssertFalse(windowManager.showCopiedNotificationCalled)
+        XCTAssertTrue(windowManager.highlightedHistoryItemIDs.isEmpty)
         XCTAssertNil(coordinator.test_captureTask())
     }
 
@@ -521,7 +530,7 @@ private final class SuspendedImageCaptureService: ScreenImageCapturing {
 private final class SpyWindowManager: WindowManaging {
     private(set) var openMainWindowCalled = false
     private(set) var preservingPosition: Bool?
-    private(set) var showCopiedNotificationCalled = false
+    private(set) var highlightedHistoryItemIDs: [UUID] = []
     var onOpen: (() -> Void)?
 
     func openMainWindow(preservingPosition: Bool) {
@@ -530,8 +539,9 @@ private final class SpyWindowManager: WindowManaging {
         self.preservingPosition = preservingPosition
     }
 
-    func showCopiedNotification() {
-        showCopiedNotificationCalled = true
+    func highlightHistoryItem(_ itemID: UUID) {
+        XCTAssertTrue(openMainWindowCalled)
+        highlightedHistoryItemIDs.append(itemID)
     }
 }
 

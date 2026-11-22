@@ -3,21 +3,20 @@ import XCTest
 
 extension ModernClipboardService {
     func resetForTesting() async {
+        await useCategoryStoreFixture()
         await stopMonitoring()
-        await clearHistory(keepPinned: false)
-        await clearAllHistory()
+        await clearHistory(keepingCategories: false)
         await clearRepositoryForTesting()
         await setMaxHistoryItems(300)
-        await resetAutoPinSequenceForTesting()
         await MainActor.run {
             AppSettings.shared.maxHistoryItems = 300
-            AppSettings.shared.maxPinnedItems = 20
-            AppSettings.shared.autoPinRepeatedCopyEnabled = true
-            AppSettings.shared.autoPinRepeatedCopyIntervalSeconds = 5
-            AppSettings.shared.autoPinRepeatedCopyCount = 3
         }
 
         await ModernClipboardServiceAdapter.shared.resetAdapterStateForTesting()
+    }
+
+    func useCategoryStoreFixture() async {
+        await setCategoryStoreForTesting(TestCategoryStore.shared)
     }
 
     func useTestingRepository(_ repository: any ClipboardRepositoryProtocol) async {
@@ -27,4 +26,16 @@ extension ModernClipboardService {
         setRepository(repository)
         await loadHistoryFromRepository()
     }
+}
+
+@MainActor
+private enum TestCategoryStore {
+    static let shared: UserCategoryStore = {
+        let defaults = UserDefaults(suiteName: "com.nissy.KippleTests.HistoryCategories")!
+        let store = UserCategoryStore(defaults: defaults)
+        if store.category(id: savedHistoryCategoryID) == nil {
+            store.add(name: "Saved history", iconSystemName: "tag", id: savedHistoryCategoryID)
+        }
+        return store
+    }()
 }

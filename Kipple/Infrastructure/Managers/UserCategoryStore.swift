@@ -16,54 +16,68 @@ final class UserCategoryStore: ObservableObject {
     @Published private(set) var categories: [UserCategory] = [] {
         didSet { persist() }
     }
+    @Published private var filterOrder: [UUID]
 
+    private let defaults: UserDefaults
     private let storageKey = "userCategories.v1"
+    private static let filterOrderKey = "categoryFilterOrder.v1"
 
-    // 単色かつテキスト関連の推奨シンボル一覧
-    static let allowedSymbols: [String] = [
-        // Documents & text
-        "doc.text", "doc", "doc.richtext", "doc.append",
-        "text.quote", "text.alignleft", "text.aligncenter", "text.alignright",
-        "text.justify", "textformat", "textformat.size", "textformat.abc",
-        "text.badge.plus",
-
-        // Editing & annotations
-        "pencil", "pencil.circle", "square.and.pencil", "highlighter",
-        "paintbrush", "scribble", "lasso", "magicwand", "rectangle.and.pencil.and.ellipsis",
-
-        // Lists & organization
-        "list.bullet", "list.bullet.rectangle", "list.number", "list.triangle",
-        "checklist", "calendar", "calendar.badge.clock", "clock",
-        "bookmark", "bookmark.fill",
-
-        // Communication & references
-        "paperclip", "tray.and.arrow.down", "envelope", "at", "number",
-        "link", "link.badge.plus", "doc.on.clipboard", "quote.bubble",
-        "bubble.left.and.bubble.right",
-
-        // Code & markup
-        "curlybraces", "curlybraces.square", "angle.brackets", "angle.bracket.square",
-        "chevron.left.slash.chevron.right", "terminal", "text.cursor", "keyboard",
-        "command", "rectangle.and.text.magnifyingglass",
-
-        // Tags & metadata
-        "tag", "tag.circle", "folder", "folder.badge.plus", "rectangle.stack",
-        "archivebox", "tray.full", "magnifyingglass", "magnifyingglass.circle", "pin",
-
-        // Symbols for notes and emphasis
-        "star", "star.circle", "flag", "flag.checkered", "bookmark.circle",
-        "lightbulb", "bolt", "exclamationmark.circle", "info.circle", "questionmark.circle",
-
-        // Shapes useful for categorization
-        "circle", "square", "triangle", "diamond", "octagon",
-        "circle.grid.2x2", "square.grid.3x3", "rhombus", "shield"
+    // カテゴリ編集のアイコンを一覧の表示順で保持する。
+    private static let iconSymbols: [String] = [
+        "doc.text", "note.text", "doc.on.clipboard", "text.quote", "list.bullet", "doc", "doc.richtext",
+        "doc.plaintext", "doc.on.doc", "paperclip", "square.and.pencil", "highlighter", "signature", "textformat",
+        "list.number", "list.bullet.clipboard", "doc.append", "printer",
+        "tag", "folder", "bookmark", "tray", "archivebox", "rectangle.stack", "externaldrive", "square.grid.2x2",
+        "square.stack", "tray.and.arrow.down", "tray.and.arrow.up", "arrow.down.doc", "arrow.up.doc", "trash",
+        "line.3.horizontal.decrease.circle", "arrow.up.arrow.down", "square.and.arrow.up",
+        "checklist", "star", "flag", "calendar", "clock", "bell", "alarm", "timer", "hourglass",
+        "checkmark.circle", "exclamationmark.triangle", "target", "calendar.badge.clock",
+        "calendar.badge.checkmark", "arrow.clockwise", "repeat", "pin",
+        "briefcase", "building.2", "person.2", "person.3", "person.crop.rectangle", "building.columns",
+        "building", "wrench.and.screwdriver", "hammer", "gearshape", "puzzlepiece", "hand.raised",
+        "rectangle.connected.to.line.below", "megaphone", "lifepreserver", "checkmark.seal", "medal",
+        "book", "character.bubble", "lightbulb", "books.vertical", "graduationcap", "pencil", "text.book.closed",
+        "newspaper", "binoculars", "magnifyingglass", "info.circle", "questionmark.circle", "character",
+        "textformat.abc", "brain", "atom", "testtube.2",
+        "envelope", "bubble.left", "person.crop.circle", "phone", "at", "bubble.left.and.bubble.right",
+        "envelope.open", "envelope.badge", "paperplane", "message", "person.text.rectangle", "person.badge.plus",
+        "phone.arrow.up.right", "video", "mic", "questionmark.bubble", "bell.badge",
+        "globe", "link", "network", "wifi", "antenna.radiowaves.left.and.right", "cloud",
+        "externaldrive.connected.to.line.below", "arrow.down.to.line", "arrow.up.to.line",
+        "arrow.triangle.2.circlepath", "cursorarrow.click", "personalhotspot", "cable.connector", "wifi.router",
+        "network.slash", "rectangle.and.text.magnifyingglass", "point.3.connected.trianglepath.dotted",
+        "chevron.left.slash.chevron.right", "terminal", "curlybraces", "arrow.triangle.branch", "ant", "cylinder",
+        "server.rack", "laptopcomputer", "desktopcomputer", "keyboard", "cpu", "memorychip", "text.cursor",
+        "command", "function", "slider.horizontal.3", "app",
+        "tablecells", "chart.bar", "chart.pie", "chart.line.uptrend.xyaxis", "gauge.with.dots.needle.50percent",
+        "chart.dots.scatter", "chart.bar.doc.horizontal", "list.bullet.rectangle", "list.bullet.indent",
+        "percent", "sum", "number", "plus.forwardslash.minus", "equal", "ruler", "scalemass",
+        "doc.text.magnifyingglass",
+        "lock", "key", "lock.shield", "lock.open", "person.badge.key", "shield", "checkmark.shield",
+        "exclamationmark.shield", "eye", "eye.slash", "hand.raised.slash", "person.crop.circle.badge.checkmark",
+        "person.crop.circle.badge.exclamationmark", "qrcode", "rectangle.badge.person.crop", "lock.rectangle",
+        "rectangle.on.rectangle.slash",
+        "cart", "receipt", "creditcard", "shippingbox", "bag", "basket", "gift", "wallet.bifold", "banknote",
+        "dollarsign.circle", "yensign.circle", "eurosign.circle", "barcode", "creditcard.and.123",
+        "yensign.arrow.circlepath", "list.clipboard", "arrow.left.arrow.right",
+        "mappin", "ticket", "map", "location", "airplane", "car", "bus", "train.side.front.car", "fuelpump",
+        "parkingsign.circle", "bed.double", "house", "door.left.hand.open", "fork.knife", "cup.and.saucer",
+        "suitcase.rolling", "signpost.right",
+        "photo", "camera", "film", "play.rectangle", "music.note", "waveform", "speaker.wave.2", "headphones",
+        "pianokeys", "guitars", "paintbrush", "paintpalette", "pencil.and.outline", "crop", "scissors",
+        "viewfinder", "photo.on.rectangle",
+        "heart", "cross.case", "stethoscope", "pills", "leaf", "pawprint", "flame", "drop", "sun.max", "moon",
+        "cloud.rain", "snowflake", "bolt", "bicycle", "figure.walk", "dumbbell", "sportscourt"
     ]
 
-    static let availableSymbols: [String] = {
-        allowedSymbols.filter { symbol in
-            NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil
-        }
-    }()
+    static let availableSymbols = iconSymbols.filter { symbol in
+        NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil
+    }
+    private static let availableSymbolSet = Set(availableSymbols)
+
+    static func iconTitleKey(for symbol: String) -> String {
+        "category.icon.\(symbol)"
+    }
 
     // ビルトインカテゴリ（削除不可）
     private static let builtInNoneID = BuiltInCategory.none
@@ -72,7 +86,7 @@ final class UserCategoryStore: ObservableObject {
         UserCategory(
             id: builtInNoneID,
             name: "None",
-            iconSystemName: "tag",
+            iconSystemName: "tag.slash",
             isFilterEnabled: false
         )
     }
@@ -106,12 +120,44 @@ final class UserCategoryStore: ObservableObject {
         return nil
     }
 
-    private init() { load() }
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        filterOrder = defaults.stringArray(forKey: Self.filterOrderKey)?.compactMap(UUID.init(uuidString:)) ?? []
+        load()
+    }
 
     /// すべて（ビルトイン＋ユーザ定義）
     func all() -> [UserCategory] { Self.builtIns + categories }
 
     func assignable() -> [UserCategory] { all().filter { $0.id != BuiltInCategory.none } }
+
+    func orderedForFiltering() -> [UserCategory] {
+        let categories = assignable() + [Self.builtInNone]
+        var remaining = Dictionary(categories.map { ($0.id, $0) }) { first, _ in first }
+        let ordered = filterOrder.compactMap { remaining.removeValue(forKey: $0) }
+        return ordered + categories.compactMap { remaining.removeValue(forKey: $0.id) }
+    }
+
+    func moveFilter(_ id: UUID, to target: UUID, among visibleIDs: [UUID]) {
+        let visible = Set(visibleIDs)
+        let order = orderedForFiltering().map(\.id)
+        var visibleOrder = order.filter { visible.contains($0) }
+        guard let from = visibleOrder.firstIndex(of: id), let to = visibleOrder.firstIndex(of: target),
+              from != to else { return }
+
+        let moved = visibleOrder.remove(at: from)
+        visibleOrder.insert(moved, at: to)
+        var reordered = visibleOrder.makeIterator()
+        let updated = order.map { visible.contains($0) ? (reordered.next() ?? $0) : $0 }
+        saveFilterOrder(updated)
+    }
+
+    func moveFiltersToEnd(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        let order = orderedForFiltering().map(\.id)
+        let updated = order.filter { !ids.contains($0) } + order.filter { ids.contains($0) }
+        if updated != order { saveFilterOrder(updated) }
+    }
 
     func categories(for item: ClipItem) -> [UserCategory] {
         let ids = item.categoryIDs
@@ -153,11 +199,11 @@ final class UserCategoryStore: ObservableObject {
         return iconName(for: categories.first ?? noneCategory())
     }
 
-    func add(name: String, iconSystemName: String) {
+    func add(name: String, iconSystemName: String, id: UUID = UUID()) {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let symbol = UserCategoryStore.availableSymbols.contains(iconSystemName)
+        let symbol = Self.availableSymbolSet.contains(iconSystemName)
             ? iconSystemName : "tag"
-        let new = UserCategory(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+        let new = UserCategory(id: id, name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                                iconSystemName: symbol,
                                isFilterEnabled: true)
         categories.append(new)
@@ -166,6 +212,7 @@ final class UserCategoryStore: ObservableObject {
     func remove(id: UUID) {
         guard !isBuiltIn(id) else { return }
         categories.removeAll { $0.id == id }
+        if filterOrder.contains(id) { saveFilterOrder(filterOrder.filter { $0 != id }) }
     }
 
     func rename(id: UUID, to name: String) {
@@ -175,7 +222,7 @@ final class UserCategoryStore: ObservableObject {
 
     func changeIcon(id: UUID, to systemName: String) {
         guard !isBuiltIn(id), let index = categories.firstIndex(where: { $0.id == id }) else { return }
-        if UserCategoryStore.availableSymbols.contains(systemName) {
+        if Self.availableSymbolSet.contains(systemName) {
             categories[index].iconSystemName = systemName
         }
     }
@@ -186,17 +233,22 @@ final class UserCategoryStore: ObservableObject {
     }
 
     // MARK: - Persistence
+    private func saveFilterOrder(_ order: [UUID]) {
+        filterOrder = order
+        defaults.set(order.map(\.uuidString), forKey: Self.filterOrderKey)
+    }
+
     private func persist() {
         do {
             let data = try JSONEncoder().encode(categories)
-            UserDefaults.standard.set(data, forKey: storageKey)
+            defaults.set(data, forKey: storageKey)
         } catch {
             Logger.shared.error("Failed to save categories: \(error)")
         }
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+        guard let data = defaults.data(forKey: storageKey) else {
             categories = []
             return
         }
@@ -215,7 +267,7 @@ final class UserCategoryStore: ObservableObject {
     }
 
     private static func resolvedIconName(_ symbol: String) -> String {
-        if availableSymbols.contains(symbol) {
+        if availableSymbolSet.contains(symbol) {
             return symbol
         }
         if NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil {

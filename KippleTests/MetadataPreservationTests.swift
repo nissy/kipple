@@ -23,13 +23,13 @@ final class MetadataPreservationTests: XCTestCase {
         viewModel = MainViewModel(clipboardService: adapter)
 
         // Clear any existing data
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.stopMonitoring()
     }
 
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.stopMonitoring()
 
         service = nil
@@ -152,10 +152,10 @@ final class MetadataPreservationTests: XCTestCase {
         XCTAssertEqual(updatedHistory[0].sourceApp, "Kipple", "Should remain as Kipple for editor items")
     }
 
-    func testRecopyPreservesPinnedState() async throws {
-        // Given: Pinned item with metadata
+    func testRecopyPreservesCategorizedState() async throws {
+        // Given: Categorized item with metadata
         let item = ClipItem(
-            content: "Pinned Content",
+            content: "Categorized Content",
             sourceApp: "Finder",
             windowTitle: "Desktop",
             bundleIdentifier: "com.apple.finder",
@@ -165,18 +165,18 @@ final class MetadataPreservationTests: XCTestCase {
 
         await service.addItemDirectly(item)
         var history = await service.getHistory()
-        _ = await service.togglePin(for: history[0])
+        try await service.setCategory(itemID: history[0].id, categoryID: savedHistoryCategoryID, enabled: true)
 
-        // When: Recopy pinned item
+        // When: Recopy categorized item
         history = await service.getHistory()
-        XCTAssertTrue(history[0].isPinned, "Item should be pinned before recopy")
+        XCTAssertTrue(history[0].hasCustomCategory, "Item should be categorized before recopy")
         viewModel.selectHistoryItem(history[0])
         try await Task.sleep(nanoseconds: 150_000_000)
         await service.flushPendingSaves()
 
-        // Then: Both pin state and metadata should be preserved
+        // Then: Both category and metadata should be preserved
         history = await service.getHistory()
-        XCTAssertTrue(history[0].isPinned, "Pin state should be preserved")
+        XCTAssertTrue(history[0].hasCustomCategory, "Category should be preserved")
         XCTAssertEqual(history[0].sourceApp, "Finder", "Source app should be preserved")
         XCTAssertEqual(history[0].windowTitle, "Desktop", "Window title should be preserved")
     }

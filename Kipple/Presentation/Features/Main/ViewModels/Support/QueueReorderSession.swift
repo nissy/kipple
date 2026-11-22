@@ -9,7 +9,7 @@ struct QueueReorderSession: Equatable {
     let mode: MainViewModel.PasteMode
     let searchText: String
     let categoryFilter: CategoryFilter
-    let filterFlags: [Bool]
+    let showOnlyURLs: Bool
     let filteredIDs: [UUID]
 }
 

@@ -18,7 +18,7 @@ final class ModernClipboardHashResetTests: XCTestCase {
         await service.stopMonitoring()
 
         // Clear history completely before each test
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.flushPendingSaves()
 
         // Wait a bit for everything to settle
@@ -26,7 +26,7 @@ final class ModernClipboardHashResetTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.flushPendingSaves()
         try await super.tearDown()
     }
@@ -43,7 +43,7 @@ final class ModernClipboardHashResetTests: XCTestCase {
         XCTAssertEqual(history.first?.content, testContent)
 
         // When: Clear all history
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
 
         // Then: Should be able to add the same content again
         await service.copyToClipboard(testContent, fromEditor: false)
@@ -53,7 +53,7 @@ final class ModernClipboardHashResetTests: XCTestCase {
         XCTAssertEqual(history.first?.content, testContent)
     }
 
-    /// Test that same content can be added after clearHistory(keepPinned: false)
+    /// Test that same content can be added after clearHistory(keepingCategories: false)
     func testDuplicateDetectionResetAfterClearHistory() async throws {
         // Given: Add some content
         let testContent = "Content to test after clear"
@@ -63,8 +63,8 @@ final class ModernClipboardHashResetTests: XCTestCase {
         var history = await service.getHistory()
         XCTAssertEqual(history.count, 1)
 
-        // When: Clear history without keeping pinned
-        await service.clearHistory(keepPinned: false)
+        // When: Clear history without keeping categorized
+        await service.clearHistory(keepingCategories: false)
 
         // Then: Should be able to add the same content again
         await service.copyToClipboard(testContent, fromEditor: false)
@@ -74,32 +74,32 @@ final class ModernClipboardHashResetTests: XCTestCase {
         XCTAssertEqual(history.first?.content, testContent)
     }
 
-    /// Test that same content can be added after clearHistory(keepPinned: true)
-    func testDuplicateDetectionResetAfterClearHistoryKeepPinned() async throws {
-        // Given: Add content and pin one item
-        let pinnedContent = "Pinned content"
+    /// Test that same content can be added after clearHistory(keepingCategories: true)
+    func testDuplicateDetectionResetAfterClearHistoryKeepingCategories() async throws {
+        // Given: Add content and categorize one item
+        let categorizedContent = "Categorized content"
         let regularContent = "Regular content"
 
-        await service.copyToClipboard(pinnedContent, fromEditor: false)
+        await service.copyToClipboard(categorizedContent, fromEditor: false)
         await service.copyToClipboard(regularContent, fromEditor: false)
 
-        // Pin the first item
+        // Categorize the first item
         var history = await service.getHistory()
-        if let pinnedItem = history.first(where: { $0.content == pinnedContent }) {
-            _ = await service.togglePin(for: pinnedItem)
+        if let categorizedItem = history.first(where: { $0.content == categorizedContent }) {
+            try await service.setCategory(itemID: categorizedItem.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
-        // When: Clear history keeping pinned
-        await service.clearHistory(keepPinned: true)
+        // When: Clear history keeping categorized
+        await service.clearHistory(keepingCategories: true)
 
         // Then: Should be able to add the regular content again
         await service.copyToClipboard(regularContent, fromEditor: false)
 
         history = await service.getHistory()
         XCTAssertTrue(history.contains { $0.content == regularContent },
-                     "Should be able to add regular content after clearing with keepPinned")
-        XCTAssertTrue(history.contains { $0.content == pinnedContent },
-                     "Pinned content should remain")
+                     "Should be able to add regular content after clearing with keepingCategories")
+        XCTAssertTrue(history.contains { $0.content == categorizedContent },
+                     "Categorized content should remain")
     }
 
     /// Test that same content can be added after deleteItem
@@ -135,7 +135,7 @@ final class ModernClipboardHashResetTests: XCTestCase {
         }
 
         // Clear all
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
 
         // Should be able to add all contents again
         for content in contents {
@@ -158,8 +158,8 @@ final class ModernClipboardHashResetTests: XCTestCase {
         let testContent = "Clear-history test content"
         await service.copyToClipboard(testContent, fromEditor: false)
 
-        // Simulate clearing history while keeping pinned items
-        await service.clearHistory(keepPinned: true)
+        // Simulate clearing history while keeping categorized items
+        await service.clearHistory(keepingCategories: true)
 
         // Then: Should be able to add the same content again
         await service.copyToClipboard(testContent, fromEditor: false)

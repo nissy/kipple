@@ -56,6 +56,18 @@ final class QueueReorderTests: XCTestCase {
         XCTAssertEqual(model.pasteQueue, [items[1], items[2], items[3], items[0]].map(\.id))
     }
 
+    func testOCRHighlightCanReachPastTheCurrentPageWithoutReorderingTheQueue() {
+        let queue = model.pasteQueue
+        let item = items[3]
+        XCTAssertFalse(model.history.contains { $0.id == item.id })
+
+        model.highlightHistoryItem(item.id)
+
+        XCTAssertEqual(model.historyHighlightRequest?.itemID, item.id)
+        XCTAssertEqual(model.history.map(\.id), queue)
+        XCTAssertEqual(model.pasteQueue, queue)
+    }
+
     func testSameSlotAndSelfDropDoNotInvalidatePendingQueueState() throws {
         let session = try XCTUnwrap(model.beginQueueReorder(itemID: items[1].id))
         for destination in [target(1), target(1, after: true), target(0, after: true), target(2)] {
@@ -121,10 +133,11 @@ final class QueueReorderTests: XCTestCase {
         XCTAssertEqual(service.recopyFromHistoryCallCount, copies)
     }
 
-    func testUnqueuedDropWithAllQueueItemsFilteredOutAppendsWithoutLosingHiddenItems() throws {
-        service.history[4].isPinned = true
-        model.showOnlyPinned = true
-        XCTAssertEqual(model.filteredHistory.map(\.id), [items[4].id])
+    func testCategoryFilterKeepsQueueVisibleWhenAppendingMatchingItem() throws {
+        service.history[4].setCategory(savedHistoryCategoryID, enabled: true)
+        service.history.append(ClipItem(content: "Uncategorized candidate"))
+        model.categoryFilter.select(savedHistoryCategoryID)
+        XCTAssertEqual(model.filteredHistory.map(\.id), items.map(\.id))
         let session = try XCTUnwrap(model.beginQueueReorder(itemID: items[4].id))
         XCTAssertTrue(model.commitQueueReorder(session, target: .end))
         XCTAssertEqual(model.pasteQueue, items.map(\.id))
@@ -174,15 +187,20 @@ final class QueueReorderTests: XCTestCase {
         XCTAssertEqual(model.pasteQueue, session.queue)
     }
 
-    func testFilteredInsertionKeepsHiddenItemsInTheQueue() throws {
-        for index in [0, 2, 3] { service.history[index].isPinned = true }
-        model.showOnlyPinned = true
-        let visible = Set(model.filteredHistory.map(\.id))
-        let hidden = try XCTUnwrap(model.pasteQueue.first { !visible.contains($0) })
+    func testSearchAndCategoryFiltersKeepQueueVisibleInPasteOrder() throws {
+        service.history[4].setCategory(savedHistoryCategoryID, enabled: true)
+        service.history.append(ClipItem(content: "Category only", userCategoryId: savedHistoryCategoryID))
+        service.history.append(ClipItem(content: "Reorder 4 search only"))
+        model.searchText = "Reorder 4"
+        model.categoryFilter.select(savedHistoryCategoryID)
+        XCTAssertEqual(model.history.map(\.id), items.map(\.id))
+
         let session = try XCTUnwrap(model.beginQueueReorder(itemID: items[3].id))
         XCTAssertTrue(model.commitQueueReorder(session, target: target(0)))
-        XCTAssertEqual(model.pasteQueue, [items[3], items[0], items[1], items[2]].map(\.id))
-        XCTAssertTrue(model.pasteQueue.contains(hidden))
+        XCTAssertEqual(model.history.map(\.id), [items[3], items[0], items[1], items[2], items[4]].map(\.id))
+
+        model.didSendQueuedPaste(items[3])
+        XCTAssertEqual(model.history.map(\.id), [items[0], items[1], items[2], items[4]].map(\.id))
     }
 
     func testPermissionLossModeChangeAndShiftSelectionRejectDragging() throws {

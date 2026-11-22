@@ -13,7 +13,7 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         adapter = ModernClipboardServiceAdapter.shared
         await ModernClipboardService.shared.resetForTesting()
         // Clear history before each test
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
     }
 
     override func tearDown() async throws {
@@ -97,29 +97,6 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         XCTAssertEqual(receivedHistory.first?.content, "Published content")
     }
 
-    func testTogglePin() async {
-        // Given
-        adapter.copyToClipboard("Item to pin", fromEditor: true) // Use fromEditor: true to ensure it's added
-        try? await Task.sleep(for: .milliseconds(200))
-
-        guard let item = adapter.history.first else {
-            XCTFail("No items in history")
-            return
-        }
-
-        // When
-        _ = adapter.togglePin(for: item)
-
-        // Wait for async update
-        try? await Task.sleep(for: .milliseconds(200))
-
-        // Then
-        // Note: The synchronous version might not return the correct value immediately
-        // but the history should be updated
-        let updatedItem = adapter.history.first { $0.id == item.id }
-        XCTAssertTrue(updatedItem?.isPinned ?? false)
-    }
-
     func testDeleteItem() async {
         // Given
         adapter.copyToClipboard("Item 1", fromEditor: false)
@@ -148,32 +125,32 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
         XCTAssertFalse(adapter.history.isEmpty)
 
         // When
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
 
         // Then
         XCTAssertTrue(adapter.history.isEmpty)
     }
 
-    func testClearHistoryKeepPinned() async {
+    func testClearHistoryKeepingCategories() async throws {
         // Given
-        adapter.copyToClipboard("Unpinned", fromEditor: false)
-        adapter.copyToClipboard("To be pinned", fromEditor: false)
+        adapter.copyToClipboard("Uncategorized", fromEditor: false)
+        adapter.copyToClipboard("To be categorized", fromEditor: false)
 
         try? await Task.sleep(for: .milliseconds(200))
 
-        // Pin one item
-        let itemToPin = adapter.history.first { $0.content == "To be pinned" }!
-        _ = adapter.togglePin(for: itemToPin)
+        // Categorize one item
+        let itemToCategorize = adapter.history.first { $0.content == "To be categorized" }!
+        try await adapter.updateCategories(itemID: itemToCategorize.id, change: .set(savedHistoryCategoryID, enabled: true))
 
         try? await Task.sleep(for: .milliseconds(200))
 
         // When
-        await adapter.clearHistory(keepPinned: true)
+        await adapter.clearHistory(keepingCategories: true)
 
         // Then
         XCTAssertEqual(adapter.history.count, 1)
-        XCTAssertEqual(adapter.history.first?.content, "To be pinned")
-        XCTAssertTrue(adapter.history.first?.isPinned ?? false)
+        XCTAssertEqual(adapter.history.first?.content, "To be categorized")
+        XCTAssertTrue(adapter.history.first?.hasCustomCategory ?? false)
     }
 
     func testSearchHistory() async {
@@ -261,29 +238,5 @@ final class ModernClipboardServiceAdapterTests: XCTestCase {
 
         // Then
         XCTAssertLessThanOrEqual(adapter.history.count, 3)
-    }
-
-    func testPinnedAndUnpinnedItems() async {
-        // Given - Use fromEditor: true to ensure items are added
-        adapter.copyToClipboard("Unpinned 1", fromEditor: true)
-        adapter.copyToClipboard("Pinned 1", fromEditor: true)
-        adapter.copyToClipboard("Unpinned 2", fromEditor: true)
-
-        try? await Task.sleep(for: .milliseconds(300))
-
-        guard let itemToPin = adapter.history.first(where: { $0.content == "Pinned 1" }) else {
-            XCTFail("Item not found in history")
-            return
-        }
-
-        // Pin one item
-        _ = adapter.togglePin(for: itemToPin)
-
-        try? await Task.sleep(for: .milliseconds(200))
-
-        // Then
-        XCTAssertEqual(adapter.pinnedItems.count, 1)
-        XCTAssertEqual(adapter.unpinnedItems.count, 2)
-        XCTAssertEqual(adapter.pinnedItems.first?.content, "Pinned 1")
     }
 }

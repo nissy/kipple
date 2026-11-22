@@ -20,8 +20,8 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
-        // Clear any existing data (including pinned items)
-        await service.clearHistory(keepPinned: false)
+        // Clear any existing data (including categorized items)
+        await service.clearHistory(keepingCategories: false)
         await service.stopMonitoring()
         await service.flushPendingSaves()
 
@@ -30,8 +30,8 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
     }
     
     override func tearDown() async throws {
-        // Clean up (including pinned items)
-        await service.clearHistory(keepPinned: false)
+        // Clean up (including categorized items)
+        await service.clearHistory(keepingCategories: false)
         await service.stopMonitoring()
         
         // Reset max history items to default
@@ -112,18 +112,18 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         XCTAssertEqual(history[0].content, "B", "Item B should be re-added")
     }
     
-    func testPinnedItemsPreservedDuringTrimming() async throws {
+    func testCategorizedItemsPreservedDuringTrimming() async throws {
         // Given: Set max history to 3
         await service.setMaxHistoryItems(3)
         
-        // Add items and pin one
+        // Add items and categorize one
         await service.copyToClipboard("Item 1", fromEditor: false)
         await service.copyToClipboard("Item 2", fromEditor: false)
         await service.flushPendingSaves()
         
         var history = await service.getHistory()
-        let itemToPin = history[1] // Item 1
-        _ = await service.togglePin(for: itemToPin)
+        let itemToCategorize = history[1] // Item 1
+        try await service.setCategory(itemID: itemToCategorize.id, categoryID: savedHistoryCategoryID, enabled: true)
         
         // Add more items to trigger trimming
         await service.copyToClipboard("Item 3", fromEditor: false)
@@ -131,15 +131,15 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         await service.copyToClipboard("Item 5", fromEditor: false)
         await service.flushPendingSaves()
         
-        // Then: Pinned item should be preserved
+        // Then: Categorized item should be preserved
         history = await service.getHistory()
-        XCTAssertEqual(history.count, 3)
+        XCTAssertEqual(history.count, 4)
         
-        let pinnedItems = history.filter { $0.isPinned }
-        XCTAssertEqual(pinnedItems.count, 1, "Pinned item should be preserved")
-        XCTAssertEqual(pinnedItems[0].content, "Item 1")
+        let categorizedItems = history.filter { $0.hasCustomCategory }
+        XCTAssertEqual(categorizedItems.count, 1, "Categorized item should be preserved")
+        XCTAssertEqual(categorizedItems[0].content, "Item 1")
         
-        // When: Re-copy a trimmed unpinned item
+        // When: Re-copy a trimmed uncategorized item
         await service.copyToClipboard("Item 2", fromEditor: false)
         await service.flushPendingSaves()
         
@@ -148,8 +148,8 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         XCTAssertEqual(history[0].content, "Item 2", "Should be able to re-add trimmed item")
     }
 
-    func testPinnedItemKeepsRelativeOrderAfterTrimming() async throws {
-        // Given: history limit set to 3 with an older pinned item
+    func testCategorizedItemKeepsRelativeOrderAfterTrimming() async throws {
+        // Given: history limit set to 3 with an older categorized item
         await service.setMaxHistoryItems(3)
 
         await service.copyToClipboard("Item 1", fromEditor: false)
@@ -157,8 +157,8 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
         await service.flushPendingSaves()
 
         var history = await service.getHistory()
-        let pinnedCandidate = history[1]
-        _ = await service.togglePin(for: pinnedCandidate)
+        let categorizedCandidate = history[1]
+        try await service.setCategory(itemID: categorizedCandidate.id, categoryID: savedHistoryCategoryID, enabled: true)
 
         // When: new items push history past the limit
         await service.copyToClipboard("Item 3", fromEditor: false)
@@ -167,9 +167,9 @@ final class TrimmedHistoryRecopyTests: XCTestCase {
 
         history = await service.getHistory()
 
-        // Then: the most recent unpinned items remain at the top and the pinned item stays last
-        XCTAssertEqual(history.map(\.content), ["Item 4", "Item 3", "Item 1"], "Pinned item should retain its relative order")
-        XCTAssertTrue(history[2].isPinned)
+        // Then: the most recent uncategorized items remain at the top and the categorized item stays last
+        XCTAssertEqual(history.map(\.content), ["Item 4", "Item 3", "Item 2", "Item 1"])
+        XCTAssertTrue(history.last?.hasCustomCategory == true)
     }
     
     func testRecopyIdenticalContentAfterTrimming() async throws {
