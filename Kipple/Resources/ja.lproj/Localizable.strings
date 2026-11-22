@@ -89,7 +89,7 @@
 "Status" = "状態";
 "Paste on selection" = "選択してペースト";
 "Paste on selection description" = "履歴の項目を選ぶと最後に使ったアプリへ自動でペーストします。\nKipple ライブエディタでは使用できません。";
-"Paste on selection permission warning" = "選択してペーストには「デバイスの制御とデータへのアクセス」の許可が必要です。「権限」タブからシステム設定を開いて許可してください。";
+"Use the Permission tab to grant %@ permission in System Settings." = "「権限」タブからシステム設定を開き、「%@」で Kipple を許可してください。";
 "Hiragino Sans" = "ヒラギノ角ゴシック";
 "History Cleared" = "履歴を削除しました";
 "History Font" = "履歴のフォント";
@@ -270,7 +270,7 @@
 "Paste as Plain Text" = "書式なしで貼り付け";
 "Kipple keeps the original formatting so you can choose either shortcut for each paste. Menu and mouse paste use the clipboard’s current format." = "元の書式を保持し、貼り付けるたびに2つのショートカットで書式の有無を選べます。メニューやマウスでの貼り付けは、その時点のクリップボードの書式を使います。";
 "Could not reserve ⌘V to switch paste formatting. Check for a conflicting shortcut in another app." = "書式を切り替えるための⌘Vを登録できませんでした。他のアプリのショートカット設定を確認してください。";
-"Allow Device Control and Data Access to configure and use paste shortcuts." = "設定・使用するには「デバイスの制御とデータへのアクセス」の許可が必要です。";
+"Allow %@ to configure and use paste shortcuts." = "設定・使用するには「%@」の許可が必要です。";
 "Open Permission Settings" = "権限の設定を開く";
 "Click the shortcut field to change it. Clear disables the shortcut." = "入力欄をクリックしてキーを押すと変更できます。「クリア」で無効にできます。";
 "Include Command, Control, or Option in the shortcut." = "Command・Control・Optionのいずれかと組み合わせてください。";
@@ -279,12 +279,13 @@
 "The paste shortcut is unavailable. Check for a conflicting shortcut in another app." = "ショートカットを登録できません。他のアプリで同じキーが使われていないか確認してください。";
 "Screen & System Audio Recording" = "画面収録とシステムオーディオ録音";
 "Device Control and Data Access" = "デバイスの制御とデータへのアクセス";
+"Accessibility" = "アクセシビリティ";
 "Screen text capture and source window names" = "画面テキストキャプチャ・コピー元ウインドウ名";
 "Without permission, screen text capture is unavailable and source window names may be missing." = "未許可の場合、画面テキストキャプチャは使えず、コピー元のウインドウ名を取得できないことがあります。";
 "Kipple captures still images for OCR and reads source window names. It does not record audio." = "OCR用の静止画とコピー元のウインドウ名を取得します。音声は録音しません。";
 "1. Use the button above and follow the macOS prompt to System Settings." = "1. 上のボタンを押し、macOSの案内に従ってシステム設定を開きます。";
 "2. In System Settings → Privacy & Security → Screen & System Audio Recording, enable “Kipple”." = "2. システム設定 → プライバシーとセキュリティ → 画面収録とシステムオーディオ録音で「Kipple」を有効にします。";
-"2. In System Settings → Privacy & Security → Device Control and Data Access, enable “Kipple”." = "2. システム設定 → プライバシーとセキュリティ → デバイスの制御とデータへのアクセスで「Kipple」を有効にします。";
+"2. In System Settings → Privacy & Security → %@, enable “Kipple”." = "2. システム設定 → プライバシーとセキュリティ → %@で「Kipple」を有効にします。";
 "Input Monitoring permission is not required for queue paste or global shortcuts." = "キューペーストやグローバルショートカットに、入力監視の許可は必要ありません。";
 "3. Return to Kipple to check the permission status." = "3. Kippleに戻って、許可の状態を確認します。";
 "If macOS requests a restart or the status remains Not Granted, quit and reopen Kipple." = "macOSから再起動を求められた場合や「未許可」のままの場合は、Kippleを終了して起動し直してください。";

@@ -69,9 +69,9 @@ Turn on Queue, select clips from history, then press `Command + V` repeatedly. K
 
 In normal mode, either hold a history item for half a second or drag and drop it inside the history list to start Queue with that item. Dragging does not require a long press. In Queue mode, drag without waiting: dropping an unqueued item adds it at the insertion line; dragging a queued item changes its position. The area below the last queue entry, including the space below the history rows, appends to the queue. This also works while searching, filtering by category, or scrolling past the queue entries. When the queue is empty or no queue entries are displayed, dropping inside the list appends the item. During a drag, pressing `Esc` or dropping outside the list cancels without changing the mode or queue. Starting Queue with a long press or adding or reordering by dragging does not change the clipboard contents. A short click still copies in normal mode or adds/removes an item in Queue mode.
 
-Use the plain text paste shortcut (default: `Command + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Queue paste requires **Device Control and Data Access** permission.
+Use the plain text paste shortcut (default: `Command + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Review the required paste permission in **Settings → Permissions**.
 
-Change or clear the plain text paste shortcut in **Settings → General → Pasting**. Device Control and Data Access permission is required to edit and use this shortcut; the settings show a link to the permission settings when access is missing. Revoking access stops the shortcut and keeps your chosen keys for when access is granted again.
+Change or clear the plain text paste shortcut in **Settings → General → Pasting**. Editing and using this shortcut requires the same permission. The settings show a link when access is missing. Revoking access stops the shortcut and keeps your chosen keys for when access is granted again.
 
 Turn on **Swap paste formatting** in the same settings to make `Command + V` paste plain text and the other shortcut (default: `Command + Shift + V`) paste with formatting. This applies to normal and Queue modes. `Command + V` continues to paste images and files unchanged. Clearing the other shortcut also turns off swapping.
 
@@ -97,7 +97,7 @@ Open **Kipple Settings → Permission** to check access and open the matching pa
 | Permission | Used for |
 | --- | --- |
 | Screen & System Audio Recording | Screen Text Capture (OCR) and retrieving source window names. Kipple captures still images; it does not record audio. |
-| Device Control and Data Access | Sending paste commands for Queue, Paste on Selection, and plain text paste. |
+| Accessibility (macOS 26) / Device Control and Data Access (macOS 27 or later) | Sending paste commands for Queue, Paste on Selection, and plain text paste. |
 
 Enable **Kipple** on the corresponding page. Return to Kipple to check the permission status. If macOS requests a restart or the status remains Not Granted, quit and reopen Kipple. If it is still Not Granted, remove the old Kipple entry from that permission list, add the Kipple.app you are currently using, and enable it again. This may be necessary after changing the app's signing identity or switching between installed and development copies.
 
@@ -131,9 +131,7 @@ Kipple does not send your clipboard history to external services.
 ## Requirements
 
 - Mac with Apple silicon (M1 or later)
-- macOS 26.0 or later
-
-macOS 26 support is provisional. Automated tests run on macOS 27; operation on a Mac running macOS 26 has not yet been verified.
+- macOS 26.0 (Tahoe) or later
 
 ## Development
 

@@ -19,6 +19,7 @@ CONFIGURATION_RELEASE = Release
 BUILD_DIR = build
 DEV_BUILD_DIR = $(BUILD_DIR)/dev
 PROD_BUILD_DIR = $(BUILD_DIR)/release
+RELEASE_APP ?= $(PROD_BUILD_DIR)/$(PROJECT_NAME).app
 DERIVED_DATA_DIR = $(BUILD_DIR)/DerivedData
 TEST_DERIVED_DATA_DIR = $(DERIVED_DATA_DIR)/Test
 ARCHIVE_PATH = $(PROD_BUILD_DIR)/$(PROJECT_NAME).xcarchive
@@ -198,7 +199,7 @@ build: generate ## Build production version
 		echo "$(GREEN)Production build available at: $(PROD_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"; \
 		codesign -dv --verbose=2 "$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"; \
 	fi
-	$(MAKE) test-mcp-release MCP_HELPER="$(PROD_BUILD_DIR)/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
+	$(MAKE) test-release RELEASE_APP="$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"
 
 #===============================================================================
 # TEST TARGETS  
@@ -218,7 +219,28 @@ test: generate ## Run all tests
 		-only-testing:KippleTests
 	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/Debug/Kipple.app/Contents/Helpers/KippleMCP"
 
-.PHONY: test-mcp-release
+.PHONY: test-release check-release-macos-version test-mcp-release
+test-release: check-release-macos-version ## Verify the release bundle and MCP helper
+	$(MAKE) test-mcp-release MCP_HELPER="$(RELEASE_APP)/Contents/Helpers/KippleMCP"
+
+check-release-macos-version: ## Verify the macOS 26.0 deployment target in the release bundle
+	@set -eu; \
+	contents="$(RELEASE_APP)/Contents"; \
+	minimum=$$(plutil -extract LSMinimumSystemVersion raw "$$contents/Info.plist"); \
+	if [ "$$minimum" != "26.0" ]; then \
+		printf '%s\n' "$$contents/Info.plist: expected LSMinimumSystemVersion 26.0, got $$minimum" >&2; \
+		exit 1; \
+	fi; \
+	for executable in "$$contents/MacOS/$(PROJECT_NAME)" "$$contents/Helpers/KippleMCP"; do \
+		build_info=$$(xcrun vtool -arch arm64 -show-build "$$executable"); \
+		minimum=$$(printf '%s\n' "$$build_info" | awk '$$1 == "minos" { print $$2 }'); \
+		if [ "$$minimum" != "26.0" ]; then \
+			printf '%s\n' "$$executable: expected arm64 minimum macOS 26.0, got $$minimum" >&2; \
+			exit 1; \
+		fi; \
+	done; \
+	printf '%s\n' 'Verified macOS 26.0 deployment target for Kipple and KippleMCP.'
+
 test-mcp-release: ## Verify signed MCP helper startup without clipboard writes
 	codesign --verify --strict "$(MCP_HELPER)"
 	python3 Scripts/test_mcp_stdio.py "$(MCP_HELPER)"
@@ -296,7 +318,7 @@ archive: generate ## Create xcarchive with Developer ID signing
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		archive
 	@echo "$(GREEN)Archive created at: $(ARCHIVE_PATH)$(NC)"
-	$(MAKE) test-mcp-release MCP_HELPER="$(ARCHIVE_PATH)/Products/Applications/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
+	$(MAKE) test-release RELEASE_APP="$(ARCHIVE_PATH)/Products/Applications/$(PROJECT_NAME).app"
 
 package: archive ## Export app from archive with Developer ID
 	@echo "$(BLUE)Exporting app from archive…$(NC)"
@@ -326,11 +348,11 @@ package: archive ## Export app from archive with Developer ID
 	@echo "$(GREEN)App exported to: $(EXPORT_PATH)/$(PROJECT_NAME).app$(NC)"
 	@echo "$(BLUE)Verifying signature…$(NC)"
 	@codesign -dv --verbose=2 "$(EXPORT_PATH)/$(PROJECT_NAME).app"
-	$(MAKE) test-mcp-release MCP_HELPER="$(EXPORT_PATH)/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
+	$(MAKE) test-release RELEASE_APP="$(EXPORT_PATH)/$(PROJECT_NAME).app"
 	@echo "$(BLUE)Copying to release directory…$(NC)"
 	@rm -rf "$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"
 	@cp -R "$(EXPORT_PATH)/$(PROJECT_NAME).app" "$(PROD_BUILD_DIR)/"
-	$(MAKE) test-mcp-release MCP_HELPER="$(PROD_BUILD_DIR)/$(PROJECT_NAME).app/Contents/Helpers/KippleMCP"
+	$(MAKE) test-release RELEASE_APP="$(PROD_BUILD_DIR)/$(PROJECT_NAME).app"
 	@echo "$(GREEN)Production app ready at: $(PROD_BUILD_DIR)/$(PROJECT_NAME).app$(NC)"
 
 dmg: package ## Create DMG for distribution
@@ -465,6 +487,7 @@ appstore-archive: generate ## Create xcarchive for Mac App Store submission
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		archive
 	@echo "$(GREEN)Archive created at: $(APPSTORE_ARCHIVE_PATH)$(NC)"
+	$(MAKE) check-release-macos-version RELEASE_APP="$(APPSTORE_ARCHIVE_PATH)/Products/Applications/$(PROJECT_NAME).app"
 
 appstore-export: appstore-archive ## Export signed .pkg for Mac App Store
 	@echo "$(BLUE)Exporting .pkg for Mac App Store…$(NC)"

@@ -97,7 +97,7 @@ struct PermissionsSettingsView: View {
 
     private var accessibilitySection: some View {
         SettingsGroup(
-            "Device Control and Data Access",
+            AccessibilityPermissionLabel.title,
             includeTopDivider: true
         ) {
             featureRow("Paste on selection, plain text paste, and queue paste")
@@ -118,9 +118,8 @@ struct PermissionsSettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Why: Lets Kipple send paste commands to the frontmost app. Input stays on device.")
                     Text("1. Use the button above and follow the macOS prompt to System Settings.")
-                    Text(
-                        "2. In System Settings → Privacy & Security → Device Control and Data Access, enable “Kipple”."
-                    )
+                    let permissionTitle = Text(AccessibilityPermissionLabel.title)
+                    Text("2. In System Settings → Privacy & Security → \(permissionTitle), enable “Kipple”.")
                     Text("3. Return to Kipple to check the permission status.")
                     permissionRecoveryInstructions
                     Text("Input Monitoring permission is not required for queue paste or global shortcuts.")
@@ -271,6 +270,15 @@ struct PermissionsSettingsView: View {
     private func stopPermissionPolling() {
         permissionPollingTimer?.invalidate()
         permissionPollingTimer = nil
+    }
+}
+
+enum AccessibilityPermissionLabel {
+    static var title: LocalizedStringKey {
+        if #available(macOS 27.0, *) {
+            return "Device Control and Data Access"
+        }
+        return "Accessibility"
     }
 }
 

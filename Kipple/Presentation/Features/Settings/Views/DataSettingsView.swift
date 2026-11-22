@@ -468,7 +468,8 @@ private struct PasteOnSelectionSettingsView: View {
                     .help(Text("Paste on selection description"))
 
                 if !hasAccessibilityPermission {
-                    Text(LocalizedStringKey("Paste on selection permission warning"))
+                    let permissionTitle = Text(AccessibilityPermissionLabel.title)
+                    Text("Use the Permission tab to grant \(permissionTitle) permission in System Settings.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }

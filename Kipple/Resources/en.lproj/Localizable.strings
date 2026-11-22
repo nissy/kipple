@@ -89,7 +89,7 @@
 "Status" = "Status";
 "Paste on selection" = "Paste on selection";
 "Paste on selection description" = "Automatically paste the selected history item into the last active app.\nThis feature is unavailable for Kipple Live Editor.";
-"Paste on selection permission warning" = "Paste on selection needs Device Control and Data Access permission. Open System Settings from the Permission tab to allow access.";
+"Use the Permission tab to grant %@ permission in System Settings." = "Use the Permission tab to grant %@ permission in System Settings.";
 "Hiragino Sans" = "Hiragino Sans";
 "History Cleared" = "History Cleared";
 "History Font" = "History Font";
@@ -270,7 +270,7 @@
 "Paste as Plain Text" = "Paste as Plain Text";
 "Kipple keeps the original formatting so you can choose either shortcut for each paste. Menu and mouse paste use the clipboard’s current format." = "Kipple keeps the original formatting so you can choose either shortcut for each paste. Menu and mouse paste use the clipboard’s current format.";
 "Could not reserve ⌘V to switch paste formatting. Check for a conflicting shortcut in another app." = "Could not reserve ⌘V to switch paste formatting. Check for a conflicting shortcut in another app.";
-"Allow Device Control and Data Access to configure and use paste shortcuts." = "Allow Device Control and Data Access to configure and use paste shortcuts.";
+"Allow %@ to configure and use paste shortcuts." = "Allow %@ to configure and use paste shortcuts.";
 "Open Permission Settings" = "Open Permission Settings";
 "Click the shortcut field to change it. Clear disables the shortcut." = "Click the shortcut field to change it. Clear disables the shortcut.";
 "Include Command, Control, or Option in the shortcut." = "Include Command, Control, or Option in the shortcut.";
@@ -279,12 +279,13 @@
 "The paste shortcut is unavailable. Check for a conflicting shortcut in another app." = "The paste shortcut is unavailable. Check for a conflicting shortcut in another app.";
 "Screen & System Audio Recording" = "Screen & System Audio Recording";
 "Device Control and Data Access" = "Device Control and Data Access";
+"Accessibility" = "Accessibility";
 "Screen text capture and source window names" = "Screen text capture and source window names";
 "Without permission, screen text capture is unavailable and source window names may be missing." = "Without permission, screen text capture is unavailable and source window names may be missing.";
 "Kipple captures still images for OCR and reads source window names. It does not record audio." = "Kipple captures still images for OCR and reads source window names. It does not record audio.";
 "1. Use the button above and follow the macOS prompt to System Settings." = "1. Use the button above and follow the macOS prompt to System Settings.";
 "2. In System Settings → Privacy & Security → Screen & System Audio Recording, enable “Kipple”." = "2. In System Settings → Privacy & Security → Screen & System Audio Recording, enable “Kipple”.";
-"2. In System Settings → Privacy & Security → Device Control and Data Access, enable “Kipple”." = "2. In System Settings → Privacy & Security → Device Control and Data Access, enable “Kipple”.";
+"2. In System Settings → Privacy & Security → %@, enable “Kipple”." = "2. In System Settings → Privacy & Security → %@, enable “Kipple”.";
 "Input Monitoring permission is not required for queue paste or global shortcuts." = "Input Monitoring permission is not required for queue paste or global shortcuts.";
 "3. Return to Kipple to check the permission status." = "3. Return to Kipple to check the permission status.";
 "If macOS requests a restart or the status remains Not Granted, quit and reopen Kipple." = "If macOS requests a restart or the status remains Not Granted, quit and reopen Kipple.";

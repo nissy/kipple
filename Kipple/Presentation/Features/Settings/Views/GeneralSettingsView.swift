@@ -150,7 +150,7 @@ struct GeneralSettingsView: View {
             )
             .disabled(!plainTextHotkey.hasAccessibilityPermission || plainTextHotkey.shortcut == .disabled)
             if !plainTextHotkey.hasAccessibilityPermission {
-                Text("Allow Device Control and Data Access to configure and use paste shortcuts.")
+                Text(plainTextHotkeyErrorMessage(.permissionRequired))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -192,7 +192,7 @@ struct GeneralSettingsView: View {
     private func plainTextHotkeyErrorMessage(_ error: PlainTextPasteHotkey.ConfigurationError) -> LocalizedStringKey {
         switch error {
         case .permissionRequired:
-            "Allow Device Control and Data Access to configure and use paste shortcuts."
+            "Allow \(Text(AccessibilityPermissionLabel.title)) to configure and use paste shortcuts."
         case .modifierRequired:
             "Include Command, Control, or Option in the shortcut."
         case .shortcutUnavailable:
