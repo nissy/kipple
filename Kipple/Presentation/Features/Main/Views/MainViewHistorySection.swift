@@ -15,10 +15,11 @@ struct MainViewHistorySection: View {
     @Binding var selectedHistoryItem: ClipItem?
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
+    let highlightRequest: HistoryHighlightRequest?
+    let onHighlightFinished: (UUID) -> Void
     let onSelectItem: (ClipItem) -> Void
     let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: (ClipItem) -> Void
-    let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     // 追加: ユーザカテゴリ変更/管理
     let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
@@ -28,8 +29,6 @@ struct MainViewHistorySection: View {
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
     let isLoadingMore: Bool
-    let isPinnedFilterActive: Bool
-    let onTogglePinnedFilter: () -> Void
     let pasteMode: MainViewModel.PasteMode
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
@@ -47,10 +46,11 @@ struct MainViewHistorySection: View {
         selectedHistoryItem: Binding<ClipItem?>,
         copyScrollRequest: Binding<HistoryCopyScrollRequest?>,
         hoverResetRequest: Binding<HistoryHoverResetRequest?>,
+        highlightRequest: HistoryHighlightRequest?,
+        onHighlightFinished: @escaping (UUID) -> Void,
         onSelectItem: @escaping (ClipItem) -> Void,
         onOpenItem: ((ClipItem) -> Void)? = nil,
         onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
-        onTogglePin: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
         onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)? = nil,
         onOpenCategoryManager: (() -> Void)? = nil,
@@ -59,8 +59,6 @@ struct MainViewHistorySection: View {
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
         isLoadingMore: Bool,
-        isPinnedFilterActive: Bool,
-        onTogglePinnedFilter: @escaping () -> Void,
         pasteMode: MainViewModel.PasteMode,
         queueBadgeProvider: @escaping (ClipItem) -> Int?,
         queueSelectionPreview: Set<UUID>,
@@ -75,10 +73,11 @@ struct MainViewHistorySection: View {
         self._selectedHistoryItem = selectedHistoryItem
         self._copyScrollRequest = copyScrollRequest
         self._hoverResetRequest = hoverResetRequest
+        self.highlightRequest = highlightRequest
+        self.onHighlightFinished = onHighlightFinished
         self.onSelectItem = onSelectItem
         self.onOpenItem = onOpenItem
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
-        self.onTogglePin = onTogglePin
         self.onDelete = onDelete
         self.onChangeUserCategory = onChangeUserCategory
         self.onOpenCategoryManager = onOpenCategoryManager
@@ -87,8 +86,6 @@ struct MainViewHistorySection: View {
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
         self.isLoadingMore = isLoadingMore
-        self.isPinnedFilterActive = isPinnedFilterActive
-        self.onTogglePinnedFilter = onTogglePinnedFilter
         self.pasteMode = pasteMode
         self.queueBadgeProvider = queueBadgeProvider
         self.queueSelectionPreview = queueSelectionPreview
@@ -100,7 +97,8 @@ struct MainViewHistorySection: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: MainViewMetrics.HistoryFilterSidebar.contentSpacing) {
-            filterSidebar
+            CategoryFilterControl(selection: $categoryFilter, onOpenManager: onOpenCategoryManager)
+                .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
 
             VStack(spacing: 0) {
                 historyToolbar
@@ -109,21 +107,6 @@ struct MainViewHistorySection: View {
         }
         .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
         .padding(.vertical, 6)
-    }
-
-    private var filterSidebar: some View {
-        VStack(spacing: 0) {
-            HistoryFilterButton(
-                systemName: isPinnedFilterActive ? "pin.fill" : "pin",
-                label: Text("Pinned only"),
-                isActive: isPinnedFilterActive,
-                iconFont: MainViewMetrics.HistoryFilterIcon.pinnedFont,
-                rotation: .degrees(isPinnedFilterActive ? 0 : -45),
-                action: onTogglePinnedFilter
-            )
-            CategoryFilterControl(selection: $categoryFilter, onOpenManager: onOpenCategoryManager)
-        }
-        .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
     }
 
     private var historyToolbar: some View {
@@ -145,7 +128,6 @@ struct MainViewHistorySection: View {
             pasteMode: pasteMode,
             historyFont: Font(fontManager.historyFont),
             onSelectItem: onSelectItem,
-            onTogglePin: onTogglePin,
             onDelete: onDelete,
             onChangeUserCategory: onChangeUserCategory,
             onOpenCategoryManager: onOpenCategoryManager,
@@ -157,6 +139,8 @@ struct MainViewHistorySection: View {
             canScrollToTop: $canScrollToTop,
             copyScrollRequest: $copyScrollRequest,
             hoverResetRequest: $hoverResetRequest,
+            highlightRequest: highlightRequest,
+            onHighlightFinished: onHighlightFinished,
             queueReorder: queueReorder
         )
     }

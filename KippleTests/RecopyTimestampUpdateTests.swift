@@ -23,13 +23,13 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         viewModel = MainViewModel(clipboardService: adapter)
 
         await service.resetForTesting()
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
     }
 
     override func tearDown() async throws {
         // Clean up
         await service.resetForTesting()
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
 
         service = nil
         adapter = nil
@@ -169,37 +169,37 @@ final class RecopyTimestampUpdateTests: XCTestCase {
         }
     }
 
-    func testTimestampUpdateWithPinnedItems() async throws {
-        // Given: Mix of pinned and unpinned items with old timestamps
-        var pinnedItem = ClipItem(content: "Pinned Old")
-        pinnedItem.timestamp = Date().addingTimeInterval(-7200) // 2 hours ago
-        pinnedItem.isPinned = true
+    func testTimestampUpdateWithCategorizedItems() async throws {
+        // Given: Mix of categorized and uncategorized items with old timestamps
+        var categorizedItem = ClipItem(content: "Categorized Old")
+        categorizedItem.timestamp = Date().addingTimeInterval(-7200) // 2 hours ago
+        categorizedItem.setCategory(savedHistoryCategoryID, enabled: true)
 
-        var unpinnedItem = ClipItem(content: "Unpinned Old")
-        unpinnedItem.timestamp = Date().addingTimeInterval(-3600) // 1 hour ago
+        var uncategorizedItem = ClipItem(content: "Uncategorized Old")
+        uncategorizedItem.timestamp = Date().addingTimeInterval(-3600) // 1 hour ago
 
-        await service.recopyFromHistory(pinnedItem)
-        await service.recopyFromHistory(unpinnedItem)
+        await service.recopyFromHistory(categorizedItem)
+        await service.recopyFromHistory(uncategorizedItem)
         await service.flushPendingSaves()
 
-        // When: Recopy pinned item
+        // When: Recopy categorized item
         let beforeRecopy = Date()
-        viewModel.selectHistoryItem(pinnedItem)
+        viewModel.selectHistoryItem(categorizedItem)
         try await Task.sleep(nanoseconds: 150_000_000)
 
         var history: [ClipItem] = []
         for _ in 0..<10 {
             await service.flushPendingSaves()
             history = await service.getHistory()
-            if history.first?.content == "Pinned Old" {
+            if history.first?.content == "Categorized Old" {
                 break
             }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
 
         XCTAssertFalse(history.isEmpty)
-        XCTAssertEqual(history[0].content, "Pinned Old")
-        XCTAssertTrue(history[0].isPinned, "Should remain pinned")
+        XCTAssertEqual(history[0].content, "Categorized Old")
+        XCTAssertTrue(history[0].hasCustomCategory, "Should remain categorized")
         XCTAssertTrue(history[0].timestamp >= beforeRecopy, "Timestamp should be updated")
     }
 

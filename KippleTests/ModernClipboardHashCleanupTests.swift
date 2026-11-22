@@ -16,7 +16,7 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
         await service.stopMonitoring()
 
         // Clear history completely before each test
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.flushPendingSaves()
 
         // Wait a bit for everything to settle
@@ -24,7 +24,7 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         await service.flushPendingSaves()
         try await super.tearDown()
     }
@@ -98,50 +98,50 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
 
     /// Test that cleared items can be re-added
     func testClearAllHistoryAllowsReAdd() async throws {
-        // Given: Add items (mix of pinned and unpinned)
-        let unpinnedContent = "Unpinned item"
-        let pinnedContent = "Pinned item"
+        // Given: Add items (mix of categorized and uncategorized)
+        let uncategorizedContent = "Uncategorized item"
+        let categorizedContent = "Categorized item"
 
-        await service.copyToClipboard(unpinnedContent, fromEditor: false)
-        await service.copyToClipboard(pinnedContent, fromEditor: false)
+        await service.copyToClipboard(uncategorizedContent, fromEditor: false)
+        await service.copyToClipboard(categorizedContent, fromEditor: false)
 
-        // Pin one item
+        // Categorize one item
         var history = await service.getHistory()
-        if let pinnedItem = history.first(where: { $0.content == pinnedContent }) {
-            _ = await service.togglePin(for: pinnedItem)
+        if let categorizedItem = history.first(where: { $0.content == categorizedContent }) {
+            try await service.setCategory(itemID: categorizedItem.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
-        // When: Clear all history (keeps pinned)
-        await service.clearAllHistory()
+        // When: Clear all history (keeps categorized)
+        await service.clearHistory(keepingCategories: true)
 
-        // Then: Unpinned item can be re-added
-        await service.copyToClipboard(unpinnedContent, fromEditor: false)
+        // Then: Uncategorized item can be re-added
+        await service.copyToClipboard(uncategorizedContent, fromEditor: false)
 
         history = await service.getHistory()
-        XCTAssertTrue(history.contains { $0.content == unpinnedContent },
-                     "Should be able to re-add cleared unpinned content")
-        XCTAssertTrue(history.contains { $0.content == pinnedContent },
-                     "Pinned content should remain")
+        XCTAssertTrue(history.contains { $0.content == uncategorizedContent },
+                     "Should be able to re-add cleared uncategorized content")
+        XCTAssertTrue(history.contains { $0.content == categorizedContent },
+                     "Categorized content should remain")
     }
 
-    /// Test clearHistory with keepPinned
-    func testClearHistoryKeepPinnedAllowsReAdd() async throws {
+    /// Test clearHistory with keepingCategories
+    func testClearHistoryKeepingCategoriesAllowsReAdd() async throws {
         // Given: Add multiple items
         let contents = ["Item1", "Item2", "Item3"]
         for content in contents {
             await service.copyToClipboard(content, fromEditor: false)
         }
 
-        // Pin the first item
+        // Categorize the first item
         var history = await service.getHistory()
         if let firstItem = history.first(where: { $0.content == "Item1" }) {
-            _ = await service.togglePin(for: firstItem)
+            try await service.setCategory(itemID: firstItem.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
-        // When: Clear history keeping pinned
-        await service.clearHistory(keepPinned: true)
+        // When: Clear history keeping categorized
+        await service.clearHistory(keepingCategories: true)
 
-        // Then: Can re-add unpinned items
+        // Then: Can re-add uncategorized items
         await service.copyToClipboard("Item2", fromEditor: false)
         await service.copyToClipboard("Item3", fromEditor: false)
 
@@ -150,23 +150,23 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
                      "Should be able to re-add Item2")
         XCTAssertTrue(history.contains { $0.content == "Item3" },
                      "Should be able to re-add Item3")
-        XCTAssertTrue(history.contains { $0.content == "Item1" && $0.isPinned },
-                     "Item1 should remain pinned")
+        XCTAssertTrue(history.contains { $0.content == "Item1" && $0.hasCustomCategory },
+                     "Item1 should remain categorized")
     }
 
-    /// Test clearHistory without keeping pinned
-    func testClearHistoryNoKeepPinnedAllowsReAdd() async throws {
-        // Given: Add and pin an item
-        let testContent = "Pinned to be cleared"
+    /// Test clearHistory without keeping categorized
+    func testClearHistoryNoKeepingCategoriesAllowsReAdd() async throws {
+        // Given: Add and categorize an item
+        let testContent = "Categorized to be cleared"
         await service.copyToClipboard(testContent, fromEditor: false)
 
         var history = await service.getHistory()
         if let item = history.first {
-            _ = await service.togglePin(for: item)
+            try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
-        // When: Clear history not keeping pinned
-        await service.clearHistory(keepPinned: false)
+        // When: Clear history not keeping categorized
+        await service.clearHistory(keepingCategories: false)
 
         // Then: Can re-add the same content
         await service.copyToClipboard(testContent, fromEditor: false)
@@ -174,8 +174,8 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
         history = await service.getHistory()
         XCTAssertEqual(history.count, 1)
         XCTAssertEqual(history.first?.content, testContent)
-        XCTAssertFalse(history.first?.isPinned ?? true,
-                      "Re-added content should not be pinned")
+        XCTAssertFalse(history.first?.hasCustomCategory ?? true,
+                      "Re-added content should not be categorized")
     }
 
     // MARK: - Update Item Tests
@@ -198,7 +198,6 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
             id: item.id,
             content: updatedContent,
             timestamp: item.timestamp,
-            isPinned: item.isPinned,
             kind: item.kind,
             sourceApp: item.sourceApp,
             windowTitle: item.windowTitle,
@@ -282,10 +281,9 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
         }
     }
 
-    /// Test interaction between delete and pin
-    func testDeletePinnedItemAllowsReAdd() async throws {
-        // Given: Add and pin an item
-        let testContent = "Pinned then deleted"
+    func testDeleteAfterRemovingLastCustomCategoryAllowsReAdd() async throws {
+        // Given: Add and categorize an item
+        let testContent = "Categorized then deleted"
         await service.copyToClipboard(testContent, fromEditor: false)
 
         var history = await service.getHistory()
@@ -294,20 +292,26 @@ final class ModernClipboardHashCleanupTests: XCTestCase {
             return
         }
 
-        // Pin it
-        _ = await service.togglePin(for: item)
+        // Assign the category
+        try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
+        history = await service.getHistory()
+        let categorizedItem = try XCTUnwrap(history.first)
+        XCTAssertTrue(categorizedItem.hasCustomCategory)
 
-        // When: Delete the pinned item
-        await service.deleteItem(item)
+        try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: false)
+        await service.deleteItem(categorizedItem)
+        history = await service.getHistory()
+        XCTAssertTrue(history.isEmpty)
 
         // Then: Can re-add the same content
         await service.copyToClipboard(testContent, fromEditor: false)
 
         history = await service.getHistory()
         XCTAssertEqual(history.count, 1)
+        XCTAssertNotEqual(history.first?.id, item.id)
         XCTAssertEqual(history.first?.content, testContent)
-        XCTAssertFalse(history.first?.isPinned ?? true,
-                      "Re-added item should not be pinned")
+        XCTAssertFalse(history.first?.hasCustomCategory ?? true,
+                      "Re-added item should not be categorized")
     }
 
     /// Test that hash cleanup doesn't affect other operations

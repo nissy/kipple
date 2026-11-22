@@ -210,7 +210,7 @@ final class MainViewModelSaveEditorTests: XCTestCase {
     private func prepareAdapterBackedViewModel(sourceText: String) async throws -> ModernClipboardServiceAdapter {
         let adapter = ModernClipboardServiceAdapter.shared
         await ModernClipboardService.shared.resetForTesting()
-        await adapter.clearHistory(keepPinned: false)
+        await adapter.clearHistory(keepingCategories: false)
         adapter.copyToClipboard(sourceText, fromEditor: false)
         await refreshAdapterBackedClipboardState(adapter)
         viewModel = MainViewModel(clipboardService: adapter)

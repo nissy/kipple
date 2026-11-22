@@ -16,9 +16,8 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
 
         // Setup services
         clipboardService = ModernClipboardService.shared
-        await clipboardService.clearAllHistory()
-        await clipboardService.clearHistory(keepPinned: false)
-        AppSettings.shared.maxPinnedItems = 20
+        await clipboardService.useCategoryStoreFixture()
+        await clipboardService.clearHistory(keepingCategories: false)
 
         // Setup repository
         let schema = Schema([ClipItemModel.self])
@@ -36,8 +35,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
 
     override func tearDown() async throws {
         await clipboardService.stopMonitoring()
-        await clipboardService.clearAllHistory()
-        await clipboardService.clearHistory(keepPinned: false)
+        await clipboardService.clearHistory(keepingCategories: false)
         repository = nil
         container = nil
         cancellables.removeAll()
@@ -64,10 +62,9 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(history[1].content, "Second item")
         XCTAssertTrue(history[1].isFromEditor ?? false)
 
-        // 4. Pin an item
-        let itemToPin = history[1]
-        let isPinned = await clipboardService.togglePin(for: itemToPin)
-        XCTAssertTrue(isPinned)
+        // 4. Categorize an item
+        let itemToCategorize = history[1]
+        try await clipboardService.setCategory(itemID: itemToCategorize.id, categoryID: savedHistoryCategoryID, enabled: true)
 
         // 5. Save to repository
         try await repository.save(history)
@@ -79,11 +76,11 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(searchResults.count, 1)
         XCTAssertEqual(searchResults.first?.content, "Second item")
 
-        // 7. Clear history keeping pinned
-        await clipboardService.clearHistory(keepPinned: true)
+        // 7. Clear history keeping categorized
+        await clipboardService.clearHistory(keepingCategories: true)
         let remainingHistory = await clipboardService.getHistory()
         XCTAssertEqual(remainingHistory.count, 1)
-        XCTAssertTrue(remainingHistory.first?.isPinned ?? false)
+        XCTAssertTrue(remainingHistory.first?.hasCustomCategory ?? false)
 
         // 8. Stop monitoring
         await clipboardService.stopMonitoring()
@@ -94,9 +91,9 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
     func testDataPersistenceWorkflow() async throws {
         // 1. Create test data
         let testItems = [
-            ClipItem(content: "Persistent 1", isPinned: false),
-            ClipItem(content: "Persistent 2", isPinned: false),
-            ClipItem(content: "Persistent 3", isPinned: false)
+            ClipItem(content: "Persistent 1"),
+            ClipItem(content: "Persistent 2"),
+            ClipItem(content: "Persistent 3")
         ]
 
         // 2. Save to repository
@@ -111,7 +108,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         // Create new item with updated values since ClipItem is immutable
         let updatedItem = ClipItem(
             content: "Updated content",
-            isPinned: true
+            userCategoryId: savedHistoryCategoryID
         )
         // Delete old and save new to simulate update
         try await repository.delete(itemToUpdate)
@@ -122,7 +119,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         let verifiedItem = updatedItems.first { $0.content == "Updated content" }
         XCTAssertNotNil(verifiedItem)
         XCTAssertEqual(verifiedItem?.content, "Updated content")
-        XCTAssertTrue(verifiedItem?.isPinned ?? false)
+        XCTAssertTrue(verifiedItem?.hasCustomCategory ?? false)
 
         // 6. Delete an item
         if let itemToDelete = updatedItems.last {
@@ -133,10 +130,10 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         let finalItems = try await repository.loadAll()
         XCTAssertEqual(finalItems.count, 2)
 
-        // 8. Clear keeping pinned
-        try await repository.clear(keepPinned: true)
-        let pinnedItems = try await repository.loadPinned()
-        XCTAssertEqual(pinnedItems.count, 1) // Updated content is pinned
+        // 8. Clear keeping categorized
+        try await repository.replaceAll(with: repository.loadCategorized())
+        let categorizedItems = try await repository.loadCategorized()
+        XCTAssertEqual(categorizedItems.count, 1) // Updated content is categorized
     }
 
     func testHotkeyIntegrationWorkflow() async throws {
@@ -204,37 +201,36 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         }
     }
 
-    func testPinSynchronization() async throws {
+    func testCategorySynchronization() async throws {
         // Clear everything first to ensure clean state
-        await clipboardService.clearAllHistory()
+        await clipboardService.clearHistory(keepingCategories: true)
         try await repository.clear()
 
         // 1. Add items to clipboard
-        await clipboardService.copyToClipboard("Pin test 1", fromEditor: false)
-        await clipboardService.copyToClipboard("Pin test 2", fromEditor: false)
-        await clipboardService.copyToClipboard("Pin test 3", fromEditor: false)
+        await clipboardService.copyToClipboard("Category test 1", fromEditor: false)
+        await clipboardService.copyToClipboard("Category test 2", fromEditor: false)
+        await clipboardService.copyToClipboard("Category test 3", fromEditor: false)
 
-        // 2. Pin items in service
+        // 2. Assign the categoryems in service
         let history = await clipboardService.getHistory()
         for (index, item) in history[0...1].enumerated() {
-            let didPin = await clipboardService.togglePin(for: item)
-            XCTAssertTrue(didPin, "Toggle should succeed for item index \(index)")
+            try await clipboardService.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
             let snapshot = await clipboardService.getHistory()
-            let pinnedCount = snapshot.filter { $0.isPinned }.count
-            XCTAssertEqual(pinnedCount, index + 1)
+            let categorizedCount = snapshot.filter { $0.hasCustomCategory }.count
+            XCTAssertEqual(categorizedCount, index + 1)
         }
 
         // 3. Save to repository
-        let pinnedHistory = await clipboardService.getHistory()
-        XCTAssertEqual(pinnedHistory.filter { $0.isPinned }.count, 2)
-        try await repository.save(pinnedHistory)
+        let categorizedHistory = await clipboardService.getHistory()
+        XCTAssertEqual(categorizedHistory.filter { $0.hasCustomCategory }.count, 2)
+        try await repository.save(categorizedHistory)
 
-        // 4. Load pinned items from repository
-        let pinnedItems = try await repository.loadPinned()
+        // 4. Load categorized items from repository
+        let categorizedItems = try await repository.loadCategorized()
 
-        // 5. Verify pin state consistency
-        XCTAssertEqual(pinnedItems.count, 2)
-        XCTAssertTrue(pinnedItems.allSatisfy { $0.isPinned })
+        // 5. Verify category consistency
+        XCTAssertEqual(categorizedItems.count, 2)
+        XCTAssertTrue(categorizedItems.allSatisfy { $0.hasCustomCategory })
     }
 
     // MARK: - Concurrent Operations Tests
@@ -285,7 +281,7 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         await clipboardService.copyToClipboard("Before error", fromEditor: false)
 
         // 2. Attempt invalid operations
-        let invalidItem = ClipItem(content: "", isPinned: false)
+        let invalidItem = ClipItem(content: "")
         await clipboardService.deleteItem(invalidItem) // Delete non-existent item
 
         // 3. Verify service continues functioning
@@ -327,7 +323,6 @@ final class IntegrationTests: XCTestCase, @unchecked Sendable {
         // 4. Load from repository
         let loadedItems = try await repository.loadAll()
 
-        // 5. Pin operations - since ClipItem is immutable, we'll skip this
         // In real usage, pinning is handled by the service layer
 
         let elapsedTime = Date().timeIntervalSince(startTime)

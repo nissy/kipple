@@ -7,9 +7,9 @@
 import SwiftUI
 
 extension MainView {
-    // 履歴とピン留めセクションのコンテンツ
+    // 履歴セクションのコンテンツ
     @ViewBuilder
-    var historyAndPinnedContent: some View {
+    var historyContent: some View {
         let queueLoopToggleHandler: () -> Void = {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                 viewModel.toggleQueueRepetition()
@@ -24,6 +24,8 @@ extension MainView {
             selectedHistoryItem: $selectedHistoryItem,
             copyScrollRequest: $historyCopyScrollRequest,
             hoverResetRequest: $historyHoverResetRequest,
+            highlightRequest: viewModel.historyHighlightRequest,
+            onHighlightFinished: viewModel.finishHighlightingHistoryItem,
             onSelectItem: handleItemSelection,
             onOpenItem: { item in
                 guard item.isActionable else { return }
@@ -31,13 +33,6 @@ extension MainView {
             },
             onSplitEditorIntoHistory: { item in
                 splitHistoryItemIntoLines(item)
-            },
-            onTogglePin: { item in
-                let wasPinned = item.isPinned
-                let newState = viewModel.togglePinSync(for: item)
-                if !wasPinned && !newState {
-                    showCopiedNotification(.pinLimitReached)
-                }
             },
             onDelete: { item in
                 viewModel.deleteItemSync(item)
@@ -56,8 +51,6 @@ extension MainView {
             },
             hasMoreItems: viewModel.hasMoreHistory,
             isLoadingMore: viewModel.isLoadingMoreHistory,
-            isPinnedFilterActive: viewModel.isPinnedFilterActive,
-            onTogglePinnedFilter: { viewModel.togglePinnedFilter() },
             pasteMode: viewModel.pasteMode,
             queueBadgeProvider: viewModel.queueBadge(for:),
             queueSelectionPreview: viewModel.queueSelectionPreview,

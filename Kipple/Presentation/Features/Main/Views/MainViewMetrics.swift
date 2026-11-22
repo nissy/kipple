@@ -65,7 +65,6 @@ enum MainViewMetrics {
     enum HistoryFilterIcon {
         static let diameter: CGFloat = HistoryColumns.controlColumnWidth
         static let defaultFont: Font = .system(size: 10, weight: .medium)
-        static let pinnedFont: Font = .system(size: 10, weight: .medium)
     }
 
     enum HistoryQueueBadge {

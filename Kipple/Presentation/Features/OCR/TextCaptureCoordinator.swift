@@ -218,9 +218,9 @@ final class TextCaptureCoordinator {
             return
         }
 
-        let copied = await clipboardService.copyRecognizedText(trimmed)
+        let itemID = await clipboardService.copyRecognizedText(trimmed)
         guard !Task.isCancelled else { return }
-        guard copied else {
+        guard let itemID else {
             Logger.shared.error("Failed to copy recognized text to the clipboard.")
             presentErrorAlert(message: NSLocalizedString(
                 "Could not copy the recognized text. Please try again.",
@@ -229,7 +229,7 @@ final class TextCaptureCoordinator {
             return
         }
         windowManager.openMainWindow(preservingPosition: true)
-        windowManager.showCopiedNotification()
+        windowManager.highlightHistoryItem(itemID)
     }
 
     private func presentErrorAlert(message: String) {

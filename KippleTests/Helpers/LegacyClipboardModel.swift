@@ -47,12 +47,12 @@ enum LegacyClipboardSchema {
             self.metadataData = metadata.flatMap { try? JSONEncoder().encode($0) }
         }
     
-        convenience init(from clipItem: ClipItem) {
+        convenience init(from clipItem: ClipItem, isPinned: Bool = false) {
             self.init(
                 id: clipItem.id,
                 content: clipItem.content,
                 timestamp: clipItem.timestamp,
-                isPinned: clipItem.isPinned,
+                isPinned: isPinned,
                 kind: clipItem.kind,
                 appName: clipItem.sourceApp,
                 windowTitle: clipItem.windowTitle,
@@ -69,7 +69,6 @@ enum LegacyClipboardSchema {
                 id: id,
                 content: content,
                 timestamp: timestamp,
-                isPinned: isPinned,
                 kind: ClipItemKind(rawValue: kindRawValue) ?? .text,
                 sourceApp: appName,
                 windowTitle: windowTitle,

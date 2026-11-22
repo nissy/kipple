@@ -33,14 +33,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private struct PaginationFilterState: Equatable {
         let searchText: String
         let showOnlyURLs: Bool
-        let showOnlyPinned: Bool
         let categoryFilter: CategoryFilter
-        let isPinnedFilterActive: Bool
-    }
-
-    private struct HistoryLookupToken: Equatable {
-        let id: UUID
-        let isPinned: Bool
     }
 
     @Published var editorText: String
@@ -53,9 +46,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var serviceCancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
-    var pinnedItems: [ClipItem] = []
+    @Published private(set) var historyHighlightRequest: HistoryHighlightRequest?
     var filteredHistory: [ClipItem] = []
-    var pinnedHistory: [ClipItem] = []
     @Published var searchText: String = "" {
         didSet {
             // resetFiltersAfterCopy 等のフィルタ一括変更中は coalesce を schedule しない
@@ -66,18 +58,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     private var searchCoalesceTask: Task<Void, Never>?
     @Published var showOnlyURLs: Bool = false
-    @Published var showOnlyPinned: Bool = false {
-        didSet {
-            applyFilters()
-        }
-    }
     @Published var categoryFilter = CategoryFilter() {
         didSet { if !isFilterMutating { applyFilters() } }
     }
     @Published var categoryEditingItemID: UUID? {
         didSet { applyFilters() }
     }
-    @Published var isPinnedFilterActive: Bool = false
     @Published private(set) var pasteMode: PasteMode = .clipboard
     @Published private(set) var pasteQueue: [UUID] = []
     private(set) var pasteQueueEpoch: UInt64 = 0
@@ -118,8 +104,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
     private var historyIDByContent: [String: UUID] = [:]
-    private var latestPinnedHistorySnapshot: [ClipItem] = []
-    private var historyLookupTokens: [HistoryLookupToken] = []
+    private var historyLookupIDs: [UUID] = []
     private static let newlineSet = CharacterSet.newlines
 
     init(
@@ -175,24 +160,24 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private func subscribeToClipboardService() {
         if let modernService = clipboardService as? ModernClipboardServiceAdapter {
             bindModernService(modernService)
+            return
         }
 
         clipboardService.onHistoryChanged = { [weak self] item in
             guard let self else { return }
-            self.handleExternalHistoryUpdate(newTopID: item.id)
-            if !(self.clipboardService is ModernClipboardServiceAdapter) {
-                self.updateFilteredItems(self.clipboardService.history)
-            }
+            let items = self.clipboardService.history
+            self.handleExternalHistoryUpdate(items, newTopID: item.id)
+            self.updateFilteredItems(items)
         }
     }
 
-        private func bindModernService(_ service: ModernClipboardServiceAdapter) {
+    private func bindModernService(_ service: ModernClipboardServiceAdapter) {
         serviceCancellables.removeAll()
 
         service.$history
             .sink { [weak self] items in
                 guard let self = self else { return }
-                self.handleExternalHistoryUpdate(newTopID: items.first?.id)
+                self.handleExternalHistoryUpdate(items, newTopID: items.first?.id)
                 self.updateFilteredItems(items)
             }
             .store(in: &serviceCancellables)
@@ -209,6 +194,18 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         updateFilteredItems(items)
     }
 
+    func highlightHistoryItem(_ itemID: UUID) {
+        guard clipboardService.history.contains(where: { $0.id == itemID }) else { return }
+        historyHighlightRequest = HistoryHighlightRequest(itemID: itemID)
+        applyFilters(animated: false)
+    }
+
+    func finishHighlightingHistoryItem(_ requestID: UUID) {
+        guard historyHighlightRequest?.id == requestID else { return }
+        historyHighlightRequest = nil
+        applyFilters(animated: false)
+    }
+
     func copyToClipboard(_ item: ClipItem) {
         clipboardService.recopyFromHistory(item)
         applyHistoryItemToEditor(item)
@@ -216,22 +213,15 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         clearQueueAfterManualCopyIfNeeded()
     }
 
-    func clearHistory(keepPinned: Bool) async {
-        if keepPinned {
-            await clipboardService.clearHistory(keepPinned: true)
-        } else {
-            clipboardService.clearAllHistory()
-        }
+    @discardableResult
+    func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
+        let result = await clipboardService.clearHistory(keepingCategories: keepingCategories)
         loadHistory()
+        return result
     }
 
     func deleteItem(_ item: ClipItem) async {
         await clipboardService.deleteItem(item)
-        loadHistory()
-    }
-
-    func togglePin(for item: ClipItem) async {
-        _ = clipboardService.togglePin(for: item)
         loadHistory()
     }
 
@@ -270,25 +260,24 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let requireURLsOnly = showOnlyURLs
-        let requirePinnedOnly = showOnlyPinned || isPinnedFilterActive
+        let highlightedItemID = historyHighlightRequest?.itemID
 
         // Fast-path: no filters and no queue ordering → avoid O(n) filter
         let noFiltersActive = !hasSearchQuery &&
                               categoryFilter.ids.isEmpty &&
-                              !requireURLsOnly &&
-                              !requirePinnedOnly
+                              !requireURLsOnly
 
         let filteredStartedAt = PerformanceTrace.nowMicros()
         let filtered: [ClipItem]
         if noFiltersActive {
             filtered = items
         } else {
+            let queuedIDs = isQueueModeActive ? Set(pasteQueue) : []
             // 安価な判定（Bool/UUID 比較）で早期 return し、最後に expensive な
             // localizedCaseInsensitiveContains を評価して総コストを下げる
             filtered = items.filter { item in
-                if item.id == categoryEditingItemID { return true }
-                if requirePinnedOnly && !item.isPinned {
-                    return false
+                if queuedIDs.contains(item.id) || item.id == categoryEditingItemID || item.id == highlightedItemID {
+                    return true
                 }
                 if !categoryFilter.includes(item) { return false }
                 if requireURLsOnly && !item.categoryIDs.contains(BuiltInCategory.url) { return false }
@@ -301,31 +290,27 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let queueStartedAt = PerformanceTrace.nowMicros()
         let queueOrdered = applyQueueOrdering(to: filtered)
         let queueFinishedAt = PerformanceTrace.nowMicros()
-        let shouldPaginate = searchText.isEmpty && !isPinnedFilterActive && !showOnlyPinned
+        let shouldPaginate = searchText.isEmpty
         let paginationFilterState = PaginationFilterState(
             searchText: searchText,
             showOnlyURLs: showOnlyURLs,
-            showOnlyPinned: showOnlyPinned,
-            categoryFilter: categoryFilter,
-            isPinnedFilterActive: isPinnedFilterActive
+            categoryFilter: categoryFilter
         )
         let shouldResetPagination = lastPaginationFilterState != paginationFilterState || currentHistoryLimit == 0
-        let visibleLimit = shouldResetPagination ? pageSize : max(pageSize, currentHistoryLimit)
+        let pageLimit = shouldResetPagination ? pageSize : max(pageSize, currentHistoryLimit)
+        let highlightLimit = highlightedItemID.flatMap { id in queueOrdered.firstIndex { $0.id == id } }.map { $0 + 1 }
+        let visibleLimit = max(pageLimit, highlightLimit ?? 0)
         let newCurrentHistoryLimit = shouldPaginate ? min(visibleLimit, queueOrdered.count) : queueOrdered.count
         let newHistory = Array(queueOrdered.prefix(newCurrentHistoryLimit))
         let newHasMoreHistory = newHistory.count < queueOrdered.count
-        let newPinnedItems = isPinnedFilterActive ? queueOrdered : []
-        let newPinnedHistory = latestPinnedHistorySnapshot
 
         let applyState = { [self] in
-            pinnedHistory = newPinnedHistory
             filteredOrderingSnapshot = queueOrdered
             filteredHistory = queueOrdered
             currentHistoryLimit = newCurrentHistoryLimit
             lastPaginationFilterState = paginationFilterState
             history = newHistory
             hasMoreHistory = newHasMoreHistory
-            pinnedItems = newPinnedItems
             PerformanceTrace.event(
                 "viewmodel_history_published",
                 content: newHistory.first?.content,
@@ -352,35 +337,26 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         guard !historyLookupMatches(items) else { return }
 
         var lookup: [String: UUID] = [:]
-        var pinned: [ClipItem] = []
-        var tokens: [HistoryLookupToken] = []
+        var ids: [UUID] = []
         lookup.reserveCapacity(items.count)
-        pinned.reserveCapacity(pinnedHistory.count)
-        tokens.reserveCapacity(items.count)
+        ids.reserveCapacity(items.count)
         for item in items {
-            tokens.append(HistoryLookupToken(id: item.id, isPinned: item.isPinned))
+            ids.append(item.id)
             if lookup[item.content] == nil {
                 lookup[item.content] = item.id
             }
-            if item.isPinned {
-                pinned.append(item)
-            }
         }
         historyIDByContent = lookup
-        latestPinnedHistorySnapshot = pinned
-        historyLookupTokens = tokens
+        historyLookupIDs = ids
     }
 
     private func historyLookupMatches(_ items: [ClipItem]) -> Bool {
-        guard historyLookupTokens.count == items.count else {
+        guard historyLookupIDs.count == items.count else {
             return false
         }
 
-        for (index, item) in items.enumerated() {
-            let token = historyLookupTokens[index]
-            if token.id != item.id || token.isPinned != item.isPinned {
-                return false
-            }
+        for (index, item) in items.enumerated() where historyLookupIDs[index] != item.id {
+            return false
         }
         return true
     }
@@ -563,10 +539,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     
     // These are now async methods above, keeping for backward compatibility
-    func togglePinSync(for item: ClipItem) -> Bool {
-        return clipboardService.togglePin(for: item)
-    }
-
     func deleteItemSync(_ item: ClipItem) {
         clipboardService.deleteItem(item)
     }
@@ -650,12 +622,6 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         if category == .all { categoryFilter.ids = [] } else { categoryFilter.toggle(BuiltInCategory.url) }
     }
 
-    /// ピンフィルタの切り替え
-    func togglePinnedFilter() {
-        isPinnedFilterActive.toggle()
-        updateFilteredItems(clipboardService.history, animated: true)
-    }
-
     func toggleUserCategoryFilter(_ id: UUID) {
         categoryFilter.toggle(id)
     }
@@ -676,16 +642,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             showOnlyURLs = false
             didMutate = true
         }
-        if showOnlyPinned {
-            showOnlyPinned = false
-            didMutate = true
-        }
         if !categoryFilter.ids.isEmpty {
             categoryFilter.ids = []
-            didMutate = true
-        }
-        if isPinnedFilterActive {
-            isPinnedFilterActive = false
             didMutate = true
         }
 
@@ -713,7 +671,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             copyEpoch: (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch,
             pasteboardChangeCount: NSPasteboard.general.changeCount, mode: pasteMode,
             searchText: searchText, categoryFilter: categoryFilter,
-            filterFlags: [showOnlyURLs, showOnlyPinned, isPinnedFilterActive],
+            showOnlyURLs: showOnlyURLs,
             filteredIDs: filteredHistory.map(\.id)
         )
     }
@@ -908,6 +866,11 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
 
     func resetPasteQueue() {
         guard !pasteQueue.isEmpty || pasteMode != .clipboard else { return }
+        resetPasteQueueState()
+        updateFilteredItems(clipboardService.history)
+    }
+
+    private func resetPasteQueueState() {
         pasteQueueEpoch &+= 1
         pasteQueue = []
         pasteMode = .clipboard
@@ -917,7 +880,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         stopPasteMonitoring()
         pendingShiftSelection = []
         queueSelectionPreview = []
-        updateFilteredItems(clipboardService.history)
+        shiftSelectionInitialQueue = []
     }
 
     private let filterAnimationThreshold = 120
@@ -1137,15 +1100,32 @@ extension MainViewModel: PasteQueueCoordinating {
         }
     }
 
-    private func handleExternalHistoryUpdate(newTopID: UUID?) {
+    private func handleExternalHistoryUpdate(_ items: [ClipItem], newTopID: UUID?) {
         guard isQueueModeActive else {
             expectedQueueHeadID = nil
             return
         }
 
+        let availableIDs = Set(items.map(\.id))
+        pendingShiftSelection.removeAll { !availableIDs.contains($0.id) }
+        shiftSelectionInitialQueue.removeAll { !availableIDs.contains($0) }
+        if !queueSelectionPreview.isSubset(of: availableIDs) {
+            queueSelectionPreview.formIntersection(availableIDs)
+        }
+
         guard !pasteQueue.isEmpty else {
             expectedQueueHeadID = nil
             return
+        }
+
+        let remaining = pasteQueue.filter { availableIDs.contains($0) }
+        guard !remaining.isEmpty else {
+            resetPasteQueueState()
+            return
+        }
+        if remaining.count != pasteQueue.count {
+            pasteQueueEpoch &+= 1
+            pasteQueue = remaining
         }
 
         if let expected = expectedQueueHeadID {
@@ -1160,8 +1140,7 @@ extension MainViewModel: PasteQueueCoordinating {
             return
         }
 
-        expectedQueueHeadID = nil
-        resetPasteQueue()
+        resetPasteQueueState()
     }
 }
 // swiftlint:enable type_body_length file_length

@@ -19,13 +19,13 @@ final class ClipboardMonitoringDuplicateTests: XCTestCase {
         await service.resetForTesting()
 
         // Clear any existing data
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.stopMonitoring()
     }
 
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.stopMonitoring()
 
         service = nil

@@ -20,19 +20,16 @@ final class HistoryLimitTests: XCTestCase {
         await service.resetForTesting()
         adapter = ModernClipboardServiceAdapter.shared
 
-        // Clear any existing data (including pinned)
-        await service.clearAllHistory()
-        await service.clearHistory(keepPinned: false)
+        // Clear any existing data (including categorized)
+        await service.clearHistory(keepingCategories: false)
 
         // Reset to default settings
         AppSettings.shared.maxHistoryItems = 100
-        AppSettings.shared.maxPinnedItems = 20
     }
 
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
 
         service = nil
         adapter = nil
@@ -101,53 +98,53 @@ final class HistoryLimitTests: XCTestCase {
         XCTAssertLessThanOrEqual(history.count, 50)
     }
 
-    // MARK: - Pinned Items Priority
+    // MARK: - Categorized Items Priority
 
-    func testPinnedItemsPreservedWhenReducingLimit() async throws {
-        // Given: Mix of pinned and unpinned items
-        // Add 20 pinned items
+    func testCategorizedItemsPreservedWhenReducingLimit() async throws {
+        // Given: Mix of categorized and uncategorized items
+        // Add 20 categorized items
         for i in 1...20 {
-            await service.copyToClipboard("Pinned \(i)", fromEditor: false)
+            await service.copyToClipboard("Categorized \(i)", fromEditor: false)
             let history = await service.getHistory()
-            if let item = history.first(where: { $0.content == "Pinned \(i)" }) {
-                _ = await service.togglePin(for: item)
+            if let item = history.first(where: { $0.content == "Categorized \(i)" }) {
+                try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
             }
         }
 
-        // Add 40 unpinned items
+        // Add 40 uncategorized items
         for i in 1...40 {
-            await service.copyToClipboard("Unpinned \(i)", fromEditor: false)
+            await service.copyToClipboard("Uncategorized \(i)", fromEditor: false)
         }
 
-        // When: Reduce limit to 30 (less than total but more than pinned)
+        // When: Reduce limit to 30 (less than total but more than categorized)
         await service.setMaxHistoryItems(30)
 
-        // Then: All pinned items should be preserved
+        // Then: All categorized items should be preserved
         let history = await service.getHistory()
-        let pinnedItems = history.filter { $0.isPinned }
-        XCTAssertEqual(pinnedItems.count, 20)
-        XCTAssertLessThanOrEqual(history.count, 30)
+        let categorizedItems = history.filter { $0.hasCustomCategory }
+        XCTAssertEqual(categorizedItems.count, 20)
+        XCTAssertEqual(history.count - categorizedItems.count, 30)
     }
 
-    func testAllPinnedExceedingLimit() async throws {
-        // Given: 50 pinned items
+    func testAllCategorizedItemsAreRetainedOverTheLimit() async throws {
+        // Given: 50 categorized items
         for i in 1...50 {
-            await service.copyToClipboard("Pinned \(i)", fromEditor: false)
+            await service.copyToClipboard("Categorized \(i)", fromEditor: false)
             let history = await service.getHistory()
-            if let item = history.first(where: { $0.content == "Pinned \(i)" }) {
-                _ = await service.togglePin(for: item)
+            if let item = history.first(where: { $0.content == "Categorized \(i)" }) {
+                try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
             }
         }
 
         // When: Reduce limit to 30
         await service.setMaxHistoryItems(30)
 
-        // Then: Even pinned items should be trimmed to respect limit
+        // Then: Categorized items remain even when their count exceeds the limit.
         let history = await service.getHistory()
-        XCTAssertLessThanOrEqual(history.count, 30)
+        XCTAssertEqual(history.count, 50)
 
-        // Newest pinned items should be kept
-        XCTAssertTrue(history.contains { $0.content == "Pinned 50" })
+        // Newest categorized items should be kept
+        XCTAssertTrue(history.contains { $0.content == "Categorized 50" })
     }
 
     // MARK: - Repository Persistence
@@ -166,7 +163,7 @@ final class HistoryLimitTests: XCTestCase {
         AppSettings.shared.maxHistoryItems = 75
 
         // Force reload (simulate app restart)
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         try await Task.sleep(nanoseconds: 100_000_000)
 
         // Load from repository (this happens on init, we simulate it)

@@ -39,8 +39,7 @@ class SettingsBackupTests: XCTestCase {
     private let settingsKeys = [
         "filterCategoryURL",
         "filterCategoryNone",
-        "maxHistoryItems",
-        "maxPinnedItems"
+        "maxHistoryItems"
     ]
     
     override func setUp() {

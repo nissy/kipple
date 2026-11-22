@@ -49,6 +49,8 @@ struct CategoryManagerView: View {
 
             Text("URL, OCR and AI are automatic categories. You can change them on each item.")
                 .font(.caption).foregroundStyle(.secondary)
+            Text("Items in custom categories are kept when history is trimmed or cleared.")
+                .font(.caption).foregroundStyle(.secondary)
             Text("AI is added to items received through MCP.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("Deleting a category keeps the history and its other categories.")
@@ -222,7 +224,7 @@ private extension CategoryManagerView {
                         store.changeIcon(id: category.id, to: symbol)
                     } label: {
                         Label(symbol, systemImage: symbol)
-                            .labelStyle(.iconOnly)
+                            .labelStyle(.titleAndIcon)
                             .accessibilityLabel(Text(symbol))
                     }
                 }
@@ -272,7 +274,6 @@ private extension CategoryManagerView {
             do {
                 for category in categories {
                     try await ModernClipboardServiceAdapter.shared.removeCategoryDefinition(category.id)
-                    store.remove(id: category.id)
                 }
             } catch {
                 deletionError = true

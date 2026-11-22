@@ -62,6 +62,42 @@ final class MCPRegistrationTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(persisted.isEmpty)
     }
 
+    func testRegistrationKeepsCustomCategoryHistoryOutsideTheLimit() async throws {
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let service = ModernClipboardService(testRepository: repository)
+        let template = ClipItem(content: "Template")
+        let otherTemplate = ClipItem(content: "Other template")
+        try await repository.save([template, otherTemplate, ClipItem(content: "Ordinary history")])
+        await service.loadHistoryFromRepository()
+        let category = UUID()
+        try await service.setCategory(itemID: template.id, categoryID: category, enabled: true)
+        try await service.setCategory(itemID: otherTemplate.id, categoryID: category, enabled: true)
+        await service.setMaxHistoryItems(1)
+
+        let newItem = ClipItem(content: "New item")
+        let reused = ClipItem(content: template.content, metadata: ClipMetadata(source: .mcp))
+        let result = try await service.registerMCP([reused, newItem], record: receipt())
+
+        XCTAssertEqual(result.items.map(\.id), [template.id, newItem.id])
+        let saved = try await repository.loadAll()
+        XCTAssertEqual(Set(saved.map(\.id)), [template.id, otherTemplate.id, newItem.id])
+        XCTAssertEqual(saved.filter(\.hasCustomCategory).count, 2)
+    }
+
+    func testLargeSavedHistoryDoesNotUseTheMCPRequestBudget() throws {
+        let category = UUID()
+        let megabyte = String(repeating: "a", count: 1024 * 1024)
+        let saved = (1...65).map { index in
+            ClipItem(content: "\(index)\(megabyte)", userCategoryId: category)
+        }
+        let incoming = ClipItem(content: "Short text")
+
+        let mutation = try MCPHistoryMutation(items: [incoming], history: saved, capacity: 10)
+
+        XCTAssertEqual(mutation.registered.map(\.id), [incoming.id])
+        XCTAssertEqual(mutation.candidate.map(\.id), [incoming.id] + saved.map(\.id))
+    }
+
     func testTitleEditPersistsWithoutCopyingOrReorderingHistory() async throws {
         let repository = try SwiftDataRepository.make(inMemory: true)
         let service = ModernClipboardService(testRepository: repository)

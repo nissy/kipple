@@ -11,16 +11,13 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
         try await super.setUp()
         service = ModernClipboardService.shared
         await service.resetForTesting()
-        await service.clearAllHistory()
-        await service.clearHistory(keepPinned: false)
-        AppSettings.shared.maxPinnedItems = 20
+        await service.clearHistory(keepingCategories: false)
         cancellables.removeAll()
     }
 
     override func tearDown() async throws {
         await service.stopMonitoring()
-        await service.clearAllHistory()
-        await service.clearHistory(keepPinned: false)
+        await service.clearHistory(keepingCategories: false)
         cancellables.removeAll()
         service = nil
         try await super.tearDown()
@@ -124,59 +121,36 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
         await service.copyToClipboard("Item 2", fromEditor: false)
 
         // When
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
 
         // Then
         let history = await service.getHistory()
         XCTAssertTrue(history.isEmpty)
     }
 
-    func testClearHistoryKeepPinned() async throws {
+    func testClearHistoryKeepingCategories() async throws {
         // Given
-        await service.copyToClipboard("Unpinned", fromEditor: false)
-        await service.copyToClipboard("Pinned", fromEditor: false)
+        await service.copyToClipboard("Uncategorized", fromEditor: false)
+        await service.copyToClipboard("Categorized", fromEditor: false)
 
         let history = await service.getHistory()
-        if let pinnedItem = history.first(where: { $0.content == "Pinned" }) {
-            _ = await service.togglePin(for: pinnedItem)
+        if let categorizedItem = history.first(where: { $0.content == "Categorized" }) {
+            try await service.setCategory(itemID: categorizedItem.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
         // When
-        await service.clearHistory(keepPinned: true)
+        await service.clearHistory(keepingCategories: true)
 
         // Then
         let remainingHistory = await service.getHistory()
         XCTAssertEqual(remainingHistory.count, 1)
-        XCTAssertTrue(remainingHistory.first?.isPinned ?? false)
-        XCTAssertEqual(remainingHistory.first?.content, "Pinned")
+        XCTAssertTrue(remainingHistory.first?.hasCustomCategory ?? false)
+        XCTAssertEqual(remainingHistory.first?.content, "Categorized")
     }
 
-    // MARK: - Pin Management Tests
+    // MARK: - Category Management Tests
 
-    func testTogglePin() async throws {
-        // Given
-        await service.copyToClipboard("Test item", fromEditor: false)
-        let history = await service.getHistory()
-        let item = history.first!
-
-        // When - Pin item
-        let isPinnedAfterToggle = await service.togglePin(for: item)
-
-        // Then
-        XCTAssertTrue(isPinnedAfterToggle)
-
-        let updatedHistory = await service.getHistory()
-        let updatedItem = updatedHistory.first { $0.id == item.id }
-        XCTAssertTrue(updatedItem?.isPinned ?? false)
-
-        // When - Unpin item
-        let isPinnedAfterSecondToggle = await service.togglePin(for: item)
-
-        // Then
-        XCTAssertFalse(isPinnedAfterSecondToggle)
-    }
-
-    func testPinnedItemsOrder() async throws {
+    func testCategorizingItemsPreservesOrder() async throws {
         // Given
         await service.copyToClipboard("Item 1", fromEditor: false)
         await service.copyToClipboard("Item 2", fromEditor: false)
@@ -184,19 +158,20 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
 
         let history = await service.getHistory()
 
-        // When - Pin middle item
+        // When - Categorize the middle item
         if let item2 = history.first(where: { $0.content == "Item 2" }) {
-            _ = await service.togglePin(for: item2)
+            try await service.setCategory(itemID: item2.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
-        // Then - Pinned items should be at the top
+        // Then - Categorizing an item keeps its position.
         let updatedHistory = await service.getHistory()
-        let pinnedItems = updatedHistory.filter { $0.isPinned }
-        let unpinnedItems = updatedHistory.filter { !$0.isPinned }
+        let categorizedItems = updatedHistory.filter { $0.hasCustomCategory }
+        let uncategorizedItems = updatedHistory.filter { !$0.hasCustomCategory }
 
-        XCTAssertEqual(pinnedItems.count, 1)
-        XCTAssertEqual(pinnedItems.first?.content, "Item 2")
-        XCTAssertEqual(unpinnedItems.count, 2)
+        XCTAssertEqual(updatedHistory.map(\.id), history.map(\.id))
+        XCTAssertEqual(categorizedItems.count, 1)
+        XCTAssertEqual(categorizedItems.first?.content, "Item 2")
+        XCTAssertEqual(uncategorizedItems.count, 2)
     }
 
     // MARK: - Search Tests
@@ -255,7 +230,7 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
 
     func testDeleteNonExistentItem() async throws {
         // Given
-        let nonExistentItem = ClipItem(content: "Non-existent", isPinned: false)
+        let nonExistentItem = ClipItem(content: "Non-existent")
 
         // When
         await service.deleteItem(nonExistentItem)
@@ -273,16 +248,15 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
         let history = await service.getHistory()
         let item = history.first!
 
-        // When - Since updateItem expects an existing item, we'll test pin toggle instead
-        // which is the main update operation for ClipItem
-        _ = await service.togglePin(for: item)
+        // When - Edit the category on the existing item.
+        try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
 
         // Then
         let updatedHistory = await service.getHistory()
         let updatedItemInHistory = updatedHistory.first { $0.id == item.id }
         XCTAssertNotNil(updatedItemInHistory)
         XCTAssertEqual(updatedItemInHistory?.content, "Original")
-        XCTAssertTrue(updatedItemInHistory?.isPinned ?? false)
+        XCTAssertTrue(updatedItemInHistory?.hasCustomCategory ?? false)
     }
 
     // MARK: - Performance Tests
@@ -388,7 +362,7 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
         XCTAssertLessThanOrEqual(history.count, operations)
     }
 
-    func testConcurrentPinOperations() async throws {
+    func testConcurrentCategoryEdits() async throws {
         // Given - Use fromEditor: true to ensure items are added
         for i in 1...5 {
             await service.copyToClipboard("Item \(i)", fromEditor: true)
@@ -396,22 +370,21 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
 
         let history = await service.getHistory()
 
-        // When - Toggle pins concurrently
+        // When - Add a categorys concurrently
         let service = self.service!
-        await withTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for item in history {
                 group.addTask {
-                    _ = await service.togglePin(for: item)
+                    try await service.setCategory(itemID: item.id, categoryID: savedHistoryCategoryID, enabled: true)
                 }
             }
+            try await group.waitForAll()
         }
 
-        // Then - Items should have their pin state toggled
+        // Then - Items should have the category assigned
         let updatedHistory = await service.getHistory()
-        let pinnedCount = updatedHistory.filter { $0.isPinned }.count
-        // Note: If items start unpinned, they should be pinned after toggle
-        // The actual count depends on the initial state
-        XCTAssertGreaterThan(pinnedCount, 0, "At least some items should be pinned")
+        let categorizedCount = updatedHistory.filter { $0.hasCustomCategory }.count
+        XCTAssertEqual(categorizedCount, history.count)
     }
 
     // MARK: - State Consistency Tests
@@ -423,7 +396,7 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
 
         var history = await service.getHistory()
         if let firstItem = history.first {
-            _ = await service.togglePin(for: firstItem)
+            try await service.setCategory(itemID: firstItem.id, categoryID: savedHistoryCategoryID, enabled: true)
         }
 
         await service.copyToClipboard("Item 3", fromEditor: false)
@@ -438,7 +411,7 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
 
         // Then - Verify consistency
         XCTAssertEqual(finalHistory.count, 2)
-        XCTAssertTrue(finalHistory.contains { $0.isPinned })
+        XCTAssertTrue(finalHistory.contains { $0.hasCustomCategory })
         XCTAssertTrue(finalHistory.allSatisfy { !$0.content.isEmpty })
     }
 

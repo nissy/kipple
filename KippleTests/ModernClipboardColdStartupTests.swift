@@ -51,9 +51,9 @@ final class ModernClipboardColdStartupTests: XCTestCase {
 
     func testFailedInitialLoadRejectsCopyAndCanRecoverWithoutLosingSavedHistory() async throws {
         let repository = MockClipboardRepository()
-        var pinned = ClipItem(content: "Saved pinned item")
-        pinned.isPinned = true
-        await repository.configure(items: [pinned], loadDelay: 0)
+        var categorized = ClipItem(content: "Saved categorized item")
+        categorized.setCategory(savedHistoryCategoryID, enabled: true)
+        await repository.configure(items: [categorized], loadDelay: 0)
         await repository.failNextLoads(2)
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
@@ -65,13 +65,13 @@ final class ModernClipboardColdStartupTests: XCTestCase {
         XCTAssertTrue(partialHistory.isEmpty)
         await service.flushPendingSaves()
         let saved = try await repository.loadAll()
-        XCTAssertEqual(saved.map(\.id), [pinned.id])
+        XCTAssertEqual(saved.map(\.id), [categorized.id])
 
         let recovered = await service.copyToClipboard("OCR after recovery", fromEditor: false, source: .ocr) { true }
         XCTAssertTrue(recovered)
         let history = await service.getHistory()
         XCTAssertEqual(history.count, 2)
-        XCTAssertTrue(history.contains { $0.id == pinned.id })
+        XCTAssertTrue(history.contains { $0.id == categorized.id })
     }
 
     func testPasteboardWriteFailureIsReturnedWithoutAddingOCRHistory() async {

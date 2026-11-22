@@ -211,7 +211,7 @@ extension MainView {
     private var mainContent: some View {
         VStack(spacing: 0) {
             if appSettings.editorPosition == "disabled" {
-                historyAndPinnedContent
+                historyContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 // メインコンテンツ（分割ビュー）
@@ -226,14 +226,14 @@ extension MainView {
                         if appSettings.editorPosition == "top" {
                             editorSection
                         } else {
-                            historyAndPinnedContent
+                            historyContent
                         }
                     },
                     bottomContent: {
                         if appSettings.editorPosition == "bottom" {
                             editorSection
                         } else {
-                            historyAndPinnedContent
+                            historyContent
                         }
                     }
                 )
@@ -268,6 +268,9 @@ extension MainView {
         }
         .onReceive(NotificationCenter.default.publisher(for: .mainWindowDidHide)) { _ in
             viewModel.endClipboardEditingIfUnchanged()
+            if let highlight = viewModel.historyHighlightRequest {
+                viewModel.finishHighlightingHistoryItem(highlight.id)
+            }
             if historyCopyScrollRequest == nil { historyCopyScrollRequest = HistoryCopyScrollRequest() }
             historyHoverResetRequest = HistoryHoverResetRequest()
         }
@@ -382,9 +385,6 @@ extension MainView {
                 activePreventAutoCloseReasons.removeAll()
                 onSetPreventAutoClose?(false)
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .showCopiedNotification)) { _ in
-            showCopiedNotification(.copied)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             if ignoreNextAutoCloseAfterQueueFinish {

@@ -45,35 +45,8 @@ final class AppSettings: ObservableObject {
     
     // History Settings
     @AppStorage("maxHistoryItems") var maxHistoryItems = 300
-    @AppStorage("maxPinnedItems") var maxPinnedItems = 50
     @AppStorage("historySelectPaste") var historySelectPaste = false
-    @AppStorage("autoPinRepeatedCopyEnabled") var autoPinRepeatedCopyEnabled = true
 
-    @AppStorage("autoPinRepeatedCopyIntervalSeconds")
-    private var storedAutoPinRepeatedCopyIntervalSeconds = 5
-    @AppStorage("autoPinRepeatedCopyCount")
-    private var storedAutoPinRepeatedCopyCount = 3
-
-    var autoPinRepeatedCopyIntervalSeconds: Int {
-        get { Self.clamp(storedAutoPinRepeatedCopyIntervalSeconds, min: 3, max: 10) }
-        set {
-            let clamped = Self.clamp(newValue, min: 3, max: 10)
-            guard storedAutoPinRepeatedCopyIntervalSeconds != clamped else { return }
-            objectWillChange.send()
-            storedAutoPinRepeatedCopyIntervalSeconds = clamped
-        }
-    }
-
-    var autoPinRepeatedCopyCount: Int {
-        get { Self.clamp(storedAutoPinRepeatedCopyCount, min: 3, max: 20) }
-        set {
-            let clamped = Self.clamp(newValue, min: 3, max: 20)
-            guard storedAutoPinRepeatedCopyCount != clamped else { return }
-            objectWillChange.send()
-            storedAutoPinRepeatedCopyCount = clamped
-        }
-    }
-    
     // Hotkey Settings
     @AppStorage("enableHotkey") var enableHotkey: Bool = false  // デフォルトで無効
     @AppStorage("hotkeyKeyCode") var hotkeyKeyCode: Int = 0  // None by default
@@ -178,10 +151,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    private static func clamp(_ value: Int, min lowerBound: Int, max upperBound: Int) -> Int {
-        Swift.max(lowerBound, Swift.min(upperBound, value))
-    }
-    
     // Settings Keys for consistency
     struct Keys {
         static let windowHeight = "windowHeight"
@@ -191,10 +160,6 @@ final class AppSettings: ObservableObject {
         static let historySectionHeight = "historySectionHeight"
         static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"
-        static let maxPinnedItems = "maxPinnedItems"
-        static let autoPinRepeatedCopyEnabled = "autoPinRepeatedCopyEnabled"
-        static let autoPinRepeatedCopyIntervalSeconds = "autoPinRepeatedCopyIntervalSeconds"
-        static let autoPinRepeatedCopyCount = "autoPinRepeatedCopyCount"
         static let enableHotkey = "enableHotkey"
         static let hotkeyKeyCode = "hotkeyKeyCode"
         static let hotkeyModifierFlags = "hotkeyModifierFlags"

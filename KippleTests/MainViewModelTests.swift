@@ -375,19 +375,7 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(mockClipboardService.lastCopiedContent, viewModel.editorText)
     }
     
-    // MARK: - Pin Tests
-
-    func testTogglePin() async {
-        // Given
-        let item = ClipItem(content: "Pin Test", isPinned: false)
-
-        // When
-        await viewModel.togglePin(for: item)
-
-        // Then
-        XCTAssertTrue(mockClipboardService.togglePinCalled)
-        XCTAssertEqual(mockClipboardService.lastToggledItem?.id, item.id)
-    }
+    // MARK: - Category Tests
 
     // MARK: - Delete Tests
 
@@ -423,23 +411,6 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.editorText, initialEditorText)
     }
     
-    func testPinnedItemsUpdate() {
-        // Given
-        let unpinnedItem = ClipItem(content: "Unpinned", isPinned: false)
-        let pinnedItem = ClipItem(content: "Pinned", isPinned: true)
-        
-        // When
-        mockClipboardService.history = [unpinnedItem, pinnedItem]
-        
-        // ViewModelは内部でClipboardServiceの変更を監視している
-        // テストでは直接pinnedItemsプロパティを確認
-        let pinnedItems = mockClipboardService.pinnedItems
-        
-        // Then
-        XCTAssertEqual(pinnedItems.count, 1)
-        XCTAssertEqual(pinnedItems.first?.content, "Pinned")
-    }
-
     func testInitialPaginationShowsFirstPageOnly() {
         // Given
         mockClipboardService.history = (1...120).map { ClipItem(content: "Item \($0)") }
@@ -479,7 +450,7 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.history.count, 100)
 
         // When: ピン/カテゴリ変更など、フィルタ条件は変わらない履歴更新
-        items[79].isPinned = true
+        items[79].setCategory(savedHistoryCategoryID, enabled: true)
         mockClipboardService.history = items
         viewModel.updateFilteredItems(mockClipboardService.history)
 
@@ -618,7 +589,6 @@ class MainViewModelTests: XCTestCase {
         measure {
             mockClipboardService.history = items
             _ = viewModel.history
-            _ = viewModel.pinnedItems
         }
     }
 }

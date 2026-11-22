@@ -37,7 +37,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
     var id: UUID
     let content: String
     var timestamp: Date
-    var isPinned: Bool
     let kind: ClipItemKind
     let sourceApp: String?
     let windowTitle: String?
@@ -99,7 +98,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     init(
         content: String,
-        isPinned: Bool = false,
         kind: ClipItemKind = .text,
         sourceApp: String? = nil,
         windowTitle: String? = nil,
@@ -113,7 +111,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.id = UUID()
         self.content = content
         self.timestamp = Date()
-        self.isPinned = isPinned
         self.kind = kind
         self.sourceApp = sourceApp
         self.windowTitle = windowTitle
@@ -129,7 +126,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
         id: UUID,
         content: String,
         timestamp: Date,
-        isPinned: Bool,
         kind: ClipItemKind,
         sourceApp: String?,
         windowTitle: String?,
@@ -143,7 +139,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
         self.id = id
         self.content = content
         self.timestamp = timestamp
-        self.isPinned = isPinned
         self.kind = kind
         self.sourceApp = sourceApp
         self.windowTitle = windowTitle
@@ -158,7 +153,6 @@ struct ClipItem: Identifiable, Codable, Equatable {
     static func == (lhs: ClipItem, rhs: ClipItem) -> Bool {
         lhs.id == rhs.id &&
         lhs.content == rhs.content &&
-        lhs.isPinned == rhs.isPinned &&
         lhs.timestamp == rhs.timestamp &&
         lhs.kind == rhs.kind &&
         lhs.sourceApp == rhs.sourceApp &&

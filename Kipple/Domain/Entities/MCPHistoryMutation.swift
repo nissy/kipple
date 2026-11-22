@@ -11,7 +11,6 @@ struct MCPHistoryMutation {
         for var item in items {
             if let previous = history.first(where: { $0.content == item.content }) {
                 item.id = previous.id
-                item.isPinned = previous.isPinned
                 item.userCategoryId = previous.userCategoryId
                 item.metadata = (item.metadata ?? ClipMetadata()).inheritingDetails(from: previous.metadata)
             }
@@ -26,13 +25,14 @@ struct MCPHistoryMutation {
         var seen = Set<UUID>()
         let unique = registered.filter { seen.insert($0.id).inserted }
         let remaining = history.filter { !seen.contains($0.id) }
-        let pinned = remaining.filter(\.isPinned)
-        guard unique.count + pinned.count <= capacity else { throw MCPFailure.capacity }
-        let available = capacity - unique.count - pinned.count
-        let retainedUnpinned = Set(remaining.filter { !$0.isPinned }.prefix(available).map(\.id))
-        let candidate = unique + remaining.filter { $0.isPinned || retainedUnpinned.contains($0.id) }
-        guard candidate.reduce(0, { $0 + $1.content.utf8.count }) <= 64 * 1024 * 1024 else {
-            throw MCPFailure.capacity
+        let registeredInLimit = unique.lazy.filter { !$0.hasCustomCategory }.count
+        var available = capacity - registeredInLimit
+        guard available >= 0 else { throw MCPFailure.capacity }
+        let candidate = unique + remaining.filter { item in
+            if item.hasCustomCategory { return true }
+            guard available > 0 else { return false }
+            available -= 1
+            return true
         }
         self.registered = registered
         self.candidate = candidate

@@ -19,7 +19,7 @@ final class ClipItemTests: XCTestCase {
         
         // Then
         XCTAssertEqual(item.content, content)
-        XCTAssertFalse(item.isPinned)
+        XCTAssertFalse(item.hasCustomCategory)
         XCTAssertNotNil(item.id)
         XCTAssertTrue(item.timestamp.timeIntervalSinceNow < 1)
     }
@@ -37,7 +37,7 @@ final class ClipItemTests: XCTestCase {
     func testClipItemCodable() throws {
         // Given
         var item = ClipItem(content: "Test content")
-        item.isPinned = true
+        item.setCategory(savedHistoryCategoryID, enabled: true)
         
         // When
         let encoded = try JSONEncoder().encode(item)
@@ -46,7 +46,7 @@ final class ClipItemTests: XCTestCase {
         // Then
         XCTAssertEqual(item.id, decoded.id)
         XCTAssertEqual(item.content, decoded.content)
-        XCTAssertEqual(item.isPinned, decoded.isPinned)
+        XCTAssertEqual(item.hasCustomCategory, decoded.hasCustomCategory)
         XCTAssertEqual(item.timestamp.timeIntervalSince1970, decoded.timestamp.timeIntervalSince1970, accuracy: 0.001)
     }
 }

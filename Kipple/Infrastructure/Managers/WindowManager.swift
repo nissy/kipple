@@ -91,11 +91,10 @@ private final class MainGlassContentController<Content: View>: NSViewController 
 @MainActor
 protocol WindowManaging: AnyObject {
     func openMainWindow(preservingPosition: Bool)
-    func showCopiedNotification()
+    func highlightHistoryItem(_ itemID: UUID)
 }
 
 extension Notification.Name {
-    static let showCopiedNotification = Notification.Name("showCopiedNotification")
     static let mainWindowDidBecomeKey = Notification.Name("KippleMainWindowDidBecomeKey")
     static let mainWindowDidResignKey = Notification.Name("KippleMainWindowDidResignKey")
     static let mainWindowDidHide = Notification.Name("KippleMainWindowDidHide")
@@ -886,12 +885,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
     // MARK: - Public Methods
 
     @MainActor
-    func showCopiedNotification() {
-        // MainViewにコピー通知を表示する
-        // ウィンドウが開いている場合のみ通知を送信
-        if mainWindow != nil {
-            NotificationCenter.default.post(name: .showCopiedNotification, object: nil)
-        }
+    func highlightHistoryItem(_ itemID: UUID) {
+        mainViewModel?.highlightHistoryItem(itemID)
     }
     
     // MARK: - Settings Window

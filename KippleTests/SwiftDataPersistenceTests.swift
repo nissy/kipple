@@ -22,9 +22,9 @@ final class SwiftDataPersistenceTests: XCTestCase {
     /// Test that deleted items don't resurrect after save and reload
     func testDeletedItemsDoNotResurrect() async throws {
         // Given: Add some items
-        let item1 = ClipItem(content: "Item 1", isPinned: false)
-        let item2 = ClipItem(content: "Item 2", isPinned: false)
-        let item3 = ClipItem(content: "Item 3", isPinned: false)
+        let item1 = ClipItem(content: "Item 1")
+        let item2 = ClipItem(content: "Item 2")
+        let item3 = ClipItem(content: "Item 3")
 
         var items = [item1, item2, item3]
         try await repository.replaceAll(with: items)
@@ -52,9 +52,9 @@ final class SwiftDataPersistenceTests: XCTestCase {
     func testClearHistoryRemovesItems() async throws {
         // Given: Add items
         let items = [
-            ClipItem(content: "Clear Test 1", isPinned: false),
-            ClipItem(content: "Clear Test 2", isPinned: false),
-            ClipItem(content: "Clear Test 3", isPinned: false)
+            ClipItem(content: "Clear Test 1"),
+            ClipItem(content: "Clear Test 2"),
+            ClipItem(content: "Clear Test 3")
         ]
         try await repository.save(items)
 
@@ -69,26 +69,26 @@ final class SwiftDataPersistenceTests: XCTestCase {
 
     // MARK: - Update Tests
 
-    /// Test that pin state changes persist
-    func testPinStateChangePersists() async throws {
-        // Given: Add an unpinned item
-        var item = ClipItem(content: "Pin Test", isPinned: false)
+    /// Test that category changes persist
+    func testCategoryChangePersists() async throws {
+        // Given: Add an uncategorized item
+        var item = ClipItem(content: "Category Test")
         try await repository.save([item])
 
         // Verify initial state
         var loaded = try await repository.loadAll()
         XCTAssertEqual(loaded.count, 1)
-        XCTAssertFalse(loaded.first!.isPinned, "Should be unpinned initially")
+        XCTAssertFalse(loaded.first!.hasCustomCategory, "Should be uncategorized initially")
 
-        // When: Toggle pin state and save
-        item.isPinned = true
+        // When: Add a category state and save
+        item.setCategory(savedHistoryCategoryID, enabled: true)
         try await repository.save([item])
 
-        // Then: Pin state should be updated
+        // Then: Category should be updated
         loaded = try await repository.loadAll()
         XCTAssertEqual(loaded.count, 1)
-        XCTAssertTrue(loaded.first!.isPinned,
-                     "Pin state change should persist")
+        XCTAssertTrue(loaded.first!.hasCustomCategory,
+                     "Category change should persist")
     }
 
     /// Test that metadata updates persist
@@ -96,7 +96,6 @@ final class SwiftDataPersistenceTests: XCTestCase {
         // Given: Add item with initial metadata
         let item = ClipItem(
             content: "Metadata Test",
-            isPinned: false,
             sourceApp: "Initial App",
             windowTitle: "Initial Window"
         )
@@ -107,13 +106,13 @@ final class SwiftDataPersistenceTests: XCTestCase {
             id: item.id,
             content: item.content,
             timestamp: item.timestamp,
-            isPinned: true,
             kind: item.kind,
             sourceApp: "Updated App",
             windowTitle: "Updated Window",
             bundleIdentifier: item.bundleIdentifier,
             processID: item.processID,
-            isFromEditor: item.isFromEditor
+            isFromEditor: item.isFromEditor,
+            userCategoryId: savedHistoryCategoryID
         )
         try await repository.save([updatedItem])
 
@@ -125,7 +124,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
                       "Source app should be updated")
         XCTAssertEqual(loadedItem.windowTitle, "Updated Window",
                       "Window title should be updated")
-        XCTAssertTrue(loadedItem.isPinned, "Pin state should be updated")
+        XCTAssertTrue(loadedItem.hasCustomCategory, "Category should be updated")
     }
 
     // MARK: - Mixed Operations Tests
@@ -133,15 +132,15 @@ final class SwiftDataPersistenceTests: XCTestCase {
     /// Test adding, updating, and deleting in a single save
     func testMixedOperations() async throws {
         // Given: Initial items
-        let item1 = ClipItem(content: "Keep", isPinned: false)
-        var item2 = ClipItem(content: "Update", isPinned: false)
-        let item3 = ClipItem(content: "Delete", isPinned: false)
+        let item1 = ClipItem(content: "Keep")
+        var item2 = ClipItem(content: "Update")
+        let item3 = ClipItem(content: "Delete")
 
         try await repository.save([item1, item2, item3])
 
         // When: Keep item1, update item2, delete item3, add item4
-        item2.isPinned = true
-        let item4 = ClipItem(content: "New", isPinned: true)
+        item2.setCategory(savedHistoryCategoryID, enabled: true)
+        let item4 = ClipItem(content: "New", userCategoryId: savedHistoryCategoryID)
 
         try await repository.replaceAll(with: [item1, item2, item4])
 
@@ -150,11 +149,11 @@ final class SwiftDataPersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.count, 3, "Should have 3 items")
 
         // Check item1 unchanged
-        XCTAssertTrue(loaded.contains { $0.id == item1.id && !$0.isPinned },
+        XCTAssertTrue(loaded.contains { $0.id == item1.id && !$0.hasCustomCategory },
                      "Item1 should be unchanged")
 
         // Check item2 updated
-        XCTAssertTrue(loaded.contains { $0.id == item2.id && $0.isPinned },
+        XCTAssertTrue(loaded.contains { $0.id == item2.id && $0.hasCustomCategory },
                      "Item2 should be updated")
 
         // Check item3 deleted
@@ -162,7 +161,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
                       "Item3 should be deleted")
 
         // Check item4 added
-        XCTAssertTrue(loaded.contains { $0.id == item4.id && $0.isPinned },
+        XCTAssertTrue(loaded.contains { $0.id == item4.id && $0.hasCustomCategory },
                      "Item4 should be added")
     }
 
@@ -171,7 +170,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
         // Given: Add 5 items
         var items: [ClipItem] = []
         for i in 1...5 {
-            items.append(ClipItem(content: "Item \(i)", isPinned: false))
+            items.append(ClipItem(content: "Item \(i)"))
         }
         try await repository.save(items)
 
@@ -198,8 +197,8 @@ final class SwiftDataPersistenceTests: XCTestCase {
     func testSaveEmptyArrayClearsAll() async throws {
         // Given: Repository with items
         let items = [
-            ClipItem(content: "Will be deleted 1", isPinned: false),
-            ClipItem(content: "Will be deleted 2", isPinned: false)
+            ClipItem(content: "Will be deleted 1"),
+            ClipItem(content: "Will be deleted 2")
         ]
         try await repository.save(items)
 
@@ -220,7 +219,6 @@ final class SwiftDataPersistenceTests: XCTestCase {
             id: id,
             content: "Original content",
             timestamp: Date(),
-            isPinned: false,
             kind: .text,
             sourceApp: nil,
             windowTitle: nil,
@@ -235,13 +233,13 @@ final class SwiftDataPersistenceTests: XCTestCase {
             id: id,
             content: "Updated content",
             timestamp: Date(),
-            isPinned: true,
             kind: .text,
             sourceApp: nil,
             windowTitle: nil,
             bundleIdentifier: nil,
             processID: nil,
-            isFromEditor: nil
+            isFromEditor: nil,
+            userCategoryId: savedHistoryCategoryID
         )
         try await repository.save([item2])
 
@@ -251,8 +249,8 @@ final class SwiftDataPersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.first?.id, id, "ID should remain the same")
         XCTAssertEqual(loaded.first?.content, "Updated content",
                       "Content should be updated")
-        XCTAssertTrue(loaded.first?.isPinned ?? false,
-                     "Pin state should be updated")
+        XCTAssertTrue(loaded.first?.hasCustomCategory ?? false,
+                     "Category should be updated")
     }
 
     /// Test rapid successive saves maintain consistency
@@ -262,7 +260,7 @@ final class SwiftDataPersistenceTests: XCTestCase {
 
         // When: Perform rapid operations
         for i in 1...10 {
-            let item = ClipItem(content: "Rapid \(i)", isPinned: false)
+            let item = ClipItem(content: "Rapid \(i)")
             items.append(item)
 
             // Keep only last 5 items

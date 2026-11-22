@@ -91,11 +91,11 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }
     }
 
-    func copyRecognizedText(_ content: String) async -> Bool {
-        guard !Task.isCancelled else { return false }
-        var copied = false
+    func copyRecognizedText(_ content: String) async -> UUID? {
+        guard !Task.isCancelled else { return nil }
+        var itemID: UUID?
         let task = enqueueClipboardOperation { [self] generation in
-            copied = await modernService.copyToClipboard(content, fromEditor: false, source: .ocr) {
+            itemID = await modernService.copyRecognizedText(content) {
                 await self.isCurrentOperation(generation) && !Task.isCancelled
             }
             await refreshHistory()
@@ -105,7 +105,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         } onCancel: {
             task.cancel()
         }
-        return copied && !Task.isCancelled
+        return Task.isCancelled ? nil : itemID
     }
 
     func performClipboardPaste(
@@ -159,53 +159,6 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         }.value
     }
 
-    func togglePin(for item: ClipItem) -> Bool {
-        // Find the item in current history
-        guard let index = history.firstIndex(where: { $0.id == item.id }) else {
-            // Item not in current history - should not happen in normal flow
-            Logger.shared.log("togglePin: Item not found in history", level: .warning)
-            return false
-        }
-
-        let currentlyPinned = history[index].isPinned
-
-        // If we're trying to pin (currently unpinned)
-        if !currentlyPinned {
-            // Check if we've reached the max pinned items limit
-            let currentPinnedCount = history.filter { $0.isPinned }.count
-            let maxPinnedItems = AppSettings.shared.maxPinnedItems
-
-            if currentPinnedCount >= maxPinnedItems {
-                // Exceeded limit, don't allow pinning
-                Logger.shared.log("Cannot pin item: Maximum pinned items limit (\(maxPinnedItems)) reached", level: .warning)
-                return false
-            }
-        }
-
-        // Update backend synchronously via Task and wait for result
-        history[index].isPinned.toggle()
-        let newState = history[index].isPinned
-
-        Task { [weak self] in
-            guard let self else { return }
-            let result = await self.modernService.togglePin(for: item)
-
-            if result != newState {
-                await MainActor.run {
-                    if let currentIndex = self.history.firstIndex(where: { $0.id == item.id }) {
-                        self.history[currentIndex].isPinned = result
-                    }
-                }
-            }
-
-            // Always refresh history to ensure consistency
-            await self.refreshHistory()
-        }
-
-        // Return expected new state (backend will be updated async)
-        return newState
-    }
-
     func deleteItem(_ item: ClipItem) {
         Task {
             await self.deleteItem(item)
@@ -217,28 +170,16 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await refreshHistory()
     }
 
-    func clearHistory(keepPinned: Bool) async {
-        await modernService.clearHistory(keepPinned: keepPinned)
+    @discardableResult
+    func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
+        let result = await modernService.clearHistory(keepingCategories: keepingCategories)
         await refreshHistory()
+        return result
     }
 
     func updateItem(_ item: ClipItem) async {
         await modernService.updateItem(item)
         await refreshHistory()
-    }
-
-    func clearAllHistory(keepPinned: Bool = false) {
-        Task {
-            await modernService.clearHistory(keepPinned: keepPinned)
-            await refreshHistory()
-        }
-    }
-
-    func clearAllHistory() {
-        Task {
-            await modernService.clearAllHistory()
-            await refreshHistory()
-        }
     }
 
     func flushPendingSaves() async {
@@ -405,16 +346,6 @@ extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     private func prepareForRecopy(of item: ClipItem) {
         pendingClipboardContent = item.content
         currentClipboardContent = pendingClipboardContent
-    }
-
-    /// Get pinned items from history
-    var pinnedItems: [ClipItem] {
-        history.filter { $0.isPinned }
-    }
-
-    /// Get unpinned items from history
-    var unpinnedItems: [ClipItem] {
-        history.filter { !$0.isPinned }
     }
 
     /// Check if monitoring is active

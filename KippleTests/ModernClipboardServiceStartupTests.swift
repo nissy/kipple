@@ -22,7 +22,6 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // Reset settings to defaults
         AppSettings.shared.maxHistoryItems = 100
-        AppSettings.shared.maxPinnedItems = 20
         await ModernClipboardService.shared.setMaxHistoryItems(100)
     }
 
@@ -33,7 +32,6 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 
         // Reset settings
         AppSettings.shared.maxHistoryItems = 300
-        AppSettings.shared.maxPinnedItems = 20
 
         try await super.tearDown()
     }
@@ -87,23 +85,23 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
 #endif
     }
 
-    func testPinnedItemsPreservedDuringStartupTrim() async throws {
-        // Given: Repository has mix of pinned and unpinned items
+    func testCategorizedItemsPreservedDuringStartupTrim() async throws {
+        // Given: Repository has mix of categorized and uncategorized items
         var testItems: [ClipItem] = []
 
-        // Add 10 pinned items
+        // Add 10 categorized items
         for i in 1...10 {
             var item = ClipItem(
-                content: "Pinned \(i)"
+                content: "Categorized \(i)"
             )
-            item.isPinned = true
+            item.setCategory(savedHistoryCategoryID, enabled: true)
             testItems.append(item)
         }
 
-        // Add 140 unpinned items (total 150, over limit of 100)
+        // Add 140 uncategorized items (total 150, over limit of 100)
         for i in 1...140 {
             let item = ClipItem(
-                content: "Unpinned \(i)"
+                content: "Uncategorized \(i)"
             )
             testItems.append(item)
         }
@@ -118,14 +116,13 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
         await service.setMaxHistoryItems(50)
         await service.loadHistoryFromRepository()
 
-        // Then: All pinned items should be preserved
+        // Then: All categorized items should be preserved
         let history = await service.getHistory()
-        let pinnedInHistory = history.filter { $0.isPinned }
+        let categorizedInHistory = history.filter { $0.hasCustomCategory }
 
-        XCTAssertEqual(pinnedInHistory.count, 10,
-                      "All pinned items should be preserved during startup trim")
-        XCTAssertLessThanOrEqual(history.count, 50,
-                                 "Total history should respect the limit")
+        XCTAssertEqual(categorizedInHistory.count, 10,
+                      "All categorized items should be preserved during startup trim")
+        XCTAssertEqual(history.count - categorizedInHistory.count, 50)
     }
 
     // MARK: - Settings Update Tests
@@ -139,7 +136,7 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
         }
 
         // Directly set history (bypassing normal add flow for test)
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         for item in testItems.reversed() {
             await service.copyToClipboard(item.content, fromEditor: false)
         }
@@ -216,27 +213,26 @@ final class ModernClipboardServiceStartupTests: XCTestCase {
                                  "Should handle very low limits on startup")
     }
 
-    func testPinnedItemsExceedLimit() async throws {
-        // Given: More pinned items than the limit
+    func testCategorizedItemsAreRetainedOverTheLimit() async throws {
+        // Given: More categorized items than the limit
         var testItems: [ClipItem] = []
         for i in 1...30 {
-            var item = ClipItem(content: "Pinned \(i)")
-            item.isPinned = true
+            var item = ClipItem(content: "Categorized \(i)")
+            item.setCategory(savedHistoryCategoryID, enabled: true)
             testItems.append(item)
         }
         try await repository.save(testItems)
 
-        // Set limit lower than pinned count
+        // Set limit lower than categorized count
         AppSettings.shared.maxHistoryItems = 20
 
         // When: Service starts
         let service = ModernClipboardService.shared
-        await service.resetForTesting()
-        try await Task.sleep(nanoseconds: 500_000_000)
+        await service.setMaxHistoryItems(20)
+        await service.loadHistoryFromRepository()
 
-        // Then: Should keep only up to limit even if all are pinned
         let history = await service.getHistory()
-        XCTAssertLessThanOrEqual(history.count, 20,
-                                 "Should enforce limit even when all items are pinned")
+        XCTAssertEqual(history.count, 30)
+        XCTAssertTrue(history.allSatisfy(\.hasCustomCategory))
     }
 }

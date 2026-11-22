@@ -12,6 +12,45 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
         try await verifyQueueReception(count: 1)
     }
 
+    func testClearHistoryAdvancesQueueToTheFirstRetainedItem() async throws {
+        let removed = try putStyledItem("Removed queue head")
+        var retained = try putStyledItem("Retained queue item")
+        retained.setCategory(UUID(), enabled: true)
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [removed, retained], loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let monitor = IntegrationPasteCommandMonitor()
+        let model = MainViewModel(clipboardService: adapter, pasteMonitor: monitor)
+        var received: [String] = []
+        let controller = PlainTextPasteController(
+            clipboardService: adapter, isTargetActive: { _ in true }, sendPaste: { _ in
+                received.append(NSPasteboard.general.string(forType: .string) ?? "")
+                return true
+            }, normalPasteMonitor: RecoveryPasteMonitor()
+        )
+        model.connectPasteController(controller)
+        model.toggleQueueMode()
+        model.queueSelection(items: [removed, retained], anchor: retained)
+        await adapter.flushPendingAdapterOperationForTesting()
+        XCTAssertEqual(model.nextQueuedItem()?.id, removed.id)
+        let epoch = model.pasteQueueEpoch
+
+        let clearResult = await adapter.clearHistory(keepingCategories: true)
+        XCTAssertEqual(try clearResult.get(), 1)
+        XCTAssertEqual(model.pasteQueue, [retained.id])
+        XCTAssertEqual(model.nextQueuedItem()?.id, retained.id)
+        XCTAssertGreaterThan(model.pasteQueueEpoch, epoch)
+
+        controller.paste(into: 101, removingFormatting: false)
+        await controller.waitForPendingPastes()
+        XCTAssertEqual(received, [retained.content])
+        XCTAssertTrue(model.pasteQueue.isEmpty)
+        XCTAssertFalse(monitor.isMonitoring)
+    }
+
     func testAlternatingPlainAndRichPasteCopiesOnlyOnTheNextRequest() async throws {
         try await verifyQueueSequence(styles: [true, false, true], repeats: false)
     }

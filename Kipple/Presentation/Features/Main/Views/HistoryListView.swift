@@ -10,7 +10,6 @@ struct HistoryListView: View {
     let pasteMode: MainViewModel.PasteMode
     let historyFont: Font
     let onSelectItem: (ClipItem) -> Void
-    let onTogglePin: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
@@ -22,7 +21,12 @@ struct HistoryListView: View {
     @Binding var canScrollToTop: Bool
     @Binding var copyScrollRequest: HistoryCopyScrollRequest?
     @Binding var hoverResetRequest: HistoryHoverResetRequest?
+    let highlightRequest: HistoryHighlightRequest?
+    let onHighlightFinished: (UUID) -> Void
     var queueReorder: QueueReorderActions?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var highlightedRequestID: UUID?
+    @State private var highlightOpacity = 0.0
     @State private var hoverResetSignal = UUID()
     @State private var isScrollLocked = false
     @StateObject private var hoverCoordinator = HistoryHoverCoordinator()
@@ -36,10 +40,15 @@ struct HistoryListView: View {
                     ForEach(history, id: \.id) { item in
                         historyRow(item)
                         .frame(height: MainViewMetrics.HistoryRows.height)
+                        .overlay {
+                            if let highlightRequest, highlightRequest.itemID == item.id,
+                               highlightRequest.id == highlightedRequestID {
+                                historyHighlight.opacity(highlightOpacity)
+                            }
+                        }
                         .opacity(queueDrag.itemID == item.id ? 0 : 1)
                         .background(HistoryQueueDragAnchor(controller: queueDrag, itemID: item.id))
                         .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.2), value: item.isPinned)
                         .onAppear {
                             onLoadMore(item)
                         }
@@ -69,6 +78,10 @@ struct HistoryListView: View {
             }
             .onChange(of: copyScrollRequest?.id) { _, _ in
                 handleCopyScrollRequest(with: proxy)
+            }
+            .task(id: highlightRequest?.id) {
+                guard let highlightRequest else { return }
+                await animateHighlight(highlightRequest, with: proxy)
             }
             .onChange(of: hoverResetRequest?.id) { _, _ in
                 handleHoverResetRequest()
@@ -107,7 +120,6 @@ struct HistoryListView: View {
             onQueueLongPress: pasteMode == .clipboard ? {
                 queueReorder?.startQueue(itemID: item.id)
             } : nil,
-            onTogglePin: { onTogglePin(item) },
             onDelete: onDelete != nil ? {
                 withAnimation(.spring(response: 0.3)) { onDelete?(item) }
             } : nil,
@@ -144,7 +156,41 @@ struct HistoryListView: View {
     private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
         guard copyScrollRequest != nil else { return }
         copyScrollRequest = nil
+        guard highlightRequest == nil else { return }
         scrollToTop(with: proxy, animated: false)
+    }
+
+    private var historyHighlight: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        return shape
+            .fill(Color.accentColor.opacity(0.16))
+            .overlay { shape.strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1.5) }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    @MainActor
+    private func animateHighlight(_ request: HistoryHighlightRequest, with proxy: ScrollViewProxy) async {
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        proxy.scrollTo(request.itemID, anchor: .top)
+        withTransaction(Transaction(animation: nil)) {
+            highlightedRequestID = request.id
+            highlightOpacity = 1
+        }
+
+        do {
+            try await Task.sleep(for: .milliseconds(reduceMotion ? 800 : 230))
+            if !reduceMotion {
+                withAnimation(.easeOut(duration: 0.65)) { highlightOpacity = 0 }
+                try await Task.sleep(for: .milliseconds(650))
+            }
+        } catch {
+            return
+        }
+        guard !Task.isCancelled else { return }
+        highlightedRequestID = nil
+        onHighlightFinished(request.id)
     }
 
     private func scrollToTop(with proxy: ScrollViewProxy, animated: Bool) {
@@ -174,6 +220,11 @@ struct HistoryListView: View {
 
 struct HistoryCopyScrollRequest: Identifiable, Equatable {
     let id = UUID()
+}
+
+struct HistoryHighlightRequest: Identifiable, Equatable {
+    let id = UUID()
+    let itemID: UUID
 }
 
 struct HistoryHoverResetRequest: Identifiable, Equatable {

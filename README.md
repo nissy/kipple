@@ -18,7 +18,7 @@ It keeps your copied text searchable, editable, organized, and ready to paste ag
 Kipple is more than a clipboard history list.
 
 - Search copied text and bring it back instantly
-- Pin important clips so they stay available
+- Keep important clips in custom categories
 - Edit clipboard text in the Live Editor before saving or pasting
 - Format JSON and YAML directly from the editor
 - Paste multiple clips in order with Queue
@@ -38,14 +38,13 @@ History items can include:
 - source app
 - source window title
 - URL classification
-- pin state
 - user category
 
 Duplicate copies are moved to the top instead of creating another identical item.
 
-### Search, Pin, and Categories
+### Search and Categories
 
-Search across clipboard content and source app names. Pin items that should stay available, and organize clips with built-in or custom categories.
+Search across clipboard content and source app names. Organize clips with built-in or custom categories. Clips in custom categories stay available when history is trimmed or cleared.
 
 Kipple includes built-in `None` and `URL` categories. You can also add your own categories with names and SF Symbol icons.
 

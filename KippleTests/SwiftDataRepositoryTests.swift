@@ -25,9 +25,9 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
     func testSaveAndLoad() async throws {
         // Given
         let items = [
-            ClipItem(content: "Test 1", isPinned: false),
-            ClipItem(content: "Test 2", isPinned: true),
-            ClipItem(content: "Test 3", isPinned: false)
+            ClipItem(content: "Test 1"),
+            ClipItem(content: "Test 2", userCategoryId: savedHistoryCategoryID),
+            ClipItem(content: "Test 3")
         ]
 
         // When
@@ -43,7 +43,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
 
     func testLoadWithLimit() async throws {
         // Given
-        let items = (1...10).map { ClipItem(content: "Item \($0)", isPinned: false) }
+        let items = (1...10).map { ClipItem(content: "Item \($0)") }
         try await repository.save(items)
 
         // When
@@ -57,7 +57,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
 
     func testLoadAll() async throws {
         // Given
-        let items = (1...20).map { ClipItem(content: "Item \($0)", isPinned: false) }
+        let items = (1...20).map { ClipItem(content: "Item \($0)") }
         try await repository.save(items)
 
         // When
@@ -70,9 +70,9 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
     func testDelete() async throws {
         // Given
         let items = [
-            ClipItem(content: "Keep 1", isPinned: false),
-            ClipItem(content: "Delete Me", isPinned: false),
-            ClipItem(content: "Keep 2", isPinned: false)
+            ClipItem(content: "Keep 1"),
+            ClipItem(content: "Delete Me"),
+            ClipItem(content: "Keep 2")
         ]
         try await repository.save(items)
 
@@ -90,7 +90,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
 
     func testClearAll() async throws {
         // Given
-        let items = (1...5).map { ClipItem(content: "Item \($0)", isPinned: false) }
+        let items = (1...5).map { ClipItem(content: "Item \($0)") }
         try await repository.save(items)
 
         // When
@@ -101,30 +101,30 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(loaded.count, 0)
     }
 
-    func testClearKeepPinned() async throws {
+    func testClearKeepingCategories() async throws {
         // Given
         let items = [
-            ClipItem(content: "Unpinned 1", isPinned: false),
-            ClipItem(content: "Pinned 1", isPinned: true),
-            ClipItem(content: "Unpinned 2", isPinned: false),
-            ClipItem(content: "Pinned 2", isPinned: true)
+            ClipItem(content: "Uncategorized 1"),
+            ClipItem(content: "Categorized 1", userCategoryId: savedHistoryCategoryID),
+            ClipItem(content: "Uncategorized 2"),
+            ClipItem(content: "Categorized 2", userCategoryId: savedHistoryCategoryID)
         ]
         try await repository.save(items)
 
         // When
-        try await repository.clear(keepPinned: true)
+        try await repository.replaceAll(with: repository.loadCategorized())
         let loaded = try await repository.loadAll()
 
         // Then
         XCTAssertEqual(loaded.count, 2)
-        XCTAssertTrue(loaded.allSatisfy { $0.isPinned })
-        XCTAssertTrue(loaded.contains { $0.content == "Pinned 1" })
-        XCTAssertTrue(loaded.contains { $0.content == "Pinned 2" })
+        XCTAssertTrue(loaded.allSatisfy { $0.hasCustomCategory })
+        XCTAssertTrue(loaded.contains { $0.content == "Categorized 1" })
+        XCTAssertTrue(loaded.contains { $0.content == "Categorized 2" })
     }
 
     func testCountItems() async throws {
         // Given
-        let items = (1...7).map { ClipItem(content: "Item \($0)", isPinned: false) }
+        let items = (1...7).map { ClipItem(content: "Item \($0)") }
         try await repository.save(items)
 
         // When
@@ -140,7 +140,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         await withTaskGroup(of: Void.self) { group in
             for i in 1...10 {
                 group.addTask {
-                    let item = ClipItem(content: "Concurrent \(i)", isPinned: false)
+                    let item = ClipItem(content: "Concurrent \(i)")
                     try? await repository.save([item])
                 }
             }
@@ -157,24 +157,24 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
 
     func testUpdateExistingItem() async throws {
         // Given
-        let originalItem = ClipItem(content: "Original", isPinned: false)
+        let originalItem = ClipItem(content: "Original")
         try await repository.save([originalItem])
 
         // When - Update the same item
         var updatedItem = originalItem
-        updatedItem.isPinned = true
+        updatedItem.setCategory(savedHistoryCategoryID, enabled: true)
         try await repository.update(updatedItem)
         let loaded = try await repository.loadAll()
 
         // Then
         XCTAssertEqual(loaded.count, 1)
         XCTAssertEqual(loaded.first?.id, originalItem.id)
-        XCTAssertTrue(loaded.first?.isPinned ?? false)
+        XCTAssertTrue(loaded.first?.hasCustomCategory ?? false)
     }
 
     func testSaveDuplicateItems() async throws {
         // Given
-        let item = ClipItem(content: "Duplicate Test", isPinned: false)
+        let item = ClipItem(content: "Duplicate Test")
 
         // When - Save the same item twice
         try await repository.save([item])
@@ -186,32 +186,32 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(loaded.first?.content, "Duplicate Test")
     }
 
-    func testLoadPinnedItems() async throws {
+    func testLoadCategorizedItems() async throws {
         // Given
         let items = [
-            ClipItem(content: "Unpinned 1", isPinned: false),
-            ClipItem(content: "Pinned 1", isPinned: true),
-            ClipItem(content: "Unpinned 2", isPinned: false),
-            ClipItem(content: "Pinned 2", isPinned: true),
-            ClipItem(content: "Pinned 3", isPinned: true)
+            ClipItem(content: "Uncategorized 1"),
+            ClipItem(content: "Categorized 1", userCategoryId: savedHistoryCategoryID),
+            ClipItem(content: "Uncategorized 2"),
+            ClipItem(content: "Categorized 2", userCategoryId: savedHistoryCategoryID),
+            ClipItem(content: "Categorized 3", userCategoryId: savedHistoryCategoryID)
         ]
         try await repository.save(items)
 
         // When
-        let pinnedItems = try await repository.loadPinned()
+        let categorizedItems = try await repository.loadCategorized()
 
         // Then
-        XCTAssertEqual(pinnedItems.count, 3)
-        XCTAssertTrue(pinnedItems.allSatisfy { $0.isPinned })
+        XCTAssertEqual(categorizedItems.count, 3)
+        XCTAssertTrue(categorizedItems.allSatisfy { $0.hasCustomCategory })
     }
 
     func testItemWithSpecialCharacters() async throws {
         // Given - Items with special characters and emojis
         let specialItems = [
-            ClipItem(content: "Test with 'quotes' and \"double quotes\"", isPinned: false),
-            ClipItem(content: "Unicode: 日本語テスト 🚀🎉", isPinned: false),
-            ClipItem(content: "Line\nbreaks\nand\ttabs", isPinned: false),
-            ClipItem(content: "Special chars: <>&@#$%^*()", isPinned: false)
+            ClipItem(content: "Test with 'quotes' and \"double quotes\""),
+            ClipItem(content: "Unicode: 日本語テスト 🚀🎉"),
+            ClipItem(content: "Line\nbreaks\nand\ttabs"),
+            ClipItem(content: "Special chars: <>&@#$%^*()")
         ]
 
         // When
@@ -227,7 +227,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
     func testLargeContentHandling() async throws {
         // Given - Very large content
         let largeContent = String(repeating: "Large content ", count: 10000)
-        let item = ClipItem(content: largeContent, isPinned: false)
+        let item = ClipItem(content: largeContent)
 
         // When
         try await repository.save([item])
@@ -240,7 +240,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
 
     func testEmptyContentHandling() async throws {
         // Given
-        let emptyItem = ClipItem(content: "", isPinned: false)
+        let emptyItem = ClipItem(content: "")
 
         // When
         try await repository.save([emptyItem])
@@ -254,7 +254,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
     func testPerformanceOfLargeDataset() async throws {
         // Given - Large number of items
         let items = (1...1000).map { index in
-            ClipItem(content: "Performance test item \(index)", isPinned: index % 10 == 0)
+            ClipItem(content: "Performance test item \(index)", userCategoryId: index % 10 == 0 ? savedHistoryCategoryID : nil)
         }
 
         // When/Then - Measure performance
@@ -279,13 +279,13 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
                 id: UUID(),
                 content: "Test Content",
                 timestamp: testDate,
-                isPinned: true,
                 kind: .text,
                 sourceApp: "TestApp",
                 windowTitle: "TestWindow",
                 bundleIdentifier: "com.test.app",
                 processID: 12345,
-                isFromEditor: true
+                isFromEditor: true,
+                userCategoryId: savedHistoryCategoryID
             )
         ]
 
@@ -297,7 +297,7 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         let loadedItem = loaded.first
         XCTAssertNotNil(loadedItem)
         XCTAssertEqual(loadedItem?.content, "Test Content")
-        XCTAssertEqual(loadedItem?.isPinned, true)
+        XCTAssertEqual(loadedItem?.hasCustomCategory, true)
         XCTAssertEqual(loadedItem?.sourceApp, "TestApp")
         XCTAssertEqual(loadedItem?.windowTitle, "TestWindow")
         XCTAssertEqual(loadedItem?.bundleIdentifier, "com.test.app")
@@ -310,10 +310,10 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         let oldDate = Date().addingTimeInterval(-86400 * 30) // 30 days ago
         let recentDate = Date().addingTimeInterval(-3600) // 1 hour ago
 
-        var oldItem = ClipItem(content: "Old item", isPinned: false)
+        var oldItem = ClipItem(content: "Old item")
         oldItem.timestamp = oldDate
 
-        var recentItem = ClipItem(content: "Recent item", isPinned: false)
+        var recentItem = ClipItem(content: "Recent item")
         recentItem.timestamp = recentDate
 
         try await repository.save([oldItem, recentItem])

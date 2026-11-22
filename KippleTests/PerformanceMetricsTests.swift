@@ -37,7 +37,7 @@ final class PerformanceMetricsTests: XCTestCase {
     func testBatchUpdatePerformance() {
         // Given: Multiple items to update
         var items = (0..<100).map { index in
-            ClipItem(content: "Item \(index)", isPinned: false)
+            ClipItem(content: "Item \(index)")
         }
 
         // When: Performing batch updates
@@ -45,7 +45,7 @@ final class PerformanceMetricsTests: XCTestCase {
             // Simulate batch operations
             items = items.map { item in
                 var updated = item
-                updated.isPinned = !item.isPinned
+                updated.setCategory(savedHistoryCategoryID, enabled: !item.hasCustomCategory)
                 return updated
             }
 

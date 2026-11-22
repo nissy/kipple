@@ -10,30 +10,22 @@ import Foundation
 
 @MainActor
 class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecopying {
-    var history: [ClipItem] = [] {
-        didSet {
-            pinnedItems = history.filter { $0.isPinned }
-        }
-    }
-    var pinnedItems: [ClipItem] = []
+    var history: [ClipItem] = []
     var currentClipboardContent: String?
     var onHistoryChanged: ((ClipItem) -> Void)?
 
     var isMonitoringActive = false
     var lastCopiedContent: String?
     var lastCopiedFromEditor: Bool?
-    var recognizedCopyHandler: ((String) async -> Bool)?
+    var recognizedCopyHandler: ((String) async -> UUID?)?
     var lastRecopiedItem: ClipItem?
 
     // Additional test properties
     var copyToClipboardCalled = false
     var writeToClipboardOnlyCalled = false
     var fromEditor: Bool?
-    var togglePinCalled = false
-    var lastToggledItem: ClipItem?
     var deleteItemCalled = false
     var lastDeletedItem: ClipItem?
-    var clearAllHistoryCalled = false
     var recopyFromHistoryAndWaitCallCount = 0
     var recopyFromHistoryCallCount = 0
     var addEditorItemsCallCount = 0
@@ -73,13 +65,12 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
         onHistoryChanged?(item)
     }
 
-    func copyRecognizedText(_ content: String) async -> Bool {
+    func copyRecognizedText(_ content: String) async -> UUID? {
         if let recognizedCopyHandler { return await recognizedCopyHandler(content) }
         copyToClipboard(content, fromEditor: false)
-        if let index = history.firstIndex(where: { $0.content == content }) {
-            history[index].metadata = ClipMetadata(source: .ocr)
-        }
-        return true
+        guard let index = history.firstIndex(where: { $0.content == content }) else { return nil }
+        history[index].metadata = ClipMetadata(source: .ocr)
+        return history[index].id
     }
 
     func writeToClipboardOnly(_ content: String) {
@@ -125,11 +116,9 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
 
         if let index = history.firstIndex(where: { $0.id == item.id }) {
             let existing = history.remove(at: index)
-            if existing.isPinned { updatedItem.isPinned = true }
             updatedItem.userCategoryId = existing.userCategoryId
         } else if let index = history.firstIndex(where: { $0.content == item.content }) {
             let existing = history.remove(at: index)
-            if existing.isPinned { updatedItem.isPinned = true }
             updatedItem.userCategoryId = existing.userCategoryId
         }
 
@@ -148,41 +137,27 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
         currentClipboardContent = nil
     }
 
-    func clearAllHistory() {
-        clearAllHistoryCalled = true
-        history.removeAll()
-        currentClipboardContent = nil
-    }
-
-    func clearHistory(keepPinned: Bool) async {
-        if keepPinned {
-            history = history.filter { $0.isPinned }
+    @discardableResult
+    func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
+        let originalCount = history.count
+        if keepingCategories {
+            history = history.filter(\.hasCustomCategory)
         } else {
-            clearAllHistory()
+            history.removeAll()
         }
-    }
-
-    func togglePin(for item: ClipItem) -> Bool {
-        togglePinCalled = true
-        lastToggledItem = item
-
-        if let index = history.firstIndex(where: { $0.id == item.id }) {
-            history[index].isPinned.toggle()
-            return history[index].isPinned
-        }
-        return false
+        return .success(originalCount - history.count)
     }
 
     func deleteItem(_ item: ClipItem) {
         deleteItemCalled = true
         lastDeletedItem = item
-        history.removeAll { $0.id == item.id }
+        history.removeAll { $0.id == item.id && !$0.hasCustomCategory }
     }
 
     func deleteItem(_ item: ClipItem) async {
         deleteItemCalled = true
         lastDeletedItem = item
-        history.removeAll { $0.id == item.id }
+        history.removeAll { $0.id == item.id && !$0.hasCustomCategory }
     }
 
     func flushPendingSaves() async {
@@ -194,9 +169,8 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
     }
 
     // Helper methods for testing
-    func addTestItem(_ content: String, isPinned: Bool = false, sourceApp: String? = nil) {
-        var item = ClipItem(content: content, sourceApp: sourceApp)
-        item.isPinned = isPinned
+    func addTestItem(_ content: String, sourceApp: String? = nil) {
+        let item = ClipItem(content: content, sourceApp: sourceApp)
         history.append(item)
     }
 
@@ -217,11 +191,8 @@ class MockClipboardService: ClipboardServiceProtocol, ClipboardServiceAsyncRecop
         copyToClipboardCalled = false
         writeToClipboardOnlyCalled = false
         fromEditor = nil
-        togglePinCalled = false
-        lastToggledItem = nil
         deleteItemCalled = false
         lastDeletedItem = nil
         recopyFromHistoryAndWaitCallCount = 0
-        clearAllHistoryCalled = false
     }
 }

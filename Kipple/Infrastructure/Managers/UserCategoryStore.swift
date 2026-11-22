@@ -217,11 +217,11 @@ final class UserCategoryStore: ObservableObject {
         return iconName(for: categories.first ?? noneCategory())
     }
 
-    func add(name: String, iconSystemName: String) {
+    func add(name: String, iconSystemName: String, id: UUID = UUID()) {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let symbol = UserCategoryStore.availableSymbols.contains(iconSystemName)
             ? iconSystemName : "tag"
-        let new = UserCategory(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+        let new = UserCategory(id: id, name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                                iconSystemName: symbol,
                                isFilterEnabled: true)
         categories.append(new)

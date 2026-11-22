@@ -10,6 +10,7 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
         try await super.setUp()
 
         service = ModernClipboardService.shared
+        await service.useCategoryStoreFixture()
         repository = MockClipboardRepository()
 
         await MainActor.run {
@@ -19,25 +20,21 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
 
         // Reset service state
         await service.stopMonitoring()
-        await service.clearHistory(keepPinned: false)
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: false)
 
         AppSettings.shared.maxHistoryItems = 300
-        AppSettings.shared.maxPinnedItems = 50
         await service.setMaxHistoryItems(300)
     }
 
     override func tearDown() async throws {
         await service.stopMonitoring()
-        await service.clearHistory(keepPinned: false)
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: false)
 
         await MainActor.run {
             RepositoryProvider.useTestingRepository(nil)
         }
 
         AppSettings.shared.maxHistoryItems = 300
-        AppSettings.shared.maxPinnedItems = 50
 
         repository = nil
         service = nil
@@ -48,17 +45,16 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
     func testInitialLoadUsesDynamicLimit() async throws {
         // Given
         AppSettings.shared.maxHistoryItems = 200
-        AppSettings.shared.maxPinnedItems = 30
         await service.setMaxHistoryItems(200)
 
         var seededItems: [ClipItem] = []
         for index in 1...70 {
-            var item = ClipItem(content: "Pinned \(index)")
-            item.isPinned = true
+            var item = ClipItem(content: "Categorized \(index)")
+            item.setCategory(savedHistoryCategoryID, enabled: true)
             seededItems.append(item)
         }
         for index in 1...120 {
-            seededItems.append(ClipItem(content: "Unpinned \(index)"))
+            seededItems.append(ClipItem(content: "Uncategorized \(index)"))
         }
         await repository.configure(items: seededItems, loadDelay: 0)
 
@@ -67,21 +63,20 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
 
         // Then
         let requestedLimits = await repository.getRequestedLimits()
-        let expectedLimit = 200 + max(30, 70) + 10
+        let expectedLimit = 200 + 70 + 10
         XCTAssertEqual(requestedLimits.last, expectedLimit,
                        "Initial load should request dynamic limit with headroom")
     }
 
-    func testPinnedItemsSurfaceBeforeFullLoad() async throws {
+    func testCategorizedItemsSurfaceBeforeFullLoad() async throws {
         // Given
         AppSettings.shared.maxHistoryItems = 50
-        AppSettings.shared.maxPinnedItems = 10
         await service.setMaxHistoryItems(50)
 
         var seededItems: [ClipItem] = []
         for index in 1...6 {
-            var item = ClipItem(content: "Pinned \(index)")
-            item.isPinned = true
+            var item = ClipItem(content: "Categorized \(index)")
+            item.setCategory(savedHistoryCategoryID, enabled: true)
             seededItems.append(item)
         }
         for index in 1...80 {
@@ -99,43 +94,41 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
 
         // Then
         XCTAssertEqual(interimHistory.count, 6,
-                       "Pinned items should be available before full history loads")
-        XCTAssertTrue(interimHistory.allSatisfy { $0.isPinned },
-                      "Interim history should only contain pinned items")
+                       "Categorized items should be available before full history loads")
+        XCTAssertTrue(interimHistory.allSatisfy { $0.hasCustomCategory },
+                      "Interim history should only contain categorized items")
 
         await loadTask.value
         let finalHistory = await service.getHistory()
 
-        XCTAssertLessThanOrEqual(finalHistory.count, 50,
-                                 "Final history should respect max history limit")
-        let pinnedInFinal = finalHistory.filter { $0.isPinned }
-        XCTAssertEqual(pinnedInFinal.count, 6,
-                       "Pinned items must be preserved after trimming")
+        let categorizedInFinal = finalHistory.filter { $0.hasCustomCategory }
+        XCTAssertEqual(finalHistory.count - categorizedInFinal.count, 50)
+        XCTAssertEqual(categorizedInFinal.count, 6,
+                       "Categorized items must be preserved after trimming")
     }
 
-    func testInitialLoadKeepsTimestampOrderWithPinnedItems() async throws {
+    func testInitialLoadKeepsTimestampOrderWithCategorizedItems() async throws {
         // Given
         AppSettings.shared.maxHistoryItems = 10
-        AppSettings.shared.maxPinnedItems = 10
         await service.setMaxHistoryItems(10)
 
         let now = Date()
-        var newest = ClipItem(content: "Newest unpinned")
+        var newest = ClipItem(content: "Newest uncategorized")
         newest.timestamp = now
 
-        var pinnedMiddle = ClipItem(content: "Pinned middle")
-        pinnedMiddle.timestamp = now.addingTimeInterval(-10)
-        pinnedMiddle.isPinned = true
+        var categorizedMiddle = ClipItem(content: "Categorized middle")
+        categorizedMiddle.timestamp = now.addingTimeInterval(-10)
+        categorizedMiddle.setCategory(savedHistoryCategoryID, enabled: true)
 
-        var recent = ClipItem(content: "Recent unpinned")
+        var recent = ClipItem(content: "Recent uncategorized")
         recent.timestamp = now.addingTimeInterval(-20)
 
-        var pinnedOld = ClipItem(content: "Pinned old")
-        pinnedOld.timestamp = now.addingTimeInterval(-30)
-        pinnedOld.isPinned = true
+        var categorizedOld = ClipItem(content: "Categorized old")
+        categorizedOld.timestamp = now.addingTimeInterval(-30)
+        categorizedOld.setCategory(savedHistoryCategoryID, enabled: true)
 
         await repository.configure(
-            items: [pinnedOld, newest, pinnedMiddle, recent],
+            items: [categorizedOld, newest, categorizedMiddle, recent],
             loadDelay: 0
         )
 
@@ -146,8 +139,8 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
         let history = await service.getHistory()
         XCTAssertEqual(
             history.map(\.content),
-            ["Newest unpinned", "Pinned middle", "Recent unpinned", "Pinned old"],
-            "Initial load should not move pinned items above newer unpinned items"
+            ["Newest uncategorized", "Categorized middle", "Recent uncategorized", "Categorized old"],
+            "Initial load should not move categorized items above newer uncategorized items"
         )
     }
 }
@@ -218,24 +211,12 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
         storage
     }
 
-    func loadPinned() async throws -> [ClipItem] {
-        storage.filter { $0.isPinned }.sorted { $0.timestamp > $1.timestamp }
-    }
-
     func delete(_ item: ClipItem) async throws {
         storage.removeAll { $0.id == item.id }
     }
 
     func clear() async throws {
         storage.removeAll()
-    }
-
-    func clear(keepPinned: Bool) async throws {
-        if keepPinned {
-            storage.removeAll { !$0.isPinned }
-        } else {
-            storage.removeAll()
-        }
     }
 
     func applyChanges(inserted: [ClipItem], updated: [ClipItem], removed: [UUID]) async throws {

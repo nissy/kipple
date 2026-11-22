@@ -6,7 +6,6 @@ final class ClipItemModel {
     @Attribute(.unique) var id: UUID
     var content: String
     var timestamp: Date
-    var isPinned: Bool
     var kindRawValue: String
     var appName: String?
     var windowTitle: String?
@@ -21,7 +20,6 @@ final class ClipItemModel {
         id: UUID = UUID(),
         content: String,
         timestamp: Date = Date(),
-        isPinned: Bool = false,
         kind: ClipItemKind = .text,
         appName: String? = nil,
         windowTitle: String? = nil,
@@ -35,7 +33,6 @@ final class ClipItemModel {
         self.id = id
         self.content = content
         self.timestamp = timestamp
-        self.isPinned = isPinned
         self.kindRawValue = kind.rawValue
         self.appName = appName
         self.windowTitle = windowTitle
@@ -52,7 +49,6 @@ final class ClipItemModel {
             id: clipItem.id,
             content: clipItem.content,
             timestamp: clipItem.timestamp,
-            isPinned: clipItem.isPinned,
             kind: clipItem.kind,
             appName: clipItem.sourceApp,
             windowTitle: clipItem.windowTitle,
@@ -66,11 +62,29 @@ final class ClipItemModel {
     }
 
     func toClipItem() -> ClipItem {
-        return ClipItem(
+        toClipItem(metadata: decodedMetadata)
+    }
+
+    var hasCustomCategory: Bool {
+        CategoryOverrides.resolve(decodedMetadata?.categoryOverrides, legacyID: userCategoryId).hasCustomCategory
+    }
+
+    func toCustomCategorizedClipItem() -> ClipItem? {
+        let metadata = decodedMetadata
+        let overrides = CategoryOverrides.resolve(metadata?.categoryOverrides, legacyID: userCategoryId)
+        guard overrides.hasCustomCategory else { return nil }
+        return toClipItem(metadata: metadata)
+    }
+
+    private var decodedMetadata: ClipMetadata? {
+        metadataData.flatMap { try? JSONDecoder().decode(ClipMetadata.self, from: $0) }
+    }
+
+    private func toClipItem(metadata: ClipMetadata?) -> ClipItem {
+        ClipItem(
             id: id,
             content: content,
             timestamp: timestamp,
-            isPinned: isPinned,
             kind: ClipItemKind(rawValue: kindRawValue) ?? .text,
             sourceApp: appName,
             windowTitle: windowTitle,
@@ -78,7 +92,7 @@ final class ClipItemModel {
             processID: processId,
             isFromEditor: isFromEditor,
             userCategoryId: userCategoryId,
-            metadata: metadataData.flatMap { try? JSONDecoder().decode(ClipMetadata.self, from: $0) },
+            metadata: metadata,
             richText: richTextData.flatMap { try? JSONDecoder().decode(ClipboardRichText.self, from: $0) }
         )
     }

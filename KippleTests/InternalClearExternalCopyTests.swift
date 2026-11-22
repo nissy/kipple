@@ -22,13 +22,13 @@ final class InternalClearExternalCopyTests: XCTestCase {
         adapter = ModernClipboardServiceAdapter.shared
 
         // Clear any existing data
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.stopMonitoring()
     }
 
     override func tearDown() async throws {
         // Clean up
-        await service.clearAllHistory()
+        await service.clearHistory(keepingCategories: true)
         await service.stopMonitoring()
 
         service = nil
