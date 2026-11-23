@@ -1,6 +1,16 @@
 import SwiftUI
 import AppKit
 
+struct HistoryItemEditorAction {
+    let handler: @MainActor (ClipItem) -> Void
+
+    @MainActor func callAsFunction(_ item: ClipItem) { handler(item) }
+}
+
+extension EnvironmentValues {
+    @Entry var openHistoryItemEditor = HistoryItemEditorAction { _ in }
+}
+
 struct HistoryListView: View {
     let history: [ClipItem]
     let selectedHistoryItem: ClipItem?
@@ -25,6 +35,7 @@ struct HistoryListView: View {
     let onHighlightFinished: (UUID) -> Void
     var queueReorder: QueueReorderActions?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openHistoryItemEditor) private var openHistoryItemEditor
     @State private var highlightedRequestID: UUID?
     @State private var highlightOpacity = 0.0
     @State private var hoverResetSignal = UUID()
@@ -114,6 +125,7 @@ struct HistoryListView: View {
             isQueuePreviewed: queueSelectionPreview.contains(item.id),
             isScrollLocked: isScrollLocked || queueDrag.itemID != nil,
             onTap: { onSelectItem(item) },
+            onEdit: { openHistoryItemEditor(item) },
             onQueueDrag: { translation in
                 queueDrag.begin(itemID: item.id, translation: translation)
             },

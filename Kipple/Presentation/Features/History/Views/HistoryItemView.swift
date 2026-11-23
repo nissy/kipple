@@ -16,6 +16,7 @@ struct HistoryItemView: View {
     let isQueuePreviewed: Bool
     let isScrollLocked: Bool
     let onTap: () -> Void
+    let onEdit: () -> Void
     let onQueueDrag: ((CGSize) -> Void)?
     let onQueueLongPress: (() -> Void)?
     let onDelete: (() -> Void)?
@@ -32,7 +33,6 @@ struct HistoryItemView: View {
     @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
     @Environment(\.categoryPopoverChanged) private var presentationChanged
     @State private var isEditingCategories = false
-    @State private var showingDetails = false
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
     @State private var windowPosition: Bool?
@@ -48,6 +48,7 @@ struct HistoryItemView: View {
         isQueuePreviewed: Bool,
         isScrollLocked: Bool,
         onTap: @escaping () -> Void,
+        onEdit: @escaping () -> Void,
         onQueueDrag: ((CGSize) -> Void)? = nil,
         onQueueLongPress: (() -> Void)? = nil,
         onDelete: (() -> Void)?,
@@ -66,6 +67,7 @@ struct HistoryItemView: View {
         self.isQueuePreviewed = isQueuePreviewed
         self.isScrollLocked = isScrollLocked
         self.onTap = onTap
+        self.onEdit = onEdit
         self.onQueueDrag = onQueueDrag
         self.onQueueLongPress = onQueueLongPress
         self.onDelete = onDelete
@@ -94,7 +96,6 @@ struct HistoryItemView: View {
         return Group {
             baseView.contextMenu { contextMenuContent }
         }
-        .sheet(isPresented: $showingDetails) { ClipDetailsView(item: item) }
         .onChange(of: hoverResetSignal) { _, _ in
             resetHoverState()
         }
@@ -385,7 +386,7 @@ private extension HistoryItemView {
 
     @ViewBuilder
     var contextMenuContent: some View {
-        Button("Item details") { closePopover(); showingDetails = true }
+        Button("Edit Item") { closePopover(); onEdit() }
         Divider()
         if let onOpenItem, item.isActionable {
             Button {

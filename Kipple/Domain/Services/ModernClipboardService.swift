@@ -8,6 +8,14 @@ extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
 }
 
+enum ClipItemEditError: Error {
+    case itemUnavailable
+    case invalidTitle
+    case emptyContent
+    case duplicateContent
+    case categoryUnavailable
+}
+
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
@@ -372,32 +380,27 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        let sanitized = contents
+        let createdItems = contents
             .filter { !$0.isEmpty }
-
-        guard !sanitized.isEmpty else { return [] }
-
-        var createdItems: [ClipItem] = []
-        createdItems.reserveCapacity(sanitized.count)
-
-        for content in sanitized {
-            let item = ClipItem(
-                content: content,
-                kind: determineKind(for: content, isFromEditor: true),
-                sourceApp: "Kipple",
-                windowTitle: "Live Editor",
-                bundleIdentifier: Bundle.main.bundleIdentifier,
-                processID: ProcessInfo.processInfo.processIdentifier,
-                isFromEditor: true
-            )
-            createdItems.append(item)
-        }
+            .map { makeEditorItem(content: $0, windowTitle: "Live Editor") }
 
         for item in createdItems.reversed() {
             addToHistory(item)
         }
 
         return createdItems
+    }
+
+    private func makeEditorItem(content: String, windowTitle: String?) -> ClipItem {
+        ClipItem(
+            content: content,
+            kind: determineKind(for: content, isFromEditor: true),
+            sourceApp: "Kipple",
+            windowTitle: windowTitle,
+            bundleIdentifier: Bundle.main.bundleIdentifier,
+            processID: ProcessInfo.processInfo.processIdentifier,
+            isFromEditor: true
+        )
     }
 
     func recopyFromHistory(_ item: ClipItem) async {
@@ -421,15 +424,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     @discardableResult
     private func recordHistoryRecopy(_ item: ClipItem) -> ClipItem {
-        // Preserve all metadata from the original item but update timestamp
         var newItem = item
-        newItem.timestamp = Date()  // Update timestamp to current time
 
-        // Try to match by ID first to avoid expensive content comparisons
         if let existingIndex = history.firstIndex(where: { $0.id == item.id }) {
-            let existingItem = history.remove(at: existingIndex)
-            newItem.userCategoryId = existingItem.userCategoryId
-            newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
+            // A row or queue action can still hold a snapshot taken before the item was edited.
+            newItem = history.remove(at: existingIndex)
         } else if let duplicateIndex = indexOfExistingContent(item.content) {
             // Preserve the user category from any remaining duplicate content
             let existingItem = history.remove(at: duplicateIndex)
@@ -438,6 +437,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
 
         // Add item at the beginning with preserved metadata and new timestamp
+        newItem.timestamp = Date()
         newItem = withDefinedCategories(newItem)
         history.insert(newItem, at: 0)
 
@@ -884,18 +884,21 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     @discardableResult
     private func trimHistory() -> Bool {
-        guard history.count > maxHistoryItems else { return false }
+        let trimmed = historyWithinLimit(history)
+        guard trimmed.count < history.count else { return false }
+        history = trimmed
+        return true
+    }
 
+    private func historyWithinLimit(_ items: [ClipItem]) -> [ClipItem] {
+        guard items.count > maxHistoryItems else { return items }
         var available = maxHistoryItems
-        let trimmed = history.filter { item in
+        return items.filter { item in
             if item.hasCustomCategory { return true }
             guard available > 0 else { return false }
             available -= 1
             return true
         }
-        guard trimmed.count < history.count else { return false }
-        history = trimmed
-        return true
     }
 
     private func notifyHistoryObservers(content: String? = nil) {
@@ -1020,13 +1023,14 @@ extension ModernClipboardService {
             ) else { return false }
         }
         let captured = await MainActor.run { (clipboardReader ?? .shared).read() }
-        guard queuedItem != nil || captured != nil else { return false }
+        let currentQueuedItem = queuedItem.map { queued in history.first { $0.id == queued.id } ?? queued }
+        guard currentQueuedItem != nil || captured != nil else { return false }
         let writtenChangeCount = await MainActor.run { () -> Int? in
             let pasteboard = NSPasteboard.general
             guard !Task.isCancelled, pasteboard.changeCount == expectedChangeCount else { return nil }
             let item: ClipItem
-            if let queuedItem {
-                item = queuedItem
+            if let currentQueuedItem {
+                item = currentQueuedItem
             } else {
                 guard let captured, captured.stamp.changeCount == expectedChangeCount,
                       let content = captured.text, !content.isEmpty else { return nil }
@@ -1037,7 +1041,7 @@ extension ModernClipboardService {
         if let writtenChangeCount {
             updateLastChangeCount(writtenChangeCount)
             _ = await recordClipboardWrite(writtenChangeCount)
-            if let queuedItem { recordHistoryRecopy(queuedItem) }
+            if let currentQueuedItem { recordHistoryRecopy(currentQueuedItem) }
         }
         return true
     }
@@ -1079,20 +1083,75 @@ extension ModernClipboardService {
         return try await repository.receipt(for: key)
     }
 
-    func updateDetails(id: UUID, title: String?) async throws {
+    func createHistoryItem(title: String?, content: String, categoryChanges: [UUID: Bool]) async throws {
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        guard let index = history.firstIndex(where: { $0.id == id }) else { throw MCPFailure.invalidInput }
-        var item = history[index]
-        var metadata = item.metadata ?? ClipMetadata()
-        metadata.title = try MCPInputValidation.title(title)
-        item.metadata = metadata
+        guard !content.isEmpty else { throw ClipItemEditError.emptyContent }
+        guard indexOfExistingContent(content) == nil else { throw ClipItemEditError.duplicateContent }
+        let draft = makeEditorItem(content: content, windowTitle: nil)
+        let item = try await itemApplyingDetails(draft, title: title, categoryChanges: categoryChanges)
+        let candidate = historyWithinLimit([item] + history)
+        guard candidate.first?.id == item.id else { throw MCPFailure.capacity }
+        try await saveHistory(candidate)
+        history = candidate
+        rebuildContentLookup()
+        markHistoryChanged()
+        notifyHistoryObservers(content: item.content)
+    }
+
+    // Pass only the changed fields. An empty title clears the saved title.
+    func updateDetails(
+        id: UUID, title: String? = nil, content: String? = nil, categoryChanges: [UUID: Bool] = [:]
+    ) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard let index = history.firstIndex(where: { $0.id == id }) else { throw ClipItemEditError.itemUnavailable }
+        let original = history[index]
+        var item = original
+        if let content, content != original.content {
+            guard !content.isEmpty else { throw ClipItemEditError.emptyContent }
+            if let duplicate = indexOfExistingContent(content), duplicate != index {
+                throw ClipItemEditError.duplicateContent
+            }
+            item = item.replacingContent(with: content)
+        }
+        item = try await itemApplyingDetails(item, title: title, categoryChanges: categoryChanges)
+        guard item != original else { return }
         var candidate = history
         candidate[index] = item
         try await saveHistory(candidate)
         history = candidate
+        if item.content != original.content { rebuildContentLookup() }
         markHistoryChanged()
         notifyHistoryObservers()
+    }
+
+    private func itemApplyingDetails(_ original: ClipItem, title: String?, categoryChanges: [UUID: Bool]) async throws -> ClipItem {
+        var item = original
+        if let title {
+            var metadata = item.metadata ?? ClipMetadata()
+            do {
+                metadata.title = try MCPInputValidation.title(title)
+            } catch {
+                throw ClipItemEditError.invalidTitle
+            }
+            item.metadata = metadata
+        }
+        let addedCategories = Set(categoryChanges.compactMap { id, enabled in enabled ? id : nil })
+        guard await areCustomCategoriesDefined(addedCategories) else { throw ClipItemEditError.categoryUnavailable }
+        for (id, enabled) in categoryChanges {
+            item.setCategory(id, enabled: enabled)
+        }
+        return item
+    }
+
+    private func areCustomCategoriesDefined(_ ids: Set<UUID>) async -> Bool {
+        let customIDs = ids.filter(BuiltInCategory.isCustom)
+        guard !customIDs.isEmpty, let categoryStore else { return true }
+        let definedIDs = Set(await categoryStore.userDefined().map(\.id))
+        guard customIDs.isSubset(of: definedIDs) else { return false }
+        definedCustomCategoryIDs = definedIDs
+        return true
     }
 
     func setCategory(itemID: UUID, categoryID: UUID, enabled: Bool) async throws {
@@ -1106,11 +1165,7 @@ extension ModernClipboardService {
         var candidate = history
         switch change {
         case let .set(id, enabled):
-            if enabled, BuiltInCategory.isCustom(id), let categoryStore {
-                let ids = Set(await categoryStore.userDefined().map(\.id))
-                guard ids.contains(id) else { throw MCPFailure.invalidInput }
-                definedCustomCategoryIDs = ids
-            }
+            if enabled, !(await areCustomCategoriesDefined([id])) { throw MCPFailure.invalidInput }
             candidate[index].setCategory(id, enabled: enabled)
         case .clear: candidate[index].clearCategories()
         }

@@ -125,6 +125,16 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         return backupAvailable
     }
 
+    func createHistoryItem(title: String?, content: String, categoryChanges: [UUID: Bool]) async throws {
+        try await modernService.createHistoryItem(title: title, content: content, categoryChanges: categoryChanges)
+        await refreshHistory()
+    }
+
+    func updateDetails(itemID: UUID, title: String?, content: String?, categoryChanges: [UUID: Bool]) async throws {
+        try await modernService.updateDetails(id: itemID, title: title, content: content, categoryChanges: categoryChanges)
+        await refreshHistory()
+    }
+
     func updateCategories(itemID: UUID, change: ClipCategoryChange) async throws {
         try await modernService.updateCategories(itemID: itemID, change: change)
         await refreshHistory()

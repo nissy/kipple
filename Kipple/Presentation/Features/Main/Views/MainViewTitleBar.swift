@@ -25,6 +25,7 @@ final class MainWindowTitleBarState: ObservableObject {
     var startCaptureHandler: (() -> Void)?
     var toggleQueueHandler: (() -> Void)?
     var toggleQueueRepetitionHandler: (() -> Void)?
+    var addHistoryItemHandler: (() -> Void)?
     
     func requestToggleAlwaysOnTop() {
         toggleAlwaysOnTopHandler?()
@@ -44,6 +45,10 @@ final class MainWindowTitleBarState: ObservableObject {
 
     func requestToggleQueueRepetition() {
         toggleQueueRepetitionHandler?()
+    }
+
+    func requestAddHistoryItem() {
+        addHistoryItemHandler?()
     }
 }
 
@@ -68,6 +73,7 @@ struct MainViewTitleBarAccessory: View {
             }
             
             editorButton
+            addHistoryItemButton
         }
     }
 }
@@ -167,6 +173,21 @@ private extension MainViewTitleBarAccessory {
         }
         .kippleSystemCircleButton(isActive: state.isEditorEnabled)
         .help(state.isEditorEnabled ? hideEditorHelpText : showEditorHelpText)
+        .focusable(false)
+        .focusEffectDisabled()
+    }
+
+    var addHistoryItemButton: some View {
+        let label = appSettings.localizedString("Add History Item")
+        return Button(action: state.requestAddHistoryItem) {
+            Image(systemName: "plus")
+                .font(MainViewMetrics.TitleBar.iconFont)
+                .foregroundColor(KippleButtonAppearance.inactiveForeground)
+                .frame(width: MainViewMetrics.TitleBar.buttonSize, height: MainViewMetrics.TitleBar.buttonSize)
+        }
+        .kippleSystemCircleButton()
+        .accessibilityLabel(Text(verbatim: label))
+        .help(label)
         .focusable(false)
         .focusEffectDisabled()
     }

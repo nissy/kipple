@@ -45,7 +45,7 @@ final class CategoryClassifier {
         ".html", ".css", ".xml", ".json", ".yml", ".yaml", ".md"
     ]
 
-    private func isLikelyURL(_ text: String) -> Bool {
+    func isLikelyURL(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 4 else { return false }
 

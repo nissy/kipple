@@ -102,14 +102,13 @@ extension SimpleLineNumberRulerView {
     func drawEmptyTextHighlight(textView: NSTextView) {
         guard textView.isEditable else { return }
 
-        let height = max(fixedLineHeight - textView.textContainerInset.height * 2, 1)
-        let y = textView.textContainerInset.height - textView.visibleRect.origin.y
+        let y = textView.textContainerOrigin.y - textView.visibleRect.origin.y
         NSColor.selectedTextBackgroundColor.withAlphaComponent(0.12).set()
         NSBezierPath(rect: NSRect(
             x: 0,
             y: y,
             width: ruleThickness,
-            height: height
+            height: fixedLineHeight
         )).fill()
     }
 
@@ -126,7 +125,6 @@ extension SimpleLineNumberRulerView {
 
         _ = textView.visibleRect
         let containerOrigin = textView.textContainerOrigin
-        let textContainerInset = textView.textContainerInset
 
         let paragraphStyle = textView.defaultParagraphStyle
         let lineHeight = paragraphStyle?.minimumLineHeight ?? fixedLineHeight
@@ -135,7 +133,7 @@ extension SimpleLineNumberRulerView {
         let lineY = lineRect.origin.y + containerOrigin.y - textView.visibleRect.origin.y
 
         let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
-        let lineCenterY = lineY + textContainerInset.height + (lineHeight / 2)
+        let lineCenterY = lineY + (lineHeight / 2)
         let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
         let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
 
@@ -167,7 +165,7 @@ extension SimpleLineNumberRulerView {
             let lineNumberFont = context.textAttributes[.font] as? NSFont ??
                 NSFont.systemFont(ofSize: context.fontSize)
             let lineNumberHeight = lineNumberFont.ascender - lineNumberFont.descender
-            let lineCenterY = lineY + context.textView.textContainerInset.height + (fixedLineHeight / 2)
+            let lineCenterY = lineY + (fixedLineHeight / 2)
             let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
             let drawingY = lineCenterY - (lineNumberHeight / 2) - lineNumberFont.descender + offset
 

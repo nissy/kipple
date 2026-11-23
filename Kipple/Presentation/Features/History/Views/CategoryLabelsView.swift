@@ -29,7 +29,7 @@ struct CategoryLabelsView: View {
             ForEach(previewLimits, id: \.self) { limit in
                 VStack(alignment: .leading, spacing: 6) {
                     labels(limit: limit)
-                    Text("Open item details to view all categories.")
+                    Text("Open Edit Item to view all categories.")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

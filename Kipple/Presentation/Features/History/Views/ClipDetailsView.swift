@@ -1,68 +1,379 @@
+import AppKit
 import SwiftUI
 
 struct ClipDetailsView: View {
-    let itemID: UUID
+    private let originalItem: ClipItem
+    private let editingItemID: UUID?
+    private let titleKey: String
+    let onClose: () -> Void
+    let onSavingChanged: (Bool) -> Void
     @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
     @ObservedObject private var categoryStore = UserCategoryStore.shared
-    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var fontManager = FontManager.shared
+    @ObservedObject private var appSettings = AppSettings.shared
+    @Environment(\.colorScheme) private var colorScheme
+    @FocusState private var isTitleFocused: Bool
     @State private var title: String
-    @State private var errorMessage = ""
+    @State private var content: String
+    @State private var categoryChanges: [UUID: Bool] = [:]
+    @State private var errorMessage: LocalizedStringKey?
+    @State private var isSaving = false
 
-    init(item: ClipItem) {
-        itemID = item.id
-        _title = State(initialValue: item.title ?? "")
+    init(item: ClipItem?, titleKey: String, onClose: @escaping () -> Void, onSavingChanged: @escaping (Bool) -> Void) {
+        originalItem = item ?? ClipItem(content: "", sourceApp: "Kipple", isFromEditor: true)
+        editingItemID = item?.id
+        self.titleKey = titleKey
+        self.onClose = onClose
+        self.onSavingChanged = onSavingChanged
+        _title = State(initialValue: item?.title ?? "")
+        _content = State(initialValue: item?.content ?? "")
     }
 
     private var currentItem: ClipItem? {
-        adapter.history.first { $0.id == itemID }
+        guard let editingItemID else { return originalItem }
+        return adapter.history.first { $0.id == editingItemID }
+    }
+    private var canSave: Bool { !isSaving && currentItem != nil && (editingItemID != nil || !content.isEmpty) }
+    private var editedTitle: String? { title == (originalItem.title ?? "") ? nil : title }
+    private var editedContent: String? { content == originalItem.content ? nil : content }
+    private let accent = Color(red: 0.09, green: 0.40, blue: 0.37)
+    private let fieldShape = RoundedRectangle(cornerRadius: KippleGlassMetrics.inputCornerRadius)
+
+    private var windowSurface: Color {
+        colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(red: 0.925, green: 0.958, blue: 0.959)
+    }
+
+    private var titleBarFill: Color {
+        colorScheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(red: 0.94, green: 0.95, blue: 0.95)
+    }
+
+    private var fieldFill: Color {
+        colorScheme == .dark ? .white.opacity(0.055) : Color(nsColor: .textBackgroundColor).opacity(0.82)
+    }
+    private var fieldBorder: Color { .primary.opacity(0.17) }
+    private var rulerFill: NSColor {
+        if colorScheme == .dark { return .white.withAlphaComponent(0.045) }
+        return NSColor(srgbRed: 0.93, green: 0.94, blue: 0.95, alpha: 1)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Item details").font(.headline)
+        VStack(spacing: 0) {
+            Text(LocalizedStringKey(titleKey))
+                .font(.system(size: 13, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .background(titleBarFill)
+                .allowsHitTesting(false)
+                .accessibilityAddTraits(.isHeader)
+            Divider()
+            form
+        }
+        .ignoresSafeArea(.container, edges: .top)
+        .defaultFocus($isTitleFocused, true)
+        .environment(\.locale, appSettings.appLocale)
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 16) {
             if let item = currentItem {
-                TextField("Title", text: $title)
-                LabeledContent("Source", value: item.sourceApp ?? "Unknown")
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Categories").font(.caption).foregroundStyle(.secondary)
-                    let categories = categoryStore.categories(for: item)
-                    CategoryLabelsView(categories: categories.isEmpty ? [categoryStore.noneCategory()] : categories)
-                }
-                if let createdAt = item.metadata?.createdAt {
-                    LabeledContent("Registered") { Text(createdAt, format: .dateTime) }
-                }
-                ScrollView {
-                    Text(verbatim: String(item.content.prefix(4000)))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 160)
-                if item.characterCount > 4000 {
-                    Text("Preview limited to 4,000 characters").font(.caption)
-                }
+                editor(for: item)
             } else {
                 Text("Item unavailable")
-            }
-            if !errorMessage.isEmpty { Text(LocalizedStringKey(errorMessage)).foregroundStyle(.red) }
-            HStack {
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Save") { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(currentItem == nil)
+            }
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+            }
+            Divider()
+            footer
+        }
+        .padding(.horizontal, 26)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(windowSurface)
+    }
+
+    private var footer: some View {
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
+            Button(action: cancel) {
+                Text("Cancel").frame(minWidth: 86)
+            }
+            .buttonStyle(ClipEditorButtonStyle(fill: fieldFill, foreground: .primary, border: fieldBorder))
+            .keyboardShortcut(.cancelAction)
+            .disabled(isSaving)
+            Button(action: save) {
+                Text("Save").frame(minWidth: 68)
+            }
+            .buttonStyle(ClipEditorButtonStyle(fill: accent, foreground: .white, border: .clear))
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(!canSave)
+        }
+    }
+
+    private func editor(for item: ClipItem) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                sectionTitle("Title")
+                TextField("Title", text: $title)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 11)
+                    .frame(height: 31)
+                    .background(fieldFill, in: fieldShape)
+                    .overlay {
+                        fieldShape.strokeBorder(isTitleFocused ? accent.opacity(0.65) : fieldBorder)
+                            .allowsHitTesting(false)
+                    }
+                    .focused($isTitleFocused)
+                    .onSubmit(save)
+                    .disabled(isSaving)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                sectionTitle("Content")
+                SimpleLineNumberView(
+                    text: $content,
+                    font: fontManager.editorFont,
+                    isEditable: !isSaving,
+                    onDoubleClick: nil,
+                    onEscape: cancel,
+                    textColor: .textColor,
+                    rulerBackgroundColor: rulerFill,
+                    onScrollChange: nil
+                )
+                .accessibilityLabel(Text("Content"))
+                .frame(minHeight: 100, maxHeight: .infinity)
+                .background(fieldFill, in: fieldShape)
+                .clipShape(fieldShape)
+                .overlay { fieldShape.strokeBorder(fieldBorder).allowsHitTesting(false) }
+
+                if item.richText != nil, editedContent != nil {
+                    Text("Content changes are saved as plain text.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+            lowerSection(for: item)
+        }
+    }
+
+    private func lowerSection(for item: ClipItem) -> some View {
+        GeometryReader { geometry in
+            HStack(alignment: .top, spacing: 16) {
+                categoryPicker(for: item)
+                    .frame(width: min(196, geometry.size.width * 0.34), alignment: .leading)
+                Divider()
+                metadata(for: item)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20)
-        .frame(width: 420)
+        .frame(height: 146)
+    }
+
+    private func sectionTitle(_ key: LocalizedStringKey) -> some View {
+        Text(key).font(.subheadline.weight(.semibold))
+    }
+
+    private func metadata(for item: ClipItem) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Item metadata")
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 7) {
+                GridRow {
+                    metadataLabel("Source")
+                    if let sourceApp = item.sourceApp {
+                        Text(verbatim: sourceApp).help(sourceApp)
+                    } else {
+                        Text("Unknown")
+                    }
+                }
+                if let windowTitle = HistoryItemPreviewContent.nonempty(item.windowTitle) {
+                    GridRow {
+                        metadataLabel("Source window")
+                        Text(verbatim: windowTitle).help(windowTitle)
+                    }
+                }
+                if editingItemID != nil, let createdAt = item.metadata?.createdAt {
+                    GridRow {
+                        metadataLabel("Registered")
+                        metadataDate(createdAt)
+                    }
+                }
+                if editingItemID != nil {
+                    GridRow {
+                        metadataLabel("Copied at")
+                        metadataDate(item.timestamp)
+                    }
+                }
+                GridRow {
+                    metadataLabel("Character count")
+                    Text(content.count, format: .number)
+                }
+            }
+            .font(.callout)
+            .monospacedDigit()
+            .lineLimit(1)
+        }
+    }
+
+    private func metadataLabel(_ key: LocalizedStringKey) -> some View {
+        Text(key)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minWidth: 105, alignment: .leading)
+    }
+
+    private func metadataDate(_ date: Date) -> some View {
+        Text(date, format: .dateTime.month(.defaultDigits).day().hour(.twoDigits(amPM: .abbreviated)).minute())
+            .help(date.formatted(.dateTime.locale(appSettings.appLocale)))
+    }
+
+    private func categoryPicker(for item: ClipItem) -> some View {
+        let currentSelection = editedContent.map { item.categoryIDs(forDraftContent: $0) } ?? item.categoryIDs
+        let initialSelection = originalItem.categoryIDs
+        let categories = categoryStore.assignable()
+        let ordered = categories.filter { initialSelection.contains($0.id) }
+            + categories.filter { !initialSelection.contains($0.id) }
+        return VStack(alignment: .leading, spacing: 8) {
+            sectionTitle("Categories")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(ordered) { category in
+                        let isInitiallySelected = currentSelection.contains(category.id)
+                        Toggle(isOn: Binding(
+                            get: { categoryChanges[category.id] ?? isInitiallySelected },
+                            set: { enabled in categoryChanges[category.id] = enabled == isInitiallySelected ? nil : enabled }
+                        )) {
+                            HStack(spacing: 8) {
+                                Image(systemName: categoryStore.iconName(for: category))
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 18)
+                                    .accessibilityHidden(true)
+                                Text(verbatim: category.name).lineLimit(1)
+                            }
+                            .help(category.name)
+                        }
+                        .toggleStyle(ClipEditorCheckboxStyle(tint: accent, fill: fieldFill, border: fieldBorder))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(2)
+            }
+            .frame(height: 105)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .disabled(isSaving)
+    }
+
+    private func cancel() {
+        guard !isSaving else { return }
+        onClose()
     }
 
     private func save() {
+        guard canSave else { return }
+        let changes = categoryChanges
+        let title = editedTitle
+        let content = editedContent
+        isSaving = true
+        onSavingChanged(true)
+        errorMessage = nil
         Task {
-            do {
-                try await ModernClipboardService.shared.updateDetails(id: itemID, title: title)
-                dismiss()
-            } catch {
-                errorMessage = "Could not save. Check the title."
+            defer {
+                isSaving = false
+                onSavingChanged(false)
             }
+            do {
+                if let editingItemID {
+                    try await adapter.updateDetails(
+                        itemID: editingItemID, title: title, content: content, categoryChanges: changes
+                    )
+                } else {
+                    try await adapter.createHistoryItem(title: title, content: content ?? "", categoryChanges: changes)
+                }
+                onClose()
+            } catch {
+                if case .categoryUnavailable = error as? ClipItemEditError {
+                    let availableIDs = Set(categoryStore.assignable().map(\.id))
+                    categoryChanges = categoryChanges.filter { availableIDs.contains($0.key) }
+                }
+                errorMessage = editErrorMessage(error)
+            }
+        }
+    }
+
+    private func editErrorMessage(_ error: Error) -> LocalizedStringKey {
+        switch error as? ClipItemEditError {
+        case .itemUnavailable: "Item unavailable"
+        case .invalidTitle: "Enter a title of up to 120 characters."
+        case .emptyContent: "Enter some content."
+        case .duplicateContent: "Another history item already has this content."
+        case .categoryUnavailable: "A selected category is no longer available."
+        case nil: "Could not save the item. Please try again."
+        }
+    }
+}
+
+private struct ClipEditorButtonStyle: ButtonStyle {
+    let fill: Color
+    let foreground: Color
+    let border: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: KippleGlassMetrics.inputCornerRadius)
+        configuration.label
+            .font(.callout.weight(.semibold))
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .foregroundStyle(foreground)
+            .background(fill, in: shape)
+            .overlay(shape.strokeBorder(border).allowsHitTesting(false))
+            .contentShape(shape)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.78 : 1) : 0.45)
+    }
+}
+
+private struct ClipEditorCheckboxStyle: ToggleStyle {
+    let tint: Color
+    let fill: Color
+    let border: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            HStack(spacing: 10) {
+                let shape = RoundedRectangle(cornerRadius: 4)
+                shape
+                    .fill(configuration.isOn ? tint : fill)
+                    .overlay(shape.strokeBorder(configuration.isOn ? .clear : border))
+                    .overlay {
+                        if configuration.isOn {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .frame(width: 16, height: 16)
+                    .accessibilityHidden(true)
+                configuration.label
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 23)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : 0.45)
+        .accessibilityRepresentation {
+            Toggle(isOn: configuration.$isOn) { configuration.label }
+                .toggleStyle(.checkbox)
         }
     }
 }

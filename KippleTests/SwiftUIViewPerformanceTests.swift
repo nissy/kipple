@@ -96,6 +96,7 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
                     isQueuePreviewed: false,
                     isScrollLocked: false,
                     onTap: {},
+                    onEdit: {},
                     onDelete: {},
                     onChangeCategory: { _ in },
                     onOpenCategoryManager: {},
