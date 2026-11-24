@@ -31,7 +31,7 @@ final class ClipItemEditorWindow: NSWindow {
         let verticalPadding = FontManager.currentEditorLayoutSettings().verticalPadding
         let bodyHeight = lineHeight * 10 + verticalPadding * 2
         let controlsHeight: CGFloat = 404
-        return NSSize(width: 560, height: controlsHeight + bodyHeight)
+        return NSSize(width: 460, height: controlsHeight + bodyHeight)
     }
     let target: Target
     var isSaving = false
@@ -44,6 +44,11 @@ final class ClipItemEditorWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        guard (firstResponder as? NSTextView)?.hasMarkedText() != true else { return }
+        performClose(sender)
     }
 }
 

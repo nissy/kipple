@@ -102,7 +102,6 @@ struct ClipDetailsView: View {
                 Text("Cancel").frame(minWidth: 86)
             }
             .buttonStyle(ClipEditorButtonStyle(fill: fieldFill, foreground: .primary, border: fieldBorder))
-            .keyboardShortcut(.cancelAction)
             .disabled(isSaving)
             Button(action: save) {
                 Text("Save").frame(minWidth: 68)

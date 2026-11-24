@@ -77,7 +77,7 @@ final class WindowSheetBehaviorTests: XCTestCase {
         let window = manager.openItemEditor(item)
         defer { window.close() }
         let visibleFrame = try XCTUnwrap((mainWindow.screen ?? NSScreen.main)?.visibleFrame)
-        XCTAssertEqual(window.frame.width, min(560, visibleFrame.width), accuracy: 1)
+        XCTAssertEqual(window.frame.width, min(460, visibleFrame.width), accuracy: 1)
         XCTAssertEqual(window.frame.height, min(ClipItemEditorWindow.initialContentSize.height, visibleFrame.height), accuracy: 1)
         XCTAssertEqual(window.frame.midX, visibleFrame.midX, accuracy: 1)
         XCTAssertEqual(window.frame.midY, visibleFrame.midY, accuracy: 1)
@@ -130,6 +130,69 @@ final class WindowSheetBehaviorTests: XCTestCase {
         let viewport = try XCTUnwrap(editor.enclosingScrollView?.contentSize)
         let lineHeight = try XCTUnwrap(editor.defaultParagraphStyle?.minimumLineHeight)
         XCTAssertEqual(viewport.height - editor.textContainerInset.height * 2, lineHeight * 10, accuracy: 1)
+    }
+
+    func testEscapeKeepsHistoryDraftOpenWhileBodyHasMarkedText() async throws {
+        let manager = WindowManager()
+        let window = manager.openItemEditor()
+        defer { window.close() }
+        await Task.yield()
+        window.displayIfNeeded()
+
+        let editor = try XCTUnwrap(window.contentView.flatMap(findEditor))
+        XCTAssertTrue(window.makeFirstResponder(editor))
+        let draft = "編集中の本文"
+        editor.string = draft
+        editor.didChangeText()
+        editor.setMarkedText(
+            "へんかん",
+            selectedRange: NSRange(location: 4, length: 0),
+            replacementRange: NSRange(location: draft.utf16.count, length: 0)
+        )
+        XCTAssertTrue(editor.hasMarkedText())
+
+        let escape = try escapeEvent(for: window)
+        window.sendEvent(escape)
+
+        XCTAssertTrue(window.isVisible)
+        XCTAssertTrue(editor.string.hasPrefix(draft))
+
+        editor.unmarkText()
+        window.sendEvent(escape)
+        XCTAssertFalse(window.isVisible)
+    }
+
+    func testEscapeKeepsHistoryDraftOpenWhileTitleHasMarkedText() async throws {
+        let manager = WindowManager()
+        let window = manager.openItemEditor()
+        defer { window.close() }
+        await Task.yield()
+        window.displayIfNeeded()
+
+        let titleEditor = try XCTUnwrap(window.firstResponder as? NSTextView)
+        XCTAssertTrue(titleEditor.isFieldEditor)
+        titleEditor.setMarkedText(
+            "へんかん",
+            selectedRange: NSRange(location: 4, length: 0),
+            replacementRange: NSRange(location: 0, length: 0)
+        )
+        XCTAssertTrue(titleEditor.hasMarkedText())
+
+        let escape = try escapeEvent(for: window)
+        window.sendEvent(escape)
+        XCTAssertTrue(window.isVisible)
+
+        titleEditor.unmarkText()
+        window.sendEvent(escape)
+        XCTAssertFalse(window.isVisible)
+    }
+
+    private func escapeEvent(for window: NSWindow) throws -> NSEvent {
+        try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "\u{1B}",
+            charactersIgnoringModifiers: "\u{1B}", isARepeat: false, keyCode: 53
+        ))
     }
 
     private func findEditor(in view: NSView) -> LiveEditorTextView? {

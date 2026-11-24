@@ -19,10 +19,16 @@ enum ClipItemEditError: Error {
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
+    struct QueueHeadChange {
+        let revision: UInt64
+        let itemID: UUID?
+    }
+
     struct HistorySnapshot {
         let items: [ClipItem]
         let revision: UInt64
         let isLoaded: Bool
+        let lastQueueHeadChange: QueueHeadChange?
     }
 
     // MARK: - Properties
@@ -54,6 +60,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var saveCancellable: AnyCancellable?
     private var persistedSnapshot: [UUID: ClipItem] = [:]
     private var historyRevision: UInt64 = 0
+    private var lastQueueHeadChange: QueueHeadChange?
     private var itemIDByContent: [String: UUID] = [:]
 
     // MARK: - Singleton
@@ -230,7 +237,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     }
 
     func getHistorySnapshot() -> HistorySnapshot {
-        HistorySnapshot(items: history, revision: historyRevision, isLoaded: isRepositoryReady)
+        HistorySnapshot(
+            items: history, revision: historyRevision, isLoaded: isRepositoryReady, lastQueueHeadChange: lastQueueHeadChange
+        )
     }
 
     func startMonitoring() async {
@@ -908,8 +917,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         }
     }
 
-    private func markHistoryChanged() {
+    private func markHistoryChanged(checkQueueHead: Bool = true) {
         historyRevision &+= 1
+        if checkQueueHead {
+            lastQueueHeadChange = QueueHeadChange(revision: historyRevision, itemID: history.first?.id)
+        }
     }
 
     private func rebuildContentLookup() {
@@ -1095,7 +1107,7 @@ extension ModernClipboardService {
         try await saveHistory(candidate)
         history = candidate
         rebuildContentLookup()
-        markHistoryChanged()
+        markHistoryChanged(checkQueueHead: false)
         notifyHistoryObservers(content: item.content)
     }
 
