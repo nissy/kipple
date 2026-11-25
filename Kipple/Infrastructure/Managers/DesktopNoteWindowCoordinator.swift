@@ -93,19 +93,27 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
 }
 
 final class DesktopNotePanel: NSPanel {
-    private static let controlsHeight: CGFloat = 32
+    private enum PointerGesture {
+        case move(start: NSPoint)
+        case select(start: NSPoint, didDrag: Bool)
+    }
+
+    private static let minimumResizeSize = NSSize(width: 170, height: 120)
     private let glassController: GlassWindowContentController<DesktopNoteContent>
     private let colorStrip = NSView()
     private let initialScreenFrame: NSRect
     private let onSave: ((String) async throws -> Void)?
     private let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
+    private let openLink: (URL) -> Void
     private var categoryControl: NSHostingView<DesktopNoteCategoryMenu>?
     private var displayModeButton: NSButton?
     private var controls: [NSView] = []
     private var displayMode: AppSettings.DesktopNoteDisplayMode
     private var selectedColor = DesktopNoteColor.none
-    private var dragOffset: NSPoint?
-    private var hasDragged = false
+    private let textHitViews = NSHashTable<DesktopNoteTextHitView>.weakObjects()
+    private var pointerGesture: PointerGesture?
+    private var pendingLink: URL?
+    private var manualSize: NSSize?
     private var editor: DesktopNoteEditor?
     private var isSaving = false
     private var closeAfterSave = false
@@ -119,7 +127,7 @@ final class DesktopNotePanel: NSPanel {
         displayMode: AppSettings.DesktopNoteDisplayMode = .plainText,
         onSave: ((String) async throws -> Void)? = nil,
         onChangeCategory: ((ClipCategoryChange) async throws -> Void)? = nil,
-        openLink: @escaping (URL) -> OpenURLAction.Result = { _ in .systemAction }
+        openLink: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
     ) {
         var content = DesktopNoteContent(item: item, displayMode: displayMode)
         let size = Self.contentSize(for: content, screenFrame: screenFrame)
@@ -127,6 +135,7 @@ final class DesktopNotePanel: NSPanel {
         self.displayMode = displayMode
         self.onSave = onSave
         self.onChangeCategory = onChangeCategory
+        self.openLink = openLink
         glassController = GlassWindowContentController(
             rootView: content,
             cornerRadius: HistoryItemPreviewContent.cornerRadius
@@ -150,8 +159,14 @@ final class DesktopNotePanel: NSPanel {
         hasShadow = true
         backgroundColor = .clear
         content.openURL = OpenURLAction { [weak self] url in
-            guard let self, !self.hasDragged else { return .discarded }
-            return openLink(url)
+            guard let self else { return .discarded }
+            // Textual can request a link on mouse down. Open it only after a click completes.
+            if case .select = self.pointerGesture {
+                self.pendingLink = url
+            } else {
+                self.openLink(url)
+            }
+            return .handled
         }
         glassController.hostingController.rootView = content
         contentViewController = glassController
@@ -169,71 +184,113 @@ final class DesktopNotePanel: NSPanel {
         if let categoryControl, categoryControl.rootView.item.categoryIDs != item.categoryIDs {
             categoryControl.rootView.item = item
         }
-        let previous = glassController.hostingController.rootView.preview.item
+        let previous = glassController.hostingController.rootView.item
         guard item.title != previous.title || item.content != previous.content else { return }
         reloadPreview(for: item)
     }
 
     private func reloadPreview(for item: ClipItem) {
         var content = DesktopNoteContent(item: item, displayMode: displayMode)
-        content.preview.showsBody = editor == nil
+        content.showsBody = editor == nil
         content.openURL = glassController.hostingController.rootView.openURL
         title = HistoryItemPreviewContent.nonempty(item.title) ?? ""
         glassController.hostingController.rootView = content
-        if editor == nil { resize(to: Self.contentSize(for: content, screenFrame: availableFrame)) }
+        if editor == nil { resize(to: manualSize ?? Self.contentSize(for: content, screenFrame: availableFrame)) }
     }
 
     private var availableFrame: NSRect { screen?.visibleFrame ?? initialScreenFrame }
 
-    private func resize(to size: NSSize) {
+    private var minimumManualHeight: CGFloat {
+        // Reserve space for a title that wraps onto two lines above the document.
+        title.isEmpty ? Self.minimumResizeSize.height : Self.minimumResizeSize.height + 40
+    }
+
+    private func resize(to requestedSize: NSSize) {
+        let screen = availableFrame
+        let height = manualSize == nil ? requestedSize.height : max(requestedSize.height, minimumManualHeight)
+        let size = NSSize(width: min(requestedSize.width, screen.width), height: min(height, screen.height))
         guard size != frame.size else { return }
         let origin = NSPoint(
-            x: min(frame.minX, availableFrame.maxX - size.width),
-            y: max(frame.maxY - size.height, availableFrame.minY)
+            x: min(frame.minX, screen.maxX - size.width),
+            y: max(frame.maxY - size.height, screen.minY)
         )
         setFrame(NSRect(origin: origin, size: size), display: true)
     }
 
+    func resizeFromBottomRight(startFrame: NSRect, displacement: NSPoint) {
+        let screen = availableFrame
+        let minHeight = minimumManualHeight
+        let maxWidth = min(screen.width, max(Self.minimumResizeSize.width, screen.maxX - startFrame.minX))
+        let maxHeight = min(screen.height, max(minHeight, startFrame.maxY - screen.minY))
+        let width = min(max(startFrame.width + displacement.x, Self.minimumResizeSize.width), maxWidth)
+        let height = min(max(startFrame.height - displacement.y, minHeight), maxHeight)
+        let size = NSSize(width: width, height: height)
+        guard frame.size != size else { return }
+        manualSize = size
+        resize(to: size)
+    }
+
     override func sendEvent(_ event: NSEvent) {
-        let forwardsLinkEvents = displayMode == .markdown && editor == nil
         switch event.type {
         case .leftMouseDown:
-            dragOffset = nil
-            hasDragged = false
-            guard isNoteBody(at: event.locationInWindow) else { break }
-            if event.clickCount == 2, editor == nil, onSave != nil {
-                beginEditing(at: convertPoint(toScreen: event.locationInWindow))
-            } else {
-                dragOffset = event.locationInWindow
-                if forwardsLinkEvents { super.sendEvent(event) }
-            }
-            return
+            if handleMouseDown(event) { return }
         case .leftMouseDragged:
-            if let dragOffset {
-                let location = event.locationInWindow
-                // Let the text cancel its link click before the window follows the pointer.
-                if forwardsLinkEvents {
-                    hasDragged = hasDragged || hypot(location.x - dragOffset.x, location.y - dragOffset.y) >= 3
-                    super.sendEvent(event)
-                    guard hasDragged else { return }
-                }
-                let pointer = convertPoint(toScreen: event.locationInWindow)
-                setFrameOrigin(NSPoint(x: pointer.x - dragOffset.x, y: pointer.y - dragOffset.y))
+            let point = event.locationInWindow
+            switch pointerGesture {
+            case .move(let start):
+                let pointer = convertPoint(toScreen: point)
+                setFrameOrigin(NSPoint(x: pointer.x - start.x, y: pointer.y - start.y))
                 return
+            case let .select(start, didDrag):
+                let distance = hypot(point.x - start.x, point.y - start.y)
+                pointerGesture = .select(start: start, didDrag: didDrag || distance >= 3)
+            case nil:
+                break
             }
         case .leftMouseUp:
-            if dragOffset != nil {
-                if forwardsLinkEvents { super.sendEvent(event) }
-                dragOffset = nil
-                hasDragged = false
-                return
-            }
+            if finishPointerGesture(event) { return }
         case .keyDown:
             if editor != nil, handleEditingKey(event) { return }
         default:
             break
         }
         super.sendEvent(event)
+    }
+
+    func registerTextHitView(_ view: DesktopNoteTextHitView) {
+        textHitViews.add(view)
+    }
+
+    private func handleMouseDown(_ event: NSEvent) -> Bool {
+        pointerGesture = nil
+        pendingLink = nil
+        let point = event.locationInWindow
+        guard isNoteBody(at: point) else { return false }
+        if event.clickCount == 2, editor == nil, onSave != nil {
+            beginEditing(at: convertPoint(toScreen: point))
+            return true
+        }
+        if editor == nil, textHitViews.allObjects.contains(where: { $0.containsText(at: point) }) {
+            pointerGesture = .select(start: point, didDrag: false)
+            if !isKeyWindow { makeKey() }
+            return false
+        }
+        pointerGesture = .move(start: point)
+        return true
+    }
+
+    private func finishPointerGesture(_ event: NSEvent) -> Bool {
+        guard let pointerGesture else { return false }
+        if case .select(_, let didDrag) = pointerGesture {
+            super.sendEvent(event)
+            let link = didDrag ? nil : pendingLink
+            self.pointerGesture = nil
+            pendingLink = nil
+            if let link { openLink(link) }
+        } else {
+            self.pointerGesture = nil
+        }
+        return true
     }
 
     override func performClose(_ sender: Any?) {
@@ -251,8 +308,9 @@ final class DesktopNotePanel: NSPanel {
     }
 
     private func isNoteBody(at point: NSPoint) -> Bool {
-        guard let contentView,
-              contentView.bounds.contains(contentView.convert(point, from: nil)) else { return false }
+        guard let contentView else { return false }
+        let location = contentView.convert(point, from: nil)
+        guard contentView.bounds.contains(location), !(contentView.hitTest(location) is NSScroller) else { return false }
         let interactiveViews = controls + (editor.map { [$0.view] } ?? [])
         return !interactiveViews.contains { $0.bounds.contains($0.convert(point, from: nil)) }
     }
@@ -260,11 +318,11 @@ final class DesktopNotePanel: NSPanel {
     private func beginEditing(at screenPoint: NSPoint) {
         let host = glassController.hostingController
         var content = host.rootView
-        guard let editor = DesktopNoteEditor(text: content.preview.item.content, font: content.preview.historyFont)
+        guard let editor = DesktopNoteEditor(text: content.item.content, font: content.historyFont)
         else { return }
         let padding = HistoryItemPreviewContent.contentPadding
-        content.preview.showsBody = false
-        let headingHeight = title.isEmpty ? 0 : NSHostingController(rootView: content.preview)
+        content.showsBody = false
+        let headingHeight = title.isEmpty ? 0 : NSHostingController(rootView: content.titlePreview)
             .sizeThatFits(in: NSSize(width: frame.width - 2 * padding, height: .infinity)).height
             + HistoryItemPreviewText.spacing
         host.rootView = content
@@ -276,9 +334,9 @@ final class DesktopNotePanel: NSPanel {
             editor.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
             editor.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -padding),
             editor.view.topAnchor.constraint(equalTo: container.topAnchor, constant: padding + headingHeight),
-            editor.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.controlsHeight)
+            editor.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -DesktopNoteContent.controlsHeight)
         ])
-        let height = max(frame.height, padding + headingHeight + Self.controlsHeight + 40)
+        let height = max(frame.height, padding + headingHeight + DesktopNoteContent.controlsHeight + 40)
         resize(to: NSSize(width: frame.width, height: min(availableFrame.height, height)))
         container.layoutSubtreeIfNeeded()
         makeKeyAndOrderFront(nil)
@@ -338,7 +396,7 @@ final class DesktopNotePanel: NSPanel {
             changeDisplayModeAfterSave = false
             flipDisplayMode()
         }
-        reloadPreview(for: glassController.hostingController.rootView.preview.item)
+        reloadPreview(for: glassController.hostingController.rootView.item)
         if closeAfterSave {
             closeAfterSave = false
             close()
@@ -347,11 +405,12 @@ final class DesktopNotePanel: NSPanel {
 
     private static func contentSize(for content: DesktopNoteContent, screenFrame: NSRect) -> NSSize {
         let maxWidth = min(420, screenFrame.width)
-        let sizing = NSHostingController(rootView: content.paddedPreview)
+        let sizing = NSHostingController(rootView: content.sizingPreview)
         let ideal = sizing.sizeThatFits(in: NSSize(width: maxWidth, height: .infinity))
-        let width = min(maxWidth, max(144, ceil(ideal.width)))
+        let width = min(maxWidth, max(Self.minimumResizeSize.width, ceil(ideal.width)))
         let wrapped = sizing.sizeThatFits(in: NSSize(width: width, height: .infinity))
-        return NSSize(width: width, height: min(screenFrame.height, ceil(wrapped.height) + controlsHeight))
+        let height = min(screenFrame.height, ceil(wrapped.height) + DesktopNoteContent.controlsHeight)
+        return NSSize(width: width, height: height)
     }
 
     private func installColorStrip(in view: NSView) {
@@ -392,7 +451,7 @@ final class DesktopNotePanel: NSPanel {
         displayModeButton = format
         updateDisplayModeButton()
         let close = makeButton("xmark", labelKey: "Remove Desktop Note", action: #selector(performClose(_:)))
-        controls.append(contentsOf: [palette, format, close])
+        controls.append(contentsOf: [palette, format, close, DesktopNoteResizeHandle(frame: .zero)])
         let stack = NSStackView(views: controls)
         stack.spacing = 4
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -410,7 +469,7 @@ final class DesktopNotePanel: NSPanel {
             return
         }
         flipDisplayMode()
-        reloadPreview(for: glassController.hostingController.rootView.preview.item)
+        reloadPreview(for: glassController.hostingController.rootView.item)
     }
 
     private func flipDisplayMode() {
@@ -463,42 +522,5 @@ final class DesktopNotePanel: NSPanel {
         selectedColor = color
         colorStrip.layer?.backgroundColor = color.fill?.cgColor
         colorStrip.isHidden = color.fill == nil
-    }
-}
-
-private struct DesktopNoteCategoryMenu: View {
-    var item: ClipItem
-    let onChangeCategory: (ClipCategoryChange) async throws -> Void
-    let onOpenCategoryManager: () -> Void
-    @ObservedObject private var appSettings = AppSettings.shared
-
-    var body: some View {
-        HistoryCategoryMenu(
-            item: item,
-            isSelected: false,
-            onChangeCategory: onChangeCategory,
-            onOpenCategoryManager: onOpenCategoryManager
-        )
-        .environment(\.locale, appSettings.appLocale)
-    }
-}
-
-private enum DesktopNoteColor: String, CaseIterable {
-    case none = "No Note Color"
-    case yellow = "Yellow Note Color"
-    case orange = "Orange Note Color"
-    case blue = "Blue Note Color"
-    case green = "Green Note Color"
-    case pink = "Pink Note Color"
-
-    var fill: NSColor? {
-        switch self {
-        case .none: nil
-        case .yellow: NSColor.systemYellow
-        case .orange: NSColor.systemOrange
-        case .blue: NSColor.systemBlue
-        case .green: NSColor.systemGreen
-        case .pink: NSColor.systemPink
-        }
     }
 }

@@ -30,6 +30,9 @@ packages:
     url: https://github.com/modelcontextprotocol/swift-sdk.git
     # Fix nested initialize capabilities (upstream PR #276); use a release once included.
     revision: f7077e0d5cd57e0b2a497862017aa94ee344252f
+  Textual:
+    url: https://github.com/gonzalezreal/textual.git
+    exactVersion: 0.5.0
   Yams:
     url: https://github.com/jpsim/Yams.git
     from: 6.2.2
@@ -83,6 +86,7 @@ targets:
           destination: wrapper
           subpath: Contents/Helpers
       - sdk: libsqlite3.tbd
+      - package: Textual
       - package: Yams
     preBuildScripts: []
     postBuildScripts: []

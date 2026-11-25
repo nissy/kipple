@@ -1,106 +1,284 @@
 import AppKit
 import SwiftUI
+import Textual
 
 struct DesktopNoteContent: View {
-    var preview: HistoryItemPreviewText
+    static let controlsHeight: CGFloat = 32
+
+    let item: ClipItem
+    let displayMode: AppSettings.DesktopNoteDisplayMode
+    let historyFont = FontManager.shared.historyFont
+    var showsBody = true
     var openURL: OpenURLAction?
 
-    init(item: ClipItem, displayMode: AppSettings.DesktopNoteDisplayMode) {
-        let font = FontManager.shared.historyFont
-        preview = HistoryItemPreviewText(item: item, historyFont: font)
-        if displayMode == .markdown {
-            let text = HistoryItemPreviewContent.makePreviewText(for: item)
-            preview.formattedBody = DesktopNoteMarkdown.render(text, baseFont: font)
+    var body: some View {
+        VStack(alignment: .leading, spacing: HistoryItemPreviewText.spacing) {
+            if HistoryItemPreviewContent.nonempty(item.title) != nil {
+                titlePreview
+                    .textSelection(.enabled)
+                    .modifier(DesktopNoteTextRegions())
+                    .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+            }
+            if showsBody {
+                ScrollView(.vertical) {
+                    document
+                        .modifier(DesktopNoteTextRegions())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+                        .padding(.bottom, 8)
+                }
+                .scrollIndicators(.visible)
+            }
+        }
+        .padding(.top, HistoryItemPreviewContent.contentPadding)
+        .padding(.bottom, Self.controlsHeight)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .foregroundStyle(.primary)
+        .transformEnvironment(\.openURL) { action in
+            if let openURL { action = openURL }
         }
     }
 
-    var body: some View {
-        paddedPreview.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .transformEnvironment(\.openURL) { action in
-                if let openURL { action = openURL }
-            }
+    var titlePreview: some View {
+        HistoryItemPreviewTitle(title: item.title)
     }
 
-    var paddedPreview: some View {
-        preview
-            .foregroundStyle(.primary)
+    // Estimate the initial window size without laying out the whole scrollable document twice.
+    var sizingPreview: some View {
+        HistoryItemPreviewText(item: item, historyFont: historyFont)
             .padding(HistoryItemPreviewContent.contentPadding)
+    }
+
+    @ViewBuilder
+    private var document: some View {
+        switch displayMode {
+        case .plainText:
+            Text(verbatim: item.content)
+                .font(Font(historyFont))
+                .lineSpacing(3)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        case .markdown:
+            DesktopNoteMarkdown(source: item.content, font: Font(historyFont))
+        }
     }
 }
 
-enum DesktopNoteMarkdown {
-    static func render(_ source: String, baseFont: NSFont) -> AttributedString? {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
-        guard let parsed = try? AttributedString(markdown: source, options: options),
-              !parsed.characters.isEmpty else { return nil }
+private struct DesktopNoteMarkdown: View {
+    let source: String
+    let font: Font
 
-        var result = AttributedString()
-        var previous: [PresentationIntent.IntentType] = []
-        for run in parsed.runs {
-            let block = run.presentationIntent?.components ?? []
-            if block != previous {
-                if !result.characters.isEmpty {
-                    if let row = tableRow(in: block), row == tableRow(in: previous) {
-                        result.append(AttributedString("  │  "))
-                    } else if result.characters.last != "\n" {
-                        result.append(AttributedString("\n"))
+    var body: some View {
+        StructuredText(markdown: source)
+            .font(font)
+            .textual.headingStyle(HeadingStyle())
+            .textual.paragraphStyle(ParagraphStyle())
+            .textual.codeBlockStyle(CodeBlockStyle())
+            .textual.tableStyle(TableStyle())
+            .textual.tableCellStyle(TableCellStyle())
+            .textual.overflowMode(.scroll)
+            .textual.textSelection(.enabled)
+    }
+
+    private struct HeadingStyle: StructuredText.HeadingStyle {
+        private static let fontScales: [CGFloat] = [1.24, 1.16, 1.08, 1, 1, 1]
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .textual.fontScale(Self.fontScales[configuration.headingLevel - 1])
+                .fontWeight(.semibold)
+                .lineSpacing(3)
+                .textual.blockSpacing(.init(top: 10, bottom: 4))
+        }
+    }
+
+    private struct ParagraphStyle: StructuredText.ParagraphStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .lineSpacing(3)
+                .textual.blockSpacing(.init(top: 6))
+        }
+    }
+
+    private struct TableStyle: StructuredText.TableStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            Overflow { state in
+                StructuredText.DefaultTableStyle()
+                    .makeBody(configuration: configuration)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: state.containerWidth.map { $0 * 3 }, alignment: .leading)
+                    .modifier(DesktopNoteTextRegions())
+            }
+            .textual.tableCellSpacing(horizontal: 1, vertical: 1)
+            .textual.blockSpacing(.init(top: 8, bottom: 8))
+        }
+    }
+
+    private struct CodeBlockStyle: StructuredText.CodeBlockStyle {
+        private static let background = DynamicColor(
+            light: Color(red: 0.961, green: 0.961, blue: 0.969),
+            dark: Color(red: 0.121, green: 0.123, blue: 0.141)
+        )
+        private static let border = DynamicColor(
+            light: Color(red: 210 / 255, green: 210 / 255, blue: 215 / 255),
+            dark: Color(red: 66 / 255, green: 66 / 255, blue: 69 / 255)
+        )
+
+        func makeBody(configuration: Configuration) -> some View {
+            Overflow {
+                configuration.label
+                    .textual.lineSpacing(.fontScaled(0.39))
+                    .textual.fontScale(0.882)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .monospaced()
+                    .modifier(DesktopNoteTextRegions())
+                    .padding(.vertical, 8)
+                    .padding(.leading, 14)
+            }
+            .background(Self.background, in: .rect(cornerRadius: 4))
+            .clipShape(.rect(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Self.border, lineWidth: 1))
+            .textual.blockSpacing(.fontScaled(top: 0.88, bottom: 0))
+        }
+    }
+
+    private struct TableCellStyle: StructuredText.TableCellStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .fontWeight(configuration.row == 0 ? .semibold : .regular)
+                .lineSpacing(3)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+        }
+    }
+}
+
+private struct DesktopNoteTextRegions: ViewModifier {
+    func body(content: Content) -> some View {
+        content.overlayPreferenceValue(Text.LayoutKey.self) { layouts in
+            GeometryReader { geometry in
+                RegionView(lines: layouts.flatMap { anchored in
+                    let origin = geometry[anchored.origin]
+                    return anchored.layout.map { line in
+                        line.typographicBounds.rect.offsetBy(dx: origin.x, dy: origin.y)
                     }
-                }
-                result.append(AttributedString(blockPrefix(block, following: previous)))
-                previous = block
+                })
             }
-            var text = AttributedString(parsed[run.range])
-            text.presentationIntent = nil
-            text.font = displayFont(for: run, baseFont: baseFont)
-            result.append(text)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
-        return result
     }
 
-    private static func blockPrefix(
-        _ block: [PresentationIntent.IntentType], following previous: [PresentationIntent.IntentType]
-    ) -> String {
-        let quote = String(repeating: "│ ", count: block.count { $0.kind == .blockQuote })
-        let listItems = block.filter {
-            if case .listItem = $0.kind { return true }
-            return false
-        }
-        guard let item = listItems.first, case let .listItem(ordinal) = item.kind else { return quote }
-        let indent = String(repeating: "  ", count: listItems.count - 1)
-        if previous.contains(item) { return quote + indent + "  " }
-        let list = block.first { $0.kind == .orderedList || $0.kind == .unorderedList }
-        let marker = list?.kind == .orderedList ? "\(ordinal). " : "• "
-        return quote + indent + marker
+    private struct RegionView: NSViewRepresentable {
+        let lines: [CGRect]
+
+        func makeNSView(context: Context) -> DesktopNoteTextHitView { DesktopNoteTextHitView() }
+
+        func updateNSView(_ view: DesktopNoteTextHitView, context: Context) { view.lines = lines }
+    }
+}
+
+@MainActor
+final class DesktopNoteTextHitView: NSView {
+    var lines: [CGRect] = []
+
+    override var isFlipped: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        (window as? DesktopNotePanel)?.registerTextHitView(self)
     }
 
-    private static func tableRow(in block: [PresentationIntent.IntentType]) -> Int? {
-        block.first {
-            switch $0.kind {
-            case .tableRow, .tableHeaderRow: true
-            default: false
-            }
-        }?.identity
+    func containsText(at windowPoint: NSPoint) -> Bool {
+        guard window != nil, !isHiddenOrHasHiddenAncestor else { return false }
+        let point = convert(windowPoint, from: nil)
+        return visibleRect.contains(point) && lines.contains { $0.contains(point) }
+    }
+}
+
+struct DesktopNoteCategoryMenu: View {
+    var item: ClipItem
+    let onChangeCategory: (ClipCategoryChange) async throws -> Void
+    let onOpenCategoryManager: () -> Void
+    @ObservedObject private var appSettings = AppSettings.shared
+
+    var body: some View {
+        HistoryCategoryMenu(
+            item: item,
+            isSelected: false,
+            onChangeCategory: onChangeCategory,
+            onOpenCategoryManager: onOpenCategoryManager
+        )
+        .environment(\.locale, appSettings.appLocale)
+    }
+}
+
+enum DesktopNoteColor: String, CaseIterable {
+    case none = "No Note Color"
+    case yellow = "Yellow Note Color"
+    case orange = "Orange Note Color"
+    case blue = "Blue Note Color"
+    case green = "Green Note Color"
+    case pink = "Pink Note Color"
+
+    var fill: NSColor? {
+        switch self {
+        case .none: nil
+        case .yellow: NSColor.systemYellow
+        case .orange: NSColor.systemOrange
+        case .blue: NSColor.systemBlue
+        case .green: NSColor.systemGreen
+        case .pink: NSColor.systemPink
+        }
+    }
+}
+
+@MainActor
+final class DesktopNoteResizeHandle: NSImageView {
+    private var dragStart: (frame: NSRect, pointer: NSPoint)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        let label = AppSettings.shared.localizedString("Resize Desktop Note")
+        let size = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
+        image = NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: label)?
+            .withSymbolConfiguration(size)
+        contentTintColor = .secondaryLabelColor
+        imageScaling = .scaleNone
+        translatesAutoresizingMaskIntoConstraints = false
+        toolTip = label
+        setAccessibilityLabel(label)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 24),
+            heightAnchor.constraint(equalToConstant: 24)
+        ])
     }
 
-    private static func displayFont(for run: AttributedString.Runs.Run, baseFont: NSFont) -> Font? {
-        let block = run.presentationIntent?.components ?? []
-        if run.inlinePresentationIntent?.contains(.code) == true || block.contains(where: {
-            if case .codeBlock = $0.kind { return true }
-            return false
-        }) {
-            return .system(size: baseFont.pointSize, design: .monospaced)
-        }
-        for component in block {
-            switch component.kind {
-            case let .header(level):
-                return .system(size: baseFont.pointSize + CGFloat(max(1, 6 - level)), weight: .semibold)
-            case .tableHeaderRow:
-                return Font(baseFont).weight(.semibold)
-            default:
-                continue
-            }
-        }
-        return nil
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .frameResize(position: .bottomRight, directions: .all))
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        dragStart = (window.frame, window.convertPoint(toScreen: event.locationInWindow))
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let note = window as? DesktopNotePanel, let dragStart else { return }
+        let pointer = note.convertPoint(toScreen: event.locationInWindow)
+        let displacement = NSPoint(x: pointer.x - dragStart.pointer.x, y: pointer.y - dragStart.pointer.y)
+        note.resizeFromBottomRight(startFrame: dragStart.frame, displacement: displacement)
+    }
+
+    override func mouseUp(with _: NSEvent) {
+        dragStart = nil
     }
 }
 

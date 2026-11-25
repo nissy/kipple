@@ -172,7 +172,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertTrue(strip.isHidden)
     }
 
-    func testNoteFitsShortAndWrappedContentAndCapsLongPreview() {
+    func testNoteFitsShortAndWrappedContentAndCapsInitialHeight() {
         let short = DesktopNotePanel(item: ClipItem(content: "Short note"), screenFrame: screenFrame)
         let wrapped = DesktopNotePanel(
             item: ClipItem(content: String(repeating: "Text that wraps across lines. ", count: 7)),
@@ -208,27 +208,51 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertGreaterThan(note.frame.height, untitled.frame.height)
     }
 
-    func testMarkdownPreviewRendersBlocksAndInlineFormatting() throws {
-        let source = """
-        # Heading
+    func testManuallyResizedNoteKeepsSizeWhenItsContentOrDisplayModeChanges() throws {
+        var item = ClipItem(content: "Short note")
+        let note = DesktopNotePanel(item: item, screenFrame: screenFrame)
+        note.setFrameTopLeftPoint(NSPoint(x: 40, y: 600))
+        defer { note.close() }
 
-        **Bold** and \\*literal\\* and `code`
+        let start = note.frame
+        note.resizeFromBottomRight(startFrame: start, displacement: NSPoint(x: 120, y: -160))
+        let resized = note.frame
+        XCTAssertEqual(resized.width, start.width + 120)
+        XCTAssertEqual(resized.height, start.height + 160)
+        XCTAssertEqual(resized.minX, start.minX)
+        XCTAssertEqual(resized.maxY, start.maxY)
 
-        1. Numbered
-           - Nested
+        item = item.replacingContent(with: String(repeating: "A longer note body.\n\n", count: 120))
+        note.update(from: item)
+        XCTAssertEqual(note.frame, resized)
 
-        > Quote
+        let stack = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSStackView }.first)
+        let showMarkdown = AppSettings.shared.localizedString("Show Markdown")
+        let button = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first { $0.toolTip == showMarkdown })
+        button.performClick(nil)
+        XCTAssertEqual(note.frame, resized)
+    }
 
-        ~~~
-        plain code block
-        ~~~
-        """
-        let rendered = try XCTUnwrap(DesktopNoteMarkdown.render(source, baseFont: .systemFont(ofSize: 13)))
-        let text = String(rendered.characters)
-        XCTAssertTrue(text.hasPrefix("Heading\nBold and *literal* and code\n1. Numbered\n  • Nested\n│ Quote\n"))
-        XCTAssertTrue(text.contains("plain code block"))
-        let bold = try XCTUnwrap(rendered.runs.first { String(rendered[$0.range].characters) == "Bold" })
-        XCTAssertTrue(bold.inlinePresentationIntent?.contains(.stronglyEmphasized) == true)
+    func testManuallyResizedNoteReservesReadingSpaceWhenATitleIsAdded() {
+        var item = ClipItem(content: "Note body")
+        let note = DesktopNotePanel(item: item, screenFrame: screenFrame)
+        note.setFrameTopLeftPoint(NSPoint(x: 40, y: 600))
+        defer { note.close() }
+
+        let shrink = NSPoint(x: -300, y: 300)
+        note.resizeFromBottomRight(startFrame: note.frame, displacement: shrink)
+        let untitled = note.frame
+        XCTAssertEqual(untitled.height, 120)
+
+        item.metadata = ClipMetadata(title: "A long history title that wraps onto two lines")
+        note.update(from: item)
+        let titled = note.frame
+        XCTAssertEqual(titled.height, 160)
+        XCTAssertEqual(titled.width, untitled.width)
+        XCTAssertEqual(titled.maxY, untitled.maxY)
+
+        note.resizeFromBottomRight(startFrame: titled, displacement: shrink)
+        XCTAssertEqual(note.frame, titled)
     }
 
     func testSwitchingFromTheEditorSavesTheOriginalMarkdownSource() async throws {
@@ -275,11 +299,15 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(adapter.history.first?.content, edited)
     }
 
-    func testDraggingTheNoteBodyMovesTheWindow() throws {
-        let note = DesktopNotePanel(item: ClipItem(content: "Drag this text"), screenFrame: screenFrame)
+    func testDraggingBlankSpaceAfterAPlainTextLineMovesTheNote() async throws {
+        let note = DesktopNotePanel(item: ClipItem(content: "Short line"), screenFrame: screenFrame)
+        note.setContentSize(NSSize(width: 260, height: 160))
+        note.makeKeyAndOrderFront(nil)
         defer { note.close() }
         let contentView = try XCTUnwrap(note.contentView)
-        let start = contentView.convert(NSPoint(x: contentView.bounds.midX, y: contentView.bounds.midY), to: nil)
+        contentView.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let start = NSPoint(x: 180, y: note.frame.height - 28)
         let origin = note.frame.origin
         let end = NSPoint(x: start.x + 100, y: start.y + 80)
 
@@ -290,7 +318,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 100, y: origin.y + 80))
     }
 
-    func testClickingAMarkdownLinkOpensItAndDraggingMovesTheNote() async throws {
+    func testDraggingAMarkdownLinkSelectsTextWithoutMovingTheNoteOrOpeningTheLink() async throws {
         var opened: [URL] = []
         let note = DesktopNotePanel(
             item: ClipItem(content: "[Open the example](https://example.com)"),
@@ -300,7 +328,6 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
             onChangeCategory: nil
         ) { url in
             opened.append(url)
-            return .handled
         }
         note.makeKeyAndOrderFront(nil)
         defer { note.close() }
@@ -320,7 +347,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         note.sendEvent(try mouseEvent(.leftMouseDragged, at: end, for: note))
         note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
         XCTAssertEqual(opened.count, 1)
-        XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 60, y: origin.y + 45))
+        XCTAssertEqual(note.frame.origin, origin)
     }
 
     func testDoubleClickEditsFullTextAndFocusLossSavesItToHistory() async throws {

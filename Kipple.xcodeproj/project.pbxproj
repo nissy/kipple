@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0048E0531B0F925F9A1E2ABB /* HistoryQueueBadgeCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDFDD8F3E28E859C05B367FB /* HistoryQueueBadgeCalculatorTests.swift */; };
 		026FE53BD73F6B1ACAEC83B9 /* ModernClipboardServiceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E9E24D363BE4F706811F47 /* ModernClipboardServiceAdapterTests.swift */; };
+		02D727CB10D315941E2BE1D3 /* Textual-ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = F17962778F160F23679F98D5 /* Textual-ThirdPartyNotices.txt */; };
 		044AE1AABD4CAAD8734437E3 /* MCPValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532A16DC134106532D9E8B00 /* MCPValidationTests.swift */; };
 		0467E80A718A8FBFCC6B626E /* SimplifiedHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6117B178F1C15E9C0F925AA /* SimplifiedHotkeyManager.swift */; };
 		04C2C232AE6342045AEAD4F9 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 744EFD983380BA9F4014C37E /* Logger.swift */; };
@@ -159,10 +160,11 @@
 		9D20AFC44AD4B4F660C3A584 /* SimpleLineNumberCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6049C5E3BDEFC0FF5344A625 /* SimpleLineNumberCoordinator.swift */; };
 		9D5DE584D34C9C952A6DE350 /* SimplifiedHotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC6B91B179AA5EFABC7CD87 /* SimplifiedHotkeyManagerTests.swift */; };
 		9D89CC36C54BF7F32256335B /* InternalOperationFlagTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5147540CFEA499BC47D2B4 /* InternalOperationFlagTests.swift */; };
+		9DF55A9C729A8BA86077F73A /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = DEA9F95267CA8FA2C97F82A6 /* Yams */; };
 		9E095EEA3349C139D0C2EBA1 /* PermissionsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11352CAF753DC8E9F7C402DA /* PermissionsSettingsView.swift */; };
 		A088458E665C2820A1C03D53 /* AutoPasteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AF21D2BE07BBC5D9D31716 /* AutoPasteController.swift */; };
 		A3DE9ECB686BA72A32C2CDDA /* SettingsGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36EF972EACF9279EE76CFE9 /* SettingsGroup.swift */; };
-		A596FAF1A17883712A0FDE71 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = DEA9F95267CA8FA2C97F82A6 /* Yams */; };
+		A596FAF1A17883712A0FDE71 /* Textual in Frameworks */ = {isa = PBXBuildFile; productRef = B965FFD5136AC4CC83A2D13A /* Textual */; };
 		A667220B99F23F60D12B4E36 /* SettingsWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */; };
 		A67CF7455D3C77FFE6FF4167 /* HistoryActionKeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F5E1ECCA7579F02B1DB3F61 /* HistoryActionKeyMonitor.swift */; };
 		A7FAAAE2B87A5F093CE614F4 /* MCPRegistration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79899915A74601B0E19A318C /* MCPRegistration.swift */; };
@@ -511,6 +513,7 @@
 		EF8A8B95993EEAACDF0AB18B /* ClipboardServiceProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardServiceProvider.swift; sourceTree = "<group>"; };
 		F057A6186CAAB1DEC508005B /* PlainTextPasteHotkey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlainTextPasteHotkey.swift; sourceTree = "<group>"; };
 		F06D6CD2CB34C53BE15740E6 /* MainView+BottomBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MainView+BottomBar.swift"; sourceTree = "<group>"; };
+		F17962778F160F23679F98D5 /* Textual-ThirdPartyNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Textual-ThirdPartyNotices.txt"; sourceTree = "<group>"; };
 		F1964394C2CC0F206796038A /* LoggerLazyEvaluationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerLazyEvaluationTests.swift; sourceTree = "<group>"; };
 		F42A2010CA96B6D224653DE2 /* WindowTitleCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleCaptureTests.swift; sourceTree = "<group>"; };
 		F4985DAAF1C064A0636A1815 /* MultipleCategoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipleCategoryTests.swift; sourceTree = "<group>"; };
@@ -538,7 +541,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F54B58C44D8D8457403D5AD6 /* libsqlite3.tbd in Frameworks */,
-				A596FAF1A17883712A0FDE71 /* Yams in Frameworks */,
+				A596FAF1A17883712A0FDE71 /* Textual in Frameworks */,
+				9DF55A9C729A8BA86077F73A /* Yams in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -561,6 +565,7 @@
 				47C920569402BF9A18A9313C /* Localizable.stringsdict */,
 				C53A715C20693DAD873ED1CA /* MCP-ThirdPartyNotices.txt */,
 				697EBB69F4BEBE93D9865E28 /* PrivacyInfo.xcprivacy */,
+				F17962778F160F23679F98D5 /* Textual-ThirdPartyNotices.txt */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1286,6 +1291,7 @@
 			);
 			name = Kipple;
 			packageProductDependencies = (
+				B965FFD5136AC4CC83A2D13A /* Textual */,
 				DEA9F95267CA8FA2C97F82A6 /* Yams */,
 			);
 			productName = Kipple;
@@ -1345,6 +1351,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				43A6A6D2A80FC132EAA2A70E /* XCRemoteSwiftPackageReference "swift-sdk" */,
+				223BBC550FE2BD9581E4C4F5 /* XCRemoteSwiftPackageReference "textual" */,
 				2EC3B8E75036BB972958FC54 /* XCRemoteSwiftPackageReference "Yams" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -1368,6 +1375,7 @@
 				7D21F2708879F96FABBF693F /* Localizable.stringsdict in Resources */,
 				E4419CE4F842E378CD55D0F8 /* MCP-ThirdPartyNotices.txt in Resources */,
 				FBC0FA1820FBC53EDA7626E4 /* PrivacyInfo.xcprivacy in Resources */,
+				02D727CB10D315941E2BE1D3 /* Textual-ThirdPartyNotices.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1976,6 +1984,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		223BBC550FE2BD9581E4C4F5 /* XCRemoteSwiftPackageReference "textual" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/textual.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.5.0;
+			};
+		};
 		2EC3B8E75036BB972958FC54 /* XCRemoteSwiftPackageReference "Yams" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/jpsim/Yams.git";
@@ -1999,6 +2015,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 43A6A6D2A80FC132EAA2A70E /* XCRemoteSwiftPackageReference "swift-sdk" */;
 			productName = MCP;
+		};
+		B965FFD5136AC4CC83A2D13A /* Textual */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 223BBC550FE2BD9581E4C4F5 /* XCRemoteSwiftPackageReference "textual" */;
+			productName = Textual;
 		};
 		DEA9F95267CA8FA2C97F82A6 /* Yams */ = {
 			isa = XCSwiftPackageProductDependency;

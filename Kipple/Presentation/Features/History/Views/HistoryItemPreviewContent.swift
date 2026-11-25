@@ -118,39 +118,37 @@ struct HistoryItemPreviewContent: View {
 struct HistoryItemPreviewText: View {
     let item: ClipItem
     let historyFont: NSFont
-    var showsBody = true
-    var formattedBody: AttributedString?
     static let spacing: CGFloat = 16
 
     var body: some View {
         VStack(alignment: .leading, spacing: Self.spacing) {
-            if let title = HistoryItemPreviewContent.nonempty(item.title) {
-                Text(verbatim: title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .help(title)
-                    .accessibilityAddTraits(.isHeader)
-            }
-
-            if showsBody {
-                bodyText
-                    .font(Font(historyFont))
-                    .lineSpacing(3)
-                    .lineLimit(previewLineLimit)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            HistoryItemPreviewTitle(title: item.title)
+            Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
+                .font(Font(historyFont))
+                .lineSpacing(3)
+                .lineLimit(previewLineLimit)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private var bodyText: Text {
-        if let formattedBody { return Text(formattedBody) }
-        return Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
     }
 
     private var previewLineLimit: Int {
         let lineHeight = ceil(historyFont.ascender - historyFont.descender + historyFont.leading + 3)
         return max(1, min(10, Int(220 / max(1, lineHeight))))
+    }
+}
+
+struct HistoryItemPreviewTitle: View {
+    let title: String?
+
+    var body: some View {
+        if let title = HistoryItemPreviewContent.nonempty(title) {
+            Text(verbatim: title)
+                .font(.system(size: 16, weight: .semibold))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .help(title)
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 }
