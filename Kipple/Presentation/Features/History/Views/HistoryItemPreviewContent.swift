@@ -8,17 +8,12 @@ struct HistoryItemPreviewContent: View {
     let item: ClipItem
     let categories: [UserCategory]
     let historyFont: NSFont
-    let isPosted: Bool
-    let onToggleDesktopNote: () -> Void
     @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 8) {
-                HistoryItemPreviewText(item: item, historyFont: historyFont)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                desktopNoteButton
-            }
+            HistoryItemPreviewText(item: item, historyFont: historyFont)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             CategoryLabelsView(categories: categories, isPreview: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -31,23 +26,6 @@ struct HistoryItemPreviewContent: View {
         .padding(Self.contentPadding)
         .frame(width: 320, alignment: .leading)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
-    }
-
-    private var desktopNoteButton: some View {
-        let label = Text(LocalizedStringKey(isPosted ? "Remove Desktop Note" : "Post to Desktop"))
-        return Button(action: onToggleDesktopNote) {
-            Image(systemName: isPosted ? "pin.fill" : "pin")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(KippleButtonAppearance.foreground(isActive: isPosted))
-                .rotationEffect(.degrees(isPosted ? 0 : -45))
-                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth,
-                       height: MainViewMetrics.HistoryColumns.controlColumnWidth)
-                .background(KippleButtonAppearance.compactFill(isActive: isPosted), in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .help(label)
     }
 
     private var metadataSection: some View {

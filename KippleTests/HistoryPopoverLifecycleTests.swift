@@ -31,6 +31,43 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         window.orderOut(nil)
     }
 
+    func testMovingToAnotherRowClosesTheOldPopoverImmediately() async throws {
+        let manager = HistoryPopoverManager.shared
+        manager.forceClose()
+        let originalWindows = NSApp.windows
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let firstRow = NSView(frame: NSRect(x: 0, y: 40, width: 200, height: 32))
+        let secondRow = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 32))
+        window.contentView?.addSubview(firstRow)
+        window.contentView?.addSubview(secondRow)
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            manager.forceClose()
+            window.orderOut(nil)
+        }
+
+        manager.show(item: ClipItem(content: "First row"), from: firstRow, trailingEdge: true)
+        let firstPanel = try XCTUnwrap(NSApp.windows.first { panel in
+            panel is NSPanel && panel.isVisible && !originalWindows.contains { $0 === panel }
+        })
+        manager.scheduleHide(after: 0.01, ifAnchoredTo: firstRow)
+        XCTAssertFalse(manager.prepareForRowHover(firstRow))
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(firstPanel.isVisible)
+
+        XCTAssertTrue(manager.prepareForRowHover(secondRow))
+        XCTAssertFalse(firstPanel.isVisible)
+
+        manager.show(item: ClipItem(content: "Second row"), from: secondRow, trailingEdge: true)
+        let secondPanel = try XCTUnwrap(NSApp.windows.first { panel in
+            panel is NSPanel && panel.isVisible && !originalWindows.contains { $0 === panel }
+        })
+        manager.scheduleHide(after: 0.01, ifAnchoredTo: firstRow)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(secondPanel.isVisible)
+    }
+
     func testPopoverStaysOpenWhilePointerCrossesFromTheRow() async throws {
         let manager = HistoryPopoverManager.shared
         manager.forceClose()

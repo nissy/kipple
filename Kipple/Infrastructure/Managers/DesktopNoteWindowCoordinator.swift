@@ -8,6 +8,7 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
     static let shared = DesktopNoteWindowCoordinator()
 
     @Published private var notes: [UUID: DesktopNotePanel] = [:]
+    private var closingNotes: [UUID: Task<Void, Never>] = [:]
     private let adapter: ModernClipboardServiceAdapter
     private var historyObservation: AnyCancellable?
     private var transparencyObservation: AnyCancellable?
@@ -32,14 +33,15 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
         notes[id] != nil
     }
 
-    func toggle(_ item: ClipItem, on screen: NSScreen?) {
-        if let note = notes[item.id] {
-            note.performClose(nil)
+    func toggle(_ itemID: UUID, on screen: NSScreen?) async {
+        if let note = notes[itemID] {
+            if closingNotes[itemID] == nil { note.performClose(nil) }
+            await closingNotes[itemID]?.value
             return
         }
-        guard let screen = screen ?? NSScreen.main else { return }
+        guard let screen = screen ?? NSScreen.main,
+              let item = await adapter.protectHistoryForDesktopNote(itemID) else { return }
 
-        let itemID = item.id
         let note = DesktopNotePanel(
             item: item,
             screenFrame: screen.visibleFrame,
@@ -52,14 +54,19 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
         )
         note.delegate = self
         note.setFrameOrigin(initialOrigin(for: note.frame.size, in: screen.visibleFrame))
-        notes[item.id] = note
+        notes[itemID] = note
         note.orderFrontRegardless()
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let note = notification.object as? DesktopNotePanel,
-              let id = notes.first(where: { $0.value === note })?.key else { return }
-        notes.removeValue(forKey: id)
+              let id = notes.first(where: { $0.value === note })?.key,
+              closingNotes[id] == nil else { return }
+        closingNotes[id] = Task { [weak self, adapter] in
+            await adapter.removeDesktopNoteProtection(id)
+            self?.notes.removeValue(forKey: id)
+            self?.closingNotes.removeValue(forKey: id)
+        }
     }
 
     private func updateOpenNotes(from history: [ClipItem]) {

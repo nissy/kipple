@@ -183,6 +183,14 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await refreshHistory()
     }
 
+    func protectHistoryForDesktopNote(_ itemID: UUID) async -> ClipItem? {
+        await modernService.protectHistoryForDesktopNote(itemID)
+    }
+
+    func removeDesktopNoteProtection(_ itemID: UUID) async {
+        await modernService.removeDesktopNoteProtection(itemID)
+    }
+
     @discardableResult
     func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
         let result = await modernService.clearHistory(keepingCategories: keepingCategories)

@@ -84,6 +84,23 @@ final class MCPRegistrationTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(saved.filter(\.hasCustomCategory).count, 2)
     }
 
+    func testRegistrationKeepsDesktopNoteHistoryOutsideTheLimit() async throws {
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let service = ModernClipboardService(testRepository: repository) { _ in 1 }
+        let posted = ClipItem(content: "Desktop note")
+        try await repository.save([posted, ClipItem(content: "Ordinary history")])
+        await service.loadHistoryFromRepository()
+        let protectedItem = await service.protectHistoryForDesktopNote(posted.id)
+        XCTAssertEqual(protectedItem?.id, posted.id)
+        await service.setMaxHistoryItems(1)
+
+        let registered = ClipItem(content: "New item")
+        let result = try await service.registerMCP([ClipItem(content: posted.content), registered], record: receipt())
+        XCTAssertEqual(result.items.map(\.id), [posted.id, registered.id])
+        let saved = try await repository.loadAll()
+        XCTAssertEqual(Set(saved.map(\.id)), [posted.id, registered.id])
+    }
+
     func testLargeSavedHistoryDoesNotUseTheMCPRequestBudget() throws {
         let category = UUID()
         let megabyte = String(repeating: "a", count: 1024 * 1024)

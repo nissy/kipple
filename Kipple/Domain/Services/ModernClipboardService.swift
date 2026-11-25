@@ -53,6 +53,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var isMonitoringFlag = false
     private var categoryStore: UserCategoryStore?
     private var definedCustomCategoryIDs: Set<UUID>?
+    private var desktopNoteItemIDs: Set<UUID> = []
 
     // Repository for persistence
     private var repository: ClipboardRepositoryProtocol?
@@ -152,7 +153,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 definedCustomCategoryIDs = Set(await categoryStore.userDefined().map(\.id))
             }
             let categorizedItems = try await repository.loadCategorized()
-            history = categorizedItems.map(withDefinedCategories).filter(\.hasCustomCategory)
+            let desktopNoteItems = previousHistory.filter { desktopNoteItemIDs.contains($0.id) }
+            let protectedByID = Dictionary((categorizedItems + desktopNoteItems).map { ($0.id, $0) }) { _, latest in latest }
+            history = protectedByID.values.map(withDefinedCategories)
+                .filter(isProtectedFromHistoryRemoval).sorted { $0.timestamp > $1.timestamp }
 
             if !history.isEmpty {
                 rebuildContentLookup()
@@ -162,12 +166,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             let fetchLimit = max(0, maxHistoryItems) + history.count + 10
             let recentItems = try await repository.load(limit: fetchLimit)
-            let combinedByID = Dictionary((categorizedItems + recentItems).map { ($0.id, $0) }) { _, latest in
+            let loadedByID = Dictionary((categorizedItems + recentItems).map { ($0.id, $0) }) { _, latest in
                 latest
             }
-            let combinedItems = combinedByID.values.sorted {
-                $0.timestamp > $1.timestamp
-            }
+            let combinedByID = loadedByID.merging(desktopNoteItems.map { ($0.id, $0) }) { _, current in current }
+            let combinedItems = combinedByID.values.sorted { $0.timestamp > $1.timestamp }
 
             history = combinedItems.map(withDefinedCategories)
             let wasTrimmed = trimHistory()
@@ -183,7 +186,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                     try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
                 }
             }
-            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, combinedByID[$0.id] ?? $0) })
+            persistedSnapshot = history.reduce(into: [:]) { snapshot, item in
+                snapshot[item.id] = loadedByID[item.id] ?? persistedSnapshot[item.id]
+            }
             isRepositoryReady = true
             notifyHistoryObservers()
         } catch {
@@ -439,10 +444,13 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             // A row or queue action can still hold a snapshot taken before the item was edited.
             newItem = history.remove(at: existingIndex)
         } else if let duplicateIndex = indexOfExistingContent(item.content) {
-            // Preserve the user category from any remaining duplicate content
             let existingItem = history.remove(at: duplicateIndex)
-            newItem.userCategoryId = existingItem.userCategoryId
-            newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
+            if desktopNoteItemIDs.contains(existingItem.id) {
+                newItem = existingItem
+            } else {
+                newItem.userCategoryId = existingItem.userCategoryId
+                newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
+            }
         }
 
         // Add item at the beginning with preserved metadata and new timestamp
@@ -486,6 +494,24 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     // MARK: - History Management
 
+    func protectHistoryForDesktopNote(_ itemID: UUID) async -> ClipItem? {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard let item = history.first(where: { $0.id == itemID }),
+              desktopNoteItemIDs.insert(itemID).inserted else { return nil }
+        return item
+    }
+
+    func removeDesktopNoteProtection(_ itemID: UUID) async {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        desktopNoteItemIDs.remove(itemID)
+    }
+
+    private func isProtectedFromHistoryRemoval(_ item: ClipItem) -> Bool {
+        item.hasCustomCategory || desktopNoteItemIDs.contains(item.id)
+    }
+
     @discardableResult
     func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
         await mutationGate.acquire()
@@ -493,7 +519,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         if !isRepositoryReady { await loadHistoryWhileLocked() }
         guard isRepositoryReady, let repository else { return .failure(MCPFailure.persistence) }
 
-        let retained = keepingCategories ? history.filter(\.hasCustomCategory) : []
+        let retained = history.filter { item in
+            desktopNoteItemIDs.contains(item.id) || (keepingCategories && item.hasCustomCategory)
+        }
         let retainedIDs = Set(retained.map(\.id))
         do {
             let storedIDs = try await repository.loadItemIDs()
@@ -516,7 +544,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         guard let index = history.firstIndex(where: { $0.id == item.id }),
-              !history[index].hasCustomCategory else { return }
+              !isProtectedFromHistoryRemoval(history[index]) else { return }
         history.remove(at: index)
         rebuildContentLookup()
 
@@ -903,7 +931,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard items.count > maxHistoryItems else { return items }
         var available = maxHistoryItems
         return items.filter { item in
-            if item.hasCustomCategory { return true }
+            if isProtectedFromHistoryRemoval(item) { return true }
             guard available > 0 else { return false }
             available -= 1
             return true
@@ -1232,7 +1260,9 @@ extension ModernClipboardService {
         if let previous = try await repository.receipt(for: record.key) {
             return previous.replay(digest: record.digest)
         }
-        let mutation = try MCPHistoryMutation(items: items, history: history, capacity: maxHistoryItems)
+        let mutation = try MCPHistoryMutation(
+            items: items, history: history, capacity: maxHistoryItems, isProtected: isProtectedFromHistoryRemoval
+        )
         let registered = mutation.registered
         let candidate = mutation.candidate
         var receipt = record

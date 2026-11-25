@@ -27,11 +27,11 @@
 "Use modifier + click" = "Use modifier + click";
 "Maximum history items" = "Maximum history items";
 "Clear history" = "Clear history";
-"Items in custom categories stay." = "Items in custom categories stay.";
+"Items in custom categories or posted as desktop notes stay." = "Items in custom categories or posted as desktop notes stay.";
 "History recopy actions are not counted." = "History recopy actions are not counted.";
 "Delete" = "Delete";
 "Delete category" = "Delete category";
-"Delete item" = "Delete item";
+"Delete from History" = "Delete from History";
 "Post to Desktop" = "Post to Desktop";
 "Remove Desktop Note" = "Remove Desktop Note";
 "Desktop Note Color" = "Desktop Note Color";
@@ -188,7 +188,7 @@
 "Text could not be detected. Please try another area." = "Text could not be detected. Please try another area.";
 "Window Animation" = "Window Animation";
 "Yu Gothic" = "Yu Gothic";
-"history.clear.confirmation" = "History outside custom categories will be deleted. This action cannot be undone.";
+"history.clear.confirmation" = "History will be deleted except for items in custom categories or posted as desktop notes. This action cannot be undone.";
 "Could not clear history" = "Could not clear history";
 "Please try clearing the history again." = "Please try clearing the history again.";
 "history.clear.success" = "Deleted %d items from history.";

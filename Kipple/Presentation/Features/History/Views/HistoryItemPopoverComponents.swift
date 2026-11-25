@@ -11,17 +11,14 @@ import AppKit
 struct ClipboardItemPopover: View {
     private let initialItem: ClipItem
     private let itemID: UUID
-    private let screen: NSScreen?
     @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
     @ObservedObject private var fontManager = FontManager.shared
     @ObservedObject private var categoryStore = UserCategoryStore.shared
     @ObservedObject private var appSettings = AppSettings.shared
-    @ObservedObject private var desktopNotes = DesktopNoteWindowCoordinator.shared
 
-    init(item: ClipItem, screen: NSScreen? = nil) {
+    init(item: ClipItem) {
         self.initialItem = item
         self.itemID = item.id
-        self.screen = screen
     }
 
     var body: some View {
@@ -36,11 +33,8 @@ struct ClipboardItemPopover: View {
         return HistoryItemPreviewContent(
             item: item,
             categories: categories.isEmpty ? [categoryStore.noneCategory()] : categories,
-            historyFont: fontManager.historyFont,
-            isPosted: desktopNotes.isPosted(item.id)
-        ) {
-            desktopNotes.toggle(item, on: screen)
-        }
+            historyFont: fontManager.historyFont
+        )
     }
 }
 

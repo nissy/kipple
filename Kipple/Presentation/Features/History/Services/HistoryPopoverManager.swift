@@ -37,9 +37,9 @@ final class HistoryPopoverManager {
         let controller: NSHostingController<ClipboardItemPopover>
         if let existing = hostingController {
             controller = existing
-            controller.rootView = ClipboardItemPopover(item: item, screen: screen)
+            controller.rootView = ClipboardItemPopover(item: item)
         } else {
-            let newController = NSHostingController(rootView: ClipboardItemPopover(item: item, screen: screen))
+            let newController = NSHostingController(rootView: ClipboardItemPopover(item: item))
             hostingController = newController
             controller = newController
         }
@@ -69,12 +69,19 @@ final class HistoryPopoverManager {
         panel.orderFront(nil)
     }
 
-    func keepOpen(ifAnchoredTo anchor: NSView) {
-        if anchorView === anchor { cancelScheduledHide() }
+    func prepareForRowHover(_ anchor: NSView) -> Bool {
+        guard panel != nil else { return false }
+        if anchorView === anchor {
+            cancelScheduledHide()
+            return false
+        }
+
+        hide()
+        return true
     }
 
-    func scheduleHide(after interval: TimeInterval = 0.3) {
-        guard !isPointerOverPanel else { return }
+    func scheduleHide(after interval: TimeInterval = 0.15, ifAnchoredTo anchor: NSView? = nil) {
+        guard panel != nil, !isPointerOverPanel, anchor == nil || anchorView === anchor else { return }
         cancelScheduledHide()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, !self.isPointerOverPanel else { return }

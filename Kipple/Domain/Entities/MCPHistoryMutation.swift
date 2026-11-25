@@ -4,7 +4,10 @@ struct MCPHistoryMutation {
     let registered: [ClipItem]
     let candidate: [ClipItem]
 
-    init(items: [ClipItem], history: [ClipItem], capacity: Int) throws {
+    init(
+        items: [ClipItem], history: [ClipItem], capacity: Int,
+        isProtected: (ClipItem) -> Bool = { $0.hasCustomCategory }
+    ) throws {
         guard (1...50).contains(items.count) else { throw MCPFailure.invalidInput }
         var registered: [ClipItem] = []
         var byContent: [String: ClipItem] = [:]
@@ -25,11 +28,11 @@ struct MCPHistoryMutation {
         var seen = Set<UUID>()
         let unique = registered.filter { seen.insert($0.id).inserted }
         let remaining = history.filter { !seen.contains($0.id) }
-        let registeredInLimit = unique.lazy.filter { !$0.hasCustomCategory }.count
+        let registeredInLimit = unique.filter { !isProtected($0) }.count
         var available = capacity - registeredInLimit
         guard available >= 0 else { throw MCPFailure.capacity }
         let candidate = unique + remaining.filter { item in
-            if item.hasCustomCategory { return true }
+            if isProtected(item) { return true }
             guard available > 0 else { return false }
             available -= 1
             return true

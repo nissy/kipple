@@ -27,11 +27,11 @@
 "Use modifier + click" = "修飾キーとクリックを使います";
 "Maximum history items" = "履歴の最大件数";
 "Clear history" = "履歴を削除";
-"Items in custom categories stay." = "自作カテゴリが付いた項目は残ります。";
+"Items in custom categories or posted as desktop notes stay." = "自作カテゴリ付きや付箋として貼り付け中の履歴は残ります。";
 "History recopy actions are not counted." = "履歴アイテムの再コピーはカウントしません。";
 "Delete" = "削除";
 "Delete category" = "カテゴリを削除";
-"Delete item" = "項目を削除";
+"Delete from History" = "履歴から削除";
 "Post to Desktop" = "デスクトップに付箋を貼る";
 "Remove Desktop Note" = "デスクトップの付箋を外す";
 "Desktop Note Color" = "付箋の色";
@@ -188,7 +188,7 @@
 "Text could not be detected. Please try another area." = "テキストを検出できませんでした。別の領域を選択してください。";
 "Window Animation" = "ウィンドウアニメーション";
 "Yu Gothic" = "游ゴシック";
-"history.clear.confirmation" = "自作カテゴリが付いていない履歴を削除します。この操作は元に戻せません。";
+"history.clear.confirmation" = "自作カテゴリ付きや付箋として貼り付け中の履歴を除いて削除します。この操作は元に戻せません。";
 "Could not clear history" = "履歴を削除できませんでした";
 "Please try clearing the history again." = "もう一度お試しください。";
 "history.clear.success" = "履歴から %d 件を削除しました。";

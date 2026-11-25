@@ -7,20 +7,25 @@ import XCTest
 final class DesktopNoteWindowCoordinatorTests: XCTestCase {
     private let screenFrame = NSRect(x: 0, y: 0, width: 900, height: 700)
 
-    func testClosingAndTogglingNotesUpdatesOnlyTheMatchingHistoryItem() throws {
+    func testClosingAndTogglingNotesUpdatesOnlyTheMatchingHistoryItem() async throws {
         let screen = try XCTUnwrap(NSScreen.main)
-        let coordinator = DesktopNoteWindowCoordinator()
+        let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
         let title = UUID().uuidString
-        let first = ClipItem(content: "First note", metadata: ClipMetadata(title: title))
-        let second = ClipItem(content: "Second note")
+        let secondTitle = UUID().uuidString
+        try await adapter.createHistoryItem(title: title, content: "First note", categoryChanges: [:])
+        let first = try XCTUnwrap(adapter.history.first)
+        try await adapter.createHistoryItem(title: secondTitle, content: "Second note", categoryChanges: [:])
+        let second = try XCTUnwrap(adapter.history.first)
         defer {
-            for item in [first, second] where coordinator.isPosted(item.id) {
-                coordinator.toggle(item, on: screen)
+            for window in NSApp.windows where window.title == title || window.title == secondTitle {
+                window.close()
             }
         }
 
-        coordinator.toggle(first, on: screen)
-        coordinator.toggle(second, on: screen)
+        await coordinator.toggle(first.id, on: screen)
+        await coordinator.toggle(second.id, on: screen)
         XCTAssertTrue(coordinator.isPosted(first.id))
         XCTAssertTrue(coordinator.isPosted(second.id))
 
@@ -33,11 +38,14 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
 
         firstNote.performClose(nil)
         XCTAssertFalse(firstNote.isVisible)
+        for _ in 0..<20 where coordinator.isPosted(first.id) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         XCTAssertFalse(coordinator.isPosted(first.id))
         XCTAssertTrue(coordinator.isPosted(second.id))
 
-        coordinator.toggle(first, on: screen)
-        coordinator.toggle(second, on: screen)
+        await coordinator.toggle(first.id, on: screen)
+        await coordinator.toggle(second.id, on: screen)
         XCTAssertTrue(coordinator.isPosted(first.id))
         XCTAssertFalse(coordinator.isPosted(second.id))
     }
@@ -51,12 +59,9 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let originalTitle = UUID().uuidString
         try await adapter.createHistoryItem(title: originalTitle, content: "Short note", categoryChanges: [:])
         let item = try XCTUnwrap(adapter.history.first)
-        coordinator.toggle(item, on: screen)
-        defer {
-            if coordinator.isPosted(item.id) { coordinator.toggle(item, on: screen) }
-        }
-
+        await coordinator.toggle(item.id, on: screen)
         let note = try XCTUnwrap(NSApp.windows.first { $0.title == originalTitle })
+        defer { note.close() }
         let topLeft = NSPoint(x: screen.visibleFrame.minX + 80, y: screen.visibleFrame.maxY - 80)
         note.setFrameTopLeftPoint(topLeft)
         let before = note.frame
@@ -84,6 +89,49 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(strip.layer?.backgroundColor, NSColor.systemBlue.cgColor)
     }
 
+    func testHistoryIsProtectedUntilTheDesktopNoteIsRemoved() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let service = ModernClipboardService(testRepository: repository) { _ in 1 }
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+        let title = UUID().uuidString
+        try await adapter.createHistoryItem(title: title, content: "Pinned history", categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: screen)
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title })
+        defer { note.close() }
+
+        await adapter.deleteItem(item)
+        XCTAssertEqual(adapter.history.map(\.id), [item.id])
+
+        await service.setMaxHistoryItems(1)
+        try await adapter.createHistoryItem(title: nil, content: "Older history", categoryChanges: [:])
+        try await adapter.createHistoryItem(title: nil, content: "Newest history", categoryChanges: [:])
+        XCTAssertEqual(adapter.history.map(\.content), ["Newest history", item.content])
+
+        // A stale row with the same content must preserve the identity used by the open note.
+        await service.recopyFromHistory(ClipItem(content: item.content))
+        let recopiedHistory = await service.getHistory()
+        XCTAssertEqual(recopiedHistory.first?.id, item.id)
+        await service.loadHistoryFromRepository()
+
+        let cleared = try await adapter.clearHistory(keepingCategories: true).get()
+        XCTAssertEqual(cleared, 1)
+        XCTAssertEqual(adapter.history.map(\.id), [item.id])
+        let retained = try await repository.loadAll()
+        XCTAssertEqual(retained.map(\.id), [item.id])
+
+        await coordinator.toggle(item.id, on: screen)
+        XCTAssertFalse(coordinator.isPosted(item.id))
+        XCTAssertEqual(adapter.history.map(\.id), [item.id])
+        await adapter.deleteItem(item)
+        XCTAssertTrue(adapter.history.isEmpty)
+
+        await coordinator.toggle(item.id, on: screen)
+        XCTAssertFalse(coordinator.isPosted(item.id))
+    }
+
     func testTransparencySettingUpdatesAnOpenNoteWithoutFadingItsColorStrip() async throws {
         let settings = AppSettings.shared
         let previous = UserDefaults.standard.object(forKey: AppSettings.Keys.desktopNoteTransparency)
@@ -91,13 +139,15 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
             UserDefaults.standard.set(previous, forKey: AppSettings.Keys.desktopNoteTransparency)
         }
         settings.desktopNoteTransparency = 0.25
-        let coordinator = DesktopNoteWindowCoordinator()
+        let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
         let title = UUID().uuidString
-        let item = ClipItem(content: "A translucent note", metadata: ClipMetadata(title: title))
-        coordinator.toggle(item, on: try XCTUnwrap(NSScreen.main))
-        defer { coordinator.toggle(item, on: nil) }
-
+        try await adapter.createHistoryItem(title: title, content: "A translucent note", categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: try XCTUnwrap(NSScreen.main))
         let note = try XCTUnwrap(NSApp.windows.first { $0.title == title })
+        defer { note.close() }
         let glass = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSGlassEffectView }.first)
         XCTAssertEqual(glass.alphaValue, 0.75, accuracy: 0.001)
         let orange = NSMenuItem()
@@ -182,7 +232,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let title = UUID().uuidString
         try await adapter.createHistoryItem(title: title, content: original, categoryChanges: [BuiltInCategory.ocr: true])
         let item = try XCTUnwrap(adapter.history.first)
-        coordinator.toggle(item, on: screen)
+        await coordinator.toggle(item.id, on: screen)
         let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
         defer { note.close() }
         let point = NSPoint(x: 35, y: note.frame.height - 70)
