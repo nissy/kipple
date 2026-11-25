@@ -246,29 +246,24 @@ enum DesktopNoteColor: String, CaseIterable {
 }
 
 @MainActor
-final class DesktopNoteEditor {
+final class DesktopNoteEditor: NSObject {
     let originalText: String
     let view: NSStackView
-    let textView: NSTextView
+    let textView: LiveEditorTextView
+    private let coordinator: SimpleLineNumberCoordinator
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
 
-    init?(text: String, font: NSFont) {
-        let scroll = NSTextView.scrollableTextView()
-        guard let textView = scroll.documentView as? NSTextView else { return nil }
+    init(text: String) {
+        let editor = SimpleLineNumberView(
+            text: .constant(text), font: FontManager.shared.editorFont, isEditable: true,
+            onDoubleClick: nil, onEscape: nil, textColor: .textColor, onScrollChange: nil
+        )
+        let coordinator = editor.makeCoordinator()
+        let (scroll, textView) = editor.makeEditor(using: coordinator)
         originalText = text
         self.textView = textView
-        scroll.drawsBackground = false
+        self.coordinator = coordinator
         scroll.scrollerStyle = .overlay
-        textView.drawsBackground = false
-        textView.isRichText = false
-        textView.allowsUndo = true
-        textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.font = font
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 3
-        textView.defaultParagraphStyle = paragraphStyle
-        textView.string = text
         textView.setAccessibilityLabel(AppSettings.shared.localizedString("Content"))
 
         errorLabel.textColor = .systemRed
@@ -278,15 +273,67 @@ final class DesktopNoteEditor {
         errorLabel.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
         scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         view = NSStackView(views: [scroll, errorLabel])
+        super.init()
         view.orientation = .vertical
         view.alignment = .width
         view.spacing = 3
         view.translatesAutoresizingMaskIntoConstraints = false
     }
 
+    func makeToolsMenu() -> NSMenu {
+        let menu = NSMenu()
+        addTool("editor.trim", action: #selector(trim), to: menu)
+        for format in ClipboardTextFormat.allCases {
+            let item = addTool("editor.format.\(format.rawValue)", action: #selector(formatText(_:)), to: menu)
+            item.representedObject = format.rawValue
+        }
+        menu.addItem(.separator())
+        addTool("Clear", action: #selector(clear), to: menu)
+        return menu
+    }
+
     func showError(_ message: String) {
         errorLabel.stringValue = message
         errorLabel.toolTip = message
         errorLabel.isHidden = false
+    }
+
+    @discardableResult
+    private func addTool(_ key: String, action: Selector, to menu: NSMenu) -> NSMenuItem {
+        let title = AppSettings.shared.localizedString(key)
+        let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    @objc private func trim() {
+        textView.unmarkText()
+        replaceText(with: textView.string.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    @objc private func formatText(_ item: NSMenuItem) {
+        guard let key = item.representedObject as? String, let format = ClipboardTextFormat(rawValue: key) else { return }
+        textView.unmarkText()
+        do {
+            replaceText(with: try ClipboardTextFormatter.format(textView.string, as: format))
+        } catch {
+            let detail = (error as? ClipboardTextFormatter.FormatError)?.detail ?? error.localizedDescription
+            let message = AppSettings.shared.localizedString("editor.format.error.invalid")
+            showError(String(format: message, format.localizedName, detail))
+        }
+    }
+
+    @objc private func clear() {
+        textView.unmarkText()
+        replaceText(with: "")
+    }
+
+    private func replaceText(with text: String) {
+        errorLabel.isHidden = true
+        guard textView.isEditable, text != textView.string else { return }
+        let range = NSRange(location: 0, length: textView.attributedString().length)
+        textView.breakUndoCoalescing()
+        _ = textView.performValidatedReplacement(in: range, with: NSAttributedString(string: text))
+        textView.breakUndoCoalescing()
     }
 }

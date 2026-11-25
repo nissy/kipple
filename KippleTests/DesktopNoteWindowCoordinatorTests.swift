@@ -430,7 +430,10 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertFalse(note.firstResponder is NSTextView)
 
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
-        let editor = try XCTUnwrap(note.firstResponder as? NSTextView)
+        let editor = try XCTUnwrap(note.firstResponder as? LiveEditorTextView)
+        XCTAssertTrue(editor.enclosingScrollView?.verticalRulerView is SimpleLineNumberRulerView)
+        XCTAssertEqual(editor.font, FontManager.shared.editorFont)
+        XCTAssertFalse(editor.isAutomaticQuoteSubstitutionEnabled)
         XCTAssertEqual(editor.string, original)
         XCTAssertLessThan(editor.selectedRange().location, 40)
         let updated = "Edited " + original
@@ -442,6 +445,48 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         await fulfillment(of: [saved], timeout: 2)
         XCTAssertEqual(adapter.history.first?.title, title)
         XCTAssertEqual(adapter.history.first?.categoryIDs, [BuiltInCategory.ocr])
+    }
+}
+
+extension DesktopNoteWindowCoordinatorTests {
+    func testDesktopNoteEditingToolsModifyTheDraftAndSupportUndo() throws {
+        let original = "  {\"例\":\"📝\"} \n"
+        let editor = DesktopNoteEditor(text: original)
+        let window = NSWindow(contentRect: screenFrame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        editor.view.translatesAutoresizingMaskIntoConstraints = true
+        window.contentView = editor.view
+        window.makeFirstResponder(editor.textView)
+        let menu = editor.makeToolsMenu()
+        let undo = try XCTUnwrap(editor.textView.undoManager)
+
+        undo.beginUndoGrouping()
+        menu.performActionForItem(at: 0)
+        undo.endUndoGrouping()
+        XCTAssertEqual(editor.textView.string, "{\"例\":\"📝\"}")
+        undo.undo()
+        XCTAssertEqual(editor.textView.string, original)
+
+        let jsonIndex = try XCTUnwrap(menu.items.firstIndex {
+            $0.representedObject as? String == ClipboardTextFormat.json.rawValue
+        })
+        menu.performActionForItem(at: jsonIndex)
+        XCTAssertEqual(editor.textView.string, try ClipboardTextFormatter.format(original, as: .json))
+
+        let yaml = "tasks: [first, second]"
+        editor.textView.string = yaml
+        menu.performActionForItem(at: jsonIndex)
+        XCTAssertEqual(editor.textView.string, yaml)
+        let yamlIndex = try XCTUnwrap(menu.items.firstIndex {
+            $0.representedObject as? String == ClipboardTextFormat.yaml.rawValue
+        })
+        menu.performActionForItem(at: yamlIndex)
+        XCTAssertEqual(editor.textView.string, try ClipboardTextFormatter.format(yaml, as: .yaml))
+
+        menu.performActionForItem(at: menu.numberOfItems - 1)
+        XCTAssertTrue(editor.textView.string.isEmpty)
+        XCTAssertEqual(editor.originalText, original)
     }
 }
 

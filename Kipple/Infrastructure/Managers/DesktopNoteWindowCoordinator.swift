@@ -97,6 +97,7 @@ final class DesktopNotePanel: NSPanel {
     private let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     private let openLink: (URL) -> Void
     private var categoryControl: NSHostingView<DesktopNoteCategoryMenu>?
+    private var editorToolsButton: NSButton?
     private var displayModeButton: NSButton?
     private var controls: [NSView] = []
     private var displayMode: AppSettings.DesktopNoteDisplayMode
@@ -292,14 +293,13 @@ final class DesktopNotePanel: NSPanel {
         guard contentView.bounds.insetBy(dx: inset, dy: inset).contains(location),
               !(contentView.hitTest(location) is NSScroller) else { return false }
         let interactiveViews = controls + (editor.map { [$0.view] } ?? [])
-        return !interactiveViews.contains { $0.bounds.contains($0.convert(point, from: nil)) }
+        return !interactiveViews.contains { !$0.isHidden && $0.bounds.contains($0.convert(point, from: nil)) }
     }
 
     private func beginEditing(at screenPoint: NSPoint) {
         let host = noteContentController.hostingController
         var content = host.rootView
-        guard let editor = DesktopNoteEditor(text: content.item.content, font: content.historyFont)
-        else { return }
+        let editor = DesktopNoteEditor(text: content.item.content)
         let padding = HistoryItemPreviewContent.contentPadding
         content.showsBody = false
         let headingHeight = title.isEmpty ? 0 : NSHostingController(rootView: content.titlePreview)
@@ -308,6 +308,7 @@ final class DesktopNotePanel: NSPanel {
         host.rootView = content
 
         self.editor = editor
+        editorToolsButton?.isHidden = false
         let container = noteContentController.view
         container.addSubview(editor.view)
         NSLayoutConstraint.activate([
@@ -370,6 +371,7 @@ final class DesktopNotePanel: NSPanel {
     private func finishEditing() {
         guard let editor else { return }
         self.editor = nil
+        editorToolsButton?.isHidden = true
         makeFirstResponder(nil)
         editor.view.removeFromSuperview()
         if changeDisplayModeAfterSave {
@@ -397,6 +399,13 @@ final class DesktopNotePanel: NSPanel {
     }
 
     private func installControls(in view: NSView, for item: ClipItem) {
+        let tools = noteContentController.makeButton(
+            "ellipsis.circle", labelKey: "editor.editTools", target: self, action: #selector(showEditorTools(_:))
+        )
+        tools.refusesFirstResponder = true
+        tools.isHidden = true
+        editorToolsButton = tools
+        controls.append(tools)
         if let onChangeCategory {
             let menu = DesktopNoteCategoryMenu(item: item, onChangeCategory: onChangeCategory) { [weak self] in
                 guard let self else { return }
@@ -412,15 +421,20 @@ final class DesktopNotePanel: NSPanel {
             categoryControl = control
             controls.append(control)
         }
-        let palette = makeButton("paintpalette", labelKey: "Desktop Note Color", action: #selector(showColors(_:)))
-        let format = makeButton(
+        let palette = noteContentController.makeButton(
+            "paintpalette", labelKey: "Desktop Note Color", target: self, action: #selector(showColors(_:))
+        )
+        let format = noteContentController.makeButton(
             "chevron.left.forwardslash.chevron.right",
             labelKey: "Show Markdown",
+            target: self,
             action: #selector(toggleDisplayMode)
         )
         displayModeButton = format
         updateDisplayModeButton()
-        let close = makeButton("xmark", labelKey: "Remove Desktop Note", action: #selector(performClose(_:)))
+        let close = noteContentController.makeButton(
+            "xmark", labelKey: "Remove Desktop Note", target: self, action: #selector(performClose(_:))
+        )
         controls.append(contentsOf: [palette, format, close])
         let stack = NSStackView(views: controls)
         stack.spacing = 4
@@ -455,25 +469,6 @@ final class DesktopNotePanel: NSPanel {
         displayModeButton?.setAccessibilityLabel(label)
     }
 
-    private func makeButton(_ symbol: String, labelKey: String, action: Selector) -> NSButton {
-        let button = NSButton(frame: .zero)
-        let label = AppSettings.shared.localizedString(labelKey)
-        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        button.imagePosition = .imageOnly
-        button.isBordered = false
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.contentTintColor = .secondaryLabelColor
-        button.target = self
-        button.action = action
-        button.toolTip = label
-        button.setAccessibilityLabel(label)
-        NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 24),
-            button.heightAnchor.constraint(equalToConstant: 24)
-        ])
-        return button
-    }
-
     @objc private func showColors(_ sender: NSButton) {
         let menu = NSMenu()
         for color in DesktopNoteColor.allCases {
@@ -485,6 +480,12 @@ final class DesktopNotePanel: NSPanel {
             menu.addItem(item)
         }
         menu.popUp(positioning: nil, at: NSPoint(x: sender.bounds.minX, y: sender.bounds.minY), in: sender)
+    }
+
+    @objc private func showEditorTools(_ sender: NSButton) {
+        guard let editor, !isSaving else { return }
+        let menu = editor.makeToolsMenu()
+        menu.popUp(positioning: nil, at: NSPoint(x: sender.bounds.minX, y: sender.bounds.maxY), in: sender)
     }
 
     @objc private func changeColor(_ sender: NSMenuItem) {

@@ -64,9 +64,9 @@ final class SimpleLineNumberCoordinator: NSObject, NSTextViewDelegate, @preconcu
         let verticalPadding = FontManager.currentEditorLayoutSettings().verticalPadding
         textView.textContainerInset = NSSize(width: 8, height: verticalPadding)
         
-        if !textView.string.isEmpty {
-            let range = NSRange(location: 0, length: textView.string.count)
-            textView.textStorage?.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
+        if let storage = textView.textStorage, storage.length > 0 {
+            let range = NSRange(location: 0, length: storage.length)
+            storage.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
         }
         
         // 行番号ビューを更新

@@ -66,6 +66,7 @@
 "editor.trim" = "Trim";
 "editor.trim.success" = "Trimmed";
 "editor.editTools.help" = "Trim or format JSON/YAML";
+"editor.editTools" = "Editing Tools";
 "editor.editTools.requiresEditing" = "Available only while editing.";
 "editor.format" = "Format";
 "editor.format.help" = "Format JSON/YAML";

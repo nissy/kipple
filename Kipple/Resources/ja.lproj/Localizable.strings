@@ -66,6 +66,7 @@
 "editor.trim" = "トリム";
 "editor.trim.success" = "トリムしました";
 "editor.editTools.help" = "トリムまたはJSON/YAML整形";
+"editor.editTools" = "編集ツール";
 "editor.editTools.requiresEditing" = "編集モードでのみ使用できます";
 "editor.format" = "整形";
 "editor.format.help" = "JSON/YAMLを整形";

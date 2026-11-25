@@ -43,6 +43,25 @@ final class DesktopNoteContentController: NSViewController {
         return (view as? NSScrollView).map { [$0] + descendants } ?? descendants
     }
 
+    func makeButton(_ symbol: String, labelKey: String, target: AnyObject, action: Selector) -> NSButton {
+        let button = NSButton(frame: .zero)
+        let label = AppSettings.shared.localizedString(labelKey)
+        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        button.imagePosition = .imageOnly
+        button.isBordered = false
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.contentTintColor = .secondaryLabelColor
+        button.target = target
+        button.action = action
+        button.toolTip = label
+        button.setAccessibilityLabel(label)
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 24),
+            button.heightAnchor.constraint(equalToConstant: 24)
+        ])
+        return button
+    }
+
     override func loadView() {
         let container = DesktopNoteBackgroundView()
         container.wantsLayer = true
