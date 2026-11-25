@@ -32,6 +32,17 @@
 "Delete" = "Delete";
 "Delete category" = "Delete category";
 "Delete item" = "Delete item";
+"Post to Desktop" = "Post to Desktop";
+"Remove Desktop Note" = "Remove Desktop Note";
+"Desktop Note Color" = "Desktop Note Color";
+"Desktop Notes" = "Desktop Notes";
+"Glass transparency" = "Glass transparency";
+"No Note Color" = "No Color";
+"Yellow Note Color" = "Yellow";
+"Orange Note Color" = "Orange";
+"Blue Note Color" = "Blue";
+"Green Note Color" = "Green";
+"Pink Note Color" = "Pink";
 "Editor Clear" = "Live Editor Clear";
 "Editor Save" = "Live Editor Save";
 "Editor Font" = "Live Editor Font";

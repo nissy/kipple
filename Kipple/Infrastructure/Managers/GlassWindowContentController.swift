@@ -13,6 +13,11 @@ final class GlassWindowContentController<Content: View>: NSViewController {
     let hostingController: NSHostingController<Content>
 
     private let cornerRadius: CGFloat
+    private let glassView = NSGlassEffectView()
+    var glassOpacity: CGFloat {
+        get { glassView.alphaValue }
+        set { glassView.alphaValue = newValue }
+    }
 
     init(hostingController: NSHostingController<Content>, cornerRadius: CGFloat) {
         self.hostingController = hostingController
@@ -45,20 +50,23 @@ final class GlassWindowContentController<Content: View>: NSViewController {
 
     private func makeGlassContainer() -> NSView {
         let container = makeRoundedContainer()
-        let glassView = NSGlassEffectView()
         glassView.style = .regular
         glassView.cornerRadius = cornerRadius
-        glassView.tintColor = nil
         glassView.translatesAutoresizingMaskIntoConstraints = false
         glassView.wantsLayer = true
         glassView.layer?.cornerRadius = cornerRadius
         glassView.layer?.cornerCurve = .continuous
         glassView.layer?.masksToBounds = true
 
-        prepareHostedView()
-        glassView.contentView = hostingController.view
+        glassView.contentView = NSView()
         container.addSubview(glassView)
         pin(glassView, to: container)
+
+        let hostedView = hostingController.view
+        prepareHostedView()
+        hostedView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(hostedView)
+        pin(hostedView, to: container)
         return container
     }
 

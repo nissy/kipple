@@ -13,6 +13,9 @@ final class SettingsToolbarControllerTests: XCTestCase {
 
         controller.toolbar(NSToolbar(identifier: "test"), didSelect: SettingsViewModel.Tab.clipboard.toolbarIdentifier)
         XCTAssertEqual(viewModel.selectedTab, .clipboard)
+
+        controller.toolbar(NSToolbar(identifier: "test"), didSelect: SettingsViewModel.Tab.desktopNotes.toolbarIdentifier)
+        XCTAssertEqual(viewModel.selectedTab, .desktopNotes)
     }
 
     func testTabChangeDuringLayoutDefersSizingUntilLayoutCompletes() async {

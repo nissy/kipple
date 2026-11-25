@@ -17,6 +17,7 @@ final class HistoryPopoverManager {
     private var hostingController: NSHostingController<ClipboardItemPopover>?
     private weak var anchorView: NSView?
     private var hideWorkItem: DispatchWorkItem?
+    private var isPointerOverPanel = false
 
     private var observers = Set<AnyCancellable>()
 
@@ -27,15 +28,18 @@ final class HistoryPopoverManager {
     }
 
     func show(item: ClipItem, from anchorView: NSView, trailingEdge: Bool) {
-        hideWorkItem?.cancel()
+        guard !isPointerOverPanel,
+              let window = anchorView.window,
+              let screen = window.screen ?? NSScreen.main else { return }
+        cancelScheduledHide()
         self.anchorView = anchorView
 
         let controller: NSHostingController<ClipboardItemPopover>
         if let existing = hostingController {
             controller = existing
-            controller.rootView = ClipboardItemPopover(item: item)
+            controller.rootView = ClipboardItemPopover(item: item, screen: screen)
         } else {
-            let newController = NSHostingController(rootView: ClipboardItemPopover(item: item))
+            let newController = NSHostingController(rootView: ClipboardItemPopover(item: item, screen: screen))
             hostingController = newController
             controller = newController
         }
@@ -47,12 +51,6 @@ final class HistoryPopoverManager {
 
         controller.view.layoutSubtreeIfNeeded()
         let fittingSize = controller.view.fittingSize
-        guard let window = anchorView.window,
-              let screen = window.screen ?? NSScreen.main else {
-            hide()
-            return
-        }
-
         let anchorRectInWindow = anchorView.convert(anchorView.bounds, to: nil)
         let anchorRectOnScreen = window.convertToScreen(anchorRectInWindow)
 
@@ -71,18 +69,24 @@ final class HistoryPopoverManager {
         panel.orderFront(nil)
     }
 
-    func scheduleHide(after interval: TimeInterval = 0.15) {
-        hideWorkItem?.cancel()
+    func keepOpen(ifAnchoredTo anchor: NSView) {
+        if anchorView === anchor { cancelScheduledHide() }
+    }
+
+    func scheduleHide(after interval: TimeInterval = 0.3) {
+        guard !isPointerOverPanel else { return }
+        cancelScheduledHide()
         let workItem = DispatchWorkItem { [weak self] in
-            self?.hide()
+            guard let self, !self.isPointerOverPanel else { return }
+            self.hide()
         }
         hideWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: workItem)
     }
 
     func hide() {
-        hideWorkItem?.cancel()
-        hideWorkItem = nil
+        cancelScheduledHide()
+        isPointerOverPanel = false
         panel?.orderOut(nil)
         panel = nil
         hostingController = nil
@@ -90,12 +94,21 @@ final class HistoryPopoverManager {
     }
 
     func forceClose() {
+        hide()
+    }
+
+    private func cancelScheduledHide() {
         hideWorkItem?.cancel()
         hideWorkItem = nil
-        panel?.orderOut(nil)
-        panel = nil
-        hostingController = nil
-        anchorView = nil
+    }
+
+    private func updatePanelHover(_ hovering: Bool) {
+        isPointerOverPanel = hovering
+        if hovering {
+            cancelScheduledHide()
+        } else {
+            scheduleHide()
+        }
     }
 
     private func makePanel() -> NSPanel {
@@ -116,18 +129,19 @@ final class HistoryPopoverManager {
     }
 
     private final class GlassContainerView: NSView {
-        let contentHost = NSView()
         private let cornerRadius: CGFloat
+        private let onHover: (Bool, NSView) -> Void
+        private var hoverArea: NSTrackingArea?
 
-        init(cornerRadius: CGFloat) {
+        init(cornerRadius: CGFloat, onHover: @escaping (Bool, NSView) -> Void) {
             self.cornerRadius = cornerRadius
+            self.onHover = onHover
             super.init(frame: .zero)
             wantsLayer = true
             layer?.backgroundColor = NSColor.clear.cgColor
             layer?.cornerRadius = cornerRadius
             layer?.cornerCurve = .continuous
             layer?.masksToBounds = true
-            contentHost.translatesAutoresizingMaskIntoConstraints = false
         }
 
         @available(*, unavailable)
@@ -139,6 +153,22 @@ final class HistoryPopoverManager {
             super.layout()
             layer?.cornerRadius = cornerRadius
         }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            if let hoverArea { removeTrackingArea(hoverArea) }
+            let area = NSTrackingArea(
+                rect: .zero,
+                options: [.inVisibleRect, .mouseEnteredAndExited, .activeInActiveApp],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(area)
+            hoverArea = area
+        }
+
+        override func mouseEntered(with event: NSEvent) { onHover(true, self) }
+        override func mouseExited(with event: NSEvent) { onHover(false, self) }
     }
 
     private func popoverOrigin(
@@ -177,7 +207,7 @@ final class HistoryPopoverManager {
     private func install(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
         controller.view.wantsLayer = true
         controller.view.layer?.backgroundColor = NSColor.clear.cgColor
-        controller.view.layer?.cornerRadius = 18
+        controller.view.layer?.cornerRadius = HistoryItemPreviewContent.cornerRadius
         controller.view.layer?.cornerCurve = .continuous
         controller.view.layer?.masksToBounds = true
         controller.view.translatesAutoresizingMaskIntoConstraints = false
@@ -186,14 +216,18 @@ final class HistoryPopoverManager {
     }
 
     private func installGlass(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
-        let container = GlassContainerView(cornerRadius: 18)
+        let cornerRadius = HistoryItemPreviewContent.cornerRadius
+        let container = GlassContainerView(cornerRadius: cornerRadius) { [weak self] hovering, source in
+            guard let self, self.panel?.contentView === source else { return }
+            self.updatePanelHover(hovering)
+        }
         let glassView = NSGlassEffectView()
         glassView.style = .regular
-        glassView.cornerRadius = 18
+        glassView.cornerRadius = cornerRadius
         glassView.tintColor = nil
         glassView.translatesAutoresizingMaskIntoConstraints = false
         glassView.wantsLayer = true
-        glassView.layer?.cornerRadius = 18
+        glassView.layer?.cornerRadius = cornerRadius
         glassView.layer?.cornerCurve = .continuous
         glassView.layer?.masksToBounds = true
         glassView.contentView = controller.view

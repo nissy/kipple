@@ -76,6 +76,8 @@ struct SettingsView: View {
             EditorSettingsView()
         case .clipboard:
             DataSettingsView()
+        case .desktopNotes:
+            DesktopNoteSettingsView()
         case .permission:
             PermissionsSettingsView()
         case .ai:
@@ -143,9 +145,9 @@ private struct SettingsToolbarButton: View {
                     .font(.system(size: 11, weight: .regular))
                     .foregroundColor(labelColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: true, vertical: false)
             }
-            .padding(.horizontal, 5)
+            .padding(.horizontal, 2)
             .padding(.vertical, 2)
             .frame(maxWidth: .infinity)
         }

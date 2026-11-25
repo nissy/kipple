@@ -17,6 +17,19 @@ final class AppSettings: ObservableObject {
     @AppStorage("windowAnimation") var windowAnimation: String = "none"
     @AppStorage("editorSectionHeight") var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") var historySectionHeight: Double = 300
+
+    static let desktopNoteTransparencyRange = 0.0...0.8
+    @AppStorage(Keys.desktopNoteTransparency) private var storedDesktopNoteTransparency = 0.5
+
+    var desktopNoteTransparency: Double {
+        get { min(max(storedDesktopNoteTransparency, 0), Self.desktopNoteTransparencyRange.upperBound) }
+        set {
+            let value = min(max(newValue, 0), Self.desktopNoteTransparencyRange.upperBound)
+            guard value != storedDesktopNoteTransparency else { return }
+            objectWillChange.send()
+            storedDesktopNoteTransparency = value
+        }
+    }
     
     // Editor Settings
     @AppStorage("editorPosition") private var storedEditorPosition: String = "disabled"
@@ -158,6 +171,7 @@ final class AppSettings: ObservableObject {
         static let windowAnimation = "windowAnimation"
         static let editorSectionHeight = "editorSectionHeight"
         static let historySectionHeight = "historySectionHeight"
+        static let desktopNoteTransparency = "desktopNoteTransparency"
         static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"
         static let enableHotkey = "enableHotkey"

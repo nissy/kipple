@@ -301,20 +301,20 @@ struct ClipDetailsView: View {
                     let availableIDs = Set(categoryStore.assignable().map(\.id))
                     categoryChanges = categoryChanges.filter { availableIDs.contains($0.key) }
                 }
-                errorMessage = editErrorMessage(error)
+                errorMessage = LocalizedStringKey(clipItemEditErrorMessage(error))
             }
         }
     }
+}
 
-    private func editErrorMessage(_ error: Error) -> LocalizedStringKey {
-        switch error as? ClipItemEditError {
-        case .itemUnavailable: "Item unavailable"
-        case .invalidTitle: "Enter a title of up to 120 characters."
-        case .emptyContent: "Enter some content."
-        case .duplicateContent: "Another history item already has this content."
-        case .categoryUnavailable: "A selected category is no longer available."
-        case nil: "Could not save the item. Please try again."
-        }
+func clipItemEditErrorMessage(_ error: Error) -> String {
+    switch error as? ClipItemEditError {
+    case .itemUnavailable: "Item unavailable"
+    case .invalidTitle: "Enter a title of up to 120 characters."
+    case .emptyContent: "Enter some content."
+    case .duplicateContent: "Another history item already has this content."
+    case .categoryUnavailable: "A selected category is no longer available."
+    case nil: "Could not save the item. Please try again."
     }
 }
 

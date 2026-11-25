@@ -16,7 +16,6 @@ struct HistoryItemView: View {
     let isQueuePreviewed: Bool
     let isScrollLocked: Bool
     let onTap: () -> Void
-    let onEdit: () -> Void
     let onQueueDrag: ((CGSize) -> Void)?
     let onQueueLongPress: (() -> Void)?
     let onDelete: (() -> Void)?
@@ -32,6 +31,7 @@ struct HistoryItemView: View {
 
     @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
     @Environment(\.categoryPopoverChanged) private var presentationChanged
+    @Environment(\.openHistoryItemEditor) private var openHistoryItemEditor
     @State private var isEditingCategories = false
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
@@ -48,7 +48,6 @@ struct HistoryItemView: View {
         isQueuePreviewed: Bool,
         isScrollLocked: Bool,
         onTap: @escaping () -> Void,
-        onEdit: @escaping () -> Void,
         onQueueDrag: ((CGSize) -> Void)? = nil,
         onQueueLongPress: (() -> Void)? = nil,
         onDelete: (() -> Void)?,
@@ -67,7 +66,6 @@ struct HistoryItemView: View {
         self.isQueuePreviewed = isQueuePreviewed
         self.isScrollLocked = isScrollLocked
         self.onTap = onTap
-        self.onEdit = onEdit
         self.onQueueDrag = onQueueDrag
         self.onQueueLongPress = onQueueLongPress
         self.onDelete = onDelete
@@ -308,21 +306,6 @@ struct HistoryItemView: View {
         return content
     }
 
-    private func evaluateWindowPosition() -> Bool {
-        guard let mainWindow = NSApp.windows.first(where: { window in
-            window.isVisible && window.contentViewController != nil
-        }) else {
-            return true
-        }
-
-        guard let currentScreen = mainWindow.screen ?? NSScreen.main else {
-            return true
-        }
-
-        let screenCenter = currentScreen.frame.midX
-        return mainWindow.frame.midX < screenCenter
-    }
-
     private func schedulePopoverPresentation(anchor: NSView) {
         guard !isEditingCategories else { return }
         cancelPopoverTask()
@@ -386,7 +369,10 @@ private extension HistoryItemView {
 
     @ViewBuilder
     var contextMenuContent: some View {
-        Button("Edit Item") { closePopover(); onEdit() }
+        Button("Edit Item") {
+            closePopover()
+            openHistoryItemEditor(item)
+        }
         Divider()
         if let onOpenItem, item.isActionable {
             Button {
@@ -425,9 +411,10 @@ private extension HistoryItemView {
         }
 
         if hovering {
+            HistoryPopoverManager.shared.keepOpen(ifAnchoredTo: anchor)
             hoverCoordinator.setHovered(itemID: item.id)
-            if windowPosition == nil {
-                windowPosition = evaluateWindowPosition()
+            if let window = anchor.window, let screen = window.screen {
+                windowPosition = window.frame.midX < screen.frame.midX
             }
             schedulePopoverPresentation(anchor: anchor)
         } else {

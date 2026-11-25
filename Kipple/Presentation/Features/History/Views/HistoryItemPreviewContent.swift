@@ -2,29 +2,23 @@ import AppKit
 import SwiftUI
 
 struct HistoryItemPreviewContent: View {
+    static let contentPadding: CGFloat = 20
+    static let cornerRadius: CGFloat = 18
+
     let item: ClipItem
     let categories: [UserCategory]
     let historyFont: NSFont
+    let isPosted: Bool
+    let onToggleDesktopNote: () -> Void
     @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let title = Self.nonempty(item.title) {
-                Text(verbatim: title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .help(title)
-                    .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .top, spacing: 8) {
+                HistoryItemPreviewText(item: item, historyFont: historyFont)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                desktopNoteButton
             }
-
-            Text(verbatim: Self.makePreviewText(for: item))
-                .font(Font(historyFont))
-                .lineSpacing(3)
-                .lineLimit(previewLineLimit)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
 
             CategoryLabelsView(categories: categories, isPreview: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,14 +28,26 @@ struct HistoryItemPreviewContent: View {
             metadataSection
         }
         .foregroundStyle(.primary)
-        .padding(20)
+        .padding(Self.contentPadding)
         .frame(width: 320, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
     }
 
-    private var previewLineLimit: Int {
-        let lineHeight = ceil(historyFont.ascender - historyFont.descender + historyFont.leading + 3)
-        return max(1, min(10, Int(220 / max(1, lineHeight))))
+    private var desktopNoteButton: some View {
+        let label = Text(LocalizedStringKey(isPosted ? "Remove Desktop Note" : "Post to Desktop"))
+        return Button(action: onToggleDesktopNote) {
+            Image(systemName: isPosted ? "pin.fill" : "pin")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(KippleButtonAppearance.foreground(isActive: isPosted))
+                .rotationEffect(.degrees(isPosted ? 0 : -45))
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                       height: MainViewMetrics.HistoryColumns.controlColumnWidth)
+                .background(KippleButtonAppearance.compactFill(isActive: isPosted), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     private var metadataSection: some View {
@@ -128,5 +134,39 @@ struct HistoryItemPreviewContent: View {
 
     static func makePreviewText(for item: ClipItem, maxLength: Int = 500) -> String {
         String(item.content.prefix(maxLength))
+    }
+}
+
+struct HistoryItemPreviewText: View {
+    let item: ClipItem
+    let historyFont: NSFont
+    var showsBody = true
+    static let spacing: CGFloat = 16
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Self.spacing) {
+            if let title = HistoryItemPreviewContent.nonempty(item.title) {
+                Text(verbatim: title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(title)
+                    .accessibilityAddTraits(.isHeader)
+            }
+
+            if showsBody {
+                Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
+                    .font(Font(historyFont))
+                    .lineSpacing(3)
+                    .lineLimit(previewLineLimit)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var previewLineLimit: Int {
+        let lineHeight = ceil(historyFont.ascender - historyFont.descender + historyFont.leading + 3)
+        return max(1, min(10, Int(220 / max(1, lineHeight))))
     }
 }
