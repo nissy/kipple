@@ -24,8 +24,8 @@ final class LiveEditorTextView: NSTextView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if isEditable, event.keyCode == 53 {
-            onEscape?()
+        if isEditable, event.keyCode == 53, !hasMarkedText(), let onEscape {
+            onEscape()
             return
         }
         super.keyDown(with: event)

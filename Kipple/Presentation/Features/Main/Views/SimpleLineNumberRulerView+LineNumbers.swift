@@ -13,7 +13,6 @@ extension SimpleLineNumberRulerView {
             NSFont.systemFont(ofSize: context.fontSize)
         let visibleRect = context.textView.visibleRect
         let containerOrigin = context.textView.textContainerOrigin
-        let textContainerInset = context.textView.textContainerInset
 
         let visibleGlyphRange = context.layoutManager.glyphRange(
             forBoundingRect: visibleRect,
@@ -35,7 +34,6 @@ extension SimpleLineNumberRulerView {
             lineNumberFont: lineNumberFont,
             visibleRect: visibleRect,
             containerOrigin: containerOrigin,
-            textContainerInset: textContainerInset,
             initialLineNumber: initialLineNumber
         )
 
@@ -60,7 +58,6 @@ extension SimpleLineNumberRulerView {
                 lineNumberFont: options.lineNumberFont,
                 visibleRect: options.visibleRect,
                 containerOrigin: options.containerOrigin,
-                textContainerInset: options.textContainerInset,
                 previousCharacterLocation: previousCharLocation
             )
             self.drawLineNumber(context: context, params: &params)
@@ -117,7 +114,7 @@ extension SimpleLineNumberRulerView {
     ) {
         let lineY = params.lineRect.origin.y + params.containerOrigin.y - params.visibleRect.origin.y
         let lineNumberHeight = params.lineNumberFont.ascender - params.lineNumberFont.descender
-        let lineCenterY = lineY + params.textContainerInset.height + (fixedLineHeight / 2)
+        let lineCenterY = lineY + (fixedLineHeight / 2)
         let offset = FontManager.currentEditorLayoutSettings().lineNumberVerticalOffset
         let drawingY = lineCenterY - (lineNumberHeight / 2) - params.lineNumberFont.descender + offset
 

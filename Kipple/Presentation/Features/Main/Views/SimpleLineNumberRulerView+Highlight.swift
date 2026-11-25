@@ -60,7 +60,6 @@ extension SimpleLineNumberRulerView {
             initialLineNumber: initialLineNumber
         )
         let state = highlightSelectedLineFragments(
-            textView: textView,
             layoutManager: layoutManager,
             input: highlightInput
         )
@@ -98,7 +97,6 @@ extension SimpleLineNumberRulerView {
     }
 
     func highlightSelectedLineFragments(
-        textView: NSTextView,
         layoutManager: NSLayoutManager,
         input: SelectedLineHighlightInput
     ) -> SelectedLineHighlightState {
@@ -121,11 +119,7 @@ extension SimpleLineNumberRulerView {
 
             if fragmentLineNumber == input.selectedLineNumber {
                 let lineY = lineRect.origin.y + input.containerOrigin.y - input.visibleRect.origin.y
-                let textContainerInset = textView.textContainerInset
-                self.drawCurrentLineHighlight(
-                    y: lineY + textContainerInset.height,
-                    height: max(self.fixedLineHeight - textContainerInset.height * 2, 1)
-                )
+                self.drawCurrentLineHighlight(y: lineY, height: lineRect.height)
                 state.didDrawSelectedLine = true
             }
 

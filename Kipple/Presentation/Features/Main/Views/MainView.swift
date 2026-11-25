@@ -313,7 +313,7 @@ extension MainView {
                 keyDownMonitor = nil
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                if isCategoryPopoverPresented { return event }
+                if event.window is ClipItemEditorWindow || isCategoryPopoverPresented { return event }
                 let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let saveModifiers = NSEvent.ModifierFlags(
                     rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)

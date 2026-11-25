@@ -171,7 +171,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         clipboardService.onHistoryChanged = { [weak self] item in
             guard let self else { return }
             let items = self.clipboardService.history
-            self.handleExternalHistoryUpdate(items, newTopID: item.id)
+            self.handleHistoryUpdateForQueue(items, newTopID: item.id)
             self.updateHistory(items)
         }
     }
@@ -182,7 +182,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         service.$history
             .sink { [weak self] items in
                 guard let self = self else { return }
-                self.handleExternalHistoryUpdate(items, newTopID: items.first?.id)
+                let headChange = service.publishedQueueHeadChange
+                self.handleHistoryUpdateForQueue(items, newTopID: headChange?.itemID, checkNewTop: headChange != nil)
                 self.updateHistory(items, isLoaded: service.isHistoryLoaded)
             }
             .store(in: &serviceCancellables)
@@ -1132,7 +1133,7 @@ extension MainViewModel: PasteQueueCoordinating {
         }
     }
 
-    private func handleExternalHistoryUpdate(_ items: [ClipItem], newTopID: UUID?) {
+    private func handleHistoryUpdateForQueue(_ items: [ClipItem], newTopID: UUID?, checkNewTop: Bool = true) {
         guard isQueueModeActive else {
             expectedQueueHeadID = nil
             return
@@ -1159,6 +1160,8 @@ extension MainViewModel: PasteQueueCoordinating {
             pasteQueueEpoch &+= 1
             pasteQueue = remaining
         }
+
+        guard checkNewTop else { return }
 
         if let expected = expectedQueueHeadID {
             if expected == newTopID {

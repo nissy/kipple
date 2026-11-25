@@ -12,6 +12,37 @@ final class PlainTextPasteIntegrationTests: XCTestCase {
         try await verifyQueueReception(count: 1)
     }
 
+    func testAddingHistoryKeepsTheActiveQueueUntilTheNextUnrelatedCopy() async throws {
+        let queued = ClipItem(content: "Queued before adding history")
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [queued], loadDelay: 0)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        await adapter.refreshHistoryForTesting()
+        let monitor = IntegrationPasteCommandMonitor()
+        let model = MainViewModel(clipboardService: adapter, pasteMonitor: monitor)
+        model.toggleQueueMode()
+        model.queueSelection(items: [queued], anchor: queued)
+        await adapter.flushPendingAdapterOperationForTesting()
+        XCTAssertEqual(model.pasteQueue, [queued.id])
+
+        let content = "Manually added history"
+        try await adapter.createHistoryItem(title: nil, content: content, categoryChanges: [:])
+
+        XCTAssertEqual(adapter.history.first?.content, content)
+        XCTAssertEqual(model.pasteQueue, [queued.id])
+        XCTAssertTrue(model.isQueueModeActive)
+        XCTAssertTrue(monitor.isMonitoring)
+
+        await service.copyToClipboard("Unrelated clipboard content", fromEditor: false)
+        await adapter.refreshHistoryForTesting()
+
+        XCTAssertTrue(model.pasteQueue.isEmpty)
+        XCTAssertFalse(model.isQueueModeActive)
+        XCTAssertFalse(monitor.isMonitoring)
+    }
+
     func testClearHistoryAdvancesQueueToTheFirstRetainedItem() async throws {
         let removed = try putStyledItem("Removed queue head")
         var retained = try putStyledItem("Retained queue item")

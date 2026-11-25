@@ -290,6 +290,140 @@ final class MultipleCategoryTests: XCTestCase, @unchecked Sendable {
         let updated = await service.getHistory()
         XCTAssertEqual(updated.first?.categoryIDs, [first, second])
     }
+}
+
+extension MultipleCategoryTests {
+    func testCreateHistoryItemSavesDetailsWithoutCopyingAndAppliesHistoryLimit() async throws {
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let older = ClipItem(content: "Older history")
+        try await repository.save([older])
+        let service = ModernClipboardService(testRepository: repository) { _ in
+            XCTFail("Adding history must not write to the clipboard")
+            return -1
+        }
+        await service.loadHistoryFromRepository()
+        await service.setMaxHistoryItems(1)
+        let category = UUID()
+        let content = "https://example.org/template"
+
+        try await service.createHistoryItem(
+            title: "  Example template  ", content: content,
+            categoryChanges: [category: true, BuiltInCategory.url: false]
+        )
+
+        let history = await service.getHistory()
+        let added = try XCTUnwrap(history.first)
+        XCTAssertEqual(history.map(\.id), [added.id, older.id])
+        XCTAssertEqual(added.title, "Example template")
+        XCTAssertEqual(added.content, content)
+        XCTAssertEqual(added.kind, .url)
+        XCTAssertEqual(added.categoryIDs, [category])
+        XCTAssertEqual(added.metadata?.source, .editor)
+        XCTAssertEqual(added.metadata?.createdAt, added.timestamp)
+        let saved = try await repository.loadAll()
+        XCTAssertEqual(saved.first { $0.id == added.id }, added)
+
+        try await service.createHistoryItem(title: nil, content: "New ordinary history", categoryChanges: [:])
+        let limited = await service.getHistory()
+        XCTAssertEqual(limited.map(\.content), ["New ordinary history", content])
+        let persisted = try await repository.loadAll()
+        XCTAssertEqual(Set(persisted.map(\.id)), Set(limited.map(\.id)))
+    }
+
+    func testCreateHistoryItemRejectsDuplicatesAndDoesNotPublishFailedSaves() async throws {
+        let existing = ClipItem(content: "Existing body", metadata: ClipMetadata(title: "Existing title"))
+        let service = ModernClipboardService(testRepository: RejectingCategoryRepository(item: existing))
+        await service.loadHistoryFromRepository()
+
+        do {
+            try await service.createHistoryItem(title: "New title", content: existing.content, categoryChanges: [UUID(): true])
+            XCTFail("Duplicate content must not replace an existing item")
+        } catch ClipItemEditError.duplicateContent {}
+
+        do {
+            try await service.createHistoryItem(title: "New title", content: "New body", categoryChanges: [UUID(): true])
+            XCTFail("A failed save must be reported")
+        } catch { XCTAssertEqual(error as? MCPFailure, .persistence) }
+
+        let history = await service.getHistory()
+        XCTAssertEqual(history, [existing])
+    }
+
+    @MainActor
+    func testItemEditSavesAllFieldsInPlaceAndRecopyUsesEditedContent() async throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let originalContent = "Original formatted content"
+        let entry = NSPasteboardItem()
+        entry.setString(originalContent, forType: .string)
+        entry.setString("<b>Original formatted content</b>", forType: .html)
+        XCTAssertTrue(pasteboard.writeObjects([entry]))
+        let richText = try XCTUnwrap(ClipboardRichText(pasteboard: pasteboard))
+        let metadata = ClipMetadata(title: "Old title", createdAt: Date(timeIntervalSince1970: 100), source: .ocr)
+        let original = ClipItem(content: originalContent, sourceApp: "Source app", metadata: metadata, richText: richText)
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        try await repository.save([original, ClipItem(content: "Other item")])
+        let service = ModernClipboardService(testRepository: repository) { ClipboardRichText.write($0, to: pasteboard) }
+        await service.loadHistoryFromRepository()
+        let before = await service.getHistory()
+        let clipboardChangeCount = pasteboard.changeCount
+        try await service.updateDetails(id: original.id, title: "Short title")
+        let renamedHistory = await service.getHistory()
+        XCTAssertEqual(renamedHistory.first { $0.id == original.id }?.richText, richText)
+
+        let custom = UUID()
+        let editedContent = "https://example.org/edited"
+        XCTAssertEqual(original.categoryIDs(forDraftContent: editedContent), [BuiltInCategory.url, BuiltInCategory.ocr])
+        try await service.updateDetails(
+            id: original.id, title: "Edited title", content: editedContent,
+            categoryChanges: [custom: true, BuiltInCategory.ocr: false]
+        )
+        let history = await service.getHistory()
+        XCTAssertEqual(history.map(\.id), before.map(\.id))
+        let edited = try XCTUnwrap(history.first { $0.id == original.id })
+        XCTAssertEqual(edited.title, "Edited title")
+        XCTAssertEqual(edited.content, editedContent)
+        XCTAssertEqual(edited.kind, .url)
+        XCTAssertEqual(edited.categoryIDs, [custom, BuiltInCategory.url])
+        XCTAssertEqual(edited.sourceApp, original.sourceApp)
+        XCTAssertEqual(edited.metadata?.createdAt, original.metadata?.createdAt)
+        XCTAssertEqual(edited.timestamp, original.timestamp)
+        XCTAssertNil(edited.richText)
+        XCTAssertEqual(pasteboard.changeCount, clipboardChangeCount)
+        let persisted = try await repository.loadAll()
+        XCTAssertEqual(persisted.first { $0.id == original.id }, edited)
+
+        await service.recopyFromHistory(original)
+        XCTAssertEqual(pasteboard.string(forType: .string), editedContent)
+        _ = await service.addEditorItems([originalContent])
+        let afterRecopy = await service.getHistory()
+        XCTAssertEqual(afterRecopy.first?.content, originalContent)
+        XCTAssertNotEqual(afterRecopy.first?.id, original.id)
+        XCTAssertEqual(afterRecopy.first { $0.id == original.id }?.title, "Edited title")
+    }
+
+    func testDuplicateItemEditLeavesBothItemsUntouched() async throws {
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let first = ClipItem(content: "First item")
+        let second = ClipItem(content: "Second item")
+        try await repository.save([first, second])
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let before = await service.getHistory()
+
+        do {
+            try await service.updateDetails(
+                id: first.id, title: "New name", content: second.content, categoryChanges: [UUID(): true]
+            )
+            XCTFail("An edit must not overwrite another item with the same body")
+        } catch ClipItemEditError.duplicateContent {}
+
+        let after = await service.getHistory()
+        let persisted = try await repository.loadAll()
+        XCTAssertEqual(after, before)
+        XCTAssertEqual(Set(persisted.map(\.id)), Set(before.map(\.id)))
+        XCTAssertTrue(persisted.allSatisfy(before.contains))
+    }
 
     @MainActor
     func testFailedPersistenceKeepsCategoryStateUnchanged() async throws {
@@ -309,6 +443,13 @@ final class MultipleCategoryTests: XCTestCase, @unchecked Sendable {
         do {
             try await service.updateCategories(itemID: item.id, change: .clear)
             XCTFail("A failed clear must be reported")
+        } catch { XCTAssertEqual(error as? MCPFailure, .persistence) }
+        do {
+            try await service.updateDetails(
+                id: item.id, title: "New title", content: "New body",
+                categoryChanges: [custom: false, BuiltInCategory.ai: true]
+            )
+            XCTFail("A failed item edit must be reported")
         } catch { XCTAssertEqual(error as? MCPFailure, .persistence) }
         do {
             try await service.removeCategoryDefinition(custom)

@@ -18,6 +18,40 @@ private final class MainGlassWindow: NSWindow {
     override var canBecomeMain: Bool { true }
 }
 
+final class ClipItemEditorWindow: NSWindow {
+    enum Target: Hashable {
+        case newItem
+        case item(UUID)
+
+        var titleKey: String { self == .newItem ? "Add History Item" : "Edit Item" }
+    }
+
+    static var initialContentSize: NSSize {
+        let lineHeight = calculateFixedLineHeight(for: FontManager.shared.editorFont)
+        let verticalPadding = FontManager.currentEditorLayoutSettings().verticalPadding
+        let bodyHeight = lineHeight * 10 + verticalPadding * 2
+        let controlsHeight: CGFloat = 404
+        return NSSize(width: 460, height: controlsHeight + bodyHeight)
+    }
+    let target: Target
+    var isSaving = false
+
+    init(target: Target) {
+        self.target = target
+        super.init(
+            contentRect: NSRect(origin: .zero, size: Self.initialContentSize),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        guard (firstResponder as? NSTextView)?.hasMarkedText() != true else { return }
+        performClose(sender)
+    }
+}
+
 private final class RoundedMaskContainerView: NSView {
     private let cornerRadius: CGFloat
 
@@ -122,6 +156,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private var mainWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var itemEditorWindows: [ClipItemEditorWindow.Target: ClipItemEditorWindow] = [:]
     private var settingsCoordinator: SettingsToolbarController?
     private var settingsViewModel: SettingsViewModel?
     private var mainViewModel: MainViewModel?
@@ -196,6 +231,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         self.lastActiveAppTracker = lastActiveAppTracker
         self.appReactivationDelay = appReactivationDelay
         super.init()
+        titleBarState.addHistoryItemHandler = { [weak self] in self?.openItemEditor() }
         localizationCancellable = appSettings.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -404,6 +440,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
             }
         )
         .environmentObject(viewModel)
+        .environment(\.openHistoryItemEditor, HistoryItemEditorAction { [weak self] item in
+            self?.openItemEditor(item)
+        })
         
         mainWindow = MainGlassWindow(contentViewController: MainGlassContentController(rootView: contentView))
         return mainWindow
@@ -889,6 +928,61 @@ final class WindowManager: NSObject, NSWindowDelegate {
         mainViewModel?.highlightHistoryItem(itemID)
     }
     
+    @discardableResult
+    func openItemEditor(_ item: ClipItem? = nil) -> NSWindow {
+        let target = item.map { ClipItemEditorWindow.Target.item($0.id) } ?? .newItem
+        if let window = itemEditorWindows[target] {
+            window.makeKeyAndOrderFront(nil)
+            return window
+        }
+
+        let window = ClipItemEditorWindow(target: target)
+        let view = ClipDetailsView(
+            item: item,
+            titleKey: target.titleKey,
+            onClose: { [weak window] in window?.close() },
+            onSavingChanged: { [weak window] in window?.isSaving = $0 }
+        )
+        let controller = NSHostingController(rootView: view)
+        controller.sizingOptions = []
+        window.contentViewController = controller
+        window.setContentSize(ClipItemEditorWindow.initialContentSize)
+        window.title = appSettings.localizedString(target.titleKey)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.tabbingMode = .disallowed
+        window.isReleasedWhenClosed = false
+        window.level = mainWindow?.level ?? .normal
+        window.delegate = self
+        window.collectionBehavior.insert(.fullScreenAuxiliary)
+        positionItemEditor(window)
+        itemEditorWindows[target] = window
+        window.makeKeyAndOrderFront(nil)
+        return window
+    }
+
+    private func positionItemEditor(_ window: NSWindow) {
+        if let screen = mainWindow?.screen ?? NSScreen.main {
+            let visible = screen.visibleFrame
+            let width = min(window.frame.width, visible.width)
+            let height = min(window.frame.height, visible.height)
+            let frame = NSRect(
+                x: visible.midX - width / 2,
+                y: visible.midY - height / 2,
+                width: width,
+                height: height
+            )
+            window.setFrame(frame, display: false)
+        } else {
+            window.center()
+        }
+        let contentSize = window.contentRect(forFrameRect: window.frame).size
+        window.contentMinSize = NSSize(width: min(440, contentSize.width), height: min(520, contentSize.height))
+    }
+
     // MARK: - Settings Window
     
     func openSettings(tab: SettingsViewModel.Tab = .general) {
@@ -998,6 +1092,9 @@ final class WindowManager: NSObject, NSWindowDelegate {
         settingsWindow?.title = localizedSettingsWindowTitle()
         settingsCoordinator?.refreshLocalization()
         aboutWindow?.title = localizedAboutWindowTitle()
+        for window in itemEditorWindows.values {
+            window.title = appSettings.localizedString(window.target.titleKey)
+        }
     }
 
     private func localizedMainWindowTitle() -> String {
@@ -1103,8 +1200,8 @@ extension WindowManager {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak window] in
                 guard let self = self,
                       let window = window,
-                      // 詳細シートへのフォーカス移動では親パネルを非表示にしない。
                       window.attachedSheet == nil,
+                      !(NSApp.keyWindow is ClipItemEditorWindow),
                       !window.isKeyWindow && !self.isAlwaysOnTop && !self.preventAutoClose && !self.isOpening else {
                     return
                 }
@@ -1122,9 +1219,15 @@ extension WindowManager {
     }
 
     func windowWillClose(_ notification: Notification) {
-       if notification.object as? NSWindow === mainWindow {
+        if let editor = notification.object as? ClipItemEditorWindow {
+            itemEditorWindows.removeValue(forKey: editor.target)
+        } else if notification.object as? NSWindow === mainWindow {
             handleMainWindowClose()
         }
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        (sender as? ClipItemEditorWindow)?.isSaving != true
     }
 }
 

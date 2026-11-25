@@ -25,7 +25,6 @@ struct DrawLineNumberParams {
     let lineNumberFont: NSFont
     let visibleRect: NSRect
     let containerOrigin: NSPoint
-    let textContainerInset: NSSize
     var previousCharacterLocation: Int = -1
 }
 
@@ -51,7 +50,6 @@ struct LineNumberRenderingOptions {
     let lineNumberFont: NSFont
     let visibleRect: NSRect
     let containerOrigin: NSPoint
-    let textContainerInset: NSSize
     let initialLineNumber: Int
 }
 

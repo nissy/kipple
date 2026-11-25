@@ -38,8 +38,12 @@ enum ClipCategoryChange: Sendable {
 
 extension ClipItem {
     var automaticCategoryIDs: Set<UUID> {
+        automaticCategoryIDs(isURL: category == .url)
+    }
+
+    private func automaticCategoryIDs(isURL: Bool) -> Set<UUID> {
         var result = Set<UUID>()
-        if category == .url { result.insert(BuiltInCategory.url) }
+        if isURL { result.insert(BuiltInCategory.url) }
         if metadata?.sources.contains(.ocr) == true { result.insert(BuiltInCategory.ocr) }
         if metadata?.sources.contains(.mcp) == true { result.insert(BuiltInCategory.ai) }
         return result
@@ -50,8 +54,17 @@ extension ClipItem {
     }
 
     var categoryIDs: Set<UUID> {
+        categoryIDs(including: automaticCategoryIDs)
+    }
+
+    func categoryIDs(forDraftContent content: String) -> Set<UUID> {
+        let isURL = CategoryClassifier.shared.isLikelyURL(content)
+        return categoryIDs(including: automaticCategoryIDs(isURL: isURL))
+    }
+
+    private func categoryIDs(including automatic: Set<UUID>) -> Set<UUID> {
         let overrides = categoryOverrides
-        return automaticCategoryIDs.union(overrides.added).subtracting(overrides.removed)
+        return automatic.union(overrides.added).subtracting(overrides.removed)
     }
 
     var hasCustomCategory: Bool { categoryOverrides.hasCustomCategory }

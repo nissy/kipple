@@ -15,6 +15,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
     let isEditable: Bool
     let onDoubleClick: (() -> Void)?
     let onEscape: (() -> Void)?
+    var textColor: NSColor = MainViewMetrics.TextColor.primaryNSColor
+    var rulerBackgroundColor: NSColor = .clear
     let onScrollChange: ((CGFloat) -> Void)?
     
     typealias Coordinator = SimpleLineNumberCoordinator
@@ -34,9 +36,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
     }
 
     private var editorTextColor: NSColor {
-        isEditable
-            ? MainViewMetrics.TextColor.primaryNSColor
-            : MainViewMetrics.TextColor.primaryNSColor.withAlphaComponent(0.58)
+        isEditable ? textColor : textColor.withAlphaComponent(0.58)
     }
     
     func makeNSView(context: Context) -> NSScrollView {
@@ -70,7 +70,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         // カスタムルーラービューを設定
         let lineNumberView = SimpleLineNumberRulerView(textView: textView)
         lineNumberView.fixedLineHeight = lineHeight // 固定行高を渡す
-        lineNumberView.backgroundColor = .clear
+        lineNumberView.backgroundColor = rulerBackgroundColor
         scrollView.verticalRulerView = lineNumberView
         scrollView.hasVerticalRuler = true
         scrollView.rulersVisible = true
@@ -265,7 +265,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         scrollView.contentView.backgroundColor = .clear
 
         if let rulerView = scrollView.verticalRulerView as? SimpleLineNumberRulerView {
-            rulerView.backgroundColor = .clear
+            rulerView.backgroundColor = rulerBackgroundColor
         }
     }
 

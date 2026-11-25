@@ -35,9 +35,9 @@ enum ClipItemCategory: String, CaseIterable {
 
 struct ClipItem: Identifiable, Codable, Equatable {
     var id: UUID
-    let content: String
+    private(set) var content: String
     var timestamp: Date
-    let kind: ClipItemKind
+    private(set) var kind: ClipItemKind
     let sourceApp: String?
     let windowTitle: String?
     let bundleIdentifier: String?
@@ -94,6 +94,15 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     var category: ClipItemCategory {
         return CategoryClassifier.shared.classify(content: content, isFromEditor: isFromEditor ?? false)
+    }
+
+    func replacingContent(with content: String) -> ClipItem {
+        guard content != self.content else { return self }
+        var item = self
+        item.content = content
+        item.kind = item.category == .url ? .url : .text
+        item.richText = nil
+        return item
     }
     
     init(
