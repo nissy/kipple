@@ -36,6 +36,11 @@
 "Remove Desktop Note" = "Remove Desktop Note";
 "Desktop Note Color" = "Desktop Note Color";
 "Desktop Notes" = "Desktop Notes";
+"Default display format" = "Default display format";
+"Plain Text" = "Plain Text";
+"Markdown" = "Markdown";
+"Show Plain Text" = "Show Plain Text";
+"Show Markdown" = "Show Markdown";
 "Glass transparency" = "Glass transparency";
 "No Note Color" = "No Color";
 "Yellow Note Color" = "Yellow";

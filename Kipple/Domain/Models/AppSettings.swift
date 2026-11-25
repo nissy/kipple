@@ -20,6 +20,8 @@ final class AppSettings: ObservableObject {
 
     static let desktopNoteTransparencyRange = 0.0...0.8
     @AppStorage(Keys.desktopNoteTransparency) private var storedDesktopNoteTransparency = 0.5
+    @AppStorage(Keys.desktopNoteDefaultDisplayMode)
+    private var storedDesktopNoteDisplayMode = DesktopNoteDisplayMode.plainText
 
     var desktopNoteTransparency: Double {
         get { min(max(storedDesktopNoteTransparency, 0), Self.desktopNoteTransparencyRange.upperBound) }
@@ -29,6 +31,20 @@ final class AppSettings: ObservableObject {
             objectWillChange.send()
             storedDesktopNoteTransparency = value
         }
+    }
+
+    var desktopNoteDefaultDisplayMode: DesktopNoteDisplayMode {
+        get { storedDesktopNoteDisplayMode }
+        set {
+            guard newValue != storedDesktopNoteDisplayMode else { return }
+            objectWillChange.send()
+            storedDesktopNoteDisplayMode = newValue
+        }
+    }
+
+    enum DesktopNoteDisplayMode: String {
+        case plainText
+        case markdown
     }
     
     // Editor Settings
@@ -172,6 +188,7 @@ final class AppSettings: ObservableObject {
         static let editorSectionHeight = "editorSectionHeight"
         static let historySectionHeight = "historySectionHeight"
         static let desktopNoteTransparency = "desktopNoteTransparency"
+        static let desktopNoteDefaultDisplayMode = "desktopNoteDefaultDisplayMode"
         static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"
         static let enableHotkey = "enableHotkey"

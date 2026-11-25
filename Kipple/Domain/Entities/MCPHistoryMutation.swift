@@ -5,7 +5,9 @@ struct MCPHistoryMutation {
     let candidate: [ClipItem]
 
     init(
-        items: [ClipItem], history: [ClipItem], capacity: Int,
+        items: [ClipItem],
+        history: [ClipItem],
+        capacity: Int,
         isProtected: (ClipItem) -> Bool = { $0.hasCustomCategory }
     ) throws {
         guard (1...50).contains(items.count) else { throw MCPFailure.invalidInput }

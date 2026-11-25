@@ -119,6 +119,7 @@ struct HistoryItemPreviewText: View {
     let item: ClipItem
     let historyFont: NSFont
     var showsBody = true
+    var formattedBody: AttributedString?
     static let spacing: CGFloat = 16
 
     var body: some View {
@@ -133,7 +134,7 @@ struct HistoryItemPreviewText: View {
             }
 
             if showsBody {
-                Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
+                bodyText
                     .font(Font(historyFont))
                     .lineSpacing(3)
                     .lineLimit(previewLineLimit)
@@ -141,6 +142,11 @@ struct HistoryItemPreviewText: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    private var bodyText: Text {
+        if let formattedBody { return Text(formattedBody) }
+        return Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
     }
 
     private var previewLineLimit: Int {

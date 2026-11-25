@@ -45,6 +45,7 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
         let note = DesktopNotePanel(
             item: item,
             screenFrame: screen.visibleFrame,
+            displayMode: AppSettings.shared.desktopNoteDefaultDisplayMode,
             onSave: { [adapter] text in
                 try await adapter.updateDetails(itemID: itemID, title: nil, content: text, categoryChanges: [:])
             },
@@ -99,24 +100,31 @@ final class DesktopNotePanel: NSPanel {
     private let onSave: ((String) async throws -> Void)?
     private let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     private var categoryControl: NSHostingView<DesktopNoteCategoryMenu>?
+    private var displayModeButton: NSButton?
     private var controls: [NSView] = []
+    private var displayMode: AppSettings.DesktopNoteDisplayMode
     private var selectedColor = DesktopNoteColor.none
     private var dragOffset: NSPoint?
+    private var hasDragged = false
     private var editor: DesktopNoteEditor?
     private var isSaving = false
     private var closeAfterSave = false
+    private var changeDisplayModeAfterSave = false
 
     override var canBecomeKey: Bool { true }
 
     init(
         item: ClipItem,
         screenFrame: NSRect,
+        displayMode: AppSettings.DesktopNoteDisplayMode = .plainText,
         onSave: ((String) async throws -> Void)? = nil,
-        onChangeCategory: ((ClipCategoryChange) async throws -> Void)? = nil
+        onChangeCategory: ((ClipCategoryChange) async throws -> Void)? = nil,
+        openLink: @escaping (URL) -> OpenURLAction.Result = { _ in .systemAction }
     ) {
-        let content = Self.makeContent(for: item)
+        var content = DesktopNoteContent(item: item, displayMode: displayMode)
         let size = Self.contentSize(for: content, screenFrame: screenFrame)
         initialScreenFrame = screenFrame
+        self.displayMode = displayMode
         self.onSave = onSave
         self.onChangeCategory = onChangeCategory
         glassController = GlassWindowContentController(
@@ -141,6 +149,11 @@ final class DesktopNotePanel: NSPanel {
         isOpaque = false
         hasShadow = true
         backgroundColor = .clear
+        content.openURL = OpenURLAction { [weak self] url in
+            guard let self, !self.hasDragged else { return .discarded }
+            return openLink(url)
+        }
+        glassController.hostingController.rootView = content
         contentViewController = glassController
         applyTransparency(AppSettings.shared.desktopNoteTransparency)
         setContentSize(size)
@@ -156,14 +169,17 @@ final class DesktopNotePanel: NSPanel {
         if let categoryControl, categoryControl.rootView.item.categoryIDs != item.categoryIDs {
             categoryControl.rootView.item = item
         }
-        let hostingController = glassController.hostingController
-        let previous = hostingController.rootView.preview.item
+        let previous = glassController.hostingController.rootView.preview.item
         guard item.title != previous.title || item.content != previous.content else { return }
+        reloadPreview(for: item)
+    }
 
-        var content = Self.makeContent(for: item)
+    private func reloadPreview(for item: ClipItem) {
+        var content = DesktopNoteContent(item: item, displayMode: displayMode)
         content.preview.showsBody = editor == nil
+        content.openURL = glassController.hostingController.rootView.openURL
         title = HistoryItemPreviewContent.nonempty(item.title) ?? ""
-        hostingController.rootView = content
+        glassController.hostingController.rootView = content
         if editor == nil { resize(to: Self.contentSize(for: content, screenFrame: availableFrame)) }
     }
 
@@ -179,25 +195,37 @@ final class DesktopNotePanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        let forwardsLinkEvents = displayMode == .markdown && editor == nil
         switch event.type {
         case .leftMouseDown:
             dragOffset = nil
+            hasDragged = false
             guard isNoteBody(at: event.locationInWindow) else { break }
             if event.clickCount == 2, editor == nil, onSave != nil {
                 beginEditing(at: convertPoint(toScreen: event.locationInWindow))
             } else {
                 dragOffset = event.locationInWindow
+                if forwardsLinkEvents { super.sendEvent(event) }
             }
             return
         case .leftMouseDragged:
             if let dragOffset {
+                let location = event.locationInWindow
+                // Let the text cancel its link click before the window follows the pointer.
+                if forwardsLinkEvents {
+                    hasDragged = hasDragged || hypot(location.x - dragOffset.x, location.y - dragOffset.y) >= 3
+                    super.sendEvent(event)
+                    guard hasDragged else { return }
+                }
                 let pointer = convertPoint(toScreen: event.locationInWindow)
                 setFrameOrigin(NSPoint(x: pointer.x - dragOffset.x, y: pointer.y - dragOffset.y))
                 return
             }
         case .leftMouseUp:
             if dragOffset != nil {
+                if forwardsLinkEvents { super.sendEvent(event) }
                 dragOffset = nil
+                hasDragged = false
                 return
             }
         case .keyDown:
@@ -294,6 +322,7 @@ final class DesktopNotePanel: NSPanel {
             } catch {
                 isSaving = false
                 closeAfterSave = false
+                changeDisplayModeAfterSave = false
                 editor.textView.isEditable = true
                 editor.showError(AppSettings.shared.localizedString(clipItemEditErrorMessage(error)))
             }
@@ -305,19 +334,15 @@ final class DesktopNotePanel: NSPanel {
         self.editor = nil
         makeFirstResponder(nil)
         editor.view.removeFromSuperview()
-        let host = glassController.hostingController
-        var content = host.rootView
-        content.preview.showsBody = true
-        host.rootView = content
-        resize(to: Self.contentSize(for: content, screenFrame: availableFrame))
+        if changeDisplayModeAfterSave {
+            changeDisplayModeAfterSave = false
+            flipDisplayMode()
+        }
+        reloadPreview(for: glassController.hostingController.rootView.preview.item)
         if closeAfterSave {
             closeAfterSave = false
             close()
         }
-    }
-
-    private static func makeContent(for item: ClipItem) -> DesktopNoteContent {
-        DesktopNoteContent(preview: HistoryItemPreviewText(item: item, historyFont: FontManager.shared.historyFont))
     }
 
     private static func contentSize(for content: DesktopNoteContent, screenFrame: NSRect) -> NSSize {
@@ -359,8 +384,15 @@ final class DesktopNotePanel: NSPanel {
             controls.append(control)
         }
         let palette = makeButton("paintpalette", labelKey: "Desktop Note Color", action: #selector(showColors(_:)))
+        let format = makeButton(
+            "chevron.left.forwardslash.chevron.right",
+            labelKey: "Show Markdown",
+            action: #selector(toggleDisplayMode)
+        )
+        displayModeButton = format
+        updateDisplayModeButton()
         let close = makeButton("xmark", labelKey: "Remove Desktop Note", action: #selector(performClose(_:)))
-        controls.append(contentsOf: [palette, close])
+        controls.append(contentsOf: [palette, format, close])
         let stack = NSStackView(views: controls)
         stack.spacing = 4
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -369,6 +401,29 @@ final class DesktopNotePanel: NSPanel {
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
             stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -6)
         ])
+    }
+
+    @objc private func toggleDisplayMode() {
+        if editor != nil {
+            changeDisplayModeAfterSave = true
+            saveEditing()
+            return
+        }
+        flipDisplayMode()
+        reloadPreview(for: glassController.hostingController.rootView.preview.item)
+    }
+
+    private func flipDisplayMode() {
+        displayMode = displayMode == .plainText ? .markdown : .plainText
+        updateDisplayModeButton()
+    }
+
+    private func updateDisplayModeButton() {
+        let isMarkdown = displayMode == .markdown
+        let label = AppSettings.shared.localizedString(isMarkdown ? "Show Plain Text" : "Show Markdown")
+        displayModeButton?.contentTintColor = isMarkdown ? .controlAccentColor : .secondaryLabelColor
+        displayModeButton?.toolTip = label
+        displayModeButton?.setAccessibilityLabel(label)
     }
 
     private func makeButton(_ symbol: String, labelKey: String, action: Selector) -> NSButton {
@@ -425,66 +480,6 @@ private struct DesktopNoteCategoryMenu: View {
             onOpenCategoryManager: onOpenCategoryManager
         )
         .environment(\.locale, appSettings.appLocale)
-    }
-}
-
-private struct DesktopNoteContent: View {
-    var preview: HistoryItemPreviewText
-
-    var body: some View {
-        paddedPreview.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    var paddedPreview: some View {
-        preview
-            .foregroundStyle(.primary)
-            .padding(HistoryItemPreviewContent.contentPadding)
-    }
-}
-
-@MainActor
-private final class DesktopNoteEditor {
-    let originalText: String
-    let view: NSStackView
-    let textView: NSTextView
-    private let errorLabel = NSTextField(wrappingLabelWithString: "")
-
-    init?(text: String, font: NSFont) {
-        let scroll = NSTextView.scrollableTextView()
-        guard let textView = scroll.documentView as? NSTextView else { return nil }
-        originalText = text
-        self.textView = textView
-        scroll.drawsBackground = false
-        scroll.scrollerStyle = .overlay
-        textView.drawsBackground = false
-        textView.isRichText = false
-        textView.allowsUndo = true
-        textView.textContainerInset = .zero
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.font = font
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 3
-        textView.defaultParagraphStyle = paragraphStyle
-        textView.string = text
-        textView.setAccessibilityLabel(AppSettings.shared.localizedString("Content"))
-
-        errorLabel.textColor = .systemRed
-        errorLabel.font = .systemFont(ofSize: 11)
-        errorLabel.maximumNumberOfLines = 2
-        errorLabel.isHidden = true
-        errorLabel.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
-        scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        view = NSStackView(views: [scroll, errorLabel])
-        view.orientation = .vertical
-        view.alignment = .width
-        view.spacing = 3
-        view.translatesAutoresizingMaskIntoConstraints = false
-    }
-
-    func showError(_ message: String) {
-        errorLabel.stringValue = message
-        errorLabel.toolTip = message
-        errorLabel.isHidden = false
     }
 }
 

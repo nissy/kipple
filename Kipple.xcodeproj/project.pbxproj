@@ -222,6 +222,7 @@
 		E4302F2642AF061608A1B78F /* MainViewReactivateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D7E6D973077D2CD1A5C250 /* MainViewReactivateTests.swift */; };
 		E4419CE4F842E378CD55D0F8 /* MCP-ThirdPartyNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = C53A715C20693DAD873ED1CA /* MCP-ThirdPartyNotices.txt */; };
 		E4A937A59BBA7585438E98DD /* SimpleLineNumberRulerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E8F672B5F8DCE4239D1494 /* SimpleLineNumberRulerView.swift */; };
+		E501959FB3DEAC3C9C4E5B5D /* DesktopNoteContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E708EB76A129DCB6F6D47B41 /* DesktopNoteContent.swift */; };
 		E681154B257159EEB2DFB185 /* WindowBehaviorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 345D0EB535CE8BC2BFEB706E /* WindowBehaviorTests.swift */; };
 		E7D22F126CF86FFA16233965 /* MainView+Utilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A50D82DF828DDB54DD9447 /* MainView+Utilities.swift */; };
 		E8E5335B01694ACF79DE96E2 /* MCPLocalTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1583C506E680B82932041796 /* MCPLocalTransportTests.swift */; };
@@ -498,6 +499,7 @@
 		E522102080E9938FBB8FA69D /* SettingsRestorationExampleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRestorationExampleTests.swift; sourceTree = "<group>"; };
 		E5778807D1EE8AD4AF29AB95 /* SettingsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRow.swift; sourceTree = "<group>"; };
 		E5E8F672B5F8DCE4239D1494 /* SimpleLineNumberRulerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleLineNumberRulerView.swift; sourceTree = "<group>"; };
+		E708EB76A129DCB6F6D47B41 /* DesktopNoteContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNoteContent.swift; sourceTree = "<group>"; };
 		E709953D569676F69301025F /* ModernClipboardServiceInitialLoadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceInitialLoadTests.swift; sourceTree = "<group>"; };
 		E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarApp.swift; sourceTree = "<group>"; };
 		E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowCoordinator.swift; sourceTree = "<group>"; };
@@ -685,6 +687,7 @@
 			children = (
 				9993A3D43EB134FFCEF5FD6C /* CategoryLabelsView.swift */,
 				D1137BB3FA8320272B443058 /* ClipDetailsView.swift */,
+				E708EB76A129DCB6F6D47B41 /* DesktopNoteContent.swift */,
 				FDFD50081D1B62468650601A /* HistoryCategoryMenu.swift */,
 				05243238D42C5917E20B6BFA /* HistoryItemPopoverComponents.swift */,
 				4F1175F7A3CAFDF9C577A3A2 /* HistoryItemPreviewContent.swift */,
@@ -1400,6 +1403,7 @@
 				6251C6BBF34040D4B1B43FDF /* ClipboardTextFormatter.swift in Sources */,
 				C9788D0FE6AFA4D6FBF95C84 /* CopiedNotificationView.swift in Sources */,
 				100153BEEC3A79B3B25838FD /* DataSettingsView.swift in Sources */,
+				E501959FB3DEAC3C9C4E5B5D /* DesktopNoteContent.swift in Sources */,
 				BC7D55A59C33000559DB8901 /* DesktopNoteSettingsView.swift in Sources */,
 				59C5FE29228912F5E6A720C6 /* DesktopNoteWindowCoordinator.swift in Sources */,
 				0E1ACDB6C80D0726AC563A56 /* EditorSettingsView.swift in Sources */,

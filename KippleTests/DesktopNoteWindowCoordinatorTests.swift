@@ -208,6 +208,73 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertGreaterThan(note.frame.height, untitled.frame.height)
     }
 
+    func testMarkdownPreviewRendersBlocksAndInlineFormatting() throws {
+        let source = """
+        # Heading
+
+        **Bold** and \\*literal\\* and `code`
+
+        1. Numbered
+           - Nested
+
+        > Quote
+
+        ~~~
+        plain code block
+        ~~~
+        """
+        let rendered = try XCTUnwrap(DesktopNoteMarkdown.render(source, baseFont: .systemFont(ofSize: 13)))
+        let text = String(rendered.characters)
+        XCTAssertTrue(text.hasPrefix("Heading\nBold and *literal* and code\n1. Numbered\n  • Nested\n│ Quote\n"))
+        XCTAssertTrue(text.contains("plain code block"))
+        let bold = try XCTUnwrap(rendered.runs.first { String(rendered[$0.range].characters) == "Bold" })
+        XCTAssertTrue(bold.inlinePresentationIntent?.contains(.stronglyEmphasized) == true)
+    }
+
+    func testSwitchingFromTheEditorSavesTheOriginalMarkdownSource() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let settings = AppSettings.shared
+        let previous = settings.desktopNoteDefaultDisplayMode
+        settings.desktopNoteDefaultDisplayMode = .markdown
+        defer { settings.desktopNoteDefaultDisplayMode = previous }
+
+        let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+        let title = UUID().uuidString
+        let source = "# Heading\n\n**Original** Markdown text"
+        try await adapter.createHistoryItem(title: title, content: source, categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: screen)
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
+        defer { note.close() }
+
+        let stack = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSStackView }.first)
+        let showPlainText = settings.localizedString("Show Plain Text")
+        let button = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first { $0.toolTip == showPlainText })
+        XCTAssertNotNil(button.image)
+        XCTAssertEqual(adapter.history.first?.content, source)
+
+        let point = NSPoint(x: 35, y: note.frame.height - 50)
+        note.sendEvent(try mouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        let editor = try XCTUnwrap(note.firstResponder as? NSTextView)
+        XCTAssertEqual(editor.string, source)
+
+        let edited = "# Heading\n\n**Edited** Markdown text"
+        editor.string = edited
+        let showMarkdown = settings.localizedString("Show Markdown")
+        button.performClick(nil)
+        for _ in 0..<30 where button.toolTip != showMarkdown {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(adapter.history.first?.content, edited)
+        XCTAssertEqual(button.toolTip, showMarkdown)
+
+        button.performClick(nil)
+        XCTAssertEqual(button.toolTip, showPlainText)
+        XCTAssertEqual(adapter.history.first?.content, edited)
+    }
+
     func testDraggingTheNoteBodyMovesTheWindow() throws {
         let note = DesktopNotePanel(item: ClipItem(content: "Drag this text"), screenFrame: screenFrame)
         defer { note.close() }
@@ -221,6 +288,39 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
 
         XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 100, y: origin.y + 80))
+    }
+
+    func testClickingAMarkdownLinkOpensItAndDraggingMovesTheNote() async throws {
+        var opened: [URL] = []
+        let note = DesktopNotePanel(
+            item: ClipItem(content: "[Open the example](https://example.com)"),
+            screenFrame: screenFrame,
+            displayMode: .markdown,
+            onSave: nil,
+            onChangeCategory: nil
+        ) { url in
+            opened.append(url)
+            return .handled
+        }
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+        let contentView = try XCTUnwrap(note.contentView)
+        contentView.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let start = NSPoint(x: 29, y: note.frame.height - 28)
+        let origin = note.frame.origin
+
+        note.sendEvent(try mouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
+        XCTAssertEqual(opened.map(\.absoluteString), ["https://example.com"])
+        XCTAssertEqual(note.frame.origin, origin)
+
+        let end = NSPoint(x: start.x + 60, y: start.y + 45)
+        note.sendEvent(try mouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try mouseEvent(.leftMouseDragged, at: end, for: note))
+        note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
+        XCTAssertEqual(opened.count, 1)
+        XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 60, y: origin.y + 45))
     }
 
     func testDoubleClickEditsFullTextAndFocusLossSavesItToHistory() async throws {

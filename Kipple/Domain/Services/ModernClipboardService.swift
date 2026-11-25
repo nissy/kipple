@@ -156,7 +156,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             let desktopNoteItems = previousHistory.filter { desktopNoteItemIDs.contains($0.id) }
             let protectedByID = Dictionary((categorizedItems + desktopNoteItems).map { ($0.id, $0) }) { _, latest in latest }
             history = protectedByID.values.map(withDefinedCategories)
-                .filter(isProtectedFromHistoryRemoval).sorted { $0.timestamp > $1.timestamp }
+                .filter(isProtectedFromHistoryRemoval)
+                .sorted { $0.timestamp > $1.timestamp }
 
             if !history.isEmpty {
                 rebuildContentLookup()
