@@ -13,6 +13,7 @@
 		044AE1AABD4CAAD8734437E3 /* MCPValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 532A16DC134106532D9E8B00 /* MCPValidationTests.swift */; };
 		0467E80A718A8FBFCC6B626E /* SimplifiedHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6117B178F1C15E9C0F925AA /* SimplifiedHotkeyManager.swift */; };
 		04C2C232AE6342045AEAD4F9 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 744EFD983380BA9F4014C37E /* Logger.swift */; };
+		04E751A39C40EFC2B327AA64 /* DesktopNoteContentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B73631357FF6C7128BB565B4 /* DesktopNoteContentController.swift */; };
 		05049F01BCACB71E37F8AF64 /* MCPReceiptModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2CCD173F9347F42DFFDA84B /* MCPReceiptModel.swift */; };
 		05E9475551A6CDBB1428C324 /* VisionTextRecognitionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6190145A61CBBB8D225A40 /* VisionTextRecognitionServiceTests.swift */; };
 		05F13CD7EA892F84606EB84E /* ClearClipboardSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A37EA352932E46C425A5EE57 /* ClearClipboardSyncTests.swift */; };
@@ -77,7 +78,6 @@
 		427F1FD66D8D46E661D2F049 /* MenuBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */; };
 		43CA83261F261DC4FD362F8B /* ClipboardReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651D1ECB20D7C5CBE36FDF9D /* ClipboardReaderTests.swift */; };
 		4550283FA1F4FA3B9CD5465E /* ModifierKeyPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5D167446E2D7AC69CFBC50 /* ModifierKeyPicker.swift */; };
-		458D67EFB61C8764D7200B7E /* GlassWindowContentController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */; };
 		45AD6ABE24D83994D0581BAD /* PerformanceTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDB4B487C65FB7AD3BAC2638 /* PerformanceTrace.swift */; };
 		48D29A126052E1EBBB3A7229 /* ModernClipboardServiceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C58001947462F24A05B563 /* ModernClipboardServiceAdapter.swift */; };
 		4BDE12BA520CAB893292A359 /* SimpleLineNumberSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521450FFCC0BA6B6EDA813C3 /* SimpleLineNumberSupport.swift */; };
@@ -214,6 +214,7 @@
 		D4D7150A572560FE2E5A5311 /* LoggerLazyEvaluationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1964394C2CC0F206796038A /* LoggerLazyEvaluationTests.swift */; };
 		D56C6FDFDC04DD3D0CFD549C /* ModernClipboardHashCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC48D2F668FB9434E6169962 /* ModernClipboardHashCleanupTests.swift */; };
 		D756FBE1A9DB7DC26355B941 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22A89DBDDE13B95E612B1BE7 /* GeneralSettingsView.swift */; };
+		D7FFA9451561379151FC8D6E /* DesktopNoteResizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D11298771C55F861950B84 /* DesktopNoteResizeTests.swift */; };
 		D8951BA3E254756423C4A6C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 313C2DE548F71294936CF09C /* Assets.xcassets */; };
 		D9869FAE029BB597ABA3F6C3 /* SettingsLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF59054401118E4A2F90AAB8 /* SettingsLayoutMetrics.swift */; };
 		DB89CEC353681DA6809ABCB7 /* TextCaptureCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02DB9871E840940BDE5310B2 /* TextCaptureCoordinatorTests.swift */; };
@@ -295,7 +296,6 @@
 		0F931BA0FFEF14AA0E30E363 /* WindowPositionRestorationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPositionRestorationTests.swift; sourceTree = "<group>"; };
 		10740C0D7563AACE8E06CBA8 /* SearchableFontPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchableFontPicker.swift; sourceTree = "<group>"; };
 		11352CAF753DC8E9F7C402DA /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
-		11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWindowContentController.swift; sourceTree = "<group>"; };
 		1351DBB094396B86B81A81B6 /* MCPIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPIntegrationTests.swift; sourceTree = "<group>"; };
 		141F74397BC94FC87C361325 /* HistoryLimitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLimitTests.swift; sourceTree = "<group>"; };
 		14D69BC2609666CEE0808F3C /* SwiftDataRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositoryTests.swift; sourceTree = "<group>"; };
@@ -455,6 +455,7 @@
 		B1088BA3F9356CC79A508A02 /* MainViewHistorySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewHistorySection.swift; sourceTree = "<group>"; };
 		B538EF6166B8332429EF10E7 /* ResizableSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResizableSplitView.swift; sourceTree = "<group>"; };
 		B5B70F6D565F5E4D7DBB160D /* SettingsSidebarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebarItem.swift; sourceTree = "<group>"; };
+		B73631357FF6C7128BB565B4 /* DesktopNoteContentController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNoteContentController.swift; sourceTree = "<group>"; };
 		B738B1A2C5D1200FA250B2C7 /* ClipboardRichTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardRichTextTests.swift; sourceTree = "<group>"; };
 		B807238F686CDDF52D3249BA /* MetadataPreservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataPreservationTests.swift; sourceTree = "<group>"; };
 		B82DA84942D28289B14E53E4 /* JapaneseFontAlignmentTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapaneseFontAlignmentTest.swift; sourceTree = "<group>"; };
@@ -504,6 +505,7 @@
 		E708EB76A129DCB6F6D47B41 /* DesktopNoteContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNoteContent.swift; sourceTree = "<group>"; };
 		E709953D569676F69301025F /* ModernClipboardServiceInitialLoadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardServiceInitialLoadTests.swift; sourceTree = "<group>"; };
 		E7E9888D6BAAC6F0345E943F /* MenuBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarApp.swift; sourceTree = "<group>"; };
+		E8D11298771C55F861950B84 /* DesktopNoteResizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNoteResizeTests.swift; sourceTree = "<group>"; };
 		E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowCoordinator.swift; sourceTree = "<group>"; };
 		E9473FC025F39F068333583B /* KippleMCP */ = {isa = PBXFileReference; includeInIndex = 0; path = KippleMCP; sourceTree = BUILT_PRODUCTS_DIR; };
 		EA50AE051B732AFB81BD1A91 /* SimpleLineNumberRulerView+Highlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SimpleLineNumberRulerView+Highlight.swift"; sourceTree = "<group>"; };
@@ -590,8 +592,8 @@
 			isa = PBXGroup;
 			children = (
 				FA12870223E68802EBD570A8 /* CategoryManagerWindowCoordinator.swift */,
+				B73631357FF6C7128BB565B4 /* DesktopNoteContentController.swift */,
 				AED7F73F7A2A605A00B41F19 /* DesktopNoteWindowCoordinator.swift */,
-				11BDC1C2450FE056A315536E /* GlassWindowContentController.swift */,
 				F057A6186CAAB1DEC508005B /* PlainTextPasteHotkey.swift */,
 				E92A5D669E28B6552C2A5F48 /* SettingsWindowCoordinator.swift */,
 				AEFEE2E4DBEE84E717957C1A /* TextCaptureHotkeyManager.swift */,
@@ -1158,6 +1160,7 @@
 				059038BA0020408573DACE35 /* ClipboardTextFormatterTests.swift */,
 				31D5369E6F3C814F606861FF /* ClipItemEqualityTests.swift */,
 				88B10B53A06B353B8ABDB1C3 /* DeleteItemSyncTests.swift */,
+				E8D11298771C55F861950B84 /* DesktopNoteResizeTests.swift */,
 				C2503F096465730873AEF7F2 /* DesktopNoteWindowCoordinatorTests.swift */,
 				A3635D451D2C85F5060AE4BE /* DuplicateRecopyTests.swift */,
 				CDDB7571C29DF8CE4C76A6B8 /* FontNameMappingsTests.swift */,
@@ -1412,6 +1415,7 @@
 				C9788D0FE6AFA4D6FBF95C84 /* CopiedNotificationView.swift in Sources */,
 				100153BEEC3A79B3B25838FD /* DataSettingsView.swift in Sources */,
 				E501959FB3DEAC3C9C4E5B5D /* DesktopNoteContent.swift in Sources */,
+				04E751A39C40EFC2B327AA64 /* DesktopNoteContentController.swift in Sources */,
 				BC7D55A59C33000559DB8901 /* DesktopNoteSettingsView.swift in Sources */,
 				59C5FE29228912F5E6A720C6 /* DesktopNoteWindowCoordinator.swift in Sources */,
 				0E1ACDB6C80D0726AC563A56 /* EditorSettingsView.swift in Sources */,
@@ -1420,7 +1424,6 @@
 				919E67E084CDE81E36F92C5A /* FontSettings.swift in Sources */,
 				D756FBE1A9DB7DC26355B941 /* GeneralSettingsView.swift in Sources */,
 				3905DF20E1D9C757C1ACE4E1 /* GlassDesignConstants.swift in Sources */,
-				458D67EFB61C8764D7200B7E /* GlassWindowContentController.swift in Sources */,
 				A67CF7455D3C77FFE6FF4167 /* HistoryActionKeyMonitor.swift in Sources */,
 				3170C40F0D335A3A2C408A51 /* HistoryCategoryMenu.swift in Sources */,
 				952959B0BCFF073ABA942496 /* HistoryColumnsRow.swift in Sources */,
@@ -1534,6 +1537,7 @@
 				D4A536568092E6214AAD1B77 /* ClipboardTextFormatterTests.swift in Sources */,
 				C44B02C21FC84E4D5E494F82 /* DebouncingTests.swift in Sources */,
 				B704BC7051E54E4CA0EE712B /* DeleteItemSyncTests.swift in Sources */,
+				D7FFA9451561379151FC8D6E /* DesktopNoteResizeTests.swift in Sources */,
 				86AA16E990F1680D491D6E0F /* DesktopNoteWindowCoordinatorTests.swift in Sources */,
 				889D878A047E63712FD8685A /* DuplicateRecopyTests.swift in Sources */,
 				3DECB552A37B3F9FD52E4415 /* FontNameMappingsTests.swift in Sources */,

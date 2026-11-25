@@ -32,9 +32,9 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let firstNote = try XCTUnwrap(NSApp.windows.first { $0.title == title })
         XCTAssertTrue(firstNote.isVisible)
         XCTAssertFalse(firstNote.hidesOnDeactivate)
-        XCTAssertTrue(firstNote.isMovable)
+        XCTAssertTrue(firstNote.canBecomeKey)
         XCTAssertGreaterThan(firstNote.level.rawValue, Int(CGWindowLevelForKey(.desktopIconWindow)))
-        XCTAssertLessThan(firstNote.level.rawValue, NSWindow.Level.normal.rawValue)
+        XCTAssertEqual(firstNote.level.rawValue, NSWindow.Level.normal.rawValue - 1)
 
         firstNote.performClose(nil)
         XCTAssertFalse(firstNote.isVisible)
@@ -65,7 +65,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let topLeft = NSPoint(x: screen.visibleFrame.minX + 80, y: screen.visibleFrame.maxY - 80)
         note.setFrameTopLeftPoint(topLeft)
         let before = note.frame
-        let glass = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSGlassEffectView }.first)
+        let content = try XCTUnwrap(note.contentView)
         let blue = NSMenuItem()
         blue.representedObject = "Blue Note Color"
         XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: note, from: blue))
@@ -85,7 +85,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertTrue(note.title.isEmpty)
         XCTAssertTrue(note.isVisible)
         XCTAssertTrue(coordinator.isPosted(item.id))
-        XCTAssertIdentical(note.contentView?.subviews.first, glass)
+        XCTAssertIdentical(note.contentView, content)
         XCTAssertEqual(strip.layer?.backgroundColor, NSColor.systemBlue.cgColor)
     }
 
@@ -132,36 +132,26 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.isPosted(item.id))
     }
 
-    func testTransparencySettingUpdatesAnOpenNoteWithoutFadingItsColorStrip() async throws {
-        let settings = AppSettings.shared
-        let previous = UserDefaults.standard.object(forKey: AppSettings.Keys.desktopNoteTransparency)
-        defer {
-            UserDefaults.standard.set(previous, forKey: AppSettings.Keys.desktopNoteTransparency)
-        }
-        settings.desktopNoteTransparency = 0.25
-        let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
-        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
-        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
-        let title = UUID().uuidString
-        try await adapter.createHistoryItem(title: title, content: "A translucent note", categoryChanges: [:])
-        let item = try XCTUnwrap(adapter.history.first)
-        await coordinator.toggle(item.id, on: try XCTUnwrap(NSScreen.main))
-        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title })
+    func testNoteRendersAnOpaqueBackgroundInLightAndDarkAppearances() throws {
+        let note = DesktopNotePanel(item: ClipItem(content: "Short note"), screenFrame: screenFrame)
+        note.setContentSize(NSSize(width: 260, height: 160))
         defer { note.close() }
-        let glass = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSGlassEffectView }.first)
-        XCTAssertEqual(glass.alphaValue, 0.75, accuracy: 0.001)
+        let content = try XCTUnwrap(note.contentView)
+        note.appearance = NSAppearance(named: .aqua)
+        let light = try renderNoteBackground(in: content)
+
         let orange = NSMenuItem()
         orange.representedObject = "Orange Note Color"
         XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: note, from: orange))
-        let strip = try XCTUnwrap(note.contentView?.subviews.first {
+        let strip = try XCTUnwrap(content.subviews.first {
             $0.layer?.backgroundColor == NSColor.systemOrange.cgColor
         })
-        settings.desktopNoteTransparency = 0.8
-        for _ in 0..<20 where glass.alphaValue > 0.21 {
-            try await Task.sleep(for: .milliseconds(10))
-        }
 
-        XCTAssertEqual(glass.alphaValue, 0.2, accuracy: 0.001)
+        note.appearance = NSAppearance(named: .darkAqua)
+        let dark = try renderNoteBackground(in: content)
+        XCTAssertEqual(light.alphaComponent, 1)
+        XCTAssertEqual(dark.alphaComponent, 1)
+        XCTAssertGreaterThan(light.redComponent, dark.redComponent)
         XCTAssertEqual(strip.alphaValue, 1)
         XCTAssertEqual(strip.layer?.backgroundColor?.alpha, 1)
         XCTAssertFalse(strip.isHidden)
@@ -170,6 +160,14 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         none.representedObject = "No Note Color"
         XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: note, from: none))
         XCTAssertTrue(strip.isHidden)
+    }
+
+    private func renderNoteBackground(in content: NSView) throws -> NSColor {
+        content.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(content.bitmapImageRepForCachingDisplay(in: content.bounds))
+        content.cacheDisplay(in: content.bounds, to: bitmap)
+        let sample = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)
+        return try XCTUnwrap(sample?.usingColorSpace(.deviceRGB))
     }
 
     func testNoteFitsShortAndWrappedContentAndCapsInitialHeight() {
@@ -215,7 +213,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         defer { note.close() }
 
         let start = note.frame
-        note.resizeFromBottomRight(startFrame: start, displacement: NSPoint(x: 120, y: -160))
+        simulateDesktopNoteLiveResize(note, to: NSSize(width: start.width + 120, height: start.height + 160))
         let resized = note.frame
         XCTAssertEqual(resized.width, start.width + 120)
         XCTAssertEqual(resized.height, start.height + 160)
@@ -239,8 +237,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         note.setFrameTopLeftPoint(NSPoint(x: 40, y: 600))
         defer { note.close() }
 
-        let shrink = NSPoint(x: -300, y: 300)
-        note.resizeFromBottomRight(startFrame: note.frame, displacement: shrink)
+        simulateDesktopNoteLiveResize(note, to: note.minSize)
         let untitled = note.frame
         XCTAssertEqual(untitled.height, 120)
 
@@ -251,8 +248,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(titled.width, untitled.width)
         XCTAssertEqual(titled.maxY, untitled.maxY)
 
-        note.resizeFromBottomRight(startFrame: titled, displacement: shrink)
-        XCTAssertEqual(note.frame, titled)
+        XCTAssertEqual(note.minSize.height, 160)
     }
 
     func testSwitchingFromTheEditorSavesTheOriginalMarkdownSource() async throws {
@@ -280,7 +276,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(adapter.history.first?.content, source)
 
         let point = NSPoint(x: 35, y: note.frame.height - 50)
-        note.sendEvent(try mouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
         let editor = try XCTUnwrap(note.firstResponder as? NSTextView)
         XCTAssertEqual(editor.string, source)
 
@@ -299,6 +295,27 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(adapter.history.first?.content, edited)
     }
 
+    func testClickingBlankSpaceMakesTheNoteKeyAtItsCurrentLevel() throws {
+        let note = DesktopNotePanel(item: ClipItem(content: "Short line"), screenFrame: screenFrame)
+        note.setContentSize(NSSize(width: 260, height: 160))
+        note.orderFrontRegardless()
+        defer { note.close() }
+
+        let originalLevel = note.level
+        let originalFrame = note.frame
+        let frontmostProcess = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let point = NSPoint(x: 180, y: 100)
+        XCTAssertFalse(note.isKeyWindow)
+
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note))
+
+        XCTAssertTrue(note.isKeyWindow)
+        XCTAssertEqual(note.level, originalLevel)
+        XCTAssertEqual(note.frame, originalFrame)
+        XCTAssertEqual(NSWorkspace.shared.frontmostApplication?.processIdentifier, frontmostProcess)
+    }
+
     func testDraggingBlankSpaceAfterAPlainTextLineMovesTheNote() async throws {
         let note = DesktopNotePanel(item: ClipItem(content: "Short line"), screenFrame: screenFrame)
         note.setContentSize(NSSize(width: 260, height: 160))
@@ -311,11 +328,55 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let origin = note.frame.origin
         let end = NSPoint(x: start.x + 100, y: start.y + 80)
 
-        note.sendEvent(try mouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try mouseEvent(.leftMouseDragged, at: end, for: note))
-        note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
 
         XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 100, y: origin.y + 80))
+    }
+
+    func testClearsPreviewSelectionOnBlankClickAndFocusLoss() async throws {
+        let note = DesktopNotePanel(
+            item: ClipItem(content: "Select this Markdown text"), screenFrame: screenFrame, displayMode: .markdown
+        )
+        note.setContentSize(NSSize(width: 260, height: 160))
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+        let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
+        controller.view.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let initialFrame = note.frame
+        let start = NSPoint(x: 27, y: note.frame.height - 28)
+        let end = NSPoint(x: 122, y: start.y)
+
+        func selectPreviewText() throws {
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+            let copyItem = NSMenuItem(title: "Copy", action: NSSelectorFromString("copy:"), keyEquivalent: "")
+            let selection = try XCTUnwrap(note.firstResponder as? NSUserInterfaceValidations)
+            XCTAssertTrue(selection.validateUserInterfaceItem(copyItem))
+        }
+
+        try selectPreviewText()
+        let blank = NSPoint(x: 195, y: 80)
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: blank, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: blank, for: note))
+
+        XCTAssertIdentical(note.firstResponder, note)
+        XCTAssertEqual(controller.hostingController.rootView.selectionRevision, 1)
+        XCTAssertEqual(note.frame, initialFrame)
+
+        controller.view.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        try selectPreviewText()
+        let otherWindow = NSWindow(contentRect: initialFrame, styleMask: [.titled], backing: .buffered, defer: false)
+        otherWindow.isReleasedWhenClosed = false
+        defer { otherWindow.close() }
+        otherWindow.makeKeyAndOrderFront(nil)
+
+        XCTAssertFalse(note.isKeyWindow)
+        XCTAssertEqual(controller.hostingController.rootView.selectionRevision, 2)
     }
 
     func testDraggingAMarkdownLinkSelectsTextWithoutMovingTheNoteOrOpeningTheLink() async throws {
@@ -337,15 +398,15 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let start = NSPoint(x: 29, y: note.frame.height - 28)
         let origin = note.frame.origin
 
-        note.sendEvent(try mouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
         XCTAssertEqual(opened.map(\.absoluteString), ["https://example.com"])
         XCTAssertEqual(note.frame.origin, origin)
 
         let end = NSPoint(x: start.x + 60, y: start.y + 45)
-        note.sendEvent(try mouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try mouseEvent(.leftMouseDragged, at: end, for: note))
-        note.sendEvent(try mouseEvent(.leftMouseUp, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
         XCTAssertEqual(opened.count, 1)
         XCTAssertEqual(note.frame.origin, origin)
     }
@@ -364,11 +425,11 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         defer { note.close() }
         let point = NSPoint(x: 35, y: note.frame.height - 70)
 
-        note.sendEvent(try mouseEvent(.leftMouseDown, at: point, for: note))
-        note.sendEvent(try mouseEvent(.leftMouseUp, at: point, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note))
         XCTAssertFalse(note.firstResponder is NSTextView)
 
-        note.sendEvent(try mouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
         let editor = try XCTUnwrap(note.firstResponder as? NSTextView)
         XCTAssertEqual(editor.string, original)
         XCTAssertLessThan(editor.selectedRange().location, 40)
@@ -382,20 +443,21 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(adapter.history.first?.title, title)
         XCTAssertEqual(adapter.history.first?.categoryIDs, [BuiltInCategory.ocr])
     }
+}
 
-    private func mouseEvent(
-        _ type: NSEvent.EventType, at point: NSPoint, for note: NSWindow, clickCount: Int = 1
-    ) throws -> NSEvent {
-        try XCTUnwrap(NSEvent.mouseEvent(
-            with: type,
-            location: point,
-            modifierFlags: [],
-            timestamp: 0,
-            windowNumber: note.windowNumber,
-            context: nil,
-            eventNumber: 0,
-            clickCount: clickCount,
-            pressure: 1
-        ))
-    }
+@MainActor
+private func desktopNoteMouseEvent(
+    _ type: NSEvent.EventType, at point: NSPoint, for note: NSWindow, clickCount: Int = 1
+) throws -> NSEvent {
+    try XCTUnwrap(NSEvent.mouseEvent(
+        with: type,
+        location: point,
+        modifierFlags: [],
+        timestamp: 0,
+        windowNumber: note.windowNumber,
+        context: nil,
+        eventNumber: 0,
+        clickCount: clickCount,
+        pressure: 1
+    ))
 }

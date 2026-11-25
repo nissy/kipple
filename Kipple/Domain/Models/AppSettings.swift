@@ -18,20 +18,8 @@ final class AppSettings: ObservableObject {
     @AppStorage("editorSectionHeight") var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") var historySectionHeight: Double = 300
 
-    static let desktopNoteTransparencyRange = 0.0...0.8
-    @AppStorage(Keys.desktopNoteTransparency) private var storedDesktopNoteTransparency = 0.5
     @AppStorage(Keys.desktopNoteDefaultDisplayMode)
     private var storedDesktopNoteDisplayMode = DesktopNoteDisplayMode.plainText
-
-    var desktopNoteTransparency: Double {
-        get { min(max(storedDesktopNoteTransparency, 0), Self.desktopNoteTransparencyRange.upperBound) }
-        set {
-            let value = min(max(newValue, 0), Self.desktopNoteTransparencyRange.upperBound)
-            guard value != storedDesktopNoteTransparency else { return }
-            objectWillChange.send()
-            storedDesktopNoteTransparency = value
-        }
-    }
 
     var desktopNoteDefaultDisplayMode: DesktopNoteDisplayMode {
         get { storedDesktopNoteDisplayMode }
@@ -46,7 +34,7 @@ final class AppSettings: ObservableObject {
         case plainText
         case markdown
     }
-    
+
     // Editor Settings
     @AppStorage("editorPosition") private var storedEditorPosition: String = "disabled"
     @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
@@ -187,7 +175,6 @@ final class AppSettings: ObservableObject {
         static let windowAnimation = "windowAnimation"
         static let editorSectionHeight = "editorSectionHeight"
         static let historySectionHeight = "historySectionHeight"
-        static let desktopNoteTransparency = "desktopNoteTransparency"
         static let desktopNoteDefaultDisplayMode = "desktopNoteDefaultDisplayMode"
         static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"

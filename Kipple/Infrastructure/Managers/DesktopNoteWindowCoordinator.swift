@@ -11,7 +11,6 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
     private var closingNotes: [UUID: Task<Void, Never>] = [:]
     private let adapter: ModernClipboardServiceAdapter
     private var historyObservation: AnyCancellable?
-    private var transparencyObservation: AnyCancellable?
 
     init(adapter: ModernClipboardServiceAdapter = .shared) {
         self.adapter = adapter
@@ -19,14 +18,6 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
         historyObservation = adapter.$history.sink { [weak self] history in
             self?.updateOpenNotes(from: history)
         }
-        let settings = AppSettings.shared
-        transparencyObservation = settings.objectWillChange
-            .receive(on: RunLoop.main)
-            .map { settings.desktopNoteTransparency }
-            .removeDuplicates()
-            .sink { [weak self] value in
-                self?.notes.values.forEach { $0.applyTransparency(value) }
-            }
     }
 
     func isPosted(_ id: UUID) -> Bool {
@@ -94,12 +85,12 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
 
 final class DesktopNotePanel: NSPanel {
     private enum PointerGesture {
-        case move(start: NSPoint)
+        case move(start: NSPoint, didDrag: Bool)
         case select(start: NSPoint, didDrag: Bool)
     }
 
     private static let minimumResizeSize = NSSize(width: 170, height: 120)
-    private let glassController: GlassWindowContentController<DesktopNoteContent>
+    private let noteContentController: DesktopNoteContentController
     private let colorStrip = NSView()
     private let initialScreenFrame: NSRect
     private let onSave: ((String) async throws -> Void)?
@@ -114,6 +105,7 @@ final class DesktopNotePanel: NSPanel {
     private var pointerGesture: PointerGesture?
     private var pendingLink: URL?
     private var manualSize: NSSize?
+    private var liveResizeStartSize: NSSize?
     private var editor: DesktopNoteEditor?
     private var isSaving = false
     private var closeAfterSave = false
@@ -130,19 +122,16 @@ final class DesktopNotePanel: NSPanel {
         openLink: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
     ) {
         var content = DesktopNoteContent(item: item, displayMode: displayMode)
-        let size = Self.contentSize(for: content, screenFrame: screenFrame)
+        let size = content.estimatedWindowSize(in: screenFrame, minimumWidth: Self.minimumResizeSize.width)
         initialScreenFrame = screenFrame
         self.displayMode = displayMode
         self.onSave = onSave
         self.onChangeCategory = onChangeCategory
         self.openLink = openLink
-        glassController = GlassWindowContentController(
-            rootView: content,
-            cornerRadius: HistoryItemPreviewContent.cornerRadius
-        )
+        noteContentController = DesktopNoteContentController(rootView: content)
         super.init(
             contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.titled, .resizable, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -150,14 +139,10 @@ final class DesktopNotePanel: NSPanel {
         isExcludedFromWindowsMenu = true
         hidesOnDeactivate = false
         becomesKeyOnlyIfNeeded = true
-        // Stay above Finder's desktop icons and below regular application windows.
-        level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)) + 1)
+        // Stay immediately below regular application windows.
+        level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         title = HistoryItemPreviewContent.nonempty(item.title) ?? ""
-        titleVisibility = .hidden
-        isOpaque = false
-        hasShadow = true
-        backgroundColor = .clear
         content.openURL = OpenURLAction { [weak self] url in
             guard let self else { return .discarded }
             // Textual can request a link on mouse down. Open it only after a click completes.
@@ -168,23 +153,25 @@ final class DesktopNotePanel: NSPanel {
             }
             return .handled
         }
-        glassController.hostingController.rootView = content
-        contentViewController = glassController
-        applyTransparency(AppSettings.shared.desktopNoteTransparency)
+        noteContentController.hostingController.rootView = content
+        contentViewController = noteContentController
+        configureNativeFrame()
         setContentSize(size)
-        installColorStrip(in: glassController.view)
-        installControls(in: glassController.view, for: item)
-    }
-
-    func applyTransparency(_ value: Double) {
-        glassController.glassOpacity = 1 - value
+        installColorStrip(in: noteContentController.view)
+        installControls(in: noteContentController.view, for: item)
+        updateResizeLimits()
+        let notifications = NotificationCenter.default
+        notifications.addObserver(self, selector: #selector(willStartLiveResize),
+                                  name: NSWindow.willStartLiveResizeNotification, object: self)
+        notifications.addObserver(self, selector: #selector(didEndLiveResize),
+                                  name: NSWindow.didEndLiveResizeNotification, object: self)
     }
 
     func update(from item: ClipItem) {
         if let categoryControl, categoryControl.rootView.item.categoryIDs != item.categoryIDs {
             categoryControl.rootView.item = item
         }
-        let previous = glassController.hostingController.rootView.item
+        let previous = noteContentController.hostingController.rootView.item
         guard item.title != previous.title || item.content != previous.content else { return }
         reloadPreview(for: item)
     }
@@ -192,65 +179,47 @@ final class DesktopNotePanel: NSPanel {
     private func reloadPreview(for item: ClipItem) {
         var content = DesktopNoteContent(item: item, displayMode: displayMode)
         content.showsBody = editor == nil
-        content.openURL = glassController.hostingController.rootView.openURL
-        title = HistoryItemPreviewContent.nonempty(item.title) ?? ""
-        glassController.hostingController.rootView = content
-        if editor == nil { resize(to: manualSize ?? Self.contentSize(for: content, screenFrame: availableFrame)) }
-    }
-
-    private var availableFrame: NSRect { screen?.visibleFrame ?? initialScreenFrame }
-
-    private var minimumManualHeight: CGFloat {
-        // Reserve space for a title that wraps onto two lines above the document.
-        title.isEmpty ? Self.minimumResizeSize.height : Self.minimumResizeSize.height + 40
-    }
-
-    private func resize(to requestedSize: NSSize) {
-        let screen = availableFrame
-        let height = manualSize == nil ? requestedSize.height : max(requestedSize.height, minimumManualHeight)
-        let size = NSSize(width: min(requestedSize.width, screen.width), height: min(height, screen.height))
-        guard size != frame.size else { return }
-        let origin = NSPoint(
-            x: min(frame.minX, screen.maxX - size.width),
-            y: max(frame.maxY - size.height, screen.minY)
-        )
-        setFrame(NSRect(origin: origin, size: size), display: true)
-    }
-
-    func resizeFromBottomRight(startFrame: NSRect, displacement: NSPoint) {
-        let screen = availableFrame
-        let minHeight = minimumManualHeight
-        let maxWidth = min(screen.width, max(Self.minimumResizeSize.width, screen.maxX - startFrame.minX))
-        let maxHeight = min(screen.height, max(minHeight, startFrame.maxY - screen.minY))
-        let width = min(max(startFrame.width + displacement.x, Self.minimumResizeSize.width), maxWidth)
-        let height = min(max(startFrame.height - displacement.y, minHeight), maxHeight)
-        let size = NSSize(width: width, height: height)
-        guard frame.size != size else { return }
-        manualSize = size
-        resize(to: size)
+        content.openURL = noteContentController.hostingController.rootView.openURL
+        let updatedTitle = HistoryItemPreviewContent.nonempty(item.title) ?? ""
+        let titleChanged = title != updatedTitle
+        title = updatedTitle
+        if titleChanged, !title.isEmpty, let manualSize, manualSize.height < minimumManualHeight {
+            self.manualSize = NSSize(width: manualSize.width, height: minimumManualHeight)
+        }
+        if titleChanged { updateResizeLimits() }
+        noteContentController.hostingController.rootView = content
+        if editor == nil, !inLiveResize {
+            resize(to: manualSize ?? content.estimatedWindowSize(in: availableFrame, minimumWidth: Self.minimumResizeSize.width))
+        }
     }
 
     override func sendEvent(_ event: NSEvent) {
         switch event.type {
         case .leftMouseDown:
+            if !isKeyWindow { makeKey() }
             if handleMouseDown(event) { return }
         case .leftMouseDragged:
             let point = event.locationInWindow
             switch pointerGesture {
-            case .move(let start):
+            case .move(let start, _):
+                pointerGesture = .move(start: start, didDrag: true)
                 let pointer = convertPoint(toScreen: point)
                 setFrameOrigin(NSPoint(x: pointer.x - start.x, y: pointer.y - start.y))
                 return
             case let .select(start, didDrag):
-                let distance = hypot(point.x - start.x, point.y - start.y)
-                pointerGesture = .select(start: start, didDrag: didDrag || distance >= 3)
+                let hasDragged = didDrag || hypot(point.x - start.x, point.y - start.y) >= 3
+                if hasDragged { noteContentController.selectionMayExist = true }
+                pointerGesture = .select(start: start, didDrag: hasDragged)
             case nil:
                 break
             }
         case .leftMouseUp:
             if finishPointerGesture(event) { return }
+        case .rightMouseDown:
+            if editor == nil { noteContentController.selectionMayExist = true }
         case .keyDown:
             if editor != nil, handleEditingKey(event) { return }
+            if editor == nil, firstResponder !== self { noteContentController.selectionMayExist = true }
         default:
             break
         }
@@ -271,11 +240,13 @@ final class DesktopNotePanel: NSPanel {
             return true
         }
         if editor == nil, textHitViews.allObjects.contains(where: { $0.containsText(at: point) }) {
+            if event.clickCount > 1 || event.modifierFlags.contains(.shift) {
+                noteContentController.selectionMayExist = true
+            }
             pointerGesture = .select(start: point, didDrag: false)
-            if !isKeyWindow { makeKey() }
             return false
         }
-        pointerGesture = .move(start: point)
+        pointerGesture = .move(start: point, didDrag: false)
         return true
     }
 
@@ -286,9 +257,14 @@ final class DesktopNotePanel: NSPanel {
             let link = didDrag ? nil : pendingLink
             self.pointerGesture = nil
             pendingLink = nil
+            if !didDrag, event.clickCount == 1, !event.modifierFlags.contains(.shift),
+               noteContentController.selectionMayExist {
+                noteContentController.clearSelection()
+            }
             if let link { openLink(link) }
-        } else {
+        } else if case .move(_, let didDrag) = pointerGesture {
             self.pointerGesture = nil
+            if !didDrag, editor == nil { noteContentController.clearSelection() }
         }
         return true
     }
@@ -304,19 +280,23 @@ final class DesktopNotePanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
+        if editor == nil { noteContentController.clearSelection() }
         saveEditing()
     }
 
     private func isNoteBody(at point: NSPoint) -> Bool {
         guard let contentView else { return false }
         let location = contentView.convert(point, from: nil)
-        guard contentView.bounds.contains(location), !(contentView.hitTest(location) is NSScroller) else { return false }
+        let inset = DesktopNoteContent.windowBorderInset
+        // AppKit handles the frame outside the note's interactive surface.
+        guard contentView.bounds.insetBy(dx: inset, dy: inset).contains(location),
+              !(contentView.hitTest(location) is NSScroller) else { return false }
         let interactiveViews = controls + (editor.map { [$0.view] } ?? [])
         return !interactiveViews.contains { $0.bounds.contains($0.convert(point, from: nil)) }
     }
 
     private func beginEditing(at screenPoint: NSPoint) {
-        let host = glassController.hostingController
+        let host = noteContentController.hostingController
         var content = host.rootView
         guard let editor = DesktopNoteEditor(text: content.item.content, font: content.historyFont)
         else { return }
@@ -328,7 +308,7 @@ final class DesktopNotePanel: NSPanel {
         host.rootView = content
 
         self.editor = editor
-        let container = glassController.view
+        let container = noteContentController.view
         container.addSubview(editor.view)
         NSLayoutConstraint.activate([
             editor.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
@@ -396,21 +376,11 @@ final class DesktopNotePanel: NSPanel {
             changeDisplayModeAfterSave = false
             flipDisplayMode()
         }
-        reloadPreview(for: glassController.hostingController.rootView.item)
+        reloadPreview(for: noteContentController.hostingController.rootView.item)
         if closeAfterSave {
             closeAfterSave = false
             close()
         }
-    }
-
-    private static func contentSize(for content: DesktopNoteContent, screenFrame: NSRect) -> NSSize {
-        let maxWidth = min(420, screenFrame.width)
-        let sizing = NSHostingController(rootView: content.sizingPreview)
-        let ideal = sizing.sizeThatFits(in: NSSize(width: maxWidth, height: .infinity))
-        let width = min(maxWidth, max(Self.minimumResizeSize.width, ceil(ideal.width)))
-        let wrapped = sizing.sizeThatFits(in: NSSize(width: width, height: .infinity))
-        let height = min(screenFrame.height, ceil(wrapped.height) + DesktopNoteContent.controlsHeight)
-        return NSSize(width: width, height: height)
     }
 
     private func installColorStrip(in view: NSView) {
@@ -451,14 +421,14 @@ final class DesktopNotePanel: NSPanel {
         displayModeButton = format
         updateDisplayModeButton()
         let close = makeButton("xmark", labelKey: "Remove Desktop Note", action: #selector(performClose(_:)))
-        controls.append(contentsOf: [palette, format, close, DesktopNoteResizeHandle(frame: .zero)])
+        controls.append(contentsOf: [palette, format, close])
         let stack = NSStackView(views: controls)
         stack.spacing = 4
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -6)
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -DesktopNoteContent.windowBorderInset)
         ])
     }
 
@@ -469,7 +439,7 @@ final class DesktopNotePanel: NSPanel {
             return
         }
         flipDisplayMode()
-        reloadPreview(for: glassController.hostingController.rootView.item)
+        reloadPreview(for: noteContentController.hostingController.rootView.item)
     }
 
     private func flipDisplayMode() {
@@ -522,5 +492,55 @@ final class DesktopNotePanel: NSPanel {
         selectedColor = color
         colorStrip.layer?.backgroundColor = color.fill?.cgColor
         colorStrip.isHidden = color.fill == nil
+    }
+}
+
+private extension DesktopNotePanel {
+    func configureNativeFrame() {
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        titlebarSeparatorStyle = .none
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            standardWindowButton(button)?.isHidden = true
+        }
+        // Blank-space dragging is handled by the note; AppKit still handles resizing.
+        isMovable = false
+        isOpaque = false
+        hasShadow = true
+        backgroundColor = .clear
+    }
+
+    var availableFrame: NSRect { screen?.visibleFrame ?? initialScreenFrame }
+
+    var minimumManualHeight: CGFloat {
+        // Reserve space for a title that wraps onto two lines above the document.
+        title.isEmpty ? Self.minimumResizeSize.height : Self.minimumResizeSize.height + 40
+    }
+
+    func resize(to requestedSize: NSSize) {
+        let screen = availableFrame
+        let size = NSSize(width: min(requestedSize.width, screen.width), height: min(requestedSize.height, screen.height))
+        guard size != frame.size else { return }
+        let origin = NSPoint(
+            x: min(frame.minX, screen.maxX - size.width),
+            y: max(frame.maxY - size.height, screen.minY)
+        )
+        setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+
+    func updateResizeLimits() {
+        let size = availableFrame.size
+        minSize = NSSize(width: min(size.width, Self.minimumResizeSize.width), height: min(size.height, minimumManualHeight))
+        maxSize = size
+    }
+
+    @objc func willStartLiveResize() {
+        updateResizeLimits()
+        liveResizeStartSize = frame.size
+    }
+
+    @objc func didEndLiveResize() {
+        if let liveResizeStartSize, liveResizeStartSize != frame.size { manualSize = frame.size }
+        liveResizeStartSize = nil
     }
 }

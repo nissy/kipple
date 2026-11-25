@@ -4,11 +4,13 @@ import Textual
 
 struct DesktopNoteContent: View {
     static let controlsHeight: CGFloat = 32
+    static let windowBorderInset: CGFloat = 6
 
     let item: ClipItem
     let displayMode: AppSettings.DesktopNoteDisplayMode
     let historyFont = FontManager.shared.historyFont
     var showsBody = true
+    var selectionRevision = 0
     var openURL: OpenURLAction?
 
     var body: some View {
@@ -16,17 +18,20 @@ struct DesktopNoteContent: View {
             if HistoryItemPreviewContent.nonempty(item.title) != nil {
                 titlePreview
                     .textSelection(.enabled)
+                    .id(selectionRevision)
                     .modifier(DesktopNoteTextRegions())
                     .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
             }
             if showsBody {
                 ScrollView(.vertical) {
                     document
+                        .id(selectionRevision)
                         .modifier(DesktopNoteTextRegions())
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
                         .padding(.bottom, 8)
                 }
+                .contentMargins(.trailing, Self.windowBorderInset, for: .scrollIndicators)
                 .scrollIndicators(.visible)
             }
         }
@@ -44,9 +49,15 @@ struct DesktopNoteContent: View {
     }
 
     // Estimate the initial window size without laying out the whole scrollable document twice.
-    var sizingPreview: some View {
-        HistoryItemPreviewText(item: item, historyFont: historyFont)
-            .padding(HistoryItemPreviewContent.contentPadding)
+    func estimatedWindowSize(in screenFrame: NSRect, minimumWidth: CGFloat) -> NSSize {
+        let maxWidth = min(420, screenFrame.width)
+        let sizing = NSHostingController(rootView: HistoryItemPreviewText(item: item, historyFont: historyFont)
+            .padding(HistoryItemPreviewContent.contentPadding))
+        let ideal = sizing.sizeThatFits(in: NSSize(width: maxWidth, height: .infinity))
+        let width = min(maxWidth, max(minimumWidth, ceil(ideal.width)))
+        let wrapped = sizing.sizeThatFits(in: NSSize(width: width, height: .infinity))
+        let height = min(screenFrame.height, ceil(wrapped.height) + Self.controlsHeight)
+        return NSSize(width: width, height: height)
     }
 
     @ViewBuilder
@@ -231,54 +242,6 @@ enum DesktopNoteColor: String, CaseIterable {
         case .green: NSColor.systemGreen
         case .pink: NSColor.systemPink
         }
-    }
-}
-
-@MainActor
-final class DesktopNoteResizeHandle: NSImageView {
-    private var dragStart: (frame: NSRect, pointer: NSPoint)?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        let label = AppSettings.shared.localizedString("Resize Desktop Note")
-        let size = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
-        image = NSImage(systemSymbolName: "arrow.up.left.and.arrow.down.right", accessibilityDescription: label)?
-            .withSymbolConfiguration(size)
-        contentTintColor = .secondaryLabelColor
-        imageScaling = .scaleNone
-        translatesAutoresizingMaskIntoConstraints = false
-        toolTip = label
-        setAccessibilityLabel(label)
-        NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 24),
-            heightAnchor.constraint(equalToConstant: 24)
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder _: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        addCursorRect(bounds, cursor: .frameResize(position: .bottomRight, directions: .all))
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        guard let window else { return }
-        dragStart = (window.frame, window.convertPoint(toScreen: event.locationInWindow))
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let note = window as? DesktopNotePanel, let dragStart else { return }
-        let pointer = note.convertPoint(toScreen: event.locationInWindow)
-        let displacement = NSPoint(x: pointer.x - dragStart.pointer.x, y: pointer.y - dragStart.pointer.y)
-        note.resizeFromBottomRight(startFrame: dragStart.frame, displacement: displacement)
-    }
-
-    override func mouseUp(with _: NSEvent) {
-        dragStart = nil
     }
 }
 
