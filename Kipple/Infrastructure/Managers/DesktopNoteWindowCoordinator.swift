@@ -208,13 +208,37 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
 final class DesktopNotePanel: NSPanel {
     private enum PointerGesture {
         case move(start: NSPoint, didDrag: Bool)
-        case select(start: NSPoint, didDrag: Bool)
+        case select(start: NSPoint, didDrag: Bool, anchor: NSPoint? = nil)
+        case sourceLink(didDrag: Bool)
     }
 
     private static let minimumResizeWidth: CGFloat = 170
     private static let toolbarItemSpace: CGFloat = 28
     private static let copyImage = makeCopyImage("doc.on.doc")
     private static let copiedImage = makeCopyImage("checkmark", tint: .controlAccentColor)
+    static let moveCursor: NSCursor = {
+        let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+        guard let glyph = NSImage(systemSymbolName: "arrow.up.and.down.and.arrow.left.and.right",
+                                  accessibilityDescription: nil),
+              let arrow = glyph.withSymbolConfiguration(configuration.applying(.init(paletteColors: [.black]))),
+              let outline = glyph.withSymbolConfiguration(configuration.applying(.init(paletteColors: [.white]))) else {
+            return .openHand
+        }
+        let size = NSSize(width: 26, height: 26)
+        let center = NSPoint(x: size.width / 2, y: size.height / 2)
+        let image = NSImage(size: size, flipped: false) { _ in
+            let frame = NSRect(x: center.x - arrow.size.width / 2, y: center.y - arrow.size.height / 2,
+                               width: arrow.size.width, height: arrow.size.height)
+            // Keep the black arrow legible over dark and light content.
+            outline.draw(in: frame.offsetBy(dx: -1, dy: 0))
+            outline.draw(in: frame.offsetBy(dx: 1, dy: 0))
+            outline.draw(in: frame.offsetBy(dx: 0, dy: -1))
+            outline.draw(in: frame.offsetBy(dx: 0, dy: 1))
+            arrow.draw(in: frame)
+            return true
+        }
+        return NSCursor(image: image, hotSpot: center)
+    }()
     private let noteContentController: DesktopNoteContentController
     private let colorStrip = NSView()
     private let initialScreenFrame: NSRect
@@ -240,8 +264,9 @@ final class DesktopNotePanel: NSPanel {
     }
     private let textHitViews = NSHashTable<DesktopNoteTextHitView>.weakObjects()
     private var pointerGesture: PointerGesture?
-    private var moveCursor: NSCursor?
+    private var pointerCursor: NSCursor?
     private var pendingLink: URL?
+    private var sourceLinkOpenTask: Task<Void, Never>?
     private var manualSize: NSSize?
     private var usesSavedFrame = false
     private var measuredPreviewSize: NSSize?
@@ -252,6 +277,7 @@ final class DesktopNotePanel: NSPanel {
     private var closeAfterSave = false
     private var changeDisplayModeAfterSave = false
     weak var sourceRegion: NSView?
+    weak var sourceLinkRegion: NSView?
     var onPlacementChange: (() -> Void)?
 
     var placement: DesktopNotePlacement {
@@ -261,6 +287,7 @@ final class DesktopNotePanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
+    fileprivate var needsBackgroundCursor: Bool { !isKeyWindow || !NSApp.isActive }
 
     init(
         item: ClipItem,
@@ -300,8 +327,8 @@ final class DesktopNotePanel: NSPanel {
         content.openURL = OpenURLAction { [weak self] url in
             guard let self else { return .discarded }
             // Textual can request a link on mouse down. Open it only after a click completes.
-            if case .select = self.pointerGesture {
-                self.pendingLink = url
+            if case .select(_, _, let anchor) = self.pointerGesture {
+                if anchor == nil { self.pendingLink = url }
             } else {
                 self.openLink(url)
             }
@@ -356,6 +383,7 @@ final class DesktopNotePanel: NSPanel {
 
     private func reloadPreview(for item: ClipItem, headerChanged: Bool = false, restoringSize: NSSize? = nil) {
         let previous = noteContentController.hostingController.rootView
+        if item.metadata?.sourceWebURL != previous.item.metadata?.sourceWebURL { cancelSourceLinkOpen() }
         var content = DesktopNoteContent(item: item, displayMode: displayMode, copyLink: previous.copyLink)
         content.showsBody = editor == nil
         content.openURL = previous.openURL
@@ -409,8 +437,10 @@ final class DesktopNotePanel: NSPanel {
     override func sendEvent(_ event: NSEvent) {
         let isContextClick = event.type == .rightMouseDown ||
             (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
-        if isContextClick, let contentView, let menu = automaticSizeMenu(at: event.locationInWindow) {
-            setMoveCursor(nil)
+        let point = event.locationInWindow
+        if isContextClick, let contentView, let menu = sourceLinkMenu(at: point) ?? automaticSizeMenu(at: point) {
+            if isPoint(point, in: sourceLinkRegion) { cancelSourceLinkOpen() }
+            setPointerCursor(nil)
             NSMenu.popUpContextMenu(menu, with: event, for: contentView)
             return
         }
@@ -419,12 +449,13 @@ final class DesktopNotePanel: NSPanel {
             super.sendEvent(event)
             if event.type == .mouseExited, event.trackingArea?.owner as AnyObject? === self {
                 if case .move = pointerGesture { return }
-                setMoveCursor(nil)
+                setPointerCursor(nil)
             } else {
                 // Resolve the cursor after child views have handled their tracking events.
-                updateMoveCursor(at: event.locationInWindow)
-                if event.type == .mouseEntered || event.type == .mouseExited {
-                    refreshOpenHandAfterTracking()
+                let location = event.type == .mouseMoved ? event.locationInWindow : mouseLocationOutsideOfEventStream
+                updatePointerCursor(at: location)
+                if event.type == .mouseEntered || event.type == .mouseExited || isPoint(location, in: sourceLinkRegion) {
+                    refreshPointerCursorAfterTracking()
                 }
             }
             return
@@ -436,14 +467,18 @@ final class DesktopNotePanel: NSPanel {
             switch pointerGesture {
             case .move(let start, _):
                 pointerGesture = .move(start: start, didDrag: true)
-                setMoveCursor(.closedHand)
+                setPointerCursor(Self.moveCursor)
                 let pointer = convertPoint(toScreen: point)
                 setFrameOrigin(NSPoint(x: pointer.x - start.x, y: pointer.y - start.y))
                 return
-            case let .select(start, didDrag):
-                let hasDragged = didDrag || hypot(point.x - start.x, point.y - start.y) >= 3
+            case let .select(start, didDrag, anchor):
+                let hasDragged = didDrag || isPoint(start, in: sourceLinkRegion)
+                    || hypot(point.x - start.x, point.y - start.y) >= 3
                 if hasDragged { noteContentController.selectionMayExist = true }
-                pointerGesture = .select(start: start, didDrag: hasDragged)
+                pointerGesture = .select(start: start, didDrag: hasDragged, anchor: anchor)
+            case .sourceLink:
+                pointerGesture = .sourceLink(didDrag: true)
+                return
             case nil:
                 break
             }
@@ -472,6 +507,27 @@ final class DesktopNotePanel: NSPanel {
         return menu
     }
 
+    private func sourceLinkMenu(at point: NSPoint) -> NSMenu? {
+        guard let url = sourceWebURL(at: point) else { return nil }
+        let menu = NSMenu()
+        let copy = #selector(NSText.copy(_:))
+        if let selection = firstResponder as? NSView, isPoint(point, in: selection), selection.responds(to: copy) {
+            let title = AppSettings.shared.localizedString("Copy")
+            menu.addItem(withTitle: title, action: copy, keyEquivalent: "").target = selection
+        }
+        let title = AppSettings.shared.localizedString("Copy URL")
+        let item = menu.addItem(withTitle: title, action: #selector(copySourceURL(_:)), keyEquivalent: "")
+        item.target = self
+        item.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+        item.representedObject = url.absoluteString
+        return menu
+    }
+
+    @objc private func copySourceURL(_ sender: NSMenuItem) {
+        guard let address = sender.representedObject as? String else { return }
+        noteContentController.hostingController.rootView.copyLink(address)
+    }
+
     @objc private func fitNoteToContent() {
         guard editor == nil, manualSize != nil else { return }
         manualSize = nil
@@ -483,52 +539,120 @@ final class DesktopNotePanel: NSPanel {
     }
 
     private func initialPointerGesture(at point: NSPoint) -> PointerGesture? {
-        guard isNoteBody(at: point) else { return nil }
-        if editor == nil, containsPreviewText(at: point) { return .select(start: point, didDrag: false) }
+        let isSourceLink = isPoint(point, in: sourceLinkRegion)
+        let selectsText = (editor == nil || isSourceLink) && containsPreviewText(at: point)
+        guard isNoteBody(at: point, includingSource: selectsText || isSourceLink) else { return nil }
+        if selectsText { return .select(start: point, didDrag: false) }
+        if isSourceLink { return .sourceLink(didDrag: false) }
+        if editor == nil, let anchor = textHitViews.allObjects.compactMap({ $0.nearbySelectionStart(at: point) }).min(by: {
+            hypot($0.x - point.x, $0.y - point.y) < hypot($1.x - point.x, $1.y - point.y)
+        }) {
+            return .select(start: point, didDrag: false, anchor: anchor)
+        }
         return .move(start: point, didDrag: false)
     }
 
-    private func updateMoveCursor(at point: NSPoint) {
+    private func updatePointerCursor(at point: NSPoint) {
         if case .move = pointerGesture {
-            setMoveCursor(.closedHand)
-        } else if pointerGesture == nil, case .move = initialPointerGesture(at: point) {
-            setMoveCursor(.openHand)
+            setPointerCursor(Self.moveCursor)
         } else {
-            setMoveCursor(nil)
+            setPointerCursor(pointerGesture == nil ? hoverCursor(at: point) : nil)
         }
     }
 
-    private func setMoveCursor(_ cursor: NSCursor?) {
+    private func hoverCursor(at point: NSPoint) -> NSCursor? {
+        if isPoint(point, in: sourceLinkRegion) { return .pointingHand }
+        let gesture = initialPointerGesture(at: point)
+        if case .move = gesture { return Self.moveCursor }
+        if case .select(_, _, .some) = gesture { return .iBeam }
+        #if !KIPPLE_APP_STORE
+        if needsBackgroundCursor {
+            if case .select = gesture {
+                // Textual provides a pointing hand for a Markdown link when available.
+                let inlineLink = displayMode == .markdown && !isPoint(point, in: sourceRegion)
+                    && NSCursor.current === NSCursor.pointingHand
+                return inlineLink ? .pointingHand : .iBeam
+            }
+            return resizeCursor(at: point)
+        }
+        #endif
+        return nil
+    }
+
+    #if !KIPPLE_APP_STORE
+    private func resizeCursor(at point: NSPoint) -> NSCursor? {
+        let bounds = NSRect(origin: .zero, size: frame.size)
+        guard styleMask.contains(.resizable), bounds.contains(point) else { return nil }
+
+        let left = point.x
+        let right = bounds.maxX - point.x
+        let top = bounds.maxY - point.y
+        let bottom = point.y
+        let horizontal = min(left, right)
+        let vertical = min(top, bottom)
+        // The native resize band sits inside the wider margin reserved from window dragging.
+        let isCorner = horizontal <= 3 && vertical <= 3
+        guard horizontal < 3 || vertical < 3 || isCorner else { return nil }
+
+        let position: NSCursor.FrameResizePosition
+        if horizontal < 16 && vertical < 16 {
+            if top < bottom {
+                position = left < right ? .topLeft : .topRight
+            } else {
+                position = left < right ? .bottomLeft : .bottomRight
+            }
+        } else if horizontal < vertical {
+            position = left < right ? .left : .right
+        } else {
+            position = top < bottom ? .top : .bottom
+        }
+        return .frameResize(position: position, directions: .all)
+    }
+    #endif
+
+    private func setPointerCursor(_ cursor: NSCursor?) {
         if let cursor {
-            cursor.set()
-        } else if let moveCursor, NSCursor.current === moveCursor {
-            NSCursor.arrow.set()
+            DesktopNotePointerCursor.set(cursor, for: self)
+        } else {
+            DesktopNotePointerCursor.clear(pointerCursor, for: self)
         }
-        moveCursor = cursor
+        pointerCursor = cursor
     }
 
-    private func refreshOpenHandAfterTracking() {
-        guard moveCursor === NSCursor.openHand else { return }
+    private func refreshPointerCursorAfterTracking() {
+        guard pointerGesture == nil, pointerCursor != nil else { return }
         // SwiftUI can reset a link's cursor after the tracking event returns.
         DispatchQueue.main.async { [weak self] in
-            guard let self, isVisible, moveCursor === NSCursor.openHand,
-                  case .move = initialPointerGesture(at: mouseLocationOutsideOfEventStream) else { return }
-            NSCursor.openHand.set()
+            guard let self, isVisible, pointerGesture == nil, pointerCursor != nil,
+                  DesktopNotePointerCursor.isOwned(by: self) else { return }
+            updatePointerCursor(at: mouseLocationOutsideOfEventStream)
         }
     }
 
     private func handleMouseDown(_ event: NSEvent) -> Bool {
         pendingLink = nil
         let point = event.locationInWindow
+        if event.clickCount > 1, isPoint(point, in: sourceLinkRegion) { cancelSourceLinkOpen() }
         pointerGesture = initialPointerGesture(at: point)
         if case .move = pointerGesture {
-            setMoveCursor(.closedHand)
+            setPointerCursor(Self.moveCursor)
             return true
         }
-        setMoveCursor(nil)
-        if case .select = pointerGesture {
+        setPointerCursor(nil)
+        // Handle a press in the link's icon or spacing without starting native button tracking.
+        if case .sourceLink = pointerGesture { return true }
+        if case .select(_, _, let anchor) = pointerGesture {
             if event.clickCount > 1 || event.modifierFlags.contains(.shift) {
                 noteContentController.selectionMayExist = true
+            }
+            // An event starting in the margin still needs to reach the native text selection view.
+            if let anchor, let textEvent = NSEvent.mouseEvent(
+                with: .leftMouseDown, location: anchor, modifierFlags: event.modifierFlags,
+                timestamp: event.timestamp, windowNumber: windowNumber, context: nil,
+                eventNumber: event.eventNumber, clickCount: event.clickCount, pressure: event.pressure
+            ) {
+                super.sendEvent(textEvent)
+                return true
             }
         }
         return false
@@ -536,18 +660,32 @@ final class DesktopNotePanel: NSPanel {
 
     private func finishPointerGesture(_ event: NSEvent) -> Bool {
         guard let pointerGesture else { return false }
-        if case .select(_, let didDrag) = pointerGesture {
+        let point = event.locationInWindow
+        let isSingleClick = event.clickCount == 1 && !event.modifierFlags.contains(.shift)
+        if case .select(let start, let didDrag, _) = pointerGesture {
+            let startsInSourceLink = isPoint(start, in: sourceLinkRegion)
             super.sendEvent(event)
-            let link = didDrag ? nil : pendingLink
+            let bodyLink = startsInSourceLink || didDrag ? nil : pendingLink
             self.pointerGesture = nil
             pendingLink = nil
-            if !didDrag, event.clickCount == 1, !event.modifierFlags.contains(.shift),
-               noteContentController.selectionMayExist {
+            if isSingleClick, !didDrag, !startsInSourceLink, noteContentController.selectionMayExist {
                 noteContentController.clearSelection()
             }
-            if let link { openLink(link) }
+            if let bodyLink { openLink(bodyLink) }
+            if startsInSourceLink, isSingleClick, !didDrag, !event.modifierFlags.contains(.control),
+               let url = sourceWebURL(at: point) {
+                openSourceLinkAfterSingleClick(url)
+            }
+        } else if case .sourceLink(let didDrag) = pointerGesture {
+            self.pointerGesture = nil
+            if isSingleClick, !didDrag, !event.modifierFlags.contains(.control), let url = sourceWebURL(at: point) {
+                cancelSourceLinkOpen()
+                noteContentController.clearSelection()
+                openLink(url)
+            }
+            updatePointerCursor(at: point)
         } else if case .move(_, let didDrag) = pointerGesture {
-            let pointer = convertPoint(toScreen: event.locationInWindow)
+            let pointer = convertPoint(toScreen: point)
             self.pointerGesture = nil
             if didDrag {
                 growToFitAfterMoving()
@@ -555,9 +693,30 @@ final class DesktopNotePanel: NSPanel {
             } else if editor == nil {
                 noteContentController.clearSelection()
             }
-            updateMoveCursor(at: convertPoint(fromScreen: pointer))
+            updatePointerCursor(at: convertPoint(fromScreen: pointer))
         }
         return true
+    }
+
+    private func sourceWebURL(at point: NSPoint) -> URL? {
+        guard isPoint(point, in: sourceLinkRegion) else { return nil }
+        return noteContentController.hostingController.rootView.item.metadata?.sourceWebURL
+    }
+
+    private func openSourceLinkAfterSingleClick(_ url: URL) {
+        cancelSourceLinkOpen()
+        // Give AppKit time to recognize a double-click for word selection.
+        sourceLinkOpenTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(NSEvent.doubleClickInterval)) } catch { return }
+            guard let self, !Task.isCancelled else { return }
+            sourceLinkOpenTask = nil
+            openLink(url)
+        }
+    }
+
+    private func cancelSourceLinkOpen() {
+        sourceLinkOpenTask?.cancel()
+        sourceLinkOpenTask = nil
     }
 
     override func performClose(_ sender: Any?) {
@@ -571,7 +730,7 @@ final class DesktopNotePanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
-        setMoveCursor(nil)
+        setPointerCursor(nil)
         if case .move(_, let didDrag) = pointerGesture {
             pointerGesture = nil
             if didDrag { onPlacementChange?() }
@@ -581,21 +740,31 @@ final class DesktopNotePanel: NSPanel {
     }
 
     override func close() {
-        setMoveCursor(nil)
+        cancelSourceLinkOpen()
+        setPointerCursor(nil)
         super.close()
     }
 
-    private func isNoteBody(at point: NSPoint) -> Bool {
+    override func orderOut(_ sender: Any?) {
+        cancelSourceLinkOpen()
+        setPointerCursor(nil)
+        super.orderOut(sender)
+    }
+
+    private func isNoteBody(at point: NSPoint, includingSource: Bool = false) -> Bool {
         guard let contentView else { return false }
         let location = contentView.convert(point, from: nil)
         let inset = DesktopNoteContent.windowBorderInset
         // AppKit handles the frame outside the note's interactive surface.
         guard contentView.bounds.insetBy(dx: inset, dy: inset).contains(location),
               !(contentView.hitTest(location) is NSScroller) else { return false }
-        let interactiveViews = controls + [editor?.view, sourceRegion].compactMap { $0 }
-        return !interactiveViews.contains {
-            $0.window === self && !$0.isHiddenOrHasHiddenAncestor && $0.bounds.contains($0.convert(point, from: nil))
-        }
+        let interactiveViews = controls + [editor?.view, includingSource ? nil : sourceRegion].compactMap { $0 }
+        return !interactiveViews.contains { isPoint(point, in: $0) }
+    }
+
+    private func isPoint(_ point: NSPoint, in view: NSView?) -> Bool {
+        guard let view, view.window === self, !view.isHiddenOrHasHiddenAncestor else { return false }
+        return view.bounds.contains(view.convert(point, from: nil))
     }
 
     @objc private func beginEditing() {
@@ -887,6 +1056,90 @@ final class DesktopNotePanel: NSPanel {
         onPlacementChange?()
     }
 }
+
+@MainActor
+private enum DesktopNotePointerCursor {
+    private static weak var owner: DesktopNotePanel?
+    #if !KIPPLE_APP_STORE
+    private static let connection = BackgroundCursorConnection()
+    private static var previousBackgroundSetting: Bool?
+    #endif
+
+    static func isOwned(by note: DesktopNotePanel) -> Bool {
+        owner === note
+    }
+
+    static func set(_ cursor: NSCursor, for note: DesktopNotePanel) {
+        owner = note
+        #if !KIPPLE_APP_STORE
+        if note.needsBackgroundCursor, previousBackgroundSetting == nil,
+           let connection, let wasEnabled = connection.isEnabled(),
+           wasEnabled || connection.setEnabled(true) {
+            previousBackgroundSetting = wasEnabled
+        }
+        #endif
+        cursor.set()
+    }
+
+    static func clear(_ cursor: NSCursor?, for note: DesktopNotePanel) {
+        guard owner === note else { return }
+        #if !KIPPLE_APP_STORE
+        // Give the foreground app its cursor back before changing the local cursor.
+        if let previousBackgroundSetting {
+            guard previousBackgroundSetting || connection?.setEnabled(false) == true else {
+                Logger.shared.log("Unable to restore the desktop note cursor setting", level: .warning)
+                return
+            }
+            self.previousBackgroundSetting = nil
+        }
+        #endif
+        owner = nil
+        if NSApp.isActive, let cursor, NSCursor.current === cursor {
+            NSCursor.arrow.set()
+        }
+    }
+}
+
+#if !KIPPLE_APP_STORE
+private struct BackgroundCursorConnection {
+    private typealias MainConnection = @convention(c) () -> Int32
+    private typealias CopyProperty = @convention(c) (
+        Int32, Int32, CFString, UnsafeMutablePointer<Unmanaged<CFTypeRef>?>
+    ) -> Int32
+    private typealias SetProperty = @convention(c) (Int32, Int32, CFString, CFTypeRef) -> Int32
+
+    private let id: Int32
+    private let copyProperty: CopyProperty
+    private let setProperty: SetProperty
+    private let property = "SetsCursorInBackground" as CFString
+
+    init?() {
+        guard let library = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY)
+        else { return nil }
+        guard let main = dlsym(library, "CGSMainConnectionID"),
+              let copy = dlsym(library, "CGSCopyConnectionProperty"),
+              let set = dlsym(library, "CGSSetConnectionProperty") else {
+            dlclose(library)
+            return nil
+        }
+        id = unsafeBitCast(main, to: MainConnection.self)()
+        copyProperty = unsafeBitCast(copy, to: CopyProperty.self)
+        setProperty = unsafeBitCast(set, to: SetProperty.self)
+    }
+
+    func isEnabled() -> Bool? {
+        var value: Unmanaged<CFTypeRef>?
+        let status = copyProperty(id, id, property, &value)
+        let current = value?.takeRetainedValue()
+        guard status == 0 else { return nil }
+        return current == nil ? false : current as? Bool
+    }
+
+    func setEnabled(_ enabled: Bool) -> Bool {
+        setProperty(id, id, property, enabled ? kCFBooleanTrue : kCFBooleanFalse) == 0
+    }
+}
+#endif
 
 private extension DesktopNotePanel {
     func configureNativeFrame() {

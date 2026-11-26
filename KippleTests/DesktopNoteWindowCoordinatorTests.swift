@@ -699,26 +699,110 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let start = try desktopNoteBodyPoint(in: note, x: 180)
         let origin = note.frame.origin
         let end = NSPoint(x: start.x + 100, y: start.y + 80)
+        let moveCursor = DesktopNotePanel.moveCursor
+        XCTAssertNotIdentical(moveCursor, NSCursor.openHand)
 
         note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: start, for: note))
-        XCTAssertTrue(NSCursor.current === NSCursor.openHand)
+        XCTAssertIdentical(NSCursor.current, moveCursor)
         let text = try desktopNoteBodyPoint(in: note, x: 29)
         note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: text, for: note))
-        XCTAssertFalse(NSCursor.current === NSCursor.openHand)
+        XCTAssertFalse(NSCursor.current === moveCursor)
         let border = NSPoint(x: 2, y: start.y)
         note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: start, for: note))
         note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: border, for: note))
-        XCTAssertFalse(NSCursor.current === NSCursor.openHand)
+        XCTAssertFalse(NSCursor.current === moveCursor)
 
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-        XCTAssertTrue(NSCursor.current === NSCursor.closedHand)
+        XCTAssertIdentical(NSCursor.current, moveCursor)
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-        XCTAssertTrue(NSCursor.current === NSCursor.closedHand)
+        XCTAssertIdentical(NSCursor.current, moveCursor)
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
-        XCTAssertTrue(NSCursor.current === NSCursor.openHand)
+        XCTAssertIdentical(NSCursor.current, moveCursor)
 
         XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 100, y: origin.y + 80))
     }
+
+    func testDraggingFromBesideTextSelectsThePreviewWithoutMovingTheNote() async throws {
+        let previousCursor = NSCursor.current
+        defer { previousCursor.set() }
+        for mode in [AppSettings.DesktopNoteDisplayMode.plainText, .markdown] {
+            let note = DesktopNotePanel(item: ClipItem(content: "Select this text"), screenFrame: screenFrame, displayMode: mode)
+            simulateDesktopNoteLiveResize(note, to: NSSize(width: 300, height: 160))
+            note.makeKeyAndOrderFront(nil)
+            defer { note.close() }
+            let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
+            controller.view.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(50))
+            let row = try XCTUnwrap(textBounds(in: controller.view).first)
+            let originalFrame = note.frame
+            let end = NSPoint(x: row.midX, y: row.midY)
+            let copy = NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "")
+
+            for x in [row.minX - 8, row.maxX + 8] {
+                let start = NSPoint(x: x, y: row.midY)
+                note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: start, for: note))
+                XCTAssertIdentical(NSCursor.current, NSCursor.iBeam)
+                note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+                note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+                note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+                let responder = try XCTUnwrap(note.firstResponder)
+                XCTAssertNotIdentical(responder, note)
+                XCTAssertTrue(responder.responds(to: try XCTUnwrap(copy.action)), "\(mode), x: \(x)")
+                if mode == .markdown {
+                    let selection = try XCTUnwrap(responder as? NSUserInterfaceValidations)
+                    XCTAssertTrue(selection.validateUserInterfaceItem(copy))
+                }
+                XCTAssertEqual(note.frame, originalFrame)
+                controller.clearSelection()
+                controller.view.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(50))
+            }
+        }
+    }
+
+    private func textBounds(in view: NSView) -> [NSRect] {
+        let bounds = (view as? DesktopNoteTextHitView).map { hit in
+            hit.lines.map { hit.convert($0, to: nil) }
+        } ?? []
+        return bounds + view.subviews.flatMap(textBounds(in:))
+    }
+
+    #if !KIPPLE_APP_STORE
+    func testUnselectedNoteUsesTextAndResizeCursorsBeforeClicking() async throws {
+        let previousCursor = NSCursor.current
+        defer { previousCursor.set() }
+        let note = DesktopNotePanel(item: ClipItem(content: "Short line"), screenFrame: screenFrame)
+        simulateDesktopNoteLiveResize(note, to: NSSize(width: 260, height: 160))
+        note.orderFrontRegardless()
+        defer { note.close() }
+        note.contentView?.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(note.isKeyWindow)
+
+        let text = try desktopNoteBodyPoint(in: note, x: 29)
+        note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: text, for: note))
+        XCTAssertTrue(NSCursor.current === NSCursor.iBeam)
+
+        let width = note.frame.width
+        let height = note.frame.height
+        let resizePoints: [(NSPoint, NSCursor.FrameResizePosition)] = [
+            (NSPoint(x: 2, y: 80), .left),
+            (NSPoint(x: width - 2, y: 80), .right),
+            (NSPoint(x: 130, y: height - 2), .top),
+            (NSPoint(x: 130, y: 2), .bottom),
+            (NSPoint(x: 3, y: height - 3), .topLeft),
+            (NSPoint(x: width - 3, y: height - 3), .topRight),
+            (NSPoint(x: 3, y: 3), .bottomLeft),
+            (NSPoint(x: width - 3, y: 3), .bottomRight)
+        ]
+        for (point, position) in resizePoints {
+            note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: point, for: note))
+            let expected = NSCursor.frameResize(position: position, directions: .all)
+            XCTAssertEqual(NSCursor.current.image.tiffRepresentation, expected.image.tiffRepresentation)
+        }
+        XCTAssertFalse(note.isKeyWindow)
+    }
+    #endif
 
     func testClearsPreviewSelectionOnBlankClickAndFocusLoss() async throws {
         let note = DesktopNotePanel(
@@ -762,6 +846,52 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
 
         XCTAssertFalse(note.isKeyWindow)
         XCTAssertEqual(controller.hostingController.rootView.selectionRevision, 2)
+    }
+
+    func testSourceAppWindowAndAddressSupportTextSelection() async throws {
+        let previousCursor = NSCursor.current
+        defer { previousCursor.set() }
+        var opened: [URL] = []
+        let item = ClipItem(
+            content: "Note body", sourceApp: "Source Browser", windowTitle: "Project window",
+            metadata: ClipMetadata(sourceURI: "https://example.com/tasks/42")
+        )
+        let openLink: (URL) -> Void = { opened.append($0) }
+        let note = DesktopNotePanel(item: item, screenFrame: screenFrame, openLink: openLink)
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+        let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
+        controller.view.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let source = try XCTUnwrap(note.sourceRegion)
+        let sourceFrame = source.convert(source.bounds, to: nil)
+        let noteFrame = note.frame
+
+        let rows = textBounds(in: controller.view)
+            .filter { sourceFrame.contains(NSPoint(x: $0.midX, y: $0.midY)) }
+            .sorted { $0.midY > $1.midY }
+        XCTAssertEqual(rows.count, 3)
+        let address = try XCTUnwrap(rows.last)
+        let linkPoint = NSPoint(x: address.midX, y: address.midY)
+        note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: linkPoint, for: note))
+        XCTAssertTrue(NSCursor.current === NSCursor.pointingHand)
+        let copy = NSSelectorFromString("copy:")
+        for (index, row) in rows.enumerated() {
+            let start = NSPoint(x: row.minX + 3, y: row.midY)
+            let end = NSPoint(x: row.maxX - 3, y: row.midY)
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+            let responder = try XCTUnwrap(note.firstResponder)
+            XCTAssertNotIdentical(responder, note, "Source row \(index + 1)")
+            XCTAssertTrue(responder.responds(to: copy), "Source row \(index + 1)")
+            XCTAssertTrue(opened.isEmpty)
+            XCTAssertEqual(note.frame, noteFrame)
+
+            controller.clearSelection()
+            controller.view.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(50))
+        }
     }
 
     func testDraggingAMarkdownLinkSelectsTextWithoutMovingTheNoteOrOpeningTheLink() async throws {

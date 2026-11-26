@@ -53,7 +53,7 @@ struct DesktopNoteContent: View {
                 ScrollView(.vertical) {
                     document
                         .id(selectionRevision)
-                        .modifier(DesktopNoteTextRegions())
+                        .modifier(DesktopNoteTextRegions(allowsSelectionMargin: true))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
                         .padding(.trailing, bodyCloseInset)
@@ -96,6 +96,7 @@ struct DesktopNoteContent: View {
                 }
                 if hasSource {
                     sourceSection
+                        .id(selectionRevision)
                         .background(DesktopNoteSourceRegion().allowsHitTesting(false).accessibilityHidden(true))
                         .padding(.trailing, hasTitle ? 0 : Self.closeClearance)
                 }
@@ -126,6 +127,8 @@ struct DesktopNoteContent: View {
             Text(verbatim: value)
                 .lineLimit(maxLines)
                 .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .modifier(DesktopNoteTextRegions())
                 .help(value)
         }
         .accessibilityElement(children: .ignore)
@@ -136,23 +139,23 @@ struct DesktopNoteContent: View {
     private func sourceLink(_ url: URL) -> some View {
         let address = url.absoluteString
         let displayAddress = String(address.dropFirst((url.scheme?.count ?? 0) + 3))
-        return Link(destination: url) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Link(destination: url) {
                 sourceIcon("arrow.up.right.square")
-                Text(verbatim: displayAddress)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .multilineTextAlignment(.leading)
-                    .foregroundStyle(Color(nsColor: .linkColor))
             }
+            .accessibilityLabel(Text("Source Link"))
+            .accessibilityValue(Text(verbatim: address))
+            Text(verbatim: displayAddress)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+                .foregroundStyle(Color(nsColor: .linkColor))
+                .textSelection(.enabled)
+                .modifier(DesktopNoteTextRegions())
         }
+        .background(DesktopNoteSourceRegion(isLink: true).allowsHitTesting(false).accessibilityHidden(true))
         .pointerStyle(.link)
-        .accessibilityLabel(Text("Source Link"))
-        .accessibilityValue(Text(verbatim: address))
         .help(address)
-        .contextMenu {
-            Button("Copy URL", systemImage: "doc.on.doc") { copyLink(address) }
-        }
     }
 
     func headerHeight(at width: CGFloat) -> CGFloat {
@@ -235,14 +238,27 @@ struct DesktopNoteContent: View {
 }
 
 private struct DesktopNoteSourceRegion: NSViewRepresentable {
-    func makeNSView(context: Context) -> RegionView { RegionView() }
+    var isLink = false
+
+    func makeNSView(context: Context) -> RegionView {
+        let view = RegionView()
+        view.isLink = isLink
+        return view
+    }
 
     func updateNSView(_ view: RegionView, context: Context) {}
 
     final class RegionView: NSView {
+        var isLink = false
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            (window as? DesktopNotePanel)?.sourceRegion = self
+            guard let note = window as? DesktopNotePanel else { return }
+            if isLink {
+                note.sourceLinkRegion = self
+            } else {
+                note.sourceRegion = self
+            }
         }
     }
 }
@@ -297,7 +313,7 @@ private struct DesktopNoteMarkdown: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: state.containerWidth.map { $0 * 3 }, alignment: .leading)
                     .onGeometryChange(for: CGFloat.self, of: \.size.width, action: onWidthChange)
-                    .modifier(DesktopNoteTextRegions())
+                    .modifier(DesktopNoteTextRegions(allowsSelectionMargin: true))
             }
             .textual.tableCellSpacing(horizontal: 1, vertical: 1)
             .textual.blockSpacing(.init(top: 8, bottom: 8))
@@ -322,7 +338,7 @@ private struct DesktopNoteMarkdown: View {
                     .textual.fontScale(0.882)
                     .fixedSize(horizontal: false, vertical: true)
                     .monospaced()
-                    .modifier(DesktopNoteTextRegions())
+                    .modifier(DesktopNoteTextRegions(allowsSelectionMargin: true))
                     .padding(.vertical, 8)
                     .padding(.leading, 14)
                     .onGeometryChange(for: CGFloat.self, of: \.size.width, action: onWidthChange)
@@ -363,6 +379,8 @@ private func isRemoteImage(_ url: URL) -> Bool {
 }
 
 private struct DesktopNoteTextRegions: ViewModifier {
+    var allowsSelectionMargin = false
+
     func body(content: Content) -> some View {
         content.overlayPreferenceValue(Text.LayoutKey.self) { layouts in
             GeometryReader { geometry in
@@ -372,7 +390,8 @@ private struct DesktopNoteTextRegions: ViewModifier {
                         return anchored.layout.map { line in
                             line.typographicBounds.rect.offsetBy(dx: origin.x, dy: origin.y)
                         }
-                    }
+                    },
+                    allowsSelectionMargin: allowsSelectionMargin
                 )
             }
             .allowsHitTesting(false)
@@ -382,18 +401,23 @@ private struct DesktopNoteTextRegions: ViewModifier {
 
     private struct RegionView: NSViewRepresentable {
         let lines: [CGRect]
+        let allowsSelectionMargin: Bool
 
         func makeNSView(context: Context) -> DesktopNoteTextHitView { DesktopNoteTextHitView() }
 
         func updateNSView(_ view: DesktopNoteTextHitView, context: Context) {
             view.lines = lines
+            view.allowsSelectionMargin = allowsSelectionMargin
         }
     }
 }
 
 @MainActor
 final class DesktopNoteTextHitView: NSView {
+    private static let horizontalSelectionMargin: CGFloat = 12
+    private static let verticalSelectionMargin: CGFloat = 4
     var lines: [CGRect] = []
+    var allowsSelectionMargin = false
 
     override var isFlipped: Bool { true }
 
@@ -406,6 +430,32 @@ final class DesktopNoteTextHitView: NSView {
         guard window != nil, !isHiddenOrHasHiddenAncestor else { return false }
         let point = convert(windowPoint, from: nil)
         return visibleRect.contains(point) && lines.contains { $0.contains(point) }
+    }
+
+    func nearbySelectionStart(at windowPoint: NSPoint) -> NSPoint? {
+        guard allowsSelectionMargin, window != nil, !isHiddenOrHasHiddenAncestor else { return nil }
+        if let clip = enclosingScrollView?.contentView,
+           !clip.visibleRect.contains(clip.convert(windowPoint, from: nil)) { return nil }
+        let point = convert(windowPoint, from: nil)
+        let visible = visibleRect
+        let dx = Self.horizontalSelectionMargin
+        let dy = Self.verticalSelectionMargin
+        guard visible.insetBy(dx: -dx, dy: -dy).contains(point) else { return nil }
+
+        var nearest: NSPoint?
+        var nearestDistance = CGFloat.infinity
+        for line in lines where line.insetBy(dx: -dx, dy: -dy).contains(point) {
+            let selectable = line.intersection(visible).insetBy(dx: 0.5, dy: 0.5)
+            guard !selectable.isEmpty else { continue }
+            let start = NSPoint(x: min(max(point.x, selectable.minX), selectable.maxX),
+                                y: min(max(point.y, selectable.minY), selectable.maxY))
+            let distance = hypot(point.x - start.x, point.y - start.y)
+            if distance < nearestDistance {
+                nearest = start
+                nearestDistance = distance
+            }
+        }
+        return nearest.map { convert($0, to: nil) }
     }
 }
 

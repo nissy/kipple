@@ -66,7 +66,7 @@ final class DesktopNoteResizeTests: XCTestCase {
         let contentView = try XCTUnwrap(note.contentView)
         let origin = note.frame.origin
         let minimumHeightWithSourceLink = note.minSize.height
-        func clickAtSourceLink(expectsLink: Bool = true, horizontalOffset: CGFloat = 40) async throws {
+        func clickAtSourceLink(expectsLink: Bool = true, horizontalOffset: CGFloat = 20) async throws {
             contentView.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(50))
             var point = NSPoint(x: 60, y: note.frame.height - 49)
@@ -102,6 +102,41 @@ final class DesktopNoteResizeTests: XCTestCase {
         simulateDesktopNoteLiveResize(note, to: note.minSize)
         try await clickAtSourceLink(horizontalOffset: 8)
         XCTAssertEqual(opened.map(\.absoluteString), [source, updatedSource])
+    }
+
+    func testSourceURLTextOpensOnlyAfterASingleClick() async throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/tasks/42"))
+        let item = ClipItem(content: "Review the project plan", metadata: ClipMetadata(sourceURI: url.absoluteString))
+        var opened: [URL] = []
+        let openLink: (URL) -> Void = { opened.append($0) }
+        let note = DesktopNotePanel(item: item, screenFrame: screenFrame, openLink: openLink)
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+        note.contentView?.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let region = try XCTUnwrap(note.sourceLinkRegion)
+        let frame = region.convert(region.bounds, to: nil)
+        let point = NSPoint(x: frame.minX + 40, y: frame.maxY - 12)
+        func click(_ count: Int) throws {
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: count))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note, clickCount: count))
+        }
+        let clickInterval = Duration.seconds(NSEvent.doubleClickInterval) + .milliseconds(100)
+
+        try click(1)
+        try click(2)
+        try await Task.sleep(for: clickInterval)
+        XCTAssertTrue(opened.isEmpty)
+
+        try click(1)
+        XCTAssertTrue(opened.isEmpty)
+        try await Task.sleep(for: clickInterval)
+        XCTAssertEqual(opened, [url])
+
+        try click(1)
+        note.orderOut(nil)
+        try await Task.sleep(for: clickInterval)
+        XCTAssertEqual(opened, [url])
     }
 
     func testNativeTitleBarAndButtonsStayHiddenWhenHistoryTitleChanges() {
