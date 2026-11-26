@@ -14,6 +14,7 @@ enum ClipItemEditError: Error {
     case emptyContent
     case duplicateContent
     case categoryUnavailable
+    case richTextLossRequiresConfirmation
 }
 
 // MARK: - Modern Clipboard Service (Actor-based)
@@ -1142,7 +1143,11 @@ extension ModernClipboardService {
 
     // Pass only the changed fields. An empty title clears the saved title.
     func updateDetails(
-        id: UUID, title: String? = nil, content: String? = nil, categoryChanges: [UUID: Bool] = [:]
+        id: UUID,
+        title: String? = nil,
+        content: String? = nil,
+        categoryChanges: [UUID: Bool] = [:],
+        allowsRemovingRichText: Bool = true
     ) async throws {
         await mutationGate.acquire()
         defer { mutationGate.release() }
@@ -1153,6 +1158,9 @@ extension ModernClipboardService {
             guard !content.isEmpty else { throw ClipItemEditError.emptyContent }
             if let duplicate = indexOfExistingContent(content), duplicate != index {
                 throw ClipItemEditError.duplicateContent
+            }
+            guard allowsRemovingRichText || original.richText == nil else {
+                throw ClipItemEditError.richTextLossRequiresConfirmation
             }
             item = item.replacingContent(with: content)
         }

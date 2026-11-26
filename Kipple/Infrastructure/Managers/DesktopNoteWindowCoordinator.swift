@@ -37,8 +37,11 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
             item: item,
             screenFrame: screen.visibleFrame,
             displayMode: AppSettings.shared.desktopNoteDefaultDisplayMode,
-            onSave: { [adapter] text in
-                try await adapter.updateDetails(itemID: itemID, title: nil, content: text, categoryChanges: [:])
+            onSave: { [adapter] text, allowsRemovingRichText in
+                try await adapter.updateDetails(
+                    itemID: itemID, title: nil, content: text, categoryChanges: [:],
+                    allowsRemovingRichText: allowsRemovingRichText
+                )
             },
             onChangeCategory: { [adapter] change in
                 try await adapter.updateCategories(itemID: itemID, change: change)
@@ -93,7 +96,7 @@ final class DesktopNotePanel: NSPanel {
     private let noteContentController: DesktopNoteContentController
     private let colorStrip = NSView()
     private let initialScreenFrame: NSRect
-    private let onSave: ((String) async throws -> Void)?
+    private let onSave: ((String, Bool) async throws -> Void)?
     private let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     private let openLink: (URL) -> Void
     private var categoryControl: NSHostingView<DesktopNoteCategoryMenu>?
@@ -118,7 +121,7 @@ final class DesktopNotePanel: NSPanel {
         item: ClipItem,
         screenFrame: NSRect,
         displayMode: AppSettings.DesktopNoteDisplayMode = .plainText,
-        onSave: ((String) async throws -> Void)? = nil,
+        onSave: ((String, Bool) async throws -> Void)? = nil,
         onChangeCategory: ((ClipCategoryChange) async throws -> Void)? = nil,
         openLink: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
     ) {
@@ -154,7 +157,7 @@ final class DesktopNotePanel: NSPanel {
             }
             return .handled
         }
-        noteContentController.hostingController.rootView = content
+        noteContentController.setContent(content)
         contentViewController = noteContentController
         configureNativeFrame()
         setContentSize(size)
@@ -180,7 +183,9 @@ final class DesktopNotePanel: NSPanel {
     private func reloadPreview(for item: ClipItem) {
         var content = DesktopNoteContent(item: item, displayMode: displayMode)
         content.showsBody = editor == nil
-        content.openURL = noteContentController.hostingController.rootView.openURL
+        let previous = noteContentController.hostingController.rootView
+        content.openURL = previous.openURL
+        content.allowsRemoteImages = item.content == previous.item.content && previous.allowsRemoteImages
         let updatedTitle = HistoryItemPreviewContent.nonempty(item.title) ?? ""
         let titleChanged = title != updatedTitle
         title = updatedTitle
@@ -188,7 +193,7 @@ final class DesktopNotePanel: NSPanel {
             self.manualSize = NSSize(width: manualSize.width, height: minimumManualHeight)
         }
         if titleChanged { updateResizeLimits() }
-        noteContentController.hostingController.rootView = content
+        noteContentController.setContent(content)
         if editor == nil, !inLiveResize {
             resize(to: manualSize ?? content.estimatedWindowSize(in: availableFrame, minimumWidth: Self.minimumResizeSize.width))
         }
@@ -219,7 +224,7 @@ final class DesktopNotePanel: NSPanel {
         case .rightMouseDown:
             if editor == nil { noteContentController.selectionMayExist = true }
         case .keyDown:
-            if editor != nil, handleEditingKey(event) { return }
+            if handleNoteShortcut(event) { return }
             if editor == nil, firstResponder !== self { noteContentController.selectionMayExist = true }
         default:
             break
@@ -297,52 +302,51 @@ final class DesktopNotePanel: NSPanel {
     }
 
     private func beginEditing(at screenPoint: NSPoint) {
+        let windowPoint = convertPoint(fromScreen: screenPoint)
+        let scrollProgress = noteContentController.previewScrollProgress
+        let sourceOffset = textHitViews.allObjects.lazy.compactMap { $0.sourceOffset(at: windowPoint) }.first
         let host = noteContentController.hostingController
         var content = host.rootView
-        let editor = DesktopNoteEditor(text: content.item.content)
+        let editor = DesktopNoteEditor(
+            text: content.item.content,
+            onCancel: { [weak self] in self?.cancelEditing() },
+            onSave: { [weak self] in self?.saveEditing(explicitly: true) }
+        )
         let padding = HistoryItemPreviewContent.contentPadding
         content.showsBody = false
         let headingHeight = title.isEmpty ? 0 : NSHostingController(rootView: content.titlePreview)
             .sizeThatFits(in: NSSize(width: frame.width - 2 * padding, height: .infinity)).height
             + HistoryItemPreviewText.spacing
-        host.rootView = content
+        noteContentController.setContent(content)
 
         self.editor = editor
         editorToolsButton?.isHidden = false
-        let container = noteContentController.view
-        container.addSubview(editor.view)
-        NSLayoutConstraint.activate([
-            editor.view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
-            editor.view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -padding),
-            editor.view.topAnchor.constraint(equalTo: container.topAnchor, constant: padding + headingHeight),
-            editor.view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -DesktopNoteContent.controlsHeight)
-        ])
-        let height = max(frame.height, padding + headingHeight + DesktopNoteContent.controlsHeight + 40)
+        editor.install(in: noteContentController.view, headingHeight: headingHeight)
+        updateResizeLimits()
+        let minimumHeight = padding + headingHeight + DesktopNoteContent.controlsHeight + DesktopNoteEditor.actionsHeight + 40
+        let height = max(frame.height, minSize.height, minimumHeight)
         resize(to: NSSize(width: frame.width, height: min(availableFrame.height, height)))
-        container.layoutSubtreeIfNeeded()
+        noteContentController.view.layoutSubtreeIfNeeded()
         makeKeyAndOrderFront(nil)
-        makeFirstResponder(editor.textView)
-        let point = editor.textView.convert(convertPoint(fromScreen: screenPoint), from: nil)
-        let index = editor.textView.characterIndexForInsertion(at: point)
-        let offset = min(index, (editor.originalText as NSString).length)
-        editor.textView.setSelectedRange(NSRange(location: offset, length: 0))
+        editor.focus(at: screenPoint, in: self, sourceOffset: sourceOffset, scrollProgress: scrollProgress)
     }
 
-    private func handleEditingKey(_ event: NSEvent) -> Bool {
+    private func handleNoteShortcut(_ event: NSEvent) -> Bool {
         guard editor?.textView.hasMarkedText() != true else { return false }
-        if event.keyCode == kVK_Escape, !isSaving {
-            finishEditing()
+        if event.keyCode == kVK_Escape {
+            let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+            if !modifiers.isEmpty, editor?.handleShortcut(event) == true { return true }
+            cancelEditing()
             return true
         }
-        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        if modifiers == .command, event.keyCode == kVK_Return || event.keyCode == kVK_ANSI_KeypadEnter {
-            saveEditing()
-            return true
-        }
-        return false
+        return editor?.handleShortcut(event) ?? false
     }
 
-    private func saveEditing() {
+    private func cancelEditing() {
+        if !isSaving { finishEditing() }
+    }
+
+    private func saveEditing(explicitly: Bool = false) {
         guard let editor, let onSave, !isSaving else { return }
         editor.textView.unmarkText()
         let text = editor.textView.string
@@ -351,19 +355,20 @@ final class DesktopNotePanel: NSPanel {
             return
         }
         isSaving = true
-        editor.textView.isEditable = false
+        editor.setSaving(true)
+        let allowsRemovingRichText = explicitly && editor.isConfirmingPlainTextSave
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await onSave(text)
+                try await onSave(text, allowsRemovingRichText)
                 isSaving = false
                 finishEditing()
             } catch {
                 isSaving = false
                 closeAfterSave = false
                 changeDisplayModeAfterSave = false
-                editor.textView.isEditable = true
-                editor.showError(AppSettings.shared.localizedString(clipItemEditErrorMessage(error)))
+                editor.setSaving(false)
+                editor.showSaveError(error)
             }
         }
     }
@@ -374,6 +379,7 @@ final class DesktopNotePanel: NSPanel {
         editorToolsButton?.isHidden = true
         makeFirstResponder(nil)
         editor.view.removeFromSuperview()
+        updateResizeLimits()
         if changeDisplayModeAfterSave {
             changeDisplayModeAfterSave = false
             flipDisplayMode()
@@ -405,7 +411,7 @@ final class DesktopNotePanel: NSPanel {
         tools.refusesFirstResponder = true
         tools.isHidden = true
         editorToolsButton = tools
-        controls.append(tools)
+        controls.append(contentsOf: [tools, noteContentController.remoteImagesButton])
         if let onChangeCategory {
             let menu = DesktopNoteCategoryMenu(item: item, onChangeCategory: onChangeCategory) { [weak self] in
                 guard let self else { return }
@@ -470,15 +476,7 @@ final class DesktopNotePanel: NSPanel {
     }
 
     @objc private func showColors(_ sender: NSButton) {
-        let menu = NSMenu()
-        for color in DesktopNoteColor.allCases {
-            let title = AppSettings.shared.localizedString(color.rawValue)
-            let item = NSMenuItem(title: title, action: #selector(changeColor(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = color.rawValue
-            item.state = color == selectedColor ? .on : .off
-            menu.addItem(item)
-        }
+        let menu = noteContentController.makeColorMenu(selected: selectedColor, target: self, action: #selector(changeColor(_:)))
         menu.popUp(positioning: nil, at: NSPoint(x: sender.bounds.minX, y: sender.bounds.minY), in: sender)
     }
 
@@ -531,7 +529,8 @@ private extension DesktopNotePanel {
 
     func updateResizeLimits() {
         let size = availableFrame.size
-        minSize = NSSize(width: min(size.width, Self.minimumResizeSize.width), height: min(size.height, minimumManualHeight))
+        let height = minimumManualHeight + (editor == nil ? 0 : DesktopNoteEditor.actionsHeight)
+        minSize = NSSize(width: min(size.width, Self.minimumResizeSize.width), height: min(size.height, height))
         maxSize = size
     }
 

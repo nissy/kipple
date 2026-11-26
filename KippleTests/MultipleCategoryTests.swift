@@ -374,6 +374,9 @@ extension MultipleCategoryTests {
         let custom = UUID()
         let editedContent = "https://example.org/edited"
         XCTAssertEqual(original.categoryIDs(forDraftContent: editedContent), [BuiltInCategory.url, BuiltInCategory.ocr])
+        try await assertUnconfirmedEditPreservesFormatting(
+            service, id: original.id, editedContent: editedContent, history: renamedHistory
+        )
         try await service.updateDetails(
             id: original.id, title: "Edited title", content: editedContent,
             categoryChanges: [custom: true, BuiltInCategory.ocr: false]
@@ -400,6 +403,18 @@ extension MultipleCategoryTests {
         XCTAssertEqual(afterRecopy.first?.content, originalContent)
         XCTAssertNotEqual(afterRecopy.first?.id, original.id)
         XCTAssertEqual(afterRecopy.first { $0.id == original.id }?.title, "Edited title")
+    }
+
+    private func assertUnconfirmedEditPreservesFormatting(
+        _ service: ModernClipboardService, id: UUID, editedContent: String, history: [ClipItem]
+    ) async throws {
+        do {
+            try await service.updateDetails(id: id, content: editedContent, allowsRemovingRichText: false)
+            XCTFail("An unconfirmed edit must preserve formatting")
+        } catch ClipItemEditError.richTextLossRequiresConfirmation {
+            let protectedHistory = await service.getHistory()
+            XCTAssertEqual(protectedHistory, history)
+        }
     }
 
     func testDuplicateItemEditLeavesBothItemsUntouched() async throws {

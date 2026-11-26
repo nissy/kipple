@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import XCTest
 @testable import Kipple
@@ -449,9 +450,42 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
 }
 
 extension DesktopNoteWindowCoordinatorTests {
+    func testEscapeCancelsEditingWithoutUnpinningTheNote() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+        let title = UUID().uuidString
+        let original = "Original note content"
+        try await adapter.createHistoryItem(title: title, content: original, categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: screen)
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
+        defer { note.close() }
+        simulateDesktopNoteLiveResize(note, to: note.minSize)
+        let viewingFrame = note.frame
+        let point = NSPoint(x: 35, y: note.frame.height - 70)
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        let editor = try XCTUnwrap(note.firstResponder as? LiveEditorTextView)
+        XCTAssertGreaterThan(note.minSize.height, viewingFrame.height)
+        XCTAssertGreaterThanOrEqual(note.frame.height, note.minSize.height)
+        editor.string = "Unsaved draft"
+        let escape = try desktopNoteKeyEvent(kVK_Escape, characters: "\u{1B}", modifiers: [], for: note)
+
+        note.sendEvent(escape)
+        XCTAssertFalse(note.firstResponder is LiveEditorTextView)
+        XCTAssertEqual(adapter.history.first?.content, original)
+        XCTAssertEqual(note.frame, viewingFrame)
+
+        note.sendEvent(escape)
+        await Task.yield()
+        XCTAssertTrue(note.isVisible)
+        XCTAssertTrue(coordinator.isPosted(item.id))
+    }
+
     func testDesktopNoteEditingToolsModifyTheDraftAndSupportUndo() throws {
         let original = "  {\"例\":\"📝\"} \n"
-        let editor = DesktopNoteEditor(text: original)
+        let editor = DesktopNoteEditor(text: original, onCancel: {}, onSave: {})
         let window = NSWindow(contentRect: screenFrame, styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
@@ -491,7 +525,18 @@ extension DesktopNoteWindowCoordinatorTests {
 }
 
 @MainActor
-private func desktopNoteMouseEvent(
+func desktopNoteKeyEvent(
+    _ keyCode: Int, characters: String, modifiers: NSEvent.ModifierFlags, for note: NSWindow
+) throws -> NSEvent {
+    try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+        windowNumber: note.windowNumber, context: nil, characters: characters,
+        charactersIgnoringModifiers: characters, isARepeat: false, keyCode: UInt16(keyCode)
+    ))
+}
+
+@MainActor
+func desktopNoteMouseEvent(
     _ type: NSEvent.EventType, at point: NSPoint, for note: NSWindow, clickCount: Int = 1
 ) throws -> NSEvent {
     try XCTUnwrap(NSEvent.mouseEvent(

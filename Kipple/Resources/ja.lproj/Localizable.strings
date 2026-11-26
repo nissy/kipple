@@ -231,6 +231,8 @@
 "Source" = "登録元";
 "Registered" = "初回登録";
 "Content changes are saved as plain text." = "本文を変更すると、書式なしテキストとして保存されます。";
+"Saving will remove formatting. Select Save to continue." = "書式が失われます。続けるには「保存」を選んでください。";
+"Load External Images" = "外部画像を読み込む";
 "Enter a title of up to 120 characters." = "タイトルは120文字以内で入力してください。";
 "Enter some content." = "本文を入力してください。";
 "Another history item already has this content." = "同じ本文を持つ項目が履歴にあります。";

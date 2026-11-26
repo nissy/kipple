@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SwiftUI
 import Textual
 
@@ -11,7 +12,14 @@ struct DesktopNoteContent: View {
     let historyFont = FontManager.shared.historyFont
     var showsBody = true
     var selectionRevision = 0
+    var allowsRemoteImages = false
     var openURL: OpenURLAction?
+
+    var offersRemoteImages: Bool {
+        guard showsBody, displayMode == .markdown, !allowsRemoteImages,
+              let markdown = try? AttributedString(markdown: item.content) else { return false }
+        return markdown.runs.contains { $0.imageURL.map(isRemoteImage) == true }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: HistoryItemPreviewText.spacing) {
@@ -26,7 +34,7 @@ struct DesktopNoteContent: View {
                 ScrollView(.vertical) {
                     document
                         .id(selectionRevision)
-                        .modifier(DesktopNoteTextRegions())
+                        .modifier(DesktopNoteTextRegions(sourceText: displayMode == .plainText ? item.content : nil))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
                         .padding(.bottom, 8)
@@ -71,7 +79,8 @@ struct DesktopNoteContent: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         case .markdown:
-            DesktopNoteMarkdown(source: item.content, font: Font(historyFont))
+            DesktopNoteMarkdown(source: item.content, font: Font(historyFont), allowsRemoteImages: allowsRemoteImages)
+                .id(allowsRemoteImages)
         }
     }
 }
@@ -79,6 +88,7 @@ struct DesktopNoteContent: View {
 private struct DesktopNoteMarkdown: View {
     let source: String
     let font: Font
+    let allowsRemoteImages: Bool
 
     var body: some View {
         StructuredText(markdown: source)
@@ -90,6 +100,8 @@ private struct DesktopNoteMarkdown: View {
             .textual.tableCellStyle(TableCellStyle())
             .textual.overflowMode(.scroll)
             .textual.textSelection(.enabled)
+            .textual.imageAttachmentLoader(DesktopNoteImageLoader(upstream: .image(), allowsRemote: allowsRemoteImages))
+            .textual.emojiAttachmentLoader(DesktopNoteImageLoader(upstream: .emoji(), allowsRemote: allowsRemoteImages))
     }
 
     private struct HeadingStyle: StructuredText.HeadingStyle {
@@ -165,16 +177,40 @@ private struct DesktopNoteMarkdown: View {
     }
 }
 
+struct DesktopNoteImageLoader<Upstream: AttachmentLoader>: AttachmentLoader {
+    let upstream: Upstream
+    let allowsRemote: Bool
+
+    func attachment(for url: URL, text: String, environment: ColorEnvironmentValues) async throws -> some Attachment {
+        guard url.scheme?.lowercased() == "data" || (allowsRemote && isRemoteImage(url)) else {
+            throw URLError(.unsupportedURL)
+        }
+        return try await upstream.attachment(for: url, text: text, environment: environment)
+    }
+}
+
+private func isRemoteImage(_ url: URL) -> Bool {
+    guard let scheme = url.scheme?.lowercased() else { return false }
+    return (scheme == "http" || scheme == "https") && url.host != nil
+}
+
 private struct DesktopNoteTextRegions: ViewModifier {
+    var sourceText: String?
+
     func body(content: Content) -> some View {
         content.overlayPreferenceValue(Text.LayoutKey.self) { layouts in
             GeometryReader { geometry in
-                RegionView(lines: layouts.flatMap { anchored in
-                    let origin = geometry[anchored.origin]
-                    return anchored.layout.map { line in
-                        line.typographicBounds.rect.offsetBy(dx: origin.x, dy: origin.y)
-                    }
-                })
+                RegionView(
+                    lines: layouts.flatMap { anchored in
+                        let origin = geometry[anchored.origin]
+                        return anchored.layout.map { line in
+                            line.typographicBounds.rect.offsetBy(dx: origin.x, dy: origin.y)
+                        }
+                    },
+                    sourceLayout: sourceText != nil && layouts.count == 1 ? layouts.first : nil,
+                    sourceText: sourceText,
+                    sourceOrigin: layouts.first.map { geometry[$0.origin] } ?? .zero
+                )
             }
             .allowsHitTesting(false)
             .accessibilityHidden(true)
@@ -183,16 +219,27 @@ private struct DesktopNoteTextRegions: ViewModifier {
 
     private struct RegionView: NSViewRepresentable {
         let lines: [CGRect]
+        let sourceLayout: Text.LayoutKey.AnchoredLayout?
+        let sourceText: String?
+        let sourceOrigin: CGPoint
 
         func makeNSView(context: Context) -> DesktopNoteTextHitView { DesktopNoteTextHitView() }
 
-        func updateNSView(_ view: DesktopNoteTextHitView, context: Context) { view.lines = lines }
+        func updateNSView(_ view: DesktopNoteTextHitView, context: Context) {
+            view.lines = lines
+            view.sourceLayout = sourceLayout?.layout
+            view.sourceText = sourceText
+            view.sourceOrigin = sourceOrigin
+        }
     }
 }
 
 @MainActor
 final class DesktopNoteTextHitView: NSView {
     var lines: [CGRect] = []
+    var sourceLayout: Text.Layout?
+    var sourceText: String?
+    var sourceOrigin = CGPoint.zero
 
     override var isFlipped: Bool { true }
 
@@ -205,6 +252,39 @@ final class DesktopNoteTextHitView: NSView {
         guard window != nil, !isHiddenOrHasHiddenAncestor else { return false }
         let point = convert(windowPoint, from: nil)
         return visibleRect.contains(point) && lines.contains { $0.contains(point) }
+    }
+
+    func sourceOffset(at windowPoint: NSPoint) -> Int? {
+        let point = convert(windowPoint, from: nil)
+        guard window != nil, !isHiddenOrHasHiddenAncestor, visibleRect.contains(point),
+              let sourceLayout, let sourceText else { return nil }
+        let x = point.x - sourceOrigin.x
+        let y = point.y - sourceOrigin.y
+        let paragraphs = sourceText.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+        var paragraph = 0
+        var start = sourceLayout.first?.flatMap(\.characterIndices).min()
+        var last: Text.Layout.CharacterIndex?
+        for (lineNumber, line) in sourceLayout.enumerated() {
+            let indices = line.flatMap(\.characterIndices)
+            let first = indices.min()
+            // SwiftUI indices restart after a hard line break, but continue across soft wraps.
+            if lineNumber > 0, first.flatMap({ index in last.map { index <= $0 } }) ?? true {
+                paragraph += 1
+                start = first
+            }
+            if (line.typographicBounds.rect.minY...line.typographicBounds.rect.maxY).contains(y) {
+                guard paragraphs.indices.contains(paragraph) else { return nil }
+                let text = paragraphs[paragraph]
+                let glyph = line.flatMap { $0 }.min {
+                    abs($0.typographicBounds.rect.midX - x) < abs($1.typographicBounds.rect.midX - x)
+                }
+                let offset = glyph?.characterIndices.min().flatMap { index in start?.distance(to: index) } ?? 0
+                guard (0...text.utf16.count).contains(offset) else { return nil }
+                return text.startIndex.utf16Offset(in: sourceText) + offset
+            }
+            last = indices.max()
+        }
+        return nil
     }
 }
 
@@ -247,13 +327,21 @@ enum DesktopNoteColor: String, CaseIterable {
 
 @MainActor
 final class DesktopNoteEditor: NSObject {
+    private static let spacing: CGFloat = 3
+    static let actionsHeight = DesktopNoteEditActions.height + spacing
+
     let originalText: String
     let view: NSStackView
     let textView: LiveEditorTextView
+    private let onSave: () -> Void
     private let coordinator: SimpleLineNumberCoordinator
+    private let actionsView: NSHostingView<DesktopNoteEditActions>
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
+    private var asksToSaveAsPlainText = false
 
-    init(text: String) {
+    var isConfirmingPlainTextSave: Bool { asksToSaveAsPlainText && !errorLabel.isHidden }
+
+    init(text: String, onCancel: @escaping () -> Void, onSave: @escaping () -> Void) {
         let editor = SimpleLineNumberView(
             text: .constant(text), font: FontManager.shared.editorFont, isEditable: true,
             onDoubleClick: nil, onEscape: nil, textColor: .textColor, onScrollChange: nil
@@ -262,7 +350,9 @@ final class DesktopNoteEditor: NSObject {
         let (scroll, textView) = editor.makeEditor(using: coordinator)
         originalText = text
         self.textView = textView
+        self.onSave = onSave
         self.coordinator = coordinator
+        actionsView = NSHostingView(rootView: DesktopNoteEditActions(onCancel: onCancel, onSave: onSave))
         scroll.scrollerStyle = .overlay
         textView.setAccessibilityLabel(AppSettings.shared.localizedString("Content"))
 
@@ -272,12 +362,70 @@ final class DesktopNoteEditor: NSObject {
         errorLabel.isHidden = true
         errorLabel.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
         scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        view = NSStackView(views: [scroll, errorLabel])
+        view = NSStackView(views: [scroll, errorLabel, actionsView])
         super.init()
         view.orientation = .vertical
         view.alignment = .width
-        view.spacing = 3
+        view.spacing = Self.spacing
         view.translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    func install(in container: NSView, headingHeight: CGFloat) {
+        let padding = HistoryItemPreviewContent.contentPadding
+        container.addSubview(view)
+        NSLayoutConstraint.activate([
+            view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
+            view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -padding),
+            view.topAnchor.constraint(equalTo: container.topAnchor, constant: padding + headingHeight),
+            view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -DesktopNoteContent.controlsHeight)
+        ])
+    }
+
+    func setSaving(_ isSaving: Bool) {
+        textView.isEditable = !isSaving
+        actionsView.rootView.isSaving = isSaving
+    }
+
+    func focus(at screenPoint: NSPoint, in window: NSWindow, sourceOffset: Int?, scrollProgress: CGFloat) {
+        if sourceOffset == nil, scrollProgress > 0 {
+            // The Markdown preview can reflow or omit syntax, so its coordinates cannot place a source caret.
+            scrollTo(progress: scrollProgress)
+            window.makeFirstResponder(nil)
+            return
+        }
+        window.makeFirstResponder(textView)
+        let point = textView.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
+        let index = sourceOffset ?? textView.characterIndexForInsertion(at: point)
+        let offset = max(0, min(index, (originalText as NSString).length))
+        let range = NSRange(location: offset, length: 0)
+        textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
+    }
+
+    private func scrollTo(progress: CGFloat) {
+        guard let scroll = textView.enclosingScrollView, let container = textView.textContainer else { return }
+        textView.layoutManager?.ensureLayout(for: container)
+        scroll.layoutSubtreeIfNeeded()
+        let clip = scroll.contentView
+        let document = clip.documentRect
+        let offset = document.minY + progress * max(0, document.height - clip.bounds.height)
+        clip.scroll(to: CGPoint(x: clip.bounds.minX, y: offset))
+        scroll.reflectScrolledClipView(clip)
+    }
+
+    func handleShortcut(_ event: NSEvent) -> Bool {
+        switch AppSettings.shared.editorHotkey(for: event) {
+        case .save:
+            onSave()
+        case .clear:
+            clear()
+        case nil:
+            let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+            guard modifiers == .command,
+                  event.keyCode == kVK_Return || event.keyCode == kVK_ANSI_KeypadEnter else { return false }
+            onSave()
+        }
+        return true
     }
 
     func makeToolsMenu() -> NSMenu {
@@ -293,9 +441,17 @@ final class DesktopNoteEditor: NSObject {
     }
 
     func showError(_ message: String) {
+        asksToSaveAsPlainText = false
         errorLabel.stringValue = message
         errorLabel.toolTip = message
         errorLabel.isHidden = false
+    }
+
+    func showSaveError(_ error: Error) {
+        showError(AppSettings.shared.localizedString(clipItemEditErrorMessage(error)))
+        if case .richTextLossRequiresConfirmation = error as? ClipItemEditError {
+            asksToSaveAsPlainText = true
+        }
     }
 
     @discardableResult
@@ -335,5 +491,35 @@ final class DesktopNoteEditor: NSObject {
         textView.breakUndoCoalescing()
         _ = textView.performValidatedReplacement(in: range, with: NSAttributedString(string: text))
         textView.breakUndoCoalescing()
+    }
+}
+
+private struct DesktopNoteEditActions: View {
+    static let height: CGFloat = 28
+
+    let onCancel: () -> Void
+    let onSave: () -> Void
+    var isSaving = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button("Cancel", action: onCancel)
+                .buttonStyle(style(
+                    fill: colorScheme == .dark ? .white.opacity(0.055) : Color(nsColor: .textBackgroundColor),
+                    foreground: .primary,
+                    border: .primary.opacity(0.17)
+                ))
+            Button("Save", action: onSave)
+                .buttonStyle(style(fill: ClipEditorButtonStyle.accent, foreground: .white, border: .clear))
+        }
+        .fixedSize()
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .disabled(isSaving)
+        .environment(\.locale, AppSettings.shared.appLocale)
+    }
+
+    private func style(fill: Color, foreground: Color, border: Color) -> ClipEditorButtonStyle {
+        ClipEditorButtonStyle(fill: fill, foreground: foreground, border: border, horizontalPadding: 8, height: Self.height)
     }
 }

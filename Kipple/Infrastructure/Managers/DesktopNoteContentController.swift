@@ -5,6 +5,9 @@ import SwiftUI
 final class DesktopNoteContentController: NSViewController {
     let hostingController: NSHostingController<DesktopNoteContent>
     var selectionMayExist = false
+    private(set) lazy var remoteImagesButton = makeButton(
+        "photo", labelKey: "Load External Images", target: self, action: #selector(loadRemoteImages)
+    )
 
     init(rootView: DesktopNoteContent) {
         hostingController = NSHostingController(rootView: rootView)
@@ -17,6 +20,26 @@ final class DesktopNoteContentController: NSViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func setContent(_ content: DesktopNoteContent) {
+        hostingController.rootView = content
+        remoteImagesButton.isHidden = !content.offersRemoteImages
+    }
+
+    var previewScrollProgress: CGFloat {
+        guard let clip = scrollViews(in: hostingController.view).first?.contentView else { return 0 }
+        let document = clip.documentRect
+        let travel = document.height - clip.bounds.height
+        guard travel > 0 else { return 0 }
+        return min(1, max(0, (clip.bounds.minY - document.minY) / travel))
+    }
+
+    @objc private func loadRemoteImages() {
+        var content = hostingController.rootView
+        guard content.offersRemoteImages else { return }
+        content.allowsRemoteImages = true
+        setContent(content)
     }
 
     func clearSelection() {
@@ -60,6 +83,18 @@ final class DesktopNoteContentController: NSViewController {
             button.heightAnchor.constraint(equalToConstant: 24)
         ])
         return button
+    }
+
+    func makeColorMenu(selected: DesktopNoteColor, target: AnyObject, action: Selector) -> NSMenu {
+        let menu = NSMenu()
+        for color in DesktopNoteColor.allCases {
+            let title = AppSettings.shared.localizedString(color.rawValue)
+            let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
+            item.target = target
+            item.representedObject = color.rawValue
+            item.state = color == selected ? .on : .off
+        }
+        return menu
     }
 
     override func loadView() {

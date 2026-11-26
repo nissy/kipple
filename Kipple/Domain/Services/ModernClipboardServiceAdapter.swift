@@ -132,8 +132,13 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await refreshHistory()
     }
 
-    func updateDetails(itemID: UUID, title: String?, content: String?, categoryChanges: [UUID: Bool]) async throws {
-        try await modernService.updateDetails(id: itemID, title: title, content: content, categoryChanges: categoryChanges)
+    func updateDetails(
+        itemID: UUID, title: String?, content: String?, categoryChanges: [UUID: Bool], allowsRemovingRichText: Bool = true
+    ) async throws {
+        try await modernService.updateDetails(
+            id: itemID, title: title, content: content, categoryChanges: categoryChanges,
+            allowsRemovingRichText: allowsRemovingRichText
+        )
         await refreshHistory()
     }
 

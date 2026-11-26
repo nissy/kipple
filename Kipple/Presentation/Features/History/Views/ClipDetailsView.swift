@@ -36,7 +36,7 @@ struct ClipDetailsView: View {
     private var canSave: Bool { !isSaving && currentItem != nil && (editingItemID != nil || !content.isEmpty) }
     private var editedTitle: String? { title == (originalItem.title ?? "") ? nil : title }
     private var editedContent: String? { content == originalItem.content ? nil : content }
-    private let accent = Color(red: 0.09, green: 0.40, blue: 0.37)
+    private let accent = ClipEditorButtonStyle.accent
     private let fieldShape = RoundedRectangle(cornerRadius: KippleGlassMetrics.inputCornerRadius)
 
     private var windowSurface: Color {
@@ -314,22 +314,27 @@ func clipItemEditErrorMessage(_ error: Error) -> String {
     case .emptyContent: "Enter some content."
     case .duplicateContent: "Another history item already has this content."
     case .categoryUnavailable: "A selected category is no longer available."
+    case .richTextLossRequiresConfirmation: "Saving will remove formatting. Select Save to continue."
     case nil: "Could not save the item. Please try again."
     }
 }
 
-private struct ClipEditorButtonStyle: ButtonStyle {
+struct ClipEditorButtonStyle: ButtonStyle {
+    static let accent = Color(red: 0.09, green: 0.40, blue: 0.37)
+
     let fill: Color
     let foreground: Color
     let border: Color
+    var horizontalPadding: CGFloat = 12
+    var height: CGFloat = 32
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: KippleGlassMetrics.inputCornerRadius)
         configuration.label
             .font(.callout.weight(.semibold))
-            .padding(.horizontal, 12)
-            .frame(height: 32)
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: height)
             .foregroundStyle(foreground)
             .background(fill, in: shape)
             .overlay(shape.strokeBorder(border).allowsHitTesting(false))

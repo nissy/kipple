@@ -313,31 +313,19 @@ extension MainView {
                 keyDownMonitor = nil
             }
             keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                if event.window is ClipItemEditorWindow || isCategoryPopoverPresented { return event }
-                let eventModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let saveModifiers = NSEvent.ModifierFlags(
-                    rawValue: UInt(appSettings.editorCopyHotkeyModifierFlags)
-                )
-                    .intersection(.deviceIndependentFlagsMask)
-                let clearModifiers = NSEvent.ModifierFlags(
-                    rawValue: UInt(appSettings.editorClearHotkeyModifierFlags)
-                )
-                    .intersection(.deviceIndependentFlagsMask)
-
-                // Editor Save Hotkey (always enabled)
-                if appSettings.editorCopyHotkeyKeyCode > 0,
-                   event.keyCode == UInt16(appSettings.editorCopyHotkeyKeyCode),
-                   eventModifiers == saveModifiers {
+                let window = event.window ?? NSApp.keyWindow
+                if window is ClipItemEditorWindow || window is DesktopNotePanel || isCategoryPopoverPresented {
+                    return event
+                }
+                switch appSettings.editorHotkey(for: event) {
+                case .save:
                     if !viewModel.isQueueModeActive { saveEditorToHistory() }
                     return nil
-                }
-
-                // Editor Clear Hotkey (always enabled)
-                if appSettings.editorClearHotkeyKeyCode > 0,
-                   event.keyCode == UInt16(appSettings.editorClearHotkeyKeyCode),
-                   eventModifiers == clearModifiers {
+                case .clear:
                     if !viewModel.isQueueModeActive { clearAction() }
                     return nil
+                case nil:
+                    break
                 }
 
                 // Enter キーでアクションを実行

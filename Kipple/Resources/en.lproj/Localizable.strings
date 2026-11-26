@@ -231,6 +231,8 @@
 "Source" = "Source";
 "Registered" = "Registered";
 "Content changes are saved as plain text." = "Content changes are saved as plain text.";
+"Saving will remove formatting. Select Save to continue." = "Saving removes formatting. Choose Save to confirm.";
+"Load External Images" = "Load External Images";
 "Enter a title of up to 120 characters." = "Enter a title of up to 120 characters.";
 "Enter some content." = "Enter some content.";
 "Another history item already has this content." = "Another history item already has this content.";

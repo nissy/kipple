@@ -78,6 +78,30 @@ final class AppSettings: ObservableObject {
     @AppStorage("editorClearHotkeyKeyCode") var editorClearHotkeyKeyCode: Int = 37  // L key
     @AppStorage("editorClearHotkeyModifierFlags") var editorClearHotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
+
+    enum EditorHotkey {
+        case save
+        case clear
+    }
+
+    func editorHotkey(for event: NSEvent) -> EditorHotkey? {
+        let mask: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        let modifiers = event.modifierFlags.intersection(mask)
+
+        func matches(keyCode: Int, modifierFlags: Int) -> Bool {
+            guard keyCode == Int(event.keyCode), let rawModifiers = UInt(exactly: modifierFlags) else { return false }
+            let configuredModifiers = NSEvent.ModifierFlags(rawValue: rawModifiers).intersection(mask)
+            return (keyCode != 0 || !configuredModifiers.isEmpty) && modifiers == configuredModifiers
+        }
+
+        if matches(keyCode: editorCopyHotkeyKeyCode, modifierFlags: editorCopyHotkeyModifierFlags) {
+            return .save
+        }
+        if matches(keyCode: editorClearHotkeyKeyCode, modifierFlags: editorClearHotkeyModifierFlags) {
+            return .clear
+        }
+        return nil
+    }
     
     // Launch Settings
     
