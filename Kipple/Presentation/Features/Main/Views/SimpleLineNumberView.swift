@@ -40,14 +40,16 @@ struct SimpleLineNumberView: NSViewRepresentable {
     }
     
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = makeScrollView()
-        
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return scrollView
-        }
+        makeEditor(using: context.coordinator).scrollView
+    }
+
+    func makeEditor(using coordinator: Coordinator) -> (scrollView: NSScrollView, textView: LiveEditorTextView) {
+        let scrollView = NSScrollView()
+        let textView = makeTextView(width: scrollView.contentSize.width)
+        scrollView.documentView = textView
         
         // テキストビューの設定（テキスト以外の基本設定）
-        setupTextView(textView, context: context)
+        setupTextView(textView, coordinator: coordinator)
         
         // 段落スタイルの設定
         let lineHeight = calculateFixedLineHeight(for: font)
@@ -55,7 +57,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         setupParagraphStyle(textView: textView, paragraphStyle: paragraphStyle)
         
         // Coordinatorに固定行高を保存
-        context.coordinator.fixedLineHeight = lineHeight
+        coordinator.fixedLineHeight = lineHeight
         
         // テキストを設定
         textView.string = text
@@ -76,32 +78,28 @@ struct SimpleLineNumberView: NSViewRepresentable {
         scrollView.rulersVisible = true
         
         // 参照を保存
-        context.coordinator.textView = textView
-        context.coordinator.scrollView = scrollView
-        context.coordinator.paragraphStyle = paragraphStyle
-        context.coordinator.setupNotifications()
+        coordinator.textView = textView
+        coordinator.scrollView = scrollView
+        coordinator.paragraphStyle = paragraphStyle
+        coordinator.setupNotifications()
         
-        return scrollView
+        return (scrollView, textView)
     }
 
-    private func makeScrollView() -> NSScrollView {
-        let scrollView = NSScrollView()
+    private func makeTextView(width: CGFloat) -> LiveEditorTextView {
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
         let textContainer = NSTextContainer(
-            containerSize: NSSize(width: scrollView.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+            containerSize: NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
         )
 
         textStorage.addLayoutManager(layoutManager)
         layoutManager.addTextContainer(textContainer)
 
-        let textView = LiveEditorTextView(
+        return LiveEditorTextView(
             frame: NSRect(origin: .zero, size: NSSize(width: 100, height: 100)),
             textContainer: textContainer
         )
-
-        scrollView.documentView = textView
-        return scrollView
     }
     
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
@@ -173,7 +171,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         if !textView.hasMarkedText() && textView.string != text {
             // 属性付き文字列として設定（1文字目に依存しないように）
             let attributedString = NSMutableAttributedString(string: text)
-            let fullRange = NSRange(location: 0, length: text.count)
+            let fullRange = NSRange(location: 0, length: attributedString.length)
             attributedString.addAttribute(.font, value: font, range: fullRange)
             attributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: fullRange)
             attributedString.addAttribute(.foregroundColor, value: editorTextColor, range: fullRange)
@@ -193,8 +191,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
         }
     }
     
-    private func setupTextView(_ textView: NSTextView, context: Context) {
-        textView.delegate = context.coordinator
+    private func setupTextView(_ textView: LiveEditorTextView, coordinator: Coordinator) {
+        textView.delegate = coordinator
         textView.font = font
         // テキストの設定は段落スタイル適用後に移動
         textView.isEditable = isEditable
@@ -217,7 +215,7 @@ struct SimpleLineNumberView: NSViewRepresentable {
         
         // カスタムレイアウトマネージャーを設定
         if let layoutManager = textView.layoutManager {
-            layoutManager.delegate = context.coordinator
+            layoutManager.delegate = coordinator
             // タイポグラフィの動作を無効化して、固定行高を保証
             layoutManager.usesDefaultHyphenation = false
             layoutManager.typesetterBehavior = .latestBehavior
@@ -244,10 +242,8 @@ struct SimpleLineNumberView: NSViewRepresentable {
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.autoresizingMask = .width
 
-        if let liveTextView = textView as? LiveEditorTextView {
-            liveTextView.onDisplayModeDoubleClick = onDoubleClick
-            liveTextView.onEscape = onEscape
-        }
+        textView.onDisplayModeDoubleClick = onDoubleClick
+        textView.onEscape = onEscape
     }
 
     private func applyEditorBackground(to scrollView: NSScrollView, textView: NSTextView) {

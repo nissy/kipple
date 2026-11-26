@@ -181,12 +181,12 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     // アクション可能かどうか（テキストかつURIスキーム判定のみ）
     var isActionable: Bool {
-        resolveURISchemeURL() != nil
+        Self.resolveURISchemeURL(content) != nil
     }
     
     // アクションタイトル
     var actionTitle: String? {
-        if let scheme = resolveURISchemeURL()?.scheme?.uppercased() {
+        if let scheme = Self.resolveURISchemeURL(content)?.scheme?.uppercased() {
             return String(
                 format: NSLocalizedString(
                     "Open %@",
@@ -200,13 +200,13 @@ struct ClipItem: Identifiable, Codable, Equatable {
     
     // アクションを実行（URIスキームのみ）
     func performAction() {
-        guard let uri = resolveURISchemeURL() else { return }
+        guard let uri = Self.resolveURISchemeURL(content) else { return }
         NSWorkspace.shared.open(uri)
     }
 
     // 最初に解釈可能なURIスキームURLを返す（mailto自動付与はしない）
-    private func resolveURISchemeURL() -> URL? {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func resolveURISchemeURL(_ value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
         // スキーム付きのみ判定（先頭にスキームがないものは対象外）

@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Combine
 
 // MARK: - Modern Clipboard Service Adapter
 
@@ -132,8 +133,13 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         await refreshHistory()
     }
 
-    func updateDetails(itemID: UUID, title: String?, content: String?, categoryChanges: [UUID: Bool]) async throws {
-        try await modernService.updateDetails(id: itemID, title: title, content: content, categoryChanges: categoryChanges)
+    func updateDetails(
+        itemID: UUID, title: String?, content: String?, categoryChanges: [UUID: Bool], allowsRemovingRichText: Bool = true
+    ) async throws {
+        try await modernService.updateDetails(
+            id: itemID, title: title, content: content, categoryChanges: categoryChanges,
+            allowsRemovingRichText: allowsRemovingRichText
+        )
         await refreshHistory()
     }
 
@@ -155,11 +161,11 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func recopyFromHistory(_ item: ClipItem) {
-        prepareForRecopy(of: item)
-        enqueueClipboardOperation { [self] generation in
-            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
-            await refreshHistory()
-        }
+        enqueueRecopy(item)
+    }
+
+    func recopyFromHistory(_ item: ClipItem, onSuccess: @escaping () -> Void) {
+        enqueueRecopy(item, onSuccess: onSuccess)
     }
 
     func clearSystemClipboard() async {
@@ -181,6 +187,24 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     func deleteItem(_ item: ClipItem) async {
         await modernService.deleteItem(item)
         await refreshHistory()
+    }
+
+    func protectHistoryForDesktopNote(_ itemID: UUID) async -> ClipItem? {
+        await modernService.protectHistoryForDesktopNote(itemID)
+    }
+
+    var repeatedCopyDesktopNoteRequests: AnyPublisher<UUID, Never> {
+        NotificationCenter.default.publisher(for: .desktopNoteRequestedByRepeatedCopy, object: modernService)
+            .compactMap { $0.userInfo?["itemID"] as? UUID }
+            .eraseToAnyPublisher()
+    }
+
+    func desktopNoteItemsToRestore(_ ids: Set<UUID>) async -> [ClipItem]? {
+        await modernService.desktopNoteItemsToRestore(ids)
+    }
+
+    func removeDesktopNoteProtection(_ itemID: UUID) async {
+        await modernService.removeDesktopNoteProtection(itemID)
     }
 
     @discardableResult
@@ -341,11 +365,17 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
 extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     func recopyFromHistoryAndWait(_ item: ClipItem) async {
+        await enqueueRecopy(item).value
+    }
+
+    @discardableResult
+    private func enqueueRecopy(_ item: ClipItem, onSuccess: (() -> Void)? = nil) -> Task<Void, Never> {
         prepareForRecopy(of: item)
-        await enqueueClipboardOperation { [self] generation in
-            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
+        return enqueueClipboardOperation { [self] generation in
+            let copied = await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
+            if copied, isCurrentOperation(generation), !Task.isCancelled { onSuccess?() }
             await refreshHistory()
-        }.value
+        }
     }
 
     /// pasteboard 書き込みのみ待機する軽量版。history 再同期は後段で finalizeRecopyRefresh() を呼ぶこと

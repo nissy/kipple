@@ -92,7 +92,7 @@ struct DataSettingsView: View {
                 SettingsGroup("Data Management") {
                     SettingsRow(
                         label: "Clear history",
-                        description: "Items in custom categories stay."
+                        description: "Items in custom categories or posted as desktop notes stay."
                     ) {
                         Button(action: {
                             showClearHistoryAlert = true

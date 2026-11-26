@@ -84,6 +84,13 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         return models.map { $0.toClipItem() }
     }
 
+    func load(ids: Set<UUID>) async throws -> [ClipItem] {
+        guard !ids.isEmpty else { return [] }
+        let itemIDs = Array(ids)
+        let descriptor = FetchDescriptor<ClipItemModel>(predicate: #Predicate { itemIDs.contains($0.id) })
+        return try makeContext().fetch(descriptor).map { $0.toClipItem() }
+    }
+
     func loadItemIDs() async throws -> Set<UUID> {
         try fetchIDs(makeContext())
     }

@@ -58,6 +58,7 @@ final class SettingsViewModel: ObservableObject {
         case general
         case editor
         case clipboard
+        case desktopNotes
         case permission
         case ai
 
@@ -66,6 +67,7 @@ final class SettingsViewModel: ObservableObject {
             case .general: return "General"
             case .editor: return "Editor"
             case .clipboard: return "Clipboard"
+            case .desktopNotes: return "Desktop Notes"
             case .permission: return "Permission"
             case .ai: return "AI Integration"
             }
@@ -79,6 +81,7 @@ final class SettingsViewModel: ObservableObject {
             case .general: return "gear"
             case .editor: return "pencil"
             case .clipboard: return "doc.on.clipboard"
+            case .desktopNotes: return "note.text"
             case .permission: return "lock.shield"
             case .ai: return "sparkles"
             }

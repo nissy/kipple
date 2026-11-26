@@ -484,7 +484,7 @@ appstore-archive: generate ## Create xcarchive for Mac App Store submission
 		CODE_SIGN_IDENTITY="$(APPLE_DISTRIBUTION_IDENTITY)" \
 		OTHER_CODE_SIGN_FLAGS="--timestamp --options=runtime" \
 		CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
+		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS) -D KIPPLE_APP_STORE' \
 		archive
 	@echo "$(GREEN)Archive created at: $(APPSTORE_ARCHIVE_PATH)$(NC)"
 	$(MAKE) check-release-macos-version RELEASE_APP="$(APPSTORE_ARCHIVE_PATH)/Products/Applications/$(PROJECT_NAME).app"

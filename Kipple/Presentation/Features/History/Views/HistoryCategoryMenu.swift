@@ -15,6 +15,7 @@ struct HistoryCategoryMenu: View {
     let isSelected: Bool
     let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
+    var showsTitle = false
     @ObservedObject private var store = UserCategoryStore.shared
     @Environment(\.categoryPopoverChanged) private var presentationChanged
     @State private var isPresented = false
@@ -27,26 +28,32 @@ struct HistoryCategoryMenu: View {
             presentationChanged(item.id, true)
             isPresented = true
         } label: {
-            Image(systemName: store.iconName(for: categories))
-                .font(.system(size: 12, weight: .medium))
-                .overlay(alignment: .bottomTrailing) {
-                    if categories.count > 1 {
-                        let countLabel = Text("\(categories.count)")
-                            .font(.system(size: 8, weight: .bold))
-                            .fixedSize()
-                        if categories.count < 10 {
-                            countLabel.frame(width: 0, alignment: .leading)
-                                .offset(x: 1, y: 2)
-                        } else {
-                            countLabel.offset(y: 8)
+            HStack(spacing: 4) {
+                Image(systemName: store.iconName(for: categories))
+                    .font(.system(size: 12, weight: .medium))
+                    .overlay(alignment: .bottomTrailing) {
+                        if categories.count > 1 {
+                            let countLabel = Text("\(categories.count)")
+                                .font(.system(size: 8, weight: .bold))
+                                .fixedSize()
+                            if categories.count < 10 {
+                                countLabel.frame(width: 0, alignment: .leading).offset(x: 1, y: 2)
+                            } else {
+                                countLabel.offset(y: 8)
+                            }
                         }
                     }
+                    .frame(
+                        width: showsTitle ? 20 : MainViewMetrics.HistoryColumns.rowCategoryWidth,
+                        height: MainViewMetrics.HistoryColumns.controlColumnWidth
+                    )
+                if showsTitle {
+                    Text("Categories")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.primary)
+                        .fixedSize()
                 }
-                .frame(
-                    width: MainViewMetrics.HistoryColumns.rowCategoryWidth,
-                    height: MainViewMetrics.HistoryColumns.controlColumnWidth,
-                    alignment: .center
-                )
+            }
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? .primary : .secondary)

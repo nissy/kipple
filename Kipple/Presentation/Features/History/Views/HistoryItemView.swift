@@ -16,7 +16,6 @@ struct HistoryItemView: View {
     let isQueuePreviewed: Bool
     let isScrollLocked: Bool
     let onTap: () -> Void
-    let onEdit: () -> Void
     let onQueueDrag: ((CGSize) -> Void)?
     let onQueueLongPress: (() -> Void)?
     let onDelete: (() -> Void)?
@@ -31,7 +30,9 @@ struct HistoryItemView: View {
     private let displayContent: String
 
     @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
+    @ObservedObject private var desktopNotes = DesktopNoteWindowCoordinator.shared
     @Environment(\.categoryPopoverChanged) private var presentationChanged
+    @Environment(\.openHistoryItemEditor) private var openHistoryItemEditor
     @State private var isEditingCategories = false
     @State private var isHovered = false
     @State private var popoverTask: DispatchWorkItem?
@@ -48,7 +49,6 @@ struct HistoryItemView: View {
         isQueuePreviewed: Bool,
         isScrollLocked: Bool,
         onTap: @escaping () -> Void,
-        onEdit: @escaping () -> Void,
         onQueueDrag: ((CGSize) -> Void)? = nil,
         onQueueLongPress: (() -> Void)? = nil,
         onDelete: (() -> Void)?,
@@ -67,7 +67,6 @@ struct HistoryItemView: View {
         self.isQueuePreviewed = isQueuePreviewed
         self.isScrollLocked = isScrollLocked
         self.onTap = onTap
-        self.onEdit = onEdit
         self.onQueueDrag = onQueueDrag
         self.onQueueLongPress = onQueueLongPress
         self.onDelete = onDelete
@@ -88,7 +87,9 @@ struct HistoryItemView: View {
             handleHoverChange(hovering, anchor: anchor)
         }, isScrollLocked: isScrollLocked)
         .onDisappear {
-            HistoryPopoverManager.shared.hide()
+            if let anchor = currentAnchorView {
+                HistoryPopoverManager.shared.hide(ifAnchoredTo: anchor)
+            }
             currentAnchorView = nil
             hoverCoordinator.clearHover(ifMatches: item.id)
         }
@@ -117,11 +118,11 @@ struct HistoryItemView: View {
             let shouldHover = hoveredID == item.id
             if isHovered != shouldHover {
                 isHovered = shouldHover
-                if shouldHover, !isScrollLocked, let anchor = currentAnchorView {
-                    schedulePopoverPresentation(anchor: anchor)
-                } else {
+                if !shouldHover {
                     cancelPopoverTask()
-                    HistoryPopoverManager.shared.scheduleHide()
+                    if let anchor = currentAnchorView {
+                        HistoryPopoverManager.shared.scheduleHide(ifAnchoredTo: anchor)
+                    }
                 }
             }
         }
@@ -137,8 +138,8 @@ struct HistoryItemView: View {
                 queueBadgeView
             } content: {
                 historyText
-            } delete: {
-                deleteButton
+            } pin: {
+                desktopNoteButton
             } category: {
                 categoryMenuView
             }
@@ -268,37 +269,29 @@ struct HistoryItemView: View {
             .fixedSize(horizontal: true, vertical: false)
     }
 
-    @ViewBuilder
-    private var deleteButton: some View {
-        if let onDelete {
-            ZStack {
-                if isHoverActive && !item.hasCustomCategory {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(KippleButtonAppearance.inactiveForeground)
-                        .frame(
-                            width: MainViewMetrics.HistoryColumns.rowControlSize,
-                            height: MainViewMetrics.HistoryColumns.rowControlSize
-                        )
-                        .contentShape(Circle())
-                        .help(deleteHelpText)
-                        .onTapGesture {
-                            closePopover()
-                            onDelete()
-                        }
-                        .transition(.opacity.animation(.easeInOut(duration: 0.15)))
-                }
-            }
-            .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth,
-                   height: MainViewMetrics.HistoryColumns.controlColumnWidth)
-        }
-    }
+    private var desktopNoteButton: some View {
+        let isPosted = desktopNotes.isPosted(item.id)
+        let label = Text(LocalizedStringKey(isPosted ? "Remove Desktop Note" : "Post to Desktop"))
 
-    private var deleteHelpText: String {
-        AppSettings.shared.localizedString(
-            "Delete item",
-            comment: "Tooltip for deleting a history item"
-        )
+        return Button {
+            closePopover()
+            let screen = currentAnchorView?.window?.screen
+            Task { await desktopNotes.toggle(item.id, on: screen) }
+        } label: {
+            Image(systemName: isPosted ? "pin.fill" : "pin")
+                .font(MainViewMetrics.HistoryFilterIcon.defaultFont)
+                .foregroundStyle(KippleButtonAppearance.foreground(isActive: isPosted))
+                .rotationEffect(.degrees(isPosted ? 0 : -45))
+                .frame(width: MainViewMetrics.HistoryColumns.rowControlSize,
+                       height: MainViewMetrics.HistoryColumns.rowControlSize)
+                .background(KippleButtonAppearance.compactFill(isActive: isPosted), in: Circle())
+                .frame(width: MainViewMetrics.HistoryColumns.controlColumnWidth,
+                       height: MainViewMetrics.HistoryColumns.controlColumnWidth)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     static func makeDisplayContent(from content: String) -> String {
@@ -308,22 +301,7 @@ struct HistoryItemView: View {
         return content
     }
 
-    private func evaluateWindowPosition() -> Bool {
-        guard let mainWindow = NSApp.windows.first(where: { window in
-            window.isVisible && window.contentViewController != nil
-        }) else {
-            return true
-        }
-
-        guard let currentScreen = mainWindow.screen ?? NSScreen.main else {
-            return true
-        }
-
-        let screenCenter = currentScreen.frame.midX
-        return mainWindow.frame.midX < screenCenter
-    }
-
-    private func schedulePopoverPresentation(anchor: NSView) {
+    private func schedulePopoverPresentation(anchor: NSView, after delay: TimeInterval = 0.3) {
         guard !isEditingCategories else { return }
         cancelPopoverTask()
         let workItem = DispatchWorkItem {
@@ -333,7 +311,7 @@ struct HistoryItemView: View {
             }
         }
         popoverTask = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     private func cancelPopoverTask() {
@@ -386,9 +364,12 @@ private extension HistoryItemView {
 
     @ViewBuilder
     var contextMenuContent: some View {
-        Button("Edit Item") { closePopover(); onEdit() }
-        Divider()
+        Button("Edit Item") {
+            closePopover()
+            openHistoryItemEditor(item)
+        }
         if let onOpenItem, item.isActionable {
+            Divider()
             Button {
                 closePopover()
                 onOpenItem()
@@ -396,11 +377,8 @@ private extension HistoryItemView {
                 Label(openMenuTitle, systemImage: "arrow.up.right.square")
             }
         }
-        if onSplitEditorIntoHistory != nil,
-           item.isActionable && onOpenItem != nil {
-            Divider()
-        }
         if let onSplitEditorIntoHistory {
+            Divider()
             Button {
                 closePopover()
                 onSplitEditorIntoHistory(item)
@@ -412,6 +390,13 @@ private extension HistoryItemView {
                 }
             }
         }
+        if let onDelete, !item.hasCustomCategory, !desktopNotes.isPosted(item.id) {
+            Divider()
+            Button("Delete from History", role: .destructive) {
+                closePopover()
+                onDelete()
+            }
+        }
     }
 
     var linkColor: Color { Color(NSColor.linkColor) }
@@ -420,19 +405,20 @@ private extension HistoryItemView {
         if isScrollLocked {
             hoverCoordinator.clearHover(ifMatches: item.id)
             cancelPopoverTask()
-            HistoryPopoverManager.shared.scheduleHide()
+            HistoryPopoverManager.shared.scheduleHide(ifAnchoredTo: anchor)
             return
         }
 
         if hovering {
+            let switchedRow = HistoryPopoverManager.shared.prepareForRowHover(anchor)
             hoverCoordinator.setHovered(itemID: item.id)
-            if windowPosition == nil {
-                windowPosition = evaluateWindowPosition()
+            if let window = anchor.window, let screen = window.screen {
+                windowPosition = window.frame.midX < screen.frame.midX
             }
-            schedulePopoverPresentation(anchor: anchor)
+            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.25 : 0.3)
         } else {
+            cancelPopoverTask()
             hoverCoordinator.clearHover(ifMatches: item.id)
-            HistoryPopoverManager.shared.scheduleHide()
         }
     }
 

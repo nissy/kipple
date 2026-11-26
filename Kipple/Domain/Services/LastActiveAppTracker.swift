@@ -21,7 +21,21 @@ final class LastActiveAppTracker {
         let bundleId: String?
         let pid: Int32
     }
+
+    static func singleVisibleWindowTitle(for pid: Int32) -> String? {
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        let matching = windows.filter {
+            $0[kCGWindowOwnerPID as String] as? Int32 == pid && $0[kCGWindowLayer as String] as? Int == 0
+        }
+        guard matching.count == 1,
+              let title = matching[0][kCGWindowName as String] as? String,
+              !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return title
+    }
+
     private var lastActiveNonKippleApp: AppInfo?
+    private var clipboardActivation: (processID: pid_t, changeCount: Int)?
     private nonisolated(unsafe) var observer: Any?
 
     // MARK: - Initialization
@@ -46,6 +60,9 @@ final class LastActiveAppTracker {
 
         // Initialize with current state
         updateFromCurrentApp()
+        clipboardActivation = NSWorkspace.shared.frontmostApplication.map {
+            ($0.processIdentifier, NSPasteboard.general.changeCount)
+        }
 
         // Observe app activation
         let workspace = NSWorkspace.shared
@@ -58,9 +75,9 @@ final class LastActiveAppTracker {
         ) { [weak self] notification in
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
 
-            Task { @MainActor [weak self, weak app] in
-                guard let self = self, let app else { return }
-
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.clipboardActivation = (app.processIdentifier, NSPasteboard.general.changeCount)
                 // If it's not Kipple, store it as last active app
                 if app.bundleIdentifier != Bundle.main.bundleIdentifier {
                     self.lastActiveNonKippleApp = AppInfo(
@@ -76,10 +93,20 @@ final class LastActiveAppTracker {
     }
 
     func stopTracking() {
+        clipboardActivation = nil
         if let observer = observer {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             self.observer = nil
         }
+    }
+
+    func foregroundApp(forClipboardChange changeCount: Int) -> NSRunningApplication? {
+        // A clipboard revision already present at activation may belong to the previous app.
+        guard let activation = clipboardActivation,
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier == activation.processID,
+              changeCount > activation.changeCount else { return nil }
+        return app
     }
 
     func getSourceAppInfo() -> AppInfo {

@@ -27,6 +27,7 @@ final class SimpleLineNumberRulerView: NSRulerView {
         ruleThickness = 28
         clientView = textView
         wantsLayer = true
+        clipsToBounds = true
         layer?.backgroundColor = NSColor.clear.cgColor
     }
 

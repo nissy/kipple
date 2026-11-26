@@ -77,8 +77,9 @@ final class WindowSheetBehaviorTests: XCTestCase {
         let window = manager.openItemEditor(item)
         defer { window.close() }
         let visibleFrame = try XCTUnwrap((mainWindow.screen ?? NSScreen.main)?.visibleFrame)
-        XCTAssertEqual(window.frame.width, min(460, visibleFrame.width), accuracy: 1)
-        XCTAssertEqual(window.frame.height, min(ClipItemEditorWindow.initialContentSize.height, visibleFrame.height), accuracy: 1)
+        let initialSize = ClipItemEditorWindow.initialContentSize(for: .item(item.id))
+        XCTAssertEqual(window.frame.width, min(initialSize.width, visibleFrame.width), accuracy: 1)
+        XCTAssertEqual(window.frame.height, min(initialSize.height, visibleFrame.height), accuracy: 1)
         XCTAssertEqual(window.frame.midX, visibleFrame.midX, accuracy: 1)
         XCTAssertEqual(window.frame.midY, visibleFrame.midY, accuracy: 1)
         XCTAssertTrue(visibleFrame.insetBy(dx: -1, dy: -1).contains(window.frame))
@@ -130,6 +131,27 @@ final class WindowSheetBehaviorTests: XCTestCase {
         let viewport = try XCTUnwrap(editor.enclosingScrollView?.contentSize)
         let lineHeight = try XCTUnwrap(editor.defaultParagraphStyle?.minimumLineHeight)
         XCTAssertEqual(viewport.height - editor.textContainerInset.height * 2, lineHeight * 10, accuracy: 1)
+    }
+
+    func testMinimumItemEditorKeepsBodyHeightAndLeavesSpaceForActions() async throws {
+        let manager = WindowManager()
+        let window = manager.openItemEditor()
+        defer { window.close() }
+        window.setContentSize(window.contentMinSize)
+        await Task.yield()
+        window.displayIfNeeded()
+
+        let root = try XCTUnwrap(window.contentView)
+        let editor = try XCTUnwrap(findEditor(in: root))
+        let editorScroll = try XCTUnwrap(editor.enclosingScrollView)
+        let formScroll = try XCTUnwrap(editorScroll.superview?.enclosingScrollView)
+        let lineHeight = try XCTUnwrap(editor.defaultParagraphStyle?.minimumLineHeight)
+        XCTAssertEqual(editorScroll.contentSize.height - editor.textContainerInset.height * 2, lineHeight * 10, accuracy: 1)
+        XCTAssertGreaterThan(formScroll.documentView?.bounds.height ?? 0, formScroll.contentSize.height)
+
+        let form = formScroll.convert(formScroll.bounds, to: root)
+        let spaceBelow = root.isFlipped ? root.bounds.maxY - form.maxY : form.minY - root.bounds.minY
+        XCTAssertGreaterThanOrEqual(spaceBelow, 32)
     }
 
     func testEscapeKeepsHistoryDraftOpenWhileBodyHasMarkedText() async throws {

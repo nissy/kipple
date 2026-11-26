@@ -6,6 +6,7 @@ import Combine
 
 extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
+    static let desktopNoteRequestedByRepeatedCopy = Notification.Name("DesktopNoteRequestedByRepeatedCopy")
 }
 
 enum ClipItemEditError: Error {
@@ -14,11 +15,19 @@ enum ClipItemEditError: Error {
     case emptyContent
     case duplicateContent
     case categoryUnavailable
+    case richTextLossRequiresConfirmation
 }
 
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
+    private struct RepeatedCopySequence {
+        let content: String
+        let firstCopiedAt: ContinuousClock.Instant
+        let settingRevision: UInt64
+        var count = 1
+    }
+
     struct QueueHeadChange {
         let revision: UInt64
         let itemID: UUID?
@@ -53,6 +62,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var isMonitoringFlag = false
     private var categoryStore: UserCategoryStore?
     private var definedCustomCategoryIDs: Set<UUID>?
+    private var desktopNoteItemIDs: Set<UUID> = []
+    private var repeatedCopySequence: RepeatedCopySequence?
 
     // Repository for persistence
     private var repository: ClipboardRepositoryProtocol?
@@ -74,6 +85,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         testRepository: ClipboardRepositoryProtocol,
         loadOnStartup: Bool = false,
         categoryStore: UserCategoryStore? = nil,
+        desktopNoteItemIDs: Set<UUID> = [],
         clipboardWriter: @escaping @MainActor @Sendable (ClipItem) -> Int = writeSystemClipboard,
         clipboardReader: ClipboardReader? = nil
     ) {
@@ -81,6 +93,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         self.clipboardWriter = clipboardWriter
         self.clipboardReader = clipboardReader
         self.categoryStore = categoryStore
+        self.desktopNoteItemIDs = desktopNoteItemIDs
         repository = testRepository
         isRepositoryReady = !loadOnStartup
         if loadOnStartup {
@@ -94,6 +107,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         mutationGate = AsyncMutationGate(initiallyOccupied: true)
         clipboardWriter = Self.writeSystemClipboard
         clipboardReader = nil
+        desktopNoteItemIDs = Set(DesktopNotePlacement.load(from: .standard).keys)
         Task { await initializeService(categoryStore: UserCategoryStore.shared) }
     }
 
@@ -152,7 +166,13 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 definedCustomCategoryIDs = Set(await categoryStore.userDefined().map(\.id))
             }
             let categorizedItems = try await repository.loadCategorized()
-            history = categorizedItems.map(withDefinedCategories).filter(\.hasCustomCategory)
+            let liveNoteItems = previousHistory.filter { desktopNoteItemIDs.contains($0.id) }
+            let storedNoteItems = try await repository.load(ids: desktopNoteItemIDs.subtracting(liveNoteItems.map(\.id)))
+            let desktopNoteItems = storedNoteItems + liveNoteItems
+            let protectedByID = Dictionary((categorizedItems + desktopNoteItems).map { ($0.id, $0) }) { _, latest in latest }
+            history = protectedByID.values.map(withDefinedCategories)
+                .filter(isProtectedFromHistoryRemoval)
+                .sorted { $0.timestamp > $1.timestamp }
 
             if !history.isEmpty {
                 rebuildContentLookup()
@@ -162,12 +182,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             let fetchLimit = max(0, maxHistoryItems) + history.count + 10
             let recentItems = try await repository.load(limit: fetchLimit)
-            let combinedByID = Dictionary((categorizedItems + recentItems).map { ($0.id, $0) }) { _, latest in
+            let loadedByID = Dictionary((categorizedItems + storedNoteItems + recentItems).map { ($0.id, $0) }) { _, latest in
                 latest
             }
-            let combinedItems = combinedByID.values.sorted {
-                $0.timestamp > $1.timestamp
-            }
+            let combinedByID = loadedByID.merging(desktopNoteItems.map { ($0.id, $0) }) { _, current in current }
+            let combinedItems = combinedByID.values.sorted { $0.timestamp > $1.timestamp }
 
             history = combinedItems.map(withDefinedCategories)
             let wasTrimmed = trimHistory()
@@ -177,13 +196,11 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             let filledLoadWindow = recentItems.count == fetchLimit
             if wasTrimmed || filledLoadWindow {
                 let storedIDs = filledLoadWindow ? try await repository.loadItemIDs() : Set(combinedByID.keys)
-                let retainedIDs = Set(history.map(\.id))
-                let removedIDs = storedIDs.subtracting(retainedIDs)
-                if !removedIDs.isEmpty {
-                    try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
-                }
+                try await removeTrimmedItems(storedIDs, from: repository)
             }
-            persistedSnapshot = Dictionary(uniqueKeysWithValues: history.map { ($0.id, combinedByID[$0.id] ?? $0) })
+            persistedSnapshot = history.reduce(into: [:]) { snapshot, item in
+                snapshot[item.id] = loadedByID[item.id] ?? persistedSnapshot[item.id]
+            }
             isRepositoryReady = true
             notifyHistoryObservers()
         } catch {
@@ -193,6 +210,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             notifyHistoryObservers()
             Logger.shared.error("Failed to load history: \(error)")
         }
+    }
+
+    private func removeTrimmedItems(_ storedIDs: Set<UUID>, from repository: ClipboardRepositoryProtocol) async throws {
+        let removedIDs = storedIDs.subtracting(history.map(\.id))
+        guard !removedIDs.isEmpty else { return }
+        try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
     }
 
     private func withDefinedCategories(_ item: ClipItem) -> ClipItem {
@@ -257,6 +280,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         isMonitoringFlag = false
         pollingTask?.cancel()
         pollingTask = nil
+        repeatedCopySequence = nil
 
         // Stop app switching observation
         await stopAppSwitchObserver()
@@ -305,23 +329,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await state.setInternalCopy(true)
         await state.setFromEditor(fromEditor)
 
-        // Get app info for metadata
-        let appInfo = await MainActor.run {
-            getActiveAppInfo()
-        }
-
-        // Add to history immediately with metadata
         let monitoringState = isMonitoringFlag
-        let metadata = fromEditor ? appInfo : await MainActor.run { sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState) }
+        let app = await MainActor.run {
+            fromEditor || source == .ocr ? nil : getActiveAppInfo(isMonitoring: monitoringState)
+        }
         var item = ClipItem(
             content: content,
             kind: determineKind(for: content, isFromEditor: fromEditor),
-            sourceApp: fromEditor ? "Kipple" : metadata.appName,
-            windowTitle: fromEditor
-                ? "Live Editor"
-                : metadata.windowTitle,
-            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
-            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
+            sourceApp: fromEditor ? "Kipple" : app?.name,
+            windowTitle: fromEditor ? "Live Editor" : app?.windowTitle,
+            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : app?.bundleID,
+            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : app?.processID,
             isFromEditor: fromEditor,
             metadata: source.map { ClipMetadata(createdAt: Date(), source: $0) }
         )
@@ -416,11 +434,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await recopyFromHistory(item) { true }
     }
 
-    func recopyFromHistory(_ item: ClipItem, shouldCopy: @Sendable () async -> Bool) async {
+    @discardableResult
+    func recopyFromHistory(_ item: ClipItem, shouldCopy: @Sendable () async -> Bool) async -> Bool {
         let generation = copyGeneration
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        guard generation == copyGeneration, await shouldCopy() else { return }
+        guard generation == copyGeneration, await shouldCopy() else { return false }
         // Set flags BEFORE updating clipboard to prevent race condition
         await state.setInternalCopy(true)
         await state.setFromEditor(item.isFromEditor ?? false)
@@ -428,7 +447,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         let newItem = recordHistoryRecopy(item)
         // Keep pasteboard access on MainActor; its type cache must not be read concurrently.
         let newChangeCount = await writeClipboardItem(newItem)
-        guard await recordClipboardWrite(newChangeCount) else { return }
+        return await recordClipboardWrite(newChangeCount)
     }
 
     @discardableResult
@@ -439,10 +458,13 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             // A row or queue action can still hold a snapshot taken before the item was edited.
             newItem = history.remove(at: existingIndex)
         } else if let duplicateIndex = indexOfExistingContent(item.content) {
-            // Preserve the user category from any remaining duplicate content
             let existingItem = history.remove(at: duplicateIndex)
-            newItem.userCategoryId = existingItem.userCategoryId
-            newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
+            if desktopNoteItemIDs.contains(existingItem.id) {
+                newItem = existingItem
+            } else {
+                newItem.userCategoryId = existingItem.userCategoryId
+                newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
+            }
         }
 
         // Add item at the beginning with preserved metadata and new timestamp
@@ -486,6 +508,33 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     // MARK: - History Management
 
+    func protectHistoryForDesktopNote(_ itemID: UUID) async -> ClipItem? {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard let item = history.first(where: { $0.id == itemID }),
+              desktopNoteItemIDs.insert(itemID).inserted else { return nil }
+        return item
+    }
+
+    func desktopNoteItemsToRestore(_ ids: Set<UUID>) async -> [ClipItem]? {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard isRepositoryReady else { return nil }
+        let items = history.filter { ids.contains($0.id) && desktopNoteItemIDs.contains($0.id) }
+        desktopNoteItemIDs.subtract(ids.subtracting(items.map(\.id)))
+        return items
+    }
+
+    func removeDesktopNoteProtection(_ itemID: UUID) async {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        desktopNoteItemIDs.remove(itemID)
+    }
+
+    private func isProtectedFromHistoryRemoval(_ item: ClipItem) -> Bool {
+        item.hasCustomCategory || desktopNoteItemIDs.contains(item.id)
+    }
+
     @discardableResult
     func clearHistory(keepingCategories: Bool) async -> Result<Int, Error> {
         await mutationGate.acquire()
@@ -493,7 +542,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         if !isRepositoryReady { await loadHistoryWhileLocked() }
         guard isRepositoryReady, let repository else { return .failure(MCPFailure.persistence) }
 
-        let retained = keepingCategories ? history.filter(\.hasCustomCategory) : []
+        let retained = history.filter { item in
+            desktopNoteItemIDs.contains(item.id) || (keepingCategories && item.hasCustomCategory)
+        }
         let retainedIDs = Set(retained.map(\.id))
         do {
             let storedIDs = try await repository.loadItemIDs()
@@ -502,6 +553,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             let clearedCount = removedIDs.union(history.map(\.id)).subtracting(retainedIDs).count
             history = retained
+            repeatedCopySequence = nil
             rebuildContentLookup()
             markHistoryChanged()
             notifyHistoryObservers()
@@ -516,7 +568,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         guard let index = history.firstIndex(where: { $0.id == item.id }),
-              !history[index].hasCustomCategory else { return }
+              !isProtectedFromHistoryRemoval(history[index]) else { return }
         history.remove(at: index)
         rebuildContentLookup()
 
@@ -624,25 +676,28 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard isRepositoryReady else { return false }
         let observation = await MainActor.run { (clipboardReader ?? .shared).observation }
         let changeCount = observation.changeCount
+        let isNewWrite = changeCount != lastChangeCount
 
-        guard forceCapture || changeCount != lastChangeCount
+        guard forceCapture || isNewWrite
                 || observation.accessRevision != lastClipboardAccessRevision else { return true }
 
         if await shouldSkipChange(for: changeCount) { return true }
 
+        let copiedAt = ContinuousClock.now
         let detectedAt = PerformanceTrace.nowMicros()
 
         // Get clipboard content
         let fetchStartedAt = PerformanceTrace.nowMicros()
-        let captured = await MainActor.run {
-            (clipboardReader ?? .shared).read()
-        }
+        let reader = await MainActor.run { clipboardReader ?? .shared }
+        let captured = await reader.readForHistory(changeCount: changeCount)
         // A copy arriving between the change-count check and capture must be retried as a whole.
         guard let captured, captured.stamp.changeCount == changeCount else { return false }
         lastChangeCount = changeCount
         lastClipboardAccessRevision = captured.stamp.accessRevision
-        guard var item = await fetchClipboardItem(captured.text) else { return true }
-        item.richText = captured.richText
+        guard !captured.shouldExcludeFromHistory, let item = await fetchClipboardItem(captured) else {
+            if isNewWrite { repeatedCopySequence = nil }
+            return true
+        }
         PerformanceTrace.event(
             "pasteboard_change_detected",
             atMicros: detectedAt,
@@ -656,13 +711,51 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         )
 
         // Always add to history - addToHistory handles duplicates by moving them to top
-        addToHistory(item)
+        let itemID = addToHistory(item)
+        if isNewWrite {
+            await trackRepeatedCopy(of: item, itemID: itemID, at: copiedAt)
+        }
         lastEventTime = Date()
         currentInterval = minInterval
 
         // Reset flags
         await state.setFromEditor(false)
         return true
+    }
+
+    private func trackRepeatedCopy(of item: ClipItem, itemID: UUID, at copiedAt: ContinuousClock.Instant) async {
+        // The clipboard changed, but native copies from Kipple views may bypass its clipboard service.
+        guard item.isFromEditor != true, item.processID != ProcessInfo.processInfo.processIdentifier,
+              Bundle.main.bundleIdentifier.map({ item.bundleIdentifier != $0 }) ?? true else { return }
+        let revision = await MainActor.run {
+            let settings = AppSettings.shared
+            return settings.desktopNoteOnRepeatedCopy ? settings.desktopNoteRepeatedCopySettingRevision : nil
+        }
+        guard let revision else {
+            repeatedCopySequence = nil
+            return
+        }
+        guard var sequence = repeatedCopySequence, sequence.content == item.content,
+              sequence.settingRevision == revision, copiedAt - sequence.firstCopiedAt <= .seconds(5) else {
+            repeatedCopySequence = RepeatedCopySequence(
+                content: item.content, firstCopiedAt: copiedAt, settingRevision: revision
+            )
+            return
+        }
+        sequence.count += 1
+        if sequence.count < 3 {
+            repeatedCopySequence = sequence
+        } else {
+            repeatedCopySequence = nil
+            Task { @MainActor in
+                let settings = AppSettings.shared
+                guard settings.desktopNoteOnRepeatedCopy,
+                      settings.desktopNoteRepeatedCopySettingRevision == revision else { return }
+                NotificationCenter.default.post(
+                    name: .desktopNoteRequestedByRepeatedCopy, object: self, userInfo: ["itemID": itemID]
+                )
+            }
+        }
     }
 
     @discardableResult
@@ -750,8 +843,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return false
     }
 
-    private func fetchClipboardItem(_ clipboardContent: String?) async -> ClipItem? {
-        guard let content = clipboardContent,
+    private func fetchClipboardItem(_ captured: ClipboardReader.Snapshot) async -> ClipItem? {
+        guard let content = captured.text,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             if await state.getInternalCopy() {
                 return nil
@@ -761,27 +854,20 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             return nil
         }
 
-        let appInfo = await MainActor.run {
-            getActiveAppInfo()
-        }
-
         let isFromEditor = await state.getFromEditor()
-        let monitoringState = isMonitoringFlag
-        let metadata = isFromEditor ? appInfo : await MainActor.run {
-            sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState)
-        }
-
-        return ClipItem(
+        let source = captured.source
+        var item = ClipItem(
             content: content,
             kind: determineKind(for: content, isFromEditor: isFromEditor),
-            sourceApp: isFromEditor ? "Kipple" : metadata.appName,
-            windowTitle: isFromEditor
-                ? "Live Editor"
-                : metadata.windowTitle,
-            bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
-            processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
-            isFromEditor: isFromEditor
+            sourceApp: isFromEditor ? "Kipple" : source?.name,
+            windowTitle: isFromEditor ? "Live Editor" : source?.windowTitle,
+            bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : source?.bundleID,
+            processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : source?.processID,
+            isFromEditor: isFromEditor,
+            richText: captured.richText
         )
+        item.metadata?.sourceURI = captured.sourceURI
+        return item
     }
 
     // MARK: - Flush Pending Saves
@@ -800,95 +886,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     // MARK: - App Info
 
-    private struct ActiveAppInfo {
-        let appName: String?
-        let windowTitle: String?
-        let bundleId: String?
-        let pid: Int32
-    }
-
     @MainActor
-    private func getActiveAppInfo() -> ActiveAppInfo {
-        // Use LastActiveAppTracker to get the correct app
-        let tracker = LastActiveAppTracker.shared
-        let appInfo = tracker.getSourceAppInfo()
-
-        // Try to get window title using CGWindowList
-        let windowTitle = getWindowTitle(for: appInfo.pid)
-
-        return ActiveAppInfo(
-            appName: appInfo.name,
-            windowTitle: windowTitle,
-            bundleId: appInfo.bundleId,
-            pid: appInfo.pid
+    private func getActiveAppInfo(isMonitoring: Bool) -> ClipboardReader.Source? {
+        let app = LastActiveAppTracker.shared.getSourceAppInfo()
+        let isKipple = app.bundleId == Bundle.main.bundleIdentifier || app.name == "Kipple"
+        guard app.pid > 0, !isMonitoring || !isKipple else { return nil }
+        return ClipboardReader.Source(
+            name: app.name,
+            bundleID: app.bundleId,
+            processID: app.pid,
+            windowTitle: LastActiveAppTracker.singleVisibleWindowTitle(for: app.pid)
         )
-    }
-
-    @MainActor
-    private func sanitizeExternalAppInfo(_ info: ActiveAppInfo, isMonitoring: Bool) -> ActiveAppInfo {
-        let bundleIdentifier = Bundle.main.bundleIdentifier
-        let isKipple = info.bundleId == bundleIdentifier || info.appName == "Kipple"
-        guard isKipple else { return info }
-
-        let fallback = LastActiveAppTracker.shared.getSourceAppInfo()
-        if fallback.bundleId != bundleIdentifier && fallback.name != "Kipple" {
-            let title = getWindowTitle(for: fallback.pid)
-            return ActiveAppInfo(
-                appName: fallback.name,
-                windowTitle: title,
-                bundleId: fallback.bundleId,
-                pid: fallback.pid
-            )
-        }
-
-        guard isMonitoring else { return info }
-
-        let syntheticPid = info.pid == 0 ? -1 : info.pid
-        return ActiveAppInfo(
-            appName: info.appName == "Kipple"
-                ? "External Source"
-                : info.appName,
-            windowTitle: info.windowTitle,
-            bundleId: info.bundleId == bundleIdentifier ? "external.app" : info.bundleId,
-            pid: syntheticPid
-        )
-    }
-
-    @MainActor
-    private func getWindowTitle(for pid: Int32) -> String? {
-        // Get window list for the specific process
-        let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
-        ) as? [[String: Any]] ?? []
-
-        // Find windows belonging to the process
-        for windowInfo in windowList {
-            // Check if window belongs to the target process
-            if let windowPID = windowInfo[kCGWindowOwnerPID as String] as? Int32,
-               windowPID == pid {
-
-                // Get window name (title)
-                if let windowName = windowInfo[kCGWindowName as String] as? String,
-                   !windowName.isEmpty {
-                    return windowName
-                }
-
-                // Fallback to window owner name if no title
-                if let ownerName = windowInfo[kCGWindowOwnerName as String] as? String,
-                   !ownerName.isEmpty {
-                    // Only return owner name if it's different from app name
-                    // to avoid redundant information
-                    if let appName = NSWorkspace.shared.frontmostApplication?.localizedName,
-                       ownerName != appName {
-                        return ownerName
-                    }
-                }
-            }
-        }
-
-        // No window title found
-        return nil
     }
 
     @discardableResult
@@ -903,7 +911,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard items.count > maxHistoryItems else { return items }
         var available = maxHistoryItems
         return items.filter { item in
-            if item.hasCustomCategory { return true }
+            if isProtectedFromHistoryRemoval(item) { return true }
             guard available > 0 else { return false }
             available -= 1
             return true
@@ -1113,7 +1121,11 @@ extension ModernClipboardService {
 
     // Pass only the changed fields. An empty title clears the saved title.
     func updateDetails(
-        id: UUID, title: String? = nil, content: String? = nil, categoryChanges: [UUID: Bool] = [:]
+        id: UUID,
+        title: String? = nil,
+        content: String? = nil,
+        categoryChanges: [UUID: Bool] = [:],
+        allowsRemovingRichText: Bool = true
     ) async throws {
         await mutationGate.acquire()
         defer { mutationGate.release() }
@@ -1124,6 +1136,9 @@ extension ModernClipboardService {
             guard !content.isEmpty else { throw ClipItemEditError.emptyContent }
             if let duplicate = indexOfExistingContent(content), duplicate != index {
                 throw ClipItemEditError.duplicateContent
+            }
+            guard allowsRemovingRichText || original.richText == nil else {
+                throw ClipItemEditError.richTextLossRequiresConfirmation
             }
             item = item.replacingContent(with: content)
         }
@@ -1232,7 +1247,9 @@ extension ModernClipboardService {
         if let previous = try await repository.receipt(for: record.key) {
             return previous.replay(digest: record.digest)
         }
-        let mutation = try MCPHistoryMutation(items: items, history: history, capacity: maxHistoryItems)
+        let mutation = try MCPHistoryMutation(
+            items: items, history: history, capacity: maxHistoryItems, isProtected: isProtectedFromHistoryRemoval
+        )
         let registered = mutation.registered
         let candidate = mutation.candidate
         var receipt = record

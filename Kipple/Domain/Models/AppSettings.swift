@@ -17,7 +17,33 @@ final class AppSettings: ObservableObject {
     @AppStorage("windowAnimation") var windowAnimation: String = "none"
     @AppStorage("editorSectionHeight") var editorSectionHeight: Double = 250
     @AppStorage("historySectionHeight") var historySectionHeight: Double = 300
-    
+
+    @AppStorage(Keys.desktopNoteDefaultDisplayMode)
+    private var storedDesktopNoteDisplayMode = DesktopNoteDisplayMode.plainText
+
+    @AppStorage(Keys.desktopNoteDisplayID) var desktopNoteDisplayID = ""
+
+    @AppStorage(Keys.desktopNoteOnRepeatedCopy) var desktopNoteOnRepeatedCopy = true {
+        didSet {
+            if oldValue != desktopNoteOnRepeatedCopy { desktopNoteRepeatedCopySettingRevision &+= 1 }
+        }
+    }
+    private(set) var desktopNoteRepeatedCopySettingRevision: UInt64 = 0
+
+    var desktopNoteDefaultDisplayMode: DesktopNoteDisplayMode {
+        get { storedDesktopNoteDisplayMode }
+        set {
+            guard newValue != storedDesktopNoteDisplayMode else { return }
+            objectWillChange.send()
+            storedDesktopNoteDisplayMode = newValue
+        }
+    }
+
+    enum DesktopNoteDisplayMode: String {
+        case plainText
+        case markdown
+    }
+
     // Editor Settings
     @AppStorage("editorPosition") private var storedEditorPosition: String = "disabled"
     @AppStorage("editorPositionLastEnabled") private var storedEditorPositionLastEnabled: String = "bottom"
@@ -61,6 +87,30 @@ final class AppSettings: ObservableObject {
     @AppStorage("editorClearHotkeyKeyCode") var editorClearHotkeyKeyCode: Int = 37  // L key
     @AppStorage("editorClearHotkeyModifierFlags") var editorClearHotkeyModifierFlags = 
         Int(NSEvent.ModifierFlags.command.rawValue)  // CMD
+
+    enum EditorHotkey {
+        case save
+        case clear
+    }
+
+    func editorHotkey(for event: NSEvent) -> EditorHotkey? {
+        let mask: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+        let modifiers = event.modifierFlags.intersection(mask)
+
+        func matches(keyCode: Int, modifierFlags: Int) -> Bool {
+            guard keyCode == Int(event.keyCode), let rawModifiers = UInt(exactly: modifierFlags) else { return false }
+            let configuredModifiers = NSEvent.ModifierFlags(rawValue: rawModifiers).intersection(mask)
+            return (keyCode != 0 || !configuredModifiers.isEmpty) && modifiers == configuredModifiers
+        }
+
+        if matches(keyCode: editorCopyHotkeyKeyCode, modifierFlags: editorCopyHotkeyModifierFlags) {
+            return .save
+        }
+        if matches(keyCode: editorClearHotkeyKeyCode, modifierFlags: editorClearHotkeyModifierFlags) {
+            return .clear
+        }
+        return nil
+    }
     
     // Launch Settings
     
@@ -158,6 +208,9 @@ final class AppSettings: ObservableObject {
         static let windowAnimation = "windowAnimation"
         static let editorSectionHeight = "editorSectionHeight"
         static let historySectionHeight = "historySectionHeight"
+        static let desktopNoteDefaultDisplayMode = "desktopNoteDefaultDisplayMode"
+        static let desktopNoteDisplayID = "desktopNoteDisplayID"
+        static let desktopNoteOnRepeatedCopy = "desktopNoteOnRepeatedCopy"
         static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"
         static let enableHotkey = "enableHotkey"

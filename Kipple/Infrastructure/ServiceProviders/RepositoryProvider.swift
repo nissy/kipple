@@ -11,6 +11,12 @@ enum RepositoryProvider {
         }
         // Use SwiftData exclusively.
         do {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+                NSClassFromString("XCTest") != nil {
+                return try SwiftDataRepository.make(inMemory: true)
+            }
+            #endif
             return try SwiftDataRepository.make()
         } catch {
             Logger.shared.error("Failed to create SwiftDataRepository: \(error)")

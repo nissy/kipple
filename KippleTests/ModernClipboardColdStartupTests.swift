@@ -13,13 +13,18 @@ final class ModernClipboardColdStartupTests: XCTestCase {
             await repository.configure(items: [existing], loadDelay: 0)
             let service = makeService(repository: repository, pasteboard: pasteboard)
             let content = "First OCR copy \(index)"
-            let copied = await service.copyToClipboard(content, fromEditor: false, source: .ocr) { true }
-            XCTAssertTrue(copied)
+            let copiedID = await service.copyRecognizedText(content) { true }
+            XCTAssertNotNil(copiedID)
             XCTAssertEqual(pasteboard.string(forType: .string), content)
             let history = await service.getHistory()
             XCTAssertEqual(history.count, 2)
+            XCTAssertEqual(history.first?.id, copiedID)
             XCTAssertEqual(history.first?.content, content)
             XCTAssertEqual(history.first?.metadata?.source, .ocr)
+            XCTAssertNil(history.first?.sourceApp)
+            XCTAssertNil(history.first?.bundleIdentifier)
+            XCTAssertNil(history.first?.processID)
+            XCTAssertNil(history.first?.windowTitle)
             XCTAssertTrue(history.contains { $0.id == existing.id })
             await service.flushPendingSaves()
             let persisted = try await repository.loadAll()

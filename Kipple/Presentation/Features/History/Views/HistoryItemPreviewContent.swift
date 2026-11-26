@@ -2,6 +2,9 @@ import AppKit
 import SwiftUI
 
 struct HistoryItemPreviewContent: View {
+    static let contentPadding: CGFloat = 20
+    static let cornerRadius: CGFloat = 18
+
     let item: ClipItem
     let categories: [UserCategory]
     let historyFont: NSFont
@@ -9,22 +12,8 @@ struct HistoryItemPreviewContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if let title = Self.nonempty(item.title) {
-                Text(verbatim: title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .help(title)
-                    .accessibilityAddTraits(.isHeader)
-            }
-
-            Text(verbatim: Self.makePreviewText(for: item))
-                .font(Font(historyFont))
-                .lineSpacing(3)
-                .lineLimit(previewLineLimit)
-                .multilineTextAlignment(.leading)
+            HistoryItemPreviewText(item: item, historyFont: historyFont)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
 
             CategoryLabelsView(categories: categories, isPreview: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,36 +23,42 @@ struct HistoryItemPreviewContent: View {
             metadataSection
         }
         .foregroundStyle(.primary)
-        .padding(20)
+        .padding(Self.contentPadding)
         .frame(width: 320, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private var previewLineLimit: Int {
-        let lineHeight = ceil(historyFont.ascender - historyFont.descender + historyFont.leading + 3)
-        return max(1, min(10, Int(220 / max(1, lineHeight))))
+        .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
     }
 
     private var metadataSection: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-            if let sourceApp = Self.nonempty(item.sourceApp) {
+            if let sourceApp = Self.visibleSourceApp(for: item) {
                 GridRow(alignment: .firstTextBaseline) {
                     metadataLabel("Copied from")
-                    Text(verbatim: localizedAppName(sourceApp))
-                        .lineLimit(1)
+                    Text(verbatim: sourceApp)
+                        .lineLimit(2)
                         .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                         .help(sourceApp)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            if let windowTitle = Self.visibleWindowTitle(sourceApp: item.sourceApp, windowTitle: item.windowTitle) {
+            if let windowTitle = Self.visibleWindowTitle(for: item) {
                 GridRow(alignment: .firstTextBaseline) {
                     metadataLabel("Source window")
                     Text(verbatim: localizedWindowTitle(windowTitle))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                         .help(windowTitle)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            if let url = item.metadata?.sourceWebURL {
+                GridRow(alignment: .firstTextBaseline) {
+                    metadataLabel("Source Link")
+                    HistorySourceLink(url: url, maxLines: 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .gridCellUnsizedAxes(.horizontal)
                 }
             }
             GridRow(alignment: .firstTextBaseline) {
@@ -105,10 +100,6 @@ struct HistoryItemPreviewContent: View {
             .fixedSize()
     }
 
-    private func localizedAppName(_ name: String) -> String {
-        name == "External Source" ? String(localized: "External Source", locale: locale) : name
-    }
-
     private func localizedWindowTitle(_ title: String) -> String {
         if title == "Quick Editor" || title == "Live Editor" {
             return String(localized: "Live Editor", locale: locale)
@@ -121,12 +112,85 @@ struct HistoryItemPreviewContent: View {
         return value
     }
 
-    static func visibleWindowTitle(sourceApp: String?, windowTitle: String?) -> String? {
-        guard let windowTitle = nonempty(windowTitle), windowTitle != nonempty(sourceApp) else { return nil }
+    static func visibleSourceApp(for item: ClipItem) -> String? {
+        guard item.sourceApp != "External Source" else { return nil }
+        return nonempty(item.sourceApp)
+    }
+
+    static func visibleWindowTitle(for item: ClipItem) -> String? {
+        guard item.sourceApp != "External Source",
+              let windowTitle = nonempty(item.windowTitle), windowTitle != visibleSourceApp(for: item) else { return nil }
         return windowTitle
     }
 
     static func makePreviewText(for item: ClipItem, maxLength: Int = 500) -> String {
         String(item.content.prefix(maxLength))
+    }
+}
+
+struct HistorySourceLink: View {
+    let url: URL
+    var maxLines: Int? = 1
+
+    var body: some View {
+        Link(destination: url) {
+            Text(verbatim: Self.displayAddress(for: url))
+                .underline()
+                .foregroundStyle(Color(nsColor: .linkColor))
+                .multilineTextAlignment(.leading)
+                .lineLimit(maxLines)
+                .truncationMode(.tail)
+        }
+        .help(url.absoluteString)
+    }
+
+    static func displayAddress(for url: URL) -> String {
+        let address = url.absoluteString
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http" else { return address }
+        let prefix = "\(scheme)://"
+        guard address.prefix(prefix.count).lowercased() == prefix else { return address }
+        return String(address.dropFirst(prefix.count))
+    }
+}
+
+struct HistoryItemPreviewText: View {
+    let item: ClipItem
+    let historyFont: NSFont
+    static let spacing: CGFloat = 16
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Self.spacing) {
+            HistoryItemPreviewTitle(title: item.title)
+            bodyPreview
+        }
+    }
+
+    var bodyPreview: some View {
+        Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
+            .font(Font(historyFont))
+            .lineSpacing(3)
+            .lineLimit(previewLineLimit)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var previewLineLimit: Int {
+        let lineHeight = ceil(historyFont.ascender - historyFont.descender + historyFont.leading + 3)
+        return max(1, min(10, Int(220 / max(1, lineHeight))))
+    }
+}
+
+struct HistoryItemPreviewTitle: View {
+    let title: String?
+
+    var body: some View {
+        if let title = HistoryItemPreviewContent.nonempty(title) {
+            Text(verbatim: title)
+                .font(.system(size: 16, weight: .semibold))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .help(title)
+                .accessibilityAddTraits(.isHeader)
+        }
     }
 }
