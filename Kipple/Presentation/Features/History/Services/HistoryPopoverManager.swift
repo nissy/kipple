@@ -18,17 +18,19 @@ final class HistoryPopoverManager {
     private weak var anchorView: NSView?
     private var hideWorkItem: DispatchWorkItem?
     private var isPointerOverPanel = false
+    private let pointerLocation: () -> CGPoint
 
     private var observers = Set<AnyCancellable>()
 
-    private init() {
+    init(pointerLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation }) {
+        self.pointerLocation = pointerLocation
         NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)
             .sink { [weak self] _ in self?.hide() }
             .store(in: &observers)
     }
 
     func show(item: ClipItem, from anchorView: NSView, trailingEdge: Bool) {
-        guard !isPointerOverPanel,
+        guard !isPointerInsidePanel,
               let window = anchorView.window,
               let screen = window.screen ?? NSScreen.main else { return }
         cancelScheduledHide()
@@ -76,22 +78,24 @@ final class HistoryPopoverManager {
             return false
         }
 
-        hide()
+        // The pointer can cross another row on its way to the panel. Let the new hover settle first.
+        scheduleHide()
         return true
     }
 
-    func scheduleHide(after interval: TimeInterval = 0.15, ifAnchoredTo anchor: NSView? = nil) {
-        guard panel != nil, !isPointerOverPanel, anchor == nil || anchorView === anchor else { return }
+    func scheduleHide(after interval: TimeInterval = 0.35, ifAnchoredTo anchor: NSView? = nil) {
+        guard panel != nil, !isPointerInsidePanel, anchor == nil || anchorView === anchor else { return }
         cancelScheduledHide()
         let workItem = DispatchWorkItem { [weak self] in
-            guard let self, !self.isPointerOverPanel else { return }
+            guard let self, !self.isPointerInsidePanel else { return }
             self.hide()
         }
         hideWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: workItem)
     }
 
-    func hide() {
+    func hide(ifAnchoredTo anchor: NSView? = nil) {
+        guard anchor == nil || anchorView === anchor else { return }
         cancelScheduledHide()
         isPointerOverPanel = false
         panel?.orderOut(nil)
@@ -107,6 +111,11 @@ final class HistoryPopoverManager {
     private func cancelScheduledHide() {
         hideWorkItem?.cancel()
         hideWorkItem = nil
+    }
+
+    private var isPointerInsidePanel: Bool {
+        guard let panel, panel.isVisible else { return false }
+        return isPointerOverPanel || panel.frame.contains(pointerLocation())
     }
 
     private func updatePanelHover(_ hovering: Bool) {
@@ -166,7 +175,7 @@ final class HistoryPopoverManager {
             if let hoverArea { removeTrackingArea(hoverArea) }
             let area = NSTrackingArea(
                 rect: .zero,
-                options: [.inVisibleRect, .mouseEnteredAndExited, .activeInActiveApp],
+                options: [.inVisibleRect, .mouseEnteredAndExited, .activeAlways],
                 owner: self,
                 userInfo: nil
             )

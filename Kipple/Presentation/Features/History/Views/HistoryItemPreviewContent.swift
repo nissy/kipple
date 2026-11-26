@@ -134,7 +134,7 @@ struct HistorySourceLink: View {
 
     var body: some View {
         Link(destination: url) {
-            Text(verbatim: url.absoluteString)
+            Text(verbatim: Self.displayAddress(for: url))
                 .underline()
                 .foregroundStyle(Color(nsColor: .linkColor))
                 .multilineTextAlignment(.leading)
@@ -142,6 +142,14 @@ struct HistorySourceLink: View {
                 .truncationMode(.tail)
         }
         .help(url.absoluteString)
+    }
+
+    static func displayAddress(for url: URL) -> String {
+        let address = url.absoluteString
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http" else { return address }
+        let prefix = "\(scheme)://"
+        guard address.prefix(prefix.count).lowercased() == prefix else { return address }
+        return String(address.dropFirst(prefix.count))
     }
 }
 

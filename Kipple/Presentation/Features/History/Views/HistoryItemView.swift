@@ -87,7 +87,9 @@ struct HistoryItemView: View {
             handleHoverChange(hovering, anchor: anchor)
         }, isScrollLocked: isScrollLocked)
         .onDisappear {
-            HistoryPopoverManager.shared.hide()
+            if let anchor = currentAnchorView {
+                HistoryPopoverManager.shared.hide(ifAnchoredTo: anchor)
+            }
             currentAnchorView = nil
             hoverCoordinator.clearHover(ifMatches: item.id)
         }
@@ -413,7 +415,7 @@ private extension HistoryItemView {
             if let window = anchor.window, let screen = window.screen {
                 windowPosition = window.frame.midX < screen.frame.midX
             }
-            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.15 : 0.3)
+            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.25 : 0.3)
         } else {
             cancelPopoverTask()
             hoverCoordinator.clearHover(ifMatches: item.id)

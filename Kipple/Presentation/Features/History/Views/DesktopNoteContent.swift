@@ -133,14 +133,13 @@ struct DesktopNoteContent: View {
 
     private func sourceLink(_ url: URL) -> some View {
         let address = url.absoluteString
-        let displayAddress = String(address.dropFirst((url.scheme?.count ?? 0) + 3))
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
             Link(destination: url) {
                 sourceIcon("arrow.up.right.square")
             }
             .accessibilityLabel(Text("Source Link"))
             .accessibilityValue(Text(verbatim: address))
-            Text(verbatim: displayAddress)
+            Text(verbatim: HistorySourceLink.displayAddress(for: url))
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.leading)

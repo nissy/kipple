@@ -11,6 +11,21 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         _ = popover.body
     }
 
+    func testSourceLinkLabelOmitsOnlyTheLeadingWebScheme() throws {
+        let cases = [
+            ("HTTPS://example.com:8443/task%20list?next=https://example.net/#details",
+             "example.com:8443/task%20list?next=https://example.net/#details"),
+            ("http://example.com/page#section", "example.com/page#section"),
+            ("slack://channel?id=C123", "slack://channel?id=C123")
+        ]
+        for (address, expected) in cases {
+            let url = try XCTUnwrap(URL(string: address))
+            let link = HistorySourceLink(url: url)
+            XCTAssertEqual(HistorySourceLink.displayAddress(for: link.url), expected)
+            XCTAssertEqual(link.url.absoluteString, address)
+        }
+    }
+
     func testHistoryPreviewWrapsLongWebURLsToTwoLinesAndOmitsAppURIs() {
         func size(for item: ClipItem) -> NSSize {
             NSHostingController(rootView: HistoryItemPreviewContent(
@@ -59,14 +74,13 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         window.orderOut(nil)
     }
 
-    func testMovingToAnotherRowClosesTheOldPopoverImmediately() async throws {
-        let manager = HistoryPopoverManager.shared
-        manager.forceClose()
+    func testCrossingAnotherRowKeepsThePanelUntilTheNewRowSettles() async throws {
+        let manager = HistoryPopoverManager { .zero }
         let originalWindows = NSApp.windows
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
                               styleMask: [.titled], backing: .buffered, defer: false)
-        let firstRow = NSView(frame: NSRect(x: 0, y: 40, width: 200, height: 32))
-        let secondRow = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 32))
+        let firstRow = NSView(frame: NSRect(x: 0, y: 220, width: 200, height: 32))
+        let secondRow = NSView(frame: NSRect(x: 0, y: 180, width: 200, height: 32))
         window.contentView?.addSubview(firstRow)
         window.contentView?.addSubview(secondRow)
         window.makeKeyAndOrderFront(nil)
@@ -85,20 +99,22 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         XCTAssertTrue(firstPanel.isVisible)
 
         XCTAssertTrue(manager.prepareForRowHover(secondRow))
-        XCTAssertFalse(firstPanel.isVisible)
+        let firstFrame = firstPanel.frame
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(firstPanel.isVisible)
+        XCTAssertEqual(firstPanel.frame, firstFrame)
 
         manager.show(item: ClipItem(content: "Second row"), from: secondRow, trailingEdge: true)
-        let secondPanel = try XCTUnwrap(NSApp.windows.first { panel in
-            panel is NSPanel && panel.isVisible && !originalWindows.contains { $0 === panel }
-        })
+        XCTAssertTrue(firstPanel.isVisible)
+        XCTAssertNotEqual(firstPanel.frame, firstFrame)
         manager.scheduleHide(after: 0.01, ifAnchoredTo: firstRow)
+        manager.hide(ifAnchoredTo: firstRow)
         try await Task.sleep(for: .milliseconds(50))
-        XCTAssertTrue(secondPanel.isVisible)
+        XCTAssertTrue(firstPanel.isVisible)
     }
 
     func testPopoverStaysOpenWhilePointerCrossesFromTheRow() async throws {
-        let manager = HistoryPopoverManager.shared
-        manager.forceClose()
+        let manager = HistoryPopoverManager { .zero }
         let originalWindows = NSApp.windows
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -122,6 +138,35 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         XCTAssertTrue(panel.isVisible)
 
         content.mouseExited(with: try hoverEvent(.mouseExited, for: panel))
+        manager.scheduleHide(after: 0.01)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(panel.isVisible)
+    }
+
+    func testPendingDismissalRechecksThePointerWhenTheEnterEventHasNotArrived() async throws {
+        var pointer = CGPoint.zero
+        let manager = HistoryPopoverManager { pointer }
+        let originalWindows = NSApp.windows
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let anchor = NSView(frame: NSRect(x: 50, y: 50, width: 200, height: 32))
+        window.contentView?.addSubview(anchor)
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            manager.forceClose()
+            window.orderOut(nil)
+        }
+
+        manager.show(item: ClipItem(content: "Source link"), from: anchor, trailingEdge: true)
+        let panel = try XCTUnwrap(NSApp.windows.first {
+            $0 is NSPanel && $0.isVisible && !originalWindows.contains($0)
+        })
+        manager.scheduleHide(after: 0.01)
+        pointer = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(panel.isVisible)
+
+        pointer = .zero
         manager.scheduleHide(after: 0.01)
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertFalse(panel.isVisible)
