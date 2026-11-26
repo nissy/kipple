@@ -687,6 +687,8 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
     }
 
     func testDraggingBlankSpaceAfterAPlainTextLineMovesTheNote() async throws {
+        let previousCursor = NSCursor.current
+        defer { previousCursor.set() }
         let note = DesktopNotePanel(item: ClipItem(content: "Short line"), screenFrame: screenFrame)
         note.setContentSize(NSSize(width: 260, height: 160))
         note.makeKeyAndOrderFront(nil)
@@ -698,9 +700,22 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let origin = note.frame.origin
         let end = NSPoint(x: start.x + 100, y: start.y + 80)
 
+        note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: start, for: note))
+        XCTAssertTrue(NSCursor.current === NSCursor.openHand)
+        let text = try desktopNoteBodyPoint(in: note, x: 29)
+        note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: text, for: note))
+        XCTAssertFalse(NSCursor.current === NSCursor.openHand)
+        let border = NSPoint(x: 2, y: start.y)
+        note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: border, for: note))
+        XCTAssertFalse(NSCursor.current === NSCursor.openHand)
+
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+        XCTAssertTrue(NSCursor.current === NSCursor.closedHand)
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+        XCTAssertTrue(NSCursor.current === NSCursor.closedHand)
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
+        XCTAssertTrue(NSCursor.current === NSCursor.openHand)
 
         XCTAssertEqual(note.frame.origin, NSPoint(x: origin.x + 100, y: origin.y + 80))
     }

@@ -240,6 +240,7 @@ final class DesktopNotePanel: NSPanel {
     }
     private let textHitViews = NSHashTable<DesktopNoteTextHitView>.weakObjects()
     private var pointerGesture: PointerGesture?
+    private var moveCursor: NSCursor?
     private var pendingLink: URL?
     private var manualSize: NSSize?
     private var usesSavedFrame = false
@@ -311,6 +312,11 @@ final class DesktopNotePanel: NSPanel {
         noteContentController.setContent(content)
         contentViewController = noteContentController
         configureNativeFrame()
+        acceptsMouseMovedEvents = true
+        noteContentController.view.addTrackingArea(NSTrackingArea(
+            rect: .zero, options: [.activeAlways, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
+            owner: self, userInfo: nil
+        ))
         setContentSize(size)
         installColorStrip(in: noteContentController.view)
         installControls(in: noteContentController.view, for: item)
@@ -404,10 +410,24 @@ final class DesktopNotePanel: NSPanel {
         let isContextClick = event.type == .rightMouseDown ||
             (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
         if isContextClick, let contentView, let menu = automaticSizeMenu(at: event.locationInWindow) {
+            setMoveCursor(nil)
             NSMenu.popUpContextMenu(menu, with: event, for: contentView)
             return
         }
         switch event.type {
+        case .mouseMoved, .mouseEntered, .mouseExited, .cursorUpdate:
+            super.sendEvent(event)
+            if event.type == .mouseExited, event.trackingArea?.owner as AnyObject? === self {
+                if case .move = pointerGesture { return }
+                setMoveCursor(nil)
+            } else {
+                // Resolve the cursor after child views have handled their tracking events.
+                updateMoveCursor(at: event.locationInWindow)
+                if event.type == .mouseEntered || event.type == .mouseExited {
+                    refreshOpenHandAfterTracking()
+                }
+            }
+            return
         case .leftMouseDown:
             if !isKeyWindow { makeKey() }
             if handleMouseDown(event) { return }
@@ -416,6 +436,7 @@ final class DesktopNotePanel: NSPanel {
             switch pointerGesture {
             case .move(let start, _):
                 pointerGesture = .move(start: start, didDrag: true)
+                setMoveCursor(.closedHand)
                 let pointer = convertPoint(toScreen: point)
                 setFrameOrigin(NSPoint(x: pointer.x - start.x, y: pointer.y - start.y))
                 return
@@ -461,20 +482,56 @@ final class DesktopNotePanel: NSPanel {
         textHitViews.allObjects.contains { $0.containsText(at: point) }
     }
 
+    private func initialPointerGesture(at point: NSPoint) -> PointerGesture? {
+        guard isNoteBody(at: point) else { return nil }
+        if editor == nil, containsPreviewText(at: point) { return .select(start: point, didDrag: false) }
+        return .move(start: point, didDrag: false)
+    }
+
+    private func updateMoveCursor(at point: NSPoint) {
+        if case .move = pointerGesture {
+            setMoveCursor(.closedHand)
+        } else if pointerGesture == nil, case .move = initialPointerGesture(at: point) {
+            setMoveCursor(.openHand)
+        } else {
+            setMoveCursor(nil)
+        }
+    }
+
+    private func setMoveCursor(_ cursor: NSCursor?) {
+        if let cursor {
+            cursor.set()
+        } else if let moveCursor, NSCursor.current === moveCursor {
+            NSCursor.arrow.set()
+        }
+        moveCursor = cursor
+    }
+
+    private func refreshOpenHandAfterTracking() {
+        guard moveCursor === NSCursor.openHand else { return }
+        // SwiftUI can reset a link's cursor after the tracking event returns.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, isVisible, moveCursor === NSCursor.openHand,
+                  case .move = initialPointerGesture(at: mouseLocationOutsideOfEventStream) else { return }
+            NSCursor.openHand.set()
+        }
+    }
+
     private func handleMouseDown(_ event: NSEvent) -> Bool {
-        pointerGesture = nil
         pendingLink = nil
         let point = event.locationInWindow
-        guard isNoteBody(at: point) else { return false }
-        if editor == nil, containsPreviewText(at: point) {
+        pointerGesture = initialPointerGesture(at: point)
+        if case .move = pointerGesture {
+            setMoveCursor(.closedHand)
+            return true
+        }
+        setMoveCursor(nil)
+        if case .select = pointerGesture {
             if event.clickCount > 1 || event.modifierFlags.contains(.shift) {
                 noteContentController.selectionMayExist = true
             }
-            pointerGesture = .select(start: point, didDrag: false)
-            return false
         }
-        pointerGesture = .move(start: point, didDrag: false)
-        return true
+        return false
     }
 
     private func finishPointerGesture(_ event: NSEvent) -> Bool {
@@ -490,6 +547,7 @@ final class DesktopNotePanel: NSPanel {
             }
             if let link { openLink(link) }
         } else if case .move(_, let didDrag) = pointerGesture {
+            let pointer = convertPoint(toScreen: event.locationInWindow)
             self.pointerGesture = nil
             if didDrag {
                 growToFitAfterMoving()
@@ -497,6 +555,7 @@ final class DesktopNotePanel: NSPanel {
             } else if editor == nil {
                 noteContentController.clearSelection()
             }
+            updateMoveCursor(at: convertPoint(fromScreen: pointer))
         }
         return true
     }
@@ -512,8 +571,18 @@ final class DesktopNotePanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
+        setMoveCursor(nil)
+        if case .move(_, let didDrag) = pointerGesture {
+            pointerGesture = nil
+            if didDrag { onPlacementChange?() }
+        }
         if editor == nil { noteContentController.clearSelection() }
         saveEditing()
+    }
+
+    override func close() {
+        setMoveCursor(nil)
+        super.close()
     }
 
     private func isNoteBody(at point: NSPoint) -> Bool {
