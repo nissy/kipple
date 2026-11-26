@@ -137,9 +137,9 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
             item: item,
             screenFrame: screen.visibleFrame,
             displayMode: AppSettings.shared.desktopNoteDefaultDisplayMode,
-            onSave: { [adapter] text, allowsRemovingRichText in
+            onSave: { [adapter] title, text, allowsRemovingRichText in
                 try await adapter.updateDetails(
-                    itemID: id, title: nil, content: text, categoryChanges: [:],
+                    itemID: id, title: title, content: text, categoryChanges: [:],
                     allowsRemovingRichText: allowsRemovingRichText
                 )
             },

@@ -39,7 +39,13 @@ extension DesktopNotePanel {
         guard let contentView else { return nil }
         if let menu = sourceLinkMenu(at: point) { return (menu, contentView) }
         if let editor {
-            return editorContextMenu(at: point, in: editor.textView)
+            if isPoint(point, in: editor.titleField) {
+                guard editor.titleField.currentEditor() != nil || makeFirstResponder(editor.titleField),
+                      let fieldEditor = editor.titleField.currentEditor() as? NSTextView else { return nil }
+                return editorContextMenu(in: fieldEditor)
+            }
+            let location = editor.textView.convert(point, from: nil)
+            return editor.textView.visibleRect.contains(location) ? editorContextMenu(in: editor.textView) : nil
         }
         guard initialPointerGesture(at: point) != nil else { return nil }
         let menu = automaticSizeMenu(at: point) ?? NSMenu()
@@ -49,9 +55,8 @@ extension DesktopNotePanel {
         return (menu, contentView)
     }
 
-    private func editorContextMenu(at point: NSPoint, in textView: NSTextView) -> (menu: NSMenu, view: NSView)? {
-        let location = textView.convert(point, from: nil)
-        guard textView.visibleRect.contains(location), let menu = NSTextView.defaultMenu?.copy() as? NSMenu else { return nil }
+    private func editorContextMenu(in textView: NSTextView) -> (menu: NSMenu, view: NSView)? {
+        guard let menu = NSTextView.defaultMenu?.copy() as? NSMenu else { return nil }
         for item in menu.items where item.target == nil {
             if let action = item.action, textView.responds(to: action) { item.target = textView }
         }

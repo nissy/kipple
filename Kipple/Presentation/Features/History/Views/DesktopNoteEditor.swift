@@ -6,11 +6,14 @@ import SwiftUI
 final class DesktopNoteEditor: NSObject {
     private static let spacing: CGFloat = 6
     private static let toolbarGap: CGFloat = 8
-    static let actionsHeight = DesktopNoteEditActions.height + spacing + toolbarGap
+    private static let titleHeight: CGFloat = 26
+    private static let errorHeight: CGFloat = 28
 
     let originalText: String
     let view: NSStackView
     let textView: LiveEditorTextView
+    let titleField: NSTextField
+    private let originalTitle: String
     private let onSave: () -> Void
     private let coordinator: SimpleLineNumberCoordinator
     private let actionsView: NSHostingView<DesktopNoteEditActions>
@@ -18,22 +21,42 @@ final class DesktopNoteEditor: NSObject {
     private var topConstraint: NSLayoutConstraint?
     private var asksToSaveAsPlainText = false
 
-    var isConfirmingPlainTextSave: Bool { asksToSaveAsPlainText && !errorLabel.isHidden }
+    var additionalHeight: CGFloat {
+        let fieldsAndActions = Self.titleHeight + DesktopNoteEditActions.height + 2 * Self.spacing + Self.toolbarGap
+        return fieldsAndActions + (errorLabel.isHidden ? 0 : Self.errorHeight + Self.spacing)
+    }
 
-    init(text: String, onCancel: @escaping () -> Void, onSave: @escaping () -> Void) {
+    var isConfirmingPlainTextSave: Bool { asksToSaveAsPlainText && !errorLabel.isHidden }
+    var hasMarkedText: Bool { textView.hasMarkedText() || titleEditor?.hasMarkedText() == true }
+    var editedTitle: String? {
+        let title = titleEditor?.string ?? titleField.stringValue
+        return title == originalTitle ? nil : title
+    }
+    var editedText: String? { textView.string == originalText ? nil : textView.string }
+    private var titleEditor: NSTextView? { titleField.currentEditor() as? NSTextView }
+
+    init(title: String?, text: String, onCancel: @escaping () -> Void, onSave: @escaping () -> Void) {
         let editor = SimpleLineNumberView(
             text: .constant(text), font: FontManager.shared.editorFont, isEditable: true,
             onDoubleClick: nil, onEscape: nil, textColor: .textColor, onScrollChange: nil
         )
         let coordinator = editor.makeCoordinator()
         let (scroll, textView) = editor.makeEditor(using: coordinator)
+        originalTitle = title ?? ""
         originalText = text
+        titleField = NSTextField(string: title ?? "")
         self.textView = textView
         self.onSave = onSave
         self.coordinator = coordinator
         actionsView = NSHostingView(rootView: DesktopNoteEditActions(onCancel: onCancel, onSave: onSave))
         scroll.scrollerStyle = .overlay
         textView.setAccessibilityLabel(AppSettings.shared.localizedString("Content"))
+        titleField.placeholderString = AppSettings.shared.localizedString("Title")
+        titleField.setAccessibilityLabel(titleField.placeholderString)
+        titleField.bezelStyle = .roundedBezel
+        titleField.usesSingleLineMode = true
+        titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        titleField.heightAnchor.constraint(equalToConstant: Self.titleHeight).isActive = true
 
         errorLabel.textColor = .systemRed
         errorLabel.font = .systemFont(ofSize: 11)
@@ -50,8 +73,11 @@ final class DesktopNoteEditor: NSObject {
             scroll.topAnchor.constraint(equalTo: scrollContainer.topAnchor),
             scroll.bottomAnchor.constraint(equalTo: scrollContainer.bottomAnchor)
         ])
-        view = NSStackView(views: [scrollContainer, errorLabel, actionsView])
+        view = NSStackView(views: [titleField, scrollContainer, errorLabel, actionsView])
         super.init()
+        titleField.target = self
+        titleField.action = #selector(focusBody)
+        titleField.nextKeyView = textView
         view.orientation = .vertical
         view.alignment = .width
         view.spacing = Self.spacing
@@ -78,8 +104,19 @@ final class DesktopNoteEditor: NSObject {
     }
 
     func setSaving(_ isSaving: Bool) {
+        titleField.isEditable = !isSaving
         textView.isEditable = !isSaving
         actionsView.rootView.isSaving = isSaving
+    }
+
+    func commitTextInput() {
+        titleEditor?.unmarkText()
+        titleField.validateEditing()
+        textView.unmarkText()
+    }
+
+    @objc private func focusBody() {
+        titleField.window?.makeFirstResponder(textView)
     }
 
     func focus(in window: NSWindow, scrollProgress: CGFloat) {
@@ -109,6 +146,7 @@ final class DesktopNoteEditor: NSObject {
         case .save:
             onSave()
         case .clear:
+            guard titleEditor == nil else { return false }
             clear()
         case nil:
             let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])

@@ -25,7 +25,7 @@ struct DesktopNoteContent: View {
     private var windowTitle: String? { HistoryItemPreviewContent.visibleWindowTitle(for: item) }
     private var sourceURL: URL? { item.metadata?.sourceWebURL }
     private var hasSource: Bool { sourceApp != nil || windowTitle != nil || sourceURL != nil }
-    private var hasTitle: Bool { HistoryItemPreviewContent.nonempty(item.title) != nil }
+    private var hasTitle: Bool { showsBody && HistoryItemPreviewContent.nonempty(item.title) != nil }
 
     func minimumHeight(at width: CGFloat) -> CGFloat {
         ceil(headerHeight(at: width)) + Self.controlsHeight + 40

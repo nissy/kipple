@@ -37,12 +37,15 @@ final class DesktopNoteEditorTests: XCTestCase {
 
         let edited = "# Heading\n\n**Edited** Markdown text"
         editor.string = edited
+        note.editor?.titleField.stringValue = "Updated Markdown title"
         let showMarkdown = settings.localizedString("Show Markdown")
         button.performClick(nil)
         for _ in 0..<30 where button.toolTip != showMarkdown {
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertEqual(adapter.history.first?.content, edited)
+        XCTAssertEqual(adapter.history.first?.title, "Updated Markdown title")
+        XCTAssertEqual(note.title, "Updated Markdown title")
         XCTAssertEqual(button.toolTip, showMarkdown)
 
         button.performClick(nil)
@@ -116,11 +119,13 @@ final class DesktopNoteEditorTests: XCTestCase {
         XCTAssertGreaterThan(note.minSize.height, viewingFrame.height)
         XCTAssertGreaterThanOrEqual(note.frame.height, note.minSize.height)
         editor.string = "Unsaved draft"
+        note.editor?.titleField.stringValue = "Unsaved title"
         let escape = try desktopNoteKeyEvent(kVK_Escape, characters: "\u{1B}", modifiers: [], for: note)
 
         note.sendEvent(escape)
         XCTAssertFalse(note.firstResponder is LiveEditorTextView)
         XCTAssertEqual(adapter.history.first?.content, original)
+        XCTAssertEqual(adapter.history.first?.title, title)
         XCTAssertEqual(note.frame, viewingFrame)
 
         note.sendEvent(escape)
@@ -131,7 +136,7 @@ final class DesktopNoteEditorTests: XCTestCase {
 
     func testDesktopNoteEditingToolsModifyTheDraftAndSupportUndo() throws {
         let original = "  {\"例\":\"📝\"} \n"
-        let editor = DesktopNoteEditor(text: original, onCancel: {}, onSave: {})
+        let editor = DesktopNoteEditor(title: nil, text: original, onCancel: {}, onSave: {})
         let window = NSWindow(contentRect: screenFrame, styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
@@ -170,7 +175,7 @@ final class DesktopNoteEditorTests: XCTestCase {
     }
 
     func testContextClickKeepsTheEditorSelection() async throws {
-        let onSave: (String, Bool) async throws -> Void = { _, _ in }
+        let onSave: (String?, String?, Bool) async throws -> Void = { _, _, _ in }
         let note = DesktopNotePanel(item: ClipItem(content: "First and second word"), screenFrame: screenFrame, onSave: onSave)
         note.makeKeyAndOrderFront(nil)
         defer { note.close() }
@@ -187,6 +192,55 @@ final class DesktopNoteEditorTests: XCTestCase {
             XCTAssertIdentical(context.view, editor)
             XCTAssertTrue(context.menu.items.contains { $0.action == #selector(NSText.paste(_:)) })
             XCTAssertEqual(editor.selectedRange(), range)
+        }
+    }
+
+    func testTitleOnlyEditsPreserveRichTextAndCanAddOrRemoveTheTitle() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let entry = NSPasteboardItem()
+        let content = "Rich note content"
+        entry.setString(content, forType: .string)
+        entry.setString("<strong>Rich note content</strong>", forType: .html)
+        XCTAssertTrue(pasteboard.writeObjects([entry]))
+        let richText = try XCTUnwrap(ClipboardRichText(pasteboard: pasteboard))
+        let item = ClipItem(content: content, metadata: ClipMetadata(sourceURI: "https://example.com/task"), richText: richText)
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        try await repository.save([item])
+        let service = ModernClipboardService(testRepository: repository, loadOnStartup: true)
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+        await coordinator.toggle(item.id, on: screen)
+        let note = try XCTUnwrap(NSApp.windows.compactMap { $0 as? DesktopNotePanel }.first {
+            $0.noteContentController.hostingController.rootView.item.id == item.id
+        })
+        defer { note.close() }
+
+        for (draft, expected) in [("進捗の確認", "進捗の確認"), (" ", nil)] {
+            try desktopNoteEditButton(in: note).performClick(nil)
+            let titleField = try XCTUnwrap(note.editor?.titleField)
+            XCTAssertEqual(titleField.stringValue, adapter.history.first?.title ?? "")
+            XCTAssertTrue(note.makeFirstResponder(titleField))
+            let fieldEditor = try XCTUnwrap(titleField.currentEditor() as? NSTextView)
+            fieldEditor.string = draft
+            let selection = NSRange(location: 0, length: 1)
+            fieldEditor.setSelectedRange(selection)
+            let point = titleField.convert(NSPoint(x: titleField.bounds.midX, y: titleField.bounds.midY), to: nil)
+            let click = try desktopNoteMouseEvent(.rightMouseDown, at: point, for: note)
+            XCTAssertIdentical(note.contextMenu(for: click)?.view, fieldEditor)
+            XCTAssertEqual(fieldEditor.selectedRange(), selection)
+            let save = try desktopNoteKeyEvent(kVK_Return, characters: "\r", modifiers: [.command], for: note)
+            note.sendEvent(save)
+            for _ in 0..<50 where note.editor != nil { try await Task.sleep(for: .milliseconds(10)) }
+            XCTAssertNil(note.editor)
+            XCTAssertEqual(adapter.history.first?.title, expected)
+            XCTAssertEqual(adapter.history.first?.content, content)
+            XCTAssertEqual(adapter.history.first?.richText, richText)
+            XCTAssertEqual(adapter.history.first?.metadata?.sourceURI, item.metadata?.sourceURI)
+            XCTAssertEqual(note.title, expected ?? "")
+            let stored = try await repository.load(ids: [item.id])
+            XCTAssertEqual(stored.first?.title, expected)
         }
     }
 }

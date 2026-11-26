@@ -38,7 +38,7 @@ final class DesktopNoteResizeTests: XCTestCase {
         let item = ClipItem(content: "![Preview](https://example.com/image.png)")
         let note = DesktopNotePanel(
             item: item, screenFrame: screenFrame, displayMode: .markdown,
-            onSave: { _, _ in }, onChangeCategory: { _ in }
+            onSave: { _, _, _ in }, onChangeCategory: { _ in }
         )
         defer { note.close() }
         simulateDesktopNoteLiveResize(note, to: note.minSize)

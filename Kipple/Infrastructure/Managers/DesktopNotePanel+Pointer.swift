@@ -116,6 +116,7 @@ extension DesktopNotePanel {
     private func hoverCursor(at point: NSPoint, useNativeMarkdownCursor: Bool) -> NSCursor? {
         guard NSRect(origin: .zero, size: frame.size).contains(point) else { return nil }
         if isPoint(point, in: sourceLinkRegion) { return .pointingHand }
+        if isPoint(point, in: editor?.titleField) { return .iBeam }
         if let textView = editor?.textView, textView.visibleRect.contains(textView.convert(point, from: nil)) {
             return .iBeam
         }

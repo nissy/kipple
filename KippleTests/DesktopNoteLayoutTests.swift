@@ -163,7 +163,7 @@ final class DesktopNoteLayoutTests: XCTestCase {
         let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
         let text = (1...6).map { "## Step \($0)\n\nReview the release notes." }.joined(separator: "\n\n")
         let item = ClipItem(content: text)
-        let note = DesktopNotePanel(item: item, screenFrame: screen, displayMode: .markdown) { _, _ in }
+        let note = DesktopNotePanel(item: item, screenFrame: screen, displayMode: .markdown) { _, _, _ in }
         let saved = NSRect(x: screen.minX + 40, y: screen.maxY - 220, width: 265, height: 180)
         note.restorePlacement(DesktopNotePlacement(frame: saved, color: .none, usesManualSize: false), in: screen)
         note.makeKeyAndOrderFront(nil)

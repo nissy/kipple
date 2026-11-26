@@ -8,7 +8,7 @@ final class DesktopNotePanel: NSPanel {
     let noteContentController: DesktopNoteContentController
     let colorStrip = NSView()
     private let initialScreenFrame: NSRect
-    let onSave: ((String, Bool) async throws -> Void)?
+    let onSave: ((String?, String?, Bool) async throws -> Void)?
     let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let openLink: (URL) -> Void
     let copyItem: (ClipItem, @escaping () -> Void) -> Void
@@ -62,7 +62,7 @@ final class DesktopNotePanel: NSPanel {
         item: ClipItem,
         screenFrame: NSRect,
         displayMode: AppSettings.DesktopNoteDisplayMode = .plainText,
-        onSave: ((String, Bool) async throws -> Void)? = nil,
+        onSave: ((String?, String?, Bool) async throws -> Void)? = nil,
         onChangeCategory: ((ClipCategoryChange) async throws -> Void)? = nil,
         copyLink: @escaping (String) -> Void = { ModernClipboardServiceAdapter.shared.writeToClipboardOnly($0) },
         copyItem: @escaping (ClipItem, @escaping () -> Void) -> Void = {
@@ -286,6 +286,7 @@ final class DesktopNotePanel: NSPanel {
         let host = noteContentController.hostingController
         var content = host.rootView
         let editor = DesktopNoteEditor(
+            title: content.item.title,
             text: content.item.content,
             onCancel: { [weak self] in self?.cancelEditing() },
             onSave: { [weak self] in self?.saveEditing(explicitly: true) }
@@ -309,7 +310,7 @@ final class DesktopNotePanel: NSPanel {
     }
 
     private func handleNoteShortcut(_ event: NSEvent) -> Bool {
-        guard editor?.textView.hasMarkedText() != true else { return false }
+        guard editor?.hasMarkedText != true else { return false }
         if event.keyCode == kVK_Escape {
             let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
             if !modifiers.isEmpty, editor?.handleShortcut(event) == true { return true }
@@ -325,9 +326,10 @@ final class DesktopNotePanel: NSPanel {
 
     func saveEditing(explicitly: Bool = false) {
         guard let editor, let onSave, !isSaving else { return }
-        editor.textView.unmarkText()
-        let text = editor.textView.string
-        guard text != editor.originalText else {
+        editor.commitTextInput()
+        let title = editor.editedTitle
+        let text = editor.editedText
+        guard title != nil || text != nil else {
             finishEditing(keepingPreviewSize: true)
             return
         }
@@ -337,7 +339,7 @@ final class DesktopNotePanel: NSPanel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await onSave(text, allowsRemovingRichText)
+                try await onSave(title, text, allowsRemovingRichText)
                 isSaving = false
                 finishEditing(keepingPreviewSize: false)
             } catch {
@@ -346,6 +348,8 @@ final class DesktopNotePanel: NSPanel {
                 changeDisplayModeAfterSave = false
                 editor.setSaving(false)
                 editor.showSaveError(error)
+                updateResizeLimits()
+                resize(to: frame.size)
             }
         }
     }
@@ -434,8 +438,7 @@ extension DesktopNotePanel {
         let size = availableFrame.size
         let content = noteContentController.hostingController.rootView
         let width = min(size.width, max(Self.minimumResizeWidth, minimumToolbarWidth))
-        let height = content.minimumHeight(at: width) +
-            (editor == nil ? 0 : DesktopNoteEditor.actionsHeight)
+        let height = content.minimumHeight(at: width) + (editor?.additionalHeight ?? 0)
         minSize = NSSize(width: width, height: min(size.height, height))
         maxSize = size
     }
