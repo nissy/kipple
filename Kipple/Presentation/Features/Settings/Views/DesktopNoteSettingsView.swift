@@ -40,7 +40,9 @@ struct DesktopNoteSettingsView: View {
         .padding(.horizontal, SettingsLayoutMetrics.scrollHorizontalPadding + SettingsLayoutMetrics.groupContentIndent)
         .padding(.vertical, SettingsLayoutMetrics.scrollVerticalPadding)
         .onAppear { displays = DesktopNoteDisplay.connected }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didChangeScreenParametersNotification
+        )) { _ in
             displays = DesktopNoteDisplay.connected
         }
     }

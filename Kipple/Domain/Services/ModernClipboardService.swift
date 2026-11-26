@@ -196,11 +196,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             let filledLoadWindow = recentItems.count == fetchLimit
             if wasTrimmed || filledLoadWindow {
                 let storedIDs = filledLoadWindow ? try await repository.loadItemIDs() : Set(combinedByID.keys)
-                let retainedIDs = Set(history.map(\.id))
-                let removedIDs = storedIDs.subtracting(retainedIDs)
-                if !removedIDs.isEmpty {
-                    try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
-                }
+                try await removeTrimmedItems(storedIDs, from: repository)
             }
             persistedSnapshot = history.reduce(into: [:]) { snapshot, item in
                 snapshot[item.id] = loadedByID[item.id] ?? persistedSnapshot[item.id]
@@ -214,6 +210,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             notifyHistoryObservers()
             Logger.shared.error("Failed to load history: \(error)")
         }
+    }
+
+    private func removeTrimmedItems(_ storedIDs: Set<UUID>, from repository: ClipboardRepositoryProtocol) async throws {
+        let removedIDs = storedIDs.subtracting(history.map(\.id))
+        guard !removedIDs.isEmpty else { return }
+        try await repository.applyChanges(inserted: [], updated: [], removed: Array(removedIDs))
     }
 
     private func withDefinedCategories(_ item: ClipItem) -> ClipItem {

@@ -45,12 +45,17 @@ final class DesktopNoteResizeTests: XCTestCase {
         let content = try XCTUnwrap(note.contentView)
         content.layoutSubtreeIfNeeded()
         let toolbar = try XCTUnwrap(content.subviews.compactMap { $0 as? NSStackView }.first)
+        let close = try XCTUnwrap(note.closeButton)
+        let closeFrame = close.convert(close.bounds, to: content)
         let visible = toolbar.views.filter { !$0.isHidden && $0.window === note }
         XCTAssertEqual(visible.count, 6)
+        XCTAssertEqual(close.title, "")
+        XCTAssertEqual(close.imagePosition, .imageOnly)
+        XCTAssertEqual(close.alignmentRect(forFrame: close.frame).midY, toolbar.frame.midY, accuracy: 1)
         XCTAssertTrue(visible.contains(try desktopNoteEditButton(in: note)))
         for control in visible {
             let frame = control.convert(control.bounds, to: content)
-            XCTAssertLessThanOrEqual(frame.maxX, content.bounds.maxX - DesktopNoteContent.windowBorderInset)
+            XCTAssertLessThan(frame.maxX, closeFrame.minX)
         }
     }
 
@@ -74,9 +79,9 @@ final class DesktopNoteResizeTests: XCTestCase {
                 let sourceRegion = try XCTUnwrap(note.sourceRegion)
                 let frame = sourceRegion.convert(sourceRegion.bounds, to: nil)
                 point = NSPoint(x: frame.minX + horizontalOffset, y: frame.maxY - 12)
-                let close = try XCTUnwrap(contentView.subviews.compactMap { $0 as? NSButton }.first)
+                let close = try XCTUnwrap(note.closeButton)
                 let closeFrame = close.convert(close.bounds, to: nil)
-                XCTAssertLessThanOrEqual(frame.maxX, closeFrame.minX)
+                XCTAssertLessThan(closeFrame.maxY, frame.minY)
                 XCTAssertEqual(frame.maxY, note.frame.height - DesktopNoteContent.headerTopInset, accuracy: 1)
             } else {
                 XCTAssertNil(note.sourceRegion?.window)

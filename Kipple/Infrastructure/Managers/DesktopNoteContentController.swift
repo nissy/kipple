@@ -86,9 +86,9 @@ final class DesktopNoteContentController: NSViewController {
             button.font = .systemFont(ofSize: 12)
         }
         NSLayoutConstraint.activate([
-            titleKey == nil ? button.widthAnchor.constraint(equalToConstant: 24)
-                : button.widthAnchor.constraint(greaterThanOrEqualToConstant: 24),
-            button.heightAnchor.constraint(equalToConstant: 24)
+            titleKey == nil ? button.widthAnchor.constraint(equalToConstant: KippleButtonMetrics.compactIconSize)
+                : button.widthAnchor.constraint(greaterThanOrEqualToConstant: KippleButtonMetrics.compactIconSize),
+            button.heightAnchor.constraint(equalToConstant: KippleButtonMetrics.compactIconSize)
         ])
         return button
     }

@@ -8,7 +8,6 @@ struct DesktopNoteContent: View {
     static let windowBorderInset: CGFloat = 6
     static let headerTopInset: CGFloat = 14
     static let maximumAutomaticWidth: CGFloat = 420
-    private static let closeClearance: CGFloat = 28
 
     let item: ClipItem
     let displayMode: AppSettings.DesktopNoteDisplayMode
@@ -27,7 +26,6 @@ struct DesktopNoteContent: View {
     private var sourceURL: URL? { item.metadata?.sourceWebURL }
     private var hasSource: Bool { sourceApp != nil || windowTitle != nil || sourceURL != nil }
     private var hasTitle: Bool { HistoryItemPreviewContent.nonempty(item.title) != nil }
-    var bodyCloseInset: CGFloat { hasTitle || hasSource ? 0 : Self.closeClearance }
 
     func minimumHeight(at width: CGFloat) -> CGFloat {
         ceil(headerHeight(at: width)) + Self.controlsHeight + 40
@@ -56,7 +54,6 @@ struct DesktopNoteContent: View {
                         .modifier(DesktopNoteTextRegions(allowsSelectionMargin: true))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
-                        .padding(.trailing, bodyCloseInset)
                         .padding(.bottom, 8)
                         .background {
                             Color.clear
@@ -92,13 +89,11 @@ struct DesktopNoteContent: View {
                         .id(selectionRevision)
                         .modifier(DesktopNoteTextRegions())
                         .frame(minHeight: 24, alignment: .topLeading)
-                        .padding(.trailing, Self.closeClearance)
                 }
                 if hasSource {
                     sourceSection
                         .id(selectionRevision)
                         .background(DesktopNoteSourceRegion().allowsHitTesting(false).accessibilityHidden(true))
-                        .padding(.trailing, hasTitle ? 0 : Self.closeClearance)
                 }
             }
             .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
@@ -176,7 +171,6 @@ struct DesktopNoteContent: View {
             header
             plainDocument(sizingText)
                 .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
-                .padding(.trailing, bodyCloseInset)
                 .padding(.bottom, 8)
         })
         let ideal = sizing.sizeThatFits(in: NSSize(width: maxWidth, height: .infinity))
@@ -229,7 +223,7 @@ struct DesktopNoteContent: View {
             plainDocument(item.content).textSelection(.enabled)
         case .markdown:
             DesktopNoteMarkdown(source: item.content, font: Font(historyFont), allowsRemoteImages: allowsRemoteImages) {
-                let paddedWidth = $0 + 2 * HistoryItemPreviewContent.contentPadding + bodyCloseInset
+                let paddedWidth = $0 + 2 * HistoryItemPreviewContent.contentPadding
                 onBlockWidthChange?(paddedWidth, measurementID)
             }
             .id(allowsRemoteImages)
@@ -432,7 +426,7 @@ final class DesktopNoteTextHitView: NSView {
         return visibleRect.contains(point) && lines.contains { $0.contains(point) }
     }
 
-    func nearbySelectionStart(at windowPoint: NSPoint, horizontalInset: CGFloat) -> NSPoint? {
+    func nearbySelectionStart(at windowPoint: NSPoint) -> NSPoint? {
         guard allowsSelectionMargin, window != nil, !isHiddenOrHasHiddenAncestor else { return nil }
         if let clip = enclosingScrollView?.contentView,
            !clip.visibleRect.contains(clip.convert(windowPoint, from: nil)) { return nil }
@@ -447,8 +441,7 @@ final class DesktopNoteTextHitView: NSView {
         for line in lines where line.insetBy(dx: -dx, dy: -dy).contains(point) {
             let clipped = line.intersection(visible)
             guard !clipped.isEmpty else { continue }
-            let inset = min(horizontalInset, clipped.width / 4)
-            let selectable = clipped.insetBy(dx: inset, dy: 0.5)
+            let selectable = clipped.insetBy(dx: min(0.5, clipped.width / 4), dy: 0.5)
             guard !selectable.isEmpty else { continue }
             let start = NSPoint(x: min(max(point.x, selectable.minX), selectable.maxX),
                                 y: min(max(point.y, selectable.minY), selectable.maxY))
@@ -498,223 +491,5 @@ enum DesktopNoteColor: String, CaseIterable, Codable {
         case .green: NSColor.systemGreen
         case .pink: NSColor.systemPink
         }
-    }
-}
-
-@MainActor
-final class DesktopNoteEditor: NSObject {
-    private static let spacing: CGFloat = 6
-    private static let toolbarGap: CGFloat = 8
-    static let actionsHeight = DesktopNoteEditActions.height + spacing + toolbarGap
-
-    let originalText: String
-    let view: NSStackView
-    let textView: LiveEditorTextView
-    private let onSave: () -> Void
-    private let coordinator: SimpleLineNumberCoordinator
-    private let actionsView: NSHostingView<DesktopNoteEditActions>
-    private let errorLabel = NSTextField(wrappingLabelWithString: "")
-    private let scrollTrailingConstraint: NSLayoutConstraint
-    private var topConstraint: NSLayoutConstraint?
-    private var asksToSaveAsPlainText = false
-
-    var isConfirmingPlainTextSave: Bool { asksToSaveAsPlainText && !errorLabel.isHidden }
-
-    init(text: String, onCancel: @escaping () -> Void, onSave: @escaping () -> Void) {
-        let editor = SimpleLineNumberView(
-            text: .constant(text), font: FontManager.shared.editorFont, isEditable: true,
-            onDoubleClick: nil, onEscape: nil, textColor: .textColor, onScrollChange: nil
-        )
-        let coordinator = editor.makeCoordinator()
-        let (scroll, textView) = editor.makeEditor(using: coordinator)
-        originalText = text
-        self.textView = textView
-        self.onSave = onSave
-        self.coordinator = coordinator
-        actionsView = NSHostingView(rootView: DesktopNoteEditActions(onCancel: onCancel, onSave: onSave))
-        scroll.scrollerStyle = .overlay
-        textView.setAccessibilityLabel(AppSettings.shared.localizedString("Content"))
-
-        errorLabel.textColor = .systemRed
-        errorLabel.font = .systemFont(ofSize: 11)
-        errorLabel.maximumNumberOfLines = 2
-        errorLabel.isHidden = true
-        errorLabel.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
-        scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        let scrollContainer = NSView()
-        scrollContainer.addSubview(scroll)
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        let trailing = scroll.trailingAnchor.constraint(equalTo: scrollContainer.trailingAnchor)
-        scrollTrailingConstraint = trailing
-        NSLayoutConstraint.activate([
-            scroll.leadingAnchor.constraint(equalTo: scrollContainer.leadingAnchor),
-            trailing,
-            scroll.topAnchor.constraint(equalTo: scrollContainer.topAnchor),
-            scroll.bottomAnchor.constraint(equalTo: scrollContainer.bottomAnchor)
-        ])
-        view = NSStackView(views: [scrollContainer, errorLabel, actionsView])
-        super.init()
-        view.orientation = .vertical
-        view.alignment = .width
-        view.spacing = Self.spacing
-        view.translatesAutoresizingMaskIntoConstraints = false
-    }
-
-    func install(in container: NSView, headerHeight: CGFloat, bodyCloseInset: CGFloat) {
-        let padding = HistoryItemPreviewContent.contentPadding
-        container.addSubview(view)
-        let top = view.topAnchor.constraint(equalTo: container.topAnchor, constant: headerHeight)
-        topConstraint = top
-        scrollTrailingConstraint.constant = -bodyCloseInset
-        NSLayoutConstraint.activate([
-            view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
-            view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -padding),
-            top,
-            view.bottomAnchor.constraint(
-                equalTo: container.bottomAnchor, constant: -(DesktopNoteContent.controlsHeight + Self.toolbarGap)
-            )
-        ])
-    }
-
-    func updateHeader(height: CGFloat, bodyCloseInset: CGFloat) {
-        topConstraint?.constant = height
-        scrollTrailingConstraint.constant = -bodyCloseInset
-    }
-
-    func setSaving(_ isSaving: Bool) {
-        textView.isEditable = !isSaving
-        actionsView.rootView.isSaving = isSaving
-    }
-
-    func focus(in window: NSWindow, scrollProgress: CGFloat) {
-        window.makeFirstResponder(textView)
-        let index = scrollProgress > 0 ? scrollTo(progress: scrollProgress) : 0
-        let offset = max(0, min(index, originalText.utf16.count))
-        let range = NSRange(location: offset, length: 0)
-        textView.setSelectedRange(range)
-        textView.scrollRangeToVisible(range)
-    }
-
-    private func scrollTo(progress: CGFloat) -> Int {
-        guard let scroll = textView.enclosingScrollView, let container = textView.textContainer else { return 0 }
-        textView.layoutManager?.ensureLayout(for: container)
-        scroll.layoutSubtreeIfNeeded()
-        let clip = scroll.contentView
-        let document = clip.documentRect
-        let offset = document.minY + progress * max(0, document.height - clip.bounds.height)
-        clip.scroll(to: CGPoint(x: clip.bounds.minX, y: offset))
-        scroll.reflectScrolledClipView(clip)
-        let point = NSPoint(x: textView.textContainerOrigin.x, y: clip.documentVisibleRect.minY + 1)
-        return textView.characterIndexForInsertion(at: point)
-    }
-
-    func handleShortcut(_ event: NSEvent) -> Bool {
-        switch AppSettings.shared.editorHotkey(for: event) {
-        case .save:
-            onSave()
-        case .clear:
-            clear()
-        case nil:
-            let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-            guard modifiers == .command,
-                  event.keyCode == kVK_Return || event.keyCode == kVK_ANSI_KeypadEnter else { return false }
-            onSave()
-        }
-        return true
-    }
-
-    func makeToolsMenu() -> NSMenu {
-        let menu = NSMenu()
-        addTool("editor.trim", action: #selector(trim), to: menu)
-        for format in ClipboardTextFormat.allCases {
-            let item = addTool("editor.format.\(format.rawValue)", action: #selector(formatText(_:)), to: menu)
-            item.representedObject = format.rawValue
-        }
-        menu.addItem(.separator())
-        addTool("Clear", action: #selector(clear), to: menu)
-        return menu
-    }
-
-    func showError(_ message: String) {
-        asksToSaveAsPlainText = false
-        errorLabel.stringValue = message
-        errorLabel.toolTip = message
-        errorLabel.isHidden = false
-    }
-
-    func showSaveError(_ error: Error) {
-        showError(AppSettings.shared.localizedString(clipItemEditErrorMessage(error)))
-        if case .richTextLossRequiresConfirmation = error as? ClipItemEditError {
-            asksToSaveAsPlainText = true
-        }
-    }
-
-    @discardableResult
-    private func addTool(_ key: String, action: Selector, to menu: NSMenu) -> NSMenuItem {
-        let title = AppSettings.shared.localizedString(key)
-        let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
-        item.target = self
-        return item
-    }
-
-    @objc private func trim() {
-        textView.unmarkText()
-        replaceText(with: textView.string.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    @objc private func formatText(_ item: NSMenuItem) {
-        guard let key = item.representedObject as? String, let format = ClipboardTextFormat(rawValue: key) else { return }
-        textView.unmarkText()
-        do {
-            replaceText(with: try ClipboardTextFormatter.format(textView.string, as: format))
-        } catch {
-            let detail = (error as? ClipboardTextFormatter.FormatError)?.detail ?? error.localizedDescription
-            let message = AppSettings.shared.localizedString("editor.format.error.invalid")
-            showError(String(format: message, format.localizedName, detail))
-        }
-    }
-
-    @objc private func clear() {
-        textView.unmarkText()
-        replaceText(with: "")
-    }
-
-    private func replaceText(with text: String) {
-        errorLabel.isHidden = true
-        guard textView.isEditable, text != textView.string else { return }
-        let range = NSRange(location: 0, length: textView.attributedString().length)
-        textView.breakUndoCoalescing()
-        _ = textView.performValidatedReplacement(in: range, with: NSAttributedString(string: text))
-        textView.breakUndoCoalescing()
-    }
-}
-
-private struct DesktopNoteEditActions: View {
-    static let height: CGFloat = 28
-
-    let onCancel: () -> Void
-    let onSave: () -> Void
-    var isSaving = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Button("Cancel", action: onCancel)
-                .buttonStyle(style(
-                    fill: colorScheme == .dark ? .white.opacity(0.055) : Color(nsColor: .textBackgroundColor),
-                    foreground: .primary,
-                    border: .primary.opacity(0.17)
-                ))
-            Button("Save", action: onSave)
-                .buttonStyle(style(fill: ClipEditorButtonStyle.accent, foreground: .white, border: .clear))
-        }
-        .fixedSize()
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .disabled(isSaving)
-        .environment(\.locale, AppSettings.shared.appLocale)
-    }
-
-    private func style(fill: Color, foreground: Color, border: Color) -> ClipEditorButtonStyle {
-        ClipEditorButtonStyle(fill: fill, foreground: foreground, border: border, horizontalPadding: 8, height: Self.height)
     }
 }
