@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Combine
 
 // MARK: - Modern Clipboard Service Adapter
 
@@ -190,6 +191,12 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     func protectHistoryForDesktopNote(_ itemID: UUID) async -> ClipItem? {
         await modernService.protectHistoryForDesktopNote(itemID)
+    }
+
+    var repeatedCopyDesktopNoteRequests: AnyPublisher<UUID, Never> {
+        NotificationCenter.default.publisher(for: .desktopNoteRequestedByRepeatedCopy, object: modernService)
+            .compactMap { $0.userInfo?["itemID"] as? UUID }
+            .eraseToAnyPublisher()
     }
 
     func desktopNoteItemsToRestore(_ ids: Set<UUID>) async -> [ClipItem]? {

@@ -5,30 +5,37 @@
 //  Tests for clipboard monitoring duplicate handling
 //
 
+import AppKit
 import XCTest
 @testable import Kipple
 
 @MainActor
 final class ClipboardMonitoringDuplicateTests: XCTestCase {
     private var service: ModernClipboardService!
+    private var pasteboard: NSPasteboard!
 
     override func setUp() async throws {
         try await super.setUp()
 
-        service = ModernClipboardService.shared
-        await service.resetForTesting()
-
-        // Clear any existing data
-        await service.clearHistory(keepingCategories: true)
-        await service.stopMonitoring()
+        let pasteboard = NSPasteboard.withUniqueName()
+        self.pasteboard = pasteboard
+        service = ModernClipboardService(
+            testRepository: try SwiftDataRepository.make(inMemory: true),
+            clipboardWriter: { item in
+                pasteboard.clearContents()
+                return pasteboard.setString(item.content, forType: .string) ? pasteboard.changeCount : -1
+            },
+            clipboardReader: ClipboardReader(
+                pasteboard: pasteboard, readAccess: { .alwaysAllow }, readSelection: { _, _ in nil }
+            )
+        )
     }
 
     override func tearDown() async throws {
-        // Clean up
-        await service.clearHistory(keepingCategories: true)
-        await service.stopMonitoring()
-
+        await service?.stopMonitoring()
+        pasteboard?.releaseGlobally()
         service = nil
+        pasteboard = nil
 
         try await super.tearDown()
     }
@@ -83,11 +90,7 @@ final class ClipboardMonitoringDuplicateTests: XCTestCase {
         // Start monitoring
         await service.startMonitoring()
 
-        // When: External app copies the same content (simulated by not marking as internal)
-        let state = ClipboardState()
-        await state.setInternalCopy(false) // Simulate external copy
-
-        // Manually trigger clipboard check with same content
+        // When: A write bypasses the service and the monitor reads it
         await simulateExternalCopy("External Test")
 
         // Then: Content should move to top
@@ -156,14 +159,8 @@ final class ClipboardMonitoringDuplicateTests: XCTestCase {
     // MARK: - Helper Methods
 
     private func simulateExternalCopy(_ content: String) async {
-        // This simulates what would happen when external app copies to clipboard
-        // The service should detect this through monitoring and update history
-
-        // We can't directly simulate NSPasteboard changes in tests,
-        // so we'll call the internal method that would be triggered
-
-        // For now, just copy through service without internal flag
-        // In real scenario, this would come from pasteboard monitoring
-        await service.copyToClipboard(content, fromEditor: false)
+        pasteboard.clearContents()
+        XCTAssertTrue(pasteboard.setString(content, forType: .string))
+        await service.checkClipboardForTesting()
     }
 }

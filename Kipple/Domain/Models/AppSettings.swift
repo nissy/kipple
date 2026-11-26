@@ -21,6 +21,15 @@ final class AppSettings: ObservableObject {
     @AppStorage(Keys.desktopNoteDefaultDisplayMode)
     private var storedDesktopNoteDisplayMode = DesktopNoteDisplayMode.plainText
 
+    @AppStorage(Keys.desktopNoteDisplayID) var desktopNoteDisplayID = ""
+
+    @AppStorage(Keys.desktopNoteOnRepeatedCopy) var desktopNoteOnRepeatedCopy = true {
+        didSet {
+            if oldValue != desktopNoteOnRepeatedCopy { desktopNoteRepeatedCopySettingRevision &+= 1 }
+        }
+    }
+    private(set) var desktopNoteRepeatedCopySettingRevision: UInt64 = 0
+
     var desktopNoteDefaultDisplayMode: DesktopNoteDisplayMode {
         get { storedDesktopNoteDisplayMode }
         set {
@@ -200,6 +209,8 @@ final class AppSettings: ObservableObject {
         static let editorSectionHeight = "editorSectionHeight"
         static let historySectionHeight = "historySectionHeight"
         static let desktopNoteDefaultDisplayMode = "desktopNoteDefaultDisplayMode"
+        static let desktopNoteDisplayID = "desktopNoteDisplayID"
+        static let desktopNoteOnRepeatedCopy = "desktopNoteOnRepeatedCopy"
         static let editorPosition = "editorPosition"
         static let maxHistoryItems = "maxHistoryItems"
         static let enableHotkey = "enableHotkey"

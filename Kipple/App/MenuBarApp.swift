@@ -103,8 +103,9 @@ final class MenuBarApp: NSObject, ObservableObject {
             guard let self else { return }
             self.setupTextCaptureHotkey()
             self.setupPlainTextPasteHotkey()
+            let desktopNotes = DesktopNoteWindowCoordinator.shared
             self.startServices()
-            Task { await DesktopNoteWindowCoordinator.shared.restoreNotes() }
+            Task { await desktopNotes.restoreNotes() }
             DispatchQueue.main.async { [weak self] in
                 self?.windowManager.prewarmMainWindow()
             }

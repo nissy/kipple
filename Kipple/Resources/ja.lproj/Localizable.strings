@@ -42,6 +42,11 @@
 "Copy URL" = "URLをコピー";
 "Desktop Notes" = "デスクトップ付箋";
 "Default display format" = "既定の表示形式";
+"Note creation display" = "作成先のモニタ";
+"Automatic display" = "自動";
+"Selected display (disconnected)" = "選択したモニタ（未接続）";
+"Create a note on repeated copy" = "連続コピーで付箋を作成";
+"Copy the same text three times within five seconds in another app." = "外部アプリで同じテキストを5秒以内に3回連続でコピーします。";
 "Plain Text" = "プレーンテキスト";
 "Markdown" = "Markdown";
 "Show Plain Text" = "プレーンテキストで表示";

@@ -6,6 +6,7 @@ import Combine
 
 extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
+    static let desktopNoteRequestedByRepeatedCopy = Notification.Name("DesktopNoteRequestedByRepeatedCopy")
 }
 
 enum ClipItemEditError: Error {
@@ -20,6 +21,13 @@ enum ClipItemEditError: Error {
 // MARK: - Modern Clipboard Service (Actor-based)
 
 actor ModernClipboardService: ModernClipboardServiceProtocol {
+    private struct RepeatedCopySequence {
+        let content: String
+        let firstCopiedAt: ContinuousClock.Instant
+        let settingRevision: UInt64
+        var count = 1
+    }
+
     struct QueueHeadChange {
         let revision: UInt64
         let itemID: UUID?
@@ -55,6 +63,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     private var categoryStore: UserCategoryStore?
     private var definedCustomCategoryIDs: Set<UUID>?
     private var desktopNoteItemIDs: Set<UUID> = []
+    private var repeatedCopySequence: RepeatedCopySequence?
 
     // Repository for persistence
     private var repository: ClipboardRepositoryProtocol?
@@ -269,6 +278,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         isMonitoringFlag = false
         pollingTask?.cancel()
         pollingTask = nil
+        repeatedCopySequence = nil
 
         // Stop app switching observation
         await stopAppSwitchObserver()
@@ -541,6 +551,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             let clearedCount = removedIDs.union(history.map(\.id)).subtracting(retainedIDs).count
             history = retained
+            repeatedCopySequence = nil
             rebuildContentLookup()
             markHistoryChanged()
             notifyHistoryObservers()
@@ -663,12 +674,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard isRepositoryReady else { return false }
         let observation = await MainActor.run { (clipboardReader ?? .shared).observation }
         let changeCount = observation.changeCount
+        let isNewWrite = changeCount != lastChangeCount
 
-        guard forceCapture || changeCount != lastChangeCount
+        guard forceCapture || isNewWrite
                 || observation.accessRevision != lastClipboardAccessRevision else { return true }
 
         if await shouldSkipChange(for: changeCount) { return true }
 
+        let copiedAt = ContinuousClock.now
         let detectedAt = PerformanceTrace.nowMicros()
 
         // Get clipboard content
@@ -679,8 +692,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard let captured, captured.stamp.changeCount == changeCount else { return false }
         lastChangeCount = changeCount
         lastClipboardAccessRevision = captured.stamp.accessRevision
-        guard !captured.shouldExcludeFromHistory else { return true }
-        guard let item = await fetchClipboardItem(captured) else { return true }
+        guard !captured.shouldExcludeFromHistory, let item = await fetchClipboardItem(captured) else {
+            if isNewWrite { repeatedCopySequence = nil }
+            return true
+        }
         PerformanceTrace.event(
             "pasteboard_change_detected",
             atMicros: detectedAt,
@@ -694,13 +709,51 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         )
 
         // Always add to history - addToHistory handles duplicates by moving them to top
-        addToHistory(item)
+        let itemID = addToHistory(item)
+        if isNewWrite {
+            await trackRepeatedCopy(of: item, itemID: itemID, at: copiedAt)
+        }
         lastEventTime = Date()
         currentInterval = minInterval
 
         // Reset flags
         await state.setFromEditor(false)
         return true
+    }
+
+    private func trackRepeatedCopy(of item: ClipItem, itemID: UUID, at copiedAt: ContinuousClock.Instant) async {
+        // The clipboard changed, but native copies from Kipple views may bypass its clipboard service.
+        guard item.isFromEditor != true, item.processID != ProcessInfo.processInfo.processIdentifier,
+              Bundle.main.bundleIdentifier.map({ item.bundleIdentifier != $0 }) ?? true else { return }
+        let revision = await MainActor.run {
+            let settings = AppSettings.shared
+            return settings.desktopNoteOnRepeatedCopy ? settings.desktopNoteRepeatedCopySettingRevision : nil
+        }
+        guard let revision else {
+            repeatedCopySequence = nil
+            return
+        }
+        guard var sequence = repeatedCopySequence, sequence.content == item.content,
+              sequence.settingRevision == revision, copiedAt - sequence.firstCopiedAt <= .seconds(5) else {
+            repeatedCopySequence = RepeatedCopySequence(
+                content: item.content, firstCopiedAt: copiedAt, settingRevision: revision
+            )
+            return
+        }
+        sequence.count += 1
+        if sequence.count < 3 {
+            repeatedCopySequence = sequence
+        } else {
+            repeatedCopySequence = nil
+            Task { @MainActor in
+                let settings = AppSettings.shared
+                guard settings.desktopNoteOnRepeatedCopy,
+                      settings.desktopNoteRepeatedCopySettingRevision == revision else { return }
+                NotificationCenter.default.post(
+                    name: .desktopNoteRequestedByRepeatedCopy, object: self, userInfo: ["itemID": itemID]
+                )
+            }
+        }
     }
 
     @discardableResult

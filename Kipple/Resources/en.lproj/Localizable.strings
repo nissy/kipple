@@ -42,6 +42,11 @@
 "Copy URL" = "Copy URL";
 "Desktop Notes" = "Desktop Notes";
 "Default display format" = "Default display format";
+"Note creation display" = "Create notes on";
+"Automatic display" = "Automatic";
+"Selected display (disconnected)" = "Selected display (disconnected)";
+"Create a note on repeated copy" = "Create a note on repeated copy";
+"Copy the same text three times within five seconds in another app." = "Copy the same text three times within five seconds in another app.";
 "Plain Text" = "Plain Text";
 "Markdown" = "Markdown";
 "Show Plain Text" = "Show Plain Text";

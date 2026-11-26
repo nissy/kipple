@@ -1,7 +1,36 @@
 import AppKit
 import Carbon.HIToolbox
 import Combine
+import CoreGraphics
 import SwiftUI
+
+@MainActor
+struct DesktopNoteDisplay: Identifiable {
+    let id: String
+    let screen: NSScreen
+
+    init?(screen: NSScreen) {
+        guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return nil }
+        id = CFUUIDCreateString(nil, uuid) as String
+        self.screen = screen
+    }
+
+    static var connected: [Self] {
+        NSScreen.screens.compactMap(Self.init)
+    }
+
+    static func destination(preferredID: String, originatingScreen: NSScreen?, among screens: [NSScreen]) -> NSScreen? {
+        let displays = screens.compactMap(Self.init)
+        let fallbackID = originatingScreen.flatMap(Self.init)?.id
+        let mainScreen = NSScreen.main
+        return displays.first { $0.id == preferredID }?.screen
+            ?? displays.first { $0.id == fallbackID }?.screen
+            ?? screens.first { $0 == originatingScreen }
+            ?? screens.first { $0 == mainScreen }
+            ?? screens.first
+    }
+}
 
 struct DesktopNotePlacement: Codable {
     private static let defaultsKey = "desktopNotePlacements"
@@ -32,6 +61,7 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
     private var placements: [UUID: DesktopNotePlacement]
     private var isTerminating = false
     private var historyObservation: AnyCancellable?
+    private var repeatedCopyObservation: AnyCancellable?
 
     init(adapter: ModernClipboardServiceAdapter = .shared, defaults: UserDefaults? = nil) {
         self.adapter = adapter
@@ -40,6 +70,9 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
         super.init()
         historyObservation = adapter.$history.sink { [weak self] history in
             self?.updateOpenNotes(from: history)
+        }
+        repeatedCopyObservation = adapter.repeatedCopyDesktopNoteRequests.sink { [weak self] itemID in
+            Task { await self?.post(itemID, on: nil) }
         }
     }
 
@@ -53,9 +86,19 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
             await closingNotes[itemID]?.value
             return
         }
-        guard let screen = screen ?? NSScreen.main,
+        await post(itemID, on: screen)
+    }
+
+    private func post(_ itemID: UUID, on screen: NSScreen?) async {
+        guard !isTerminating, notes[itemID] == nil, !NSScreen.screens.isEmpty,
               let item = await adapter.protectHistoryForDesktopNote(itemID) else { return }
-        openNote(for: item, on: screen)
+        guard !isTerminating, let destination = DesktopNoteDisplay.destination(
+            preferredID: AppSettings.shared.desktopNoteDisplayID, originatingScreen: screen, among: NSScreen.screens
+        ) else {
+            await adapter.removeDesktopNoteProtection(itemID)
+            return
+        }
+        openNote(for: item, on: destination)
     }
 
     func restoreNotes() async {

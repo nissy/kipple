@@ -79,9 +79,12 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let suite = UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let previousLimit = AppSettings.shared.maxHistoryItems
+        let previousDisplay = AppSettings.shared.desktopNoteDisplayID
+        AppSettings.shared.desktopNoteDisplayID = ""
         defer {
             defaults.removePersistentDomain(forName: suite)
             AppSettings.shared.maxHistoryItems = previousLimit
+            AppSettings.shared.desktopNoteDisplayID = previousDisplay
         }
         let repository = try SwiftDataRepository.make(inMemory: true)
         let adapter = ModernClipboardServiceAdapter(
@@ -123,6 +126,9 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         )
         let reopenedAdapter = ModernClipboardServiceAdapter(modernService: reopenedService, refreshPeriodically: false)
         let reopened = DesktopNoteWindowCoordinator(adapter: reopenedAdapter, defaults: defaults)
+        AppSettings.shared.desktopNoteDisplayID = DesktopNoteDisplay.connected.first {
+            $0.screen.frame != screen.frame
+        }?.id ?? UUID().uuidString
         await reopened.restoreNotes()
         let window = try XCTUnwrap(NSApp.windows.first { $0.title == title && $0.isVisible } as? DesktopNotePanel)
         defer { window.close() }
@@ -137,6 +143,56 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertTrue(DesktopNotePlacement.load(from: defaults).isEmpty)
         await reopened.restoreNotes()
         XCTAssertFalse(reopened.isPosted(item.id))
+    }
+
+    func testNewNotesUseTheSelectedDisplayWithTheOriginatingDisplayAsFallback() async throws {
+        let displays = DesktopNoteDisplay.connected
+        let originating = try XCTUnwrap(displays.first)
+        let selected = try XCTUnwrap(displays.last)
+        let settings = AppSettings.shared
+        let previousDisplay = settings.desktopNoteDisplayID
+        defer { settings.desktopNoteDisplayID = previousDisplay }
+        let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+
+        settings.desktopNoteDisplayID = selected.id
+        let title = UUID().uuidString
+        try await adapter.createHistoryItem(title: title, content: "Selected display note", categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: originating.screen)
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
+        defer { note.close() }
+        XCTAssertTrue(selected.screen.visibleFrame.contains(note.frame))
+        let originalFrame = note.frame
+
+        let unavailable = UUID().uuidString
+        settings.desktopNoteDisplayID = unavailable
+        let fallbackTitle = UUID().uuidString
+        try await adapter.createHistoryItem(title: fallbackTitle, content: "Fallback display note", categoryChanges: [:])
+        let fallbackItem = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(fallbackItem.id, on: originating.screen)
+        let fallback = try XCTUnwrap(NSApp.windows.first { $0.title == fallbackTitle } as? DesktopNotePanel)
+        defer { fallback.close() }
+        XCTAssertTrue(originating.screen.visibleFrame.contains(fallback.frame))
+        XCTAssertEqual(settings.desktopNoteDisplayID, unavailable)
+        XCTAssertEqual(note.frame, originalFrame)
+    }
+
+    func testDisplaySelectionResolvesAgainWhenTheSavedMonitorIsAvailable() throws {
+        let displays = DesktopNoteDisplay.connected
+        let selected = try XCTUnwrap(displays.last)
+        let fallback = displays.first { $0.id != selected.id }
+        let remaining = displays.filter { $0.id != selected.id }.map(\.screen)
+
+        let whileDisconnected = DesktopNoteDisplay.destination(
+            preferredID: selected.id, originatingScreen: fallback?.screen, among: remaining
+        )
+        XCTAssertEqual(whileDisconnected?.frame, fallback?.screen.frame)
+        let afterReconnect = DesktopNoteDisplay.destination(
+            preferredID: selected.id, originatingScreen: fallback?.screen, among: displays.map(\.screen)
+        )
+        XCTAssertEqual(afterReconnect?.frame, selected.screen.frame)
     }
 
     func testRestoreKeepsNotesOnScreenAndRemovesMissingHistoryReferences() async throws {
@@ -411,7 +467,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
         let text = (1...6).map { "## Step \($0)\n\nReview the release notes." }.joined(separator: "\n\n")
         let item = ClipItem(content: text)
-        let note = DesktopNotePanel(item: item, screenFrame: screen, displayMode: .markdown, onSave: { _, _ in })
+        let note = DesktopNotePanel(item: item, screenFrame: screen, displayMode: .markdown) { _, _ in }
         let saved = NSRect(x: screen.minX + 40, y: screen.maxY - 220, width: 265, height: 180)
         note.restorePlacement(DesktopNotePlacement(frame: saved, color: .none, usesManualSize: false), in: screen)
         note.makeKeyAndOrderFront(nil)
@@ -773,6 +829,148 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
 }
 
 extension DesktopNoteWindowCoordinatorTests {
+    func testThirdExternalCopyPostsOneNoteForTheExistingHistoryItem() async throws {
+        let settings = AppSettings.shared
+        let previous = settings.desktopNoteOnRepeatedCopy
+        let previousDisplay = settings.desktopNoteDisplayID
+        let selected = try XCTUnwrap(DesktopNoteDisplay.connected.last)
+        settings.desktopNoteOnRepeatedCopy = true
+        settings.desktopNoteDisplayID = selected.id
+        defer {
+            settings.desktopNoteOnRepeatedCopy = previous
+            settings.desktopNoteDisplayID = previousDisplay
+        }
+        let fixture = try RepeatedCopyFixture()
+        defer { fixture.pasteboard.releaseGlobally() }
+        let text = "Review the desktop release checklist"
+
+        let first = await fixture.copy(text)
+        let original = try XCTUnwrap(first)
+        _ = await fixture.copy(text)
+        await fixture.service.checkClipboardForTesting()
+        await fixture.service.recopyFromHistory(original)
+        await fixture.service.checkClipboardForTesting()
+        XCTAssertTrue(fixture.requests.isEmpty)
+
+        let third = await fixture.copy(text)
+        XCTAssertEqual(third?.id, original.id)
+        for _ in 0..<50 where !fixture.coordinator.isPosted(original.id) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(fixture.coordinator.isPosted(original.id))
+        let window = try XCTUnwrap(fixture.noteWindow(for: original.id))
+        defer { window.close() }
+        XCTAssertTrue(selected.screen.visibleFrame.contains(window.frame))
+
+        for _ in 0..<3 { _ = await fixture.copy(text) }
+        for _ in 0..<50 where fixture.requests.count < 2 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(fixture.requests, [original.id, original.id])
+        XCTAssertIdentical(fixture.noteWindow(for: original.id), window)
+        XCTAssertTrue(fixture.coordinator.isPosted(original.id))
+        let history = await fixture.service.getHistory()
+        XCTAssertEqual(history.map(\.id), [original.id])
+    }
+
+    func testRepeatedCopiesStartOverAfterATimeoutOrDifferentText() async throws {
+        let settings = AppSettings.shared
+        let previous = settings.desktopNoteOnRepeatedCopy
+        settings.desktopNoteOnRepeatedCopy = true
+        defer { settings.desktopNoteOnRepeatedCopy = previous }
+        let fixture = try RepeatedCopyFixture()
+        defer { fixture.pasteboard.releaseGlobally() }
+        let text = "Follow up on the action item"
+
+        _ = await fixture.copy(text)
+        _ = await fixture.copy(text)
+        try await Task.sleep(for: .milliseconds(5_100))
+        _ = await fixture.copy(text)
+        XCTAssertTrue(fixture.requests.isEmpty)
+        _ = await fixture.copy("Another action item")
+        _ = await fixture.copy(text)
+        _ = await fixture.copy(text)
+        XCTAssertTrue(fixture.requests.isEmpty)
+        let third = await fixture.copy(text)
+        let itemID = try XCTUnwrap(third?.id)
+        for _ in 0..<50 where !fixture.coordinator.isPosted(itemID) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        defer { fixture.noteWindow(for: itemID)?.close() }
+        XCTAssertEqual(fixture.requests, [itemID])
+        XCTAssertTrue(fixture.coordinator.isPosted(itemID))
+    }
+
+    func testRepeatedCopySettingCanBeTurnedOffAndBackOn() async throws {
+        let settings = AppSettings.shared
+        let previous = settings.desktopNoteOnRepeatedCopy
+        settings.desktopNoteOnRepeatedCopy = false
+        defer { settings.desktopNoteOnRepeatedCopy = previous }
+        let fixture = try RepeatedCopyFixture()
+        defer { fixture.pasteboard.releaseGlobally() }
+        let text = "Schedule a follow-up"
+
+        for _ in 0..<3 { _ = await fixture.copy(text) }
+        XCTAssertTrue(fixture.requests.isEmpty)
+
+        settings.desktopNoteOnRepeatedCopy = true
+        _ = await fixture.copy(text)
+        _ = await fixture.copy(text)
+        settings.desktopNoteOnRepeatedCopy = false
+        settings.desktopNoteOnRepeatedCopy = true
+        _ = await fixture.copy(text)
+        _ = await fixture.copy(text)
+        XCTAssertTrue(fixture.requests.isEmpty)
+
+        let third = await fixture.copy(text)
+        let itemID = try XCTUnwrap(third?.id)
+        for _ in 0..<50 where !fixture.coordinator.isPosted(itemID) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        defer { fixture.noteWindow(for: itemID)?.close() }
+        XCTAssertEqual(fixture.requests, [itemID])
+        XCTAssertTrue(fixture.coordinator.isPosted(itemID))
+    }
+
+    @MainActor
+    private final class RepeatedCopyFixture {
+        let pasteboard = NSPasteboard.withUniqueName()
+        let service: ModernClipboardService
+        let coordinator: DesktopNoteWindowCoordinator
+        private(set) var requests: [UUID] = []
+        private var observation: AnyCancellable?
+
+        init() throws {
+            let pasteboard = self.pasteboard
+            service = ModernClipboardService(
+                testRepository: try SwiftDataRepository.make(inMemory: true),
+                clipboardWriter: { item in
+                    pasteboard.clearContents()
+                    return pasteboard.setString(item.content, forType: .string) ? pasteboard.changeCount : -1
+                },
+                clipboardReader: ClipboardReader(
+                    pasteboard: pasteboard, readAccess: { .alwaysAllow }, readSelection: { _, _ in nil }
+                )
+            )
+            let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+            coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+            observation = adapter.repeatedCopyDesktopNoteRequests.sink { [weak self] in self?.requests.append($0) }
+        }
+
+        func copy(_ content: String) async -> ClipItem? {
+            pasteboard.clearContents()
+            XCTAssertTrue(pasteboard.setString(content, forType: .string))
+            await service.checkClipboardForTesting()
+            return await service.getHistory().first
+        }
+
+        func noteWindow(for itemID: UUID) -> DesktopNotePanel? {
+            NSApp.windows.compactMap { $0 as? DesktopNotePanel }.first {
+                ($0.contentViewController as? DesktopNoteContentController)?.hostingController.rootView.item.id == itemID
+            }
+        }
+    }
+
     func testEscapeCancelsEditingWithoutUnpinningTheNote() async throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
