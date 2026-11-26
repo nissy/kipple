@@ -176,7 +176,8 @@ final class DesktopNotePanel: NSPanel {
             categoryControl.rootView.item = item
         }
         let previous = noteContentController.hostingController.rootView.item
-        guard item.title != previous.title || item.content != previous.content else { return }
+        guard item.title != previous.title || item.content != previous.content ||
+                item.metadata?.sourceWebURL != previous.metadata?.sourceWebURL else { return }
         reloadPreview(for: item)
     }
 
@@ -186,14 +187,14 @@ final class DesktopNotePanel: NSPanel {
         let previous = noteContentController.hostingController.rootView
         content.openURL = previous.openURL
         content.allowsRemoteImages = item.content == previous.item.content && previous.allowsRemoteImages
-        let updatedTitle = HistoryItemPreviewContent.nonempty(item.title) ?? ""
-        let titleChanged = title != updatedTitle
-        title = updatedTitle
-        if titleChanged, !title.isEmpty, let manualSize, manualSize.height < minimumManualHeight {
-            self.manualSize = NSSize(width: manualSize.width, height: minimumManualHeight)
-        }
-        if titleChanged { updateResizeLimits() }
+        title = HistoryItemPreviewContent.nonempty(item.title) ?? ""
         noteContentController.setContent(content)
+        if item.title != previous.item.title || previous.sourceLinkHeight != content.sourceLinkHeight {
+            if let manualHeight = manualSize?.height {
+                manualSize?.height = max(manualHeight, content.minimumHeight(startingAt: Self.minimumResizeSize.height))
+            }
+            updateResizeLimits()
+        }
         if editor == nil, !inLiveResize {
             resize(to: manualSize ?? content.estimatedWindowSize(in: availableFrame, minimumWidth: Self.minimumResizeSize.width))
         }
@@ -294,8 +295,10 @@ final class DesktopNotePanel: NSPanel {
         guard let contentView else { return false }
         let location = contentView.convert(point, from: nil)
         let inset = DesktopNoteContent.windowBorderInset
+        let sourceLink = noteContentController.hostingController.rootView.sourceLinkVerticalRange
         // AppKit handles the frame outside the note's interactive surface.
         guard contentView.bounds.insetBy(dx: inset, dy: inset).contains(location),
+              !sourceLink.contains(location.y),
               !(contentView.hitTest(location) is NSScroller) else { return false }
         let interactiveViews = controls + (editor.map { [$0.view] } ?? [])
         return !interactiveViews.contains { !$0.isHidden && $0.bounds.contains($0.convert(point, from: nil)) }
@@ -511,11 +514,6 @@ private extension DesktopNotePanel {
 
     var availableFrame: NSRect { screen?.visibleFrame ?? initialScreenFrame }
 
-    var minimumManualHeight: CGFloat {
-        // Reserve space for a title that wraps onto two lines above the document.
-        title.isEmpty ? Self.minimumResizeSize.height : Self.minimumResizeSize.height + 40
-    }
-
     func resize(to requestedSize: NSSize) {
         let screen = availableFrame
         let size = NSSize(width: min(requestedSize.width, screen.width), height: min(requestedSize.height, screen.height))
@@ -529,7 +527,9 @@ private extension DesktopNotePanel {
 
     func updateResizeLimits() {
         let size = availableFrame.size
-        let height = minimumManualHeight + (editor == nil ? 0 : DesktopNoteEditor.actionsHeight)
+        let content = noteContentController.hostingController.rootView
+        let height = content.minimumHeight(startingAt: Self.minimumResizeSize.height) +
+            (editor == nil ? 0 : DesktopNoteEditor.actionsHeight)
         minSize = NSSize(width: min(size.width, Self.minimumResizeSize.width), height: min(size.height, height))
         maxSize = size
     }

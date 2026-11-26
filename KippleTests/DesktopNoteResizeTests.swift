@@ -34,6 +34,46 @@ final class DesktopNoteResizeTests: XCTestCase {
         XCTAssertEqual(note.frame.maxY, start.maxY)
     }
 
+    func testNoteFooterOnlyShowsAndOpensWebSourceURLs() async throws {
+        var item = ClipItem(content: "Review the project plan")
+        let source = "https://example.com/tasks/42"
+        item.metadata?.sourceURI = source
+        var opened: [URL] = []
+        let note = DesktopNotePanel(item: item, screenFrame: screenFrame, onSave: nil, onChangeCategory: nil) { url in
+            opened.append(url)
+        }
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+        let contentView = try XCTUnwrap(note.contentView)
+        let origin = note.frame.origin
+        let minimumHeightWithSourceLink = note.minSize.height
+        let point = NSPoint(x: 30, y: DesktopNoteContent.controlsHeight + 11)
+
+        func clickSourceLink() async throws {
+            contentView.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(50))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note))
+            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note))
+        }
+
+        try await clickSourceLink()
+        XCTAssertEqual(opened.map(\.absoluteString), [source])
+        XCTAssertEqual(note.frame.origin, origin)
+
+        item.metadata?.sourceURI = "slack://channel?team=T123&id=C456"
+        note.update(from: item)
+        XCTAssertLessThan(note.minSize.height, minimumHeightWithSourceLink)
+        try await clickSourceLink()
+        XCTAssertEqual(opened.map(\.absoluteString), [source])
+
+        let updatedSource = "http://example.com/tasks/43"
+        item.metadata?.sourceURI = updatedSource
+        note.update(from: item)
+        XCTAssertEqual(note.minSize.height, minimumHeightWithSourceLink)
+        try await clickSourceLink()
+        XCTAssertEqual(opened.map(\.absoluteString), [source, updatedSource])
+    }
+
     func testNativeTitleBarAndButtonsStayHiddenWhenHistoryTitleChanges() {
         let item = ClipItem(content: "Short note")
         let note = DesktopNotePanel(item: item, screenFrame: screenFrame)

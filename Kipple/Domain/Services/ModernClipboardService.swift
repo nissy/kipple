@@ -312,23 +312,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await state.setInternalCopy(true)
         await state.setFromEditor(fromEditor)
 
-        // Get app info for metadata
-        let appInfo = await MainActor.run {
-            getActiveAppInfo()
-        }
-
-        // Add to history immediately with metadata
         let monitoringState = isMonitoringFlag
-        let metadata = fromEditor ? appInfo : await MainActor.run { sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState) }
+        let app = await MainActor.run {
+            fromEditor || source == .ocr ? nil : getActiveAppInfo(isMonitoring: monitoringState)
+        }
         var item = ClipItem(
             content: content,
             kind: determineKind(for: content, isFromEditor: fromEditor),
-            sourceApp: fromEditor ? "Kipple" : metadata.appName,
-            windowTitle: fromEditor
-                ? "Live Editor"
-                : metadata.windowTitle,
-            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
-            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
+            sourceApp: fromEditor ? "Kipple" : app?.name,
+            windowTitle: fromEditor ? "Live Editor" : app?.windowTitle,
+            bundleIdentifier: fromEditor ? Bundle.main.bundleIdentifier : app?.bundleID,
+            processID: fromEditor ? ProcessInfo.processInfo.processIdentifier : app?.processID,
             isFromEditor: fromEditor,
             metadata: source.map { ClipMetadata(createdAt: Date(), source: $0) }
         )
@@ -664,15 +658,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
         // Get clipboard content
         let fetchStartedAt = PerformanceTrace.nowMicros()
-        let captured = await MainActor.run {
-            (clipboardReader ?? .shared).read()
-        }
+        let reader = await MainActor.run { clipboardReader ?? .shared }
+        let captured = await reader.readForHistory(changeCount: changeCount)
         // A copy arriving between the change-count check and capture must be retried as a whole.
         guard let captured, captured.stamp.changeCount == changeCount else { return false }
         lastChangeCount = changeCount
         lastClipboardAccessRevision = captured.stamp.accessRevision
-        guard var item = await fetchClipboardItem(captured.text) else { return true }
-        item.richText = captured.richText
+        guard !captured.shouldExcludeFromHistory else { return true }
+        guard let item = await fetchClipboardItem(captured) else { return true }
         PerformanceTrace.event(
             "pasteboard_change_detected",
             atMicros: detectedAt,
@@ -780,8 +773,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return false
     }
 
-    private func fetchClipboardItem(_ clipboardContent: String?) async -> ClipItem? {
-        guard let content = clipboardContent,
+    private func fetchClipboardItem(_ captured: ClipboardReader.Snapshot) async -> ClipItem? {
+        guard let content = captured.text,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             if await state.getInternalCopy() {
                 return nil
@@ -791,27 +784,20 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             return nil
         }
 
-        let appInfo = await MainActor.run {
-            getActiveAppInfo()
-        }
-
         let isFromEditor = await state.getFromEditor()
-        let monitoringState = isMonitoringFlag
-        let metadata = isFromEditor ? appInfo : await MainActor.run {
-            sanitizeExternalAppInfo(appInfo, isMonitoring: monitoringState)
-        }
-
-        return ClipItem(
+        let source = captured.source
+        var item = ClipItem(
             content: content,
             kind: determineKind(for: content, isFromEditor: isFromEditor),
-            sourceApp: isFromEditor ? "Kipple" : metadata.appName,
-            windowTitle: isFromEditor
-                ? "Live Editor"
-                : metadata.windowTitle,
-            bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : metadata.bundleId,
-            processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : metadata.pid,
-            isFromEditor: isFromEditor
+            sourceApp: isFromEditor ? "Kipple" : source?.name,
+            windowTitle: isFromEditor ? "Live Editor" : source?.windowTitle,
+            bundleIdentifier: isFromEditor ? Bundle.main.bundleIdentifier : source?.bundleID,
+            processID: isFromEditor ? ProcessInfo.processInfo.processIdentifier : source?.processID,
+            isFromEditor: isFromEditor,
+            richText: captured.richText
         )
+        item.metadata?.sourceURI = captured.sourceURI
+        return item
     }
 
     // MARK: - Flush Pending Saves
@@ -830,95 +816,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     // MARK: - App Info
 
-    private struct ActiveAppInfo {
-        let appName: String?
-        let windowTitle: String?
-        let bundleId: String?
-        let pid: Int32
-    }
-
     @MainActor
-    private func getActiveAppInfo() -> ActiveAppInfo {
-        // Use LastActiveAppTracker to get the correct app
-        let tracker = LastActiveAppTracker.shared
-        let appInfo = tracker.getSourceAppInfo()
-
-        // Try to get window title using CGWindowList
-        let windowTitle = getWindowTitle(for: appInfo.pid)
-
-        return ActiveAppInfo(
-            appName: appInfo.name,
-            windowTitle: windowTitle,
-            bundleId: appInfo.bundleId,
-            pid: appInfo.pid
+    private func getActiveAppInfo(isMonitoring: Bool) -> ClipboardReader.Source? {
+        let app = LastActiveAppTracker.shared.getSourceAppInfo()
+        let isKipple = app.bundleId == Bundle.main.bundleIdentifier || app.name == "Kipple"
+        guard app.pid > 0, !isMonitoring || !isKipple else { return nil }
+        return ClipboardReader.Source(
+            name: app.name,
+            bundleID: app.bundleId,
+            processID: app.pid,
+            windowTitle: LastActiveAppTracker.singleVisibleWindowTitle(for: app.pid)
         )
-    }
-
-    @MainActor
-    private func sanitizeExternalAppInfo(_ info: ActiveAppInfo, isMonitoring: Bool) -> ActiveAppInfo {
-        let bundleIdentifier = Bundle.main.bundleIdentifier
-        let isKipple = info.bundleId == bundleIdentifier || info.appName == "Kipple"
-        guard isKipple else { return info }
-
-        let fallback = LastActiveAppTracker.shared.getSourceAppInfo()
-        if fallback.bundleId != bundleIdentifier && fallback.name != "Kipple" {
-            let title = getWindowTitle(for: fallback.pid)
-            return ActiveAppInfo(
-                appName: fallback.name,
-                windowTitle: title,
-                bundleId: fallback.bundleId,
-                pid: fallback.pid
-            )
-        }
-
-        guard isMonitoring else { return info }
-
-        let syntheticPid = info.pid == 0 ? -1 : info.pid
-        return ActiveAppInfo(
-            appName: info.appName == "Kipple"
-                ? "External Source"
-                : info.appName,
-            windowTitle: info.windowTitle,
-            bundleId: info.bundleId == bundleIdentifier ? "external.app" : info.bundleId,
-            pid: syntheticPid
-        )
-    }
-
-    @MainActor
-    private func getWindowTitle(for pid: Int32) -> String? {
-        // Get window list for the specific process
-        let windowList = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements],
-            kCGNullWindowID
-        ) as? [[String: Any]] ?? []
-
-        // Find windows belonging to the process
-        for windowInfo in windowList {
-            // Check if window belongs to the target process
-            if let windowPID = windowInfo[kCGWindowOwnerPID as String] as? Int32,
-               windowPID == pid {
-
-                // Get window name (title)
-                if let windowName = windowInfo[kCGWindowName as String] as? String,
-                   !windowName.isEmpty {
-                    return windowName
-                }
-
-                // Fallback to window owner name if no title
-                if let ownerName = windowInfo[kCGWindowOwnerName as String] as? String,
-                   !ownerName.isEmpty {
-                    // Only return owner name if it's different from app name
-                    // to avoid redundant information
-                    if let appName = NSWorkspace.shared.frontmostApplication?.localizedName,
-                       ownerName != appName {
-                        return ownerName
-                    }
-                }
-            }
-        }
-
-        // No window title found
-        return nil
     }
 
     @discardableResult

@@ -26,12 +26,15 @@ final class ClipItemEditorWindow: NSWindow {
         var titleKey: String { self == .newItem ? "Add History Item" : "Edit Item" }
     }
 
-    static var initialContentSize: NSSize {
+    static var preferredEditorHeight: CGFloat {
         let lineHeight = calculateFixedLineHeight(for: FontManager.shared.editorFont)
         let verticalPadding = FontManager.currentEditorLayoutSettings().verticalPadding
-        let bodyHeight = lineHeight * 10 + verticalPadding * 2
-        let controlsHeight: CGFloat = 404
-        return NSSize(width: 460, height: controlsHeight + bodyHeight)
+        return lineHeight * 10 + verticalPadding * 2
+    }
+
+    static func initialContentSize(for target: Target) -> NSSize {
+        let controlsHeight: CGFloat = target == .newItem ? 420 : 535
+        return NSSize(width: 560, height: controlsHeight + preferredEditorHeight)
     }
     let target: Target
     var isSaving = false
@@ -39,7 +42,7 @@ final class ClipItemEditorWindow: NSWindow {
     init(target: Target) {
         self.target = target
         super.init(
-            contentRect: NSRect(origin: .zero, size: Self.initialContentSize),
+            contentRect: NSRect(origin: .zero, size: Self.initialContentSize(for: target)),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -939,14 +942,14 @@ final class WindowManager: NSObject, NSWindowDelegate {
         let window = ClipItemEditorWindow(target: target)
         let view = ClipDetailsView(
             item: item,
-            titleKey: target.titleKey,
+            target: target,
             onClose: { [weak window] in window?.close() },
             onSavingChanged: { [weak window] in window?.isSaving = $0 }
         )
         let controller = NSHostingController(rootView: view)
         controller.sizingOptions = []
         window.contentViewController = controller
-        window.setContentSize(ClipItemEditorWindow.initialContentSize)
+        window.setContentSize(ClipItemEditorWindow.initialContentSize(for: target))
         window.title = appSettings.localizedString(target.titleKey)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true

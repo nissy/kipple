@@ -171,6 +171,7 @@
 		AB52FE7203F1C9B52E026D23 /* TextCaptureHotkeyManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7955B9273FADD78F8B637D13 /* TextCaptureHotkeyManagerTests.swift */; };
 		ABA16FADADE89FB7D04377B0 /* HistoryItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86EB3075FA086F96EAF118D1 /* HistoryItemView.swift */; };
 		AC14F54787977FD78290F104 /* ClipboardFontSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ED56E8888BBC7EF54BB602 /* ClipboardFontSettingsView.swift */; };
+		AC6B9302D8F135AB5F131A77 /* ClipboardReaderImageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B53F88A0A4B1DC61ED96A20 /* ClipboardReaderImageTests.swift */; };
 		AE4E9F53B3136C6C2AC1D3F5 /* MultipleCategoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4985DAAF1C064A0636A1815 /* MultipleCategoryTests.swift */; };
 		AEE506B8A601E5E30A93DAC4 /* TextCaptureCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 184889D405CAF3B49E5A64B2 /* TextCaptureCoordinator.swift */; };
 		AF778ECCA9E520AC5A8CD4B8 /* MainViewHistorySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1088BA3F9356CC79A508A02 /* MainViewHistorySection.swift */; };
@@ -305,6 +306,7 @@
 		167B79F14132ADCEE67F5C5E /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.stringsdict; name = en; path = en.lproj/Localizable.stringsdict; sourceTree = "<group>"; };
 		184889D405CAF3B49E5A64B2 /* TextCaptureCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCaptureCoordinator.swift; sourceTree = "<group>"; };
 		1B01ED0E79A9494F70A575FB /* ScreenRecordingPermissionOpener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingPermissionOpener.swift; sourceTree = "<group>"; };
+		1B53F88A0A4B1DC61ED96A20 /* ClipboardReaderImageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardReaderImageTests.swift; sourceTree = "<group>"; };
 		1C06F7D47534462B06D88C33 /* MCPConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPConfigurationTests.swift; sourceTree = "<group>"; };
 		1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecopyPerformanceTests.swift; sourceTree = "<group>"; };
 		1DABBCDDA93C2A620E7AF4E3 /* ScreenImageCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenImageCaptureService.swift; sourceTree = "<group>"; };
@@ -1156,6 +1158,7 @@
 				6C5CA9ACC28FEC15F2548171 /* ClearButtonRegressionTest.swift */,
 				A37EA352932E46C425A5EE57 /* ClearClipboardSyncTests.swift */,
 				A0ED818B8D1B98408B17D834 /* ClipboardMonitoringDuplicateTests.swift */,
+				1B53F88A0A4B1DC61ED96A20 /* ClipboardReaderImageTests.swift */,
 				651D1ECB20D7C5CBE36FDF9D /* ClipboardReaderTests.swift */,
 				B738B1A2C5D1200FA250B2C7 /* ClipboardRichTextTests.swift */,
 				D9C5F08C099B7059A59ACB71 /* ClipboardServiceProviderTests.swift */,
@@ -1534,6 +1537,7 @@
 				CDF35C2C4B849ADD16A715FE /* ClipItemTests.swift in Sources */,
 				1B31E79BB06D60A45DAA6B22 /* ClipboardItemPopoverTests.swift in Sources */,
 				2FF63815069C45B948B9ADBD /* ClipboardMonitoringDuplicateTests.swift in Sources */,
+				AC6B9302D8F135AB5F131A77 /* ClipboardReaderImageTests.swift in Sources */,
 				43CA83261F261DC4FD362F8B /* ClipboardReaderTests.swift in Sources */,
 				1F77648DF25DA552B7428D5B /* ClipboardRichTextTests.swift in Sources */,
 				8C8003ED3513195C1FF9D59B /* ClipboardServiceProviderTests.swift in Sources */,

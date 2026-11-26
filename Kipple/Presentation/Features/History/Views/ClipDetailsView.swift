@@ -4,7 +4,7 @@ import SwiftUI
 struct ClipDetailsView: View {
     private let originalItem: ClipItem
     private let editingItemID: UUID?
-    private let titleKey: String
+    private let target: ClipItemEditorWindow.Target
     let onClose: () -> Void
     let onSavingChanged: (Bool) -> Void
     @ObservedObject private var adapter = ModernClipboardServiceAdapter.shared
@@ -19,10 +19,15 @@ struct ClipDetailsView: View {
     @State private var errorMessage: LocalizedStringKey?
     @State private var isSaving = false
 
-    init(item: ClipItem?, titleKey: String, onClose: @escaping () -> Void, onSavingChanged: @escaping (Bool) -> Void) {
+    init(
+        item: ClipItem?,
+        target: ClipItemEditorWindow.Target,
+        onClose: @escaping () -> Void,
+        onSavingChanged: @escaping (Bool) -> Void
+    ) {
         originalItem = item ?? ClipItem(content: "", sourceApp: "Kipple", isFromEditor: true)
         editingItemID = item?.id
-        self.titleKey = titleKey
+        self.target = target
         self.onClose = onClose
         self.onSavingChanged = onSavingChanged
         _title = State(initialValue: item?.title ?? "")
@@ -57,41 +62,55 @@ struct ClipDetailsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text(LocalizedStringKey(titleKey))
-                .font(.system(size: 13, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 32)
-                .background(titleBarFill)
-                .allowsHitTesting(false)
-                .accessibilityAddTraits(.isHeader)
-            Divider()
-            form
+        GeometryReader { geometry in
+            let defaultHeight = ClipItemEditorWindow.initialContentSize(for: target).height
+            let extraHeight = max(0, geometry.size.height - defaultHeight)
+            VStack(spacing: 0) {
+                Text(LocalizedStringKey(target.titleKey))
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
+                    .background(titleBarFill)
+                    .allowsHitTesting(false)
+                    .accessibilityAddTraits(.isHeader)
+                Divider()
+                form(editorHeight: ClipItemEditorWindow.preferredEditorHeight + extraHeight)
+            }
         }
         .ignoresSafeArea(.container, edges: .top)
         .defaultFocus($isTitleFocused, true)
         .environment(\.locale, appSettings.appLocale)
     }
 
-    private var form: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if let item = currentItem {
-                editor(for: item)
-            } else {
-                Text("Item unavailable")
-                Spacer()
+    private func form(editorHeight: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                Group {
+                    if let item = currentItem {
+                        editor(for: item, height: editorHeight)
+                    } else {
+                        Text("Item unavailable")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 18)
             }
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-            }
+            .scrollBounceBehavior(.basedOnSize)
+
             Divider()
-            footer
+            VStack(alignment: .leading, spacing: 10) {
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                footer
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
         }
-        .padding(.horizontal, 26)
-        .padding(.vertical, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(windowSurface)
     }
 
@@ -112,7 +131,7 @@ struct ClipDetailsView: View {
         }
     }
 
-    private func editor(for item: ClipItem) -> some View {
+    private func editor(for item: ClipItem, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 sectionTitle("Title")
@@ -144,7 +163,7 @@ struct ClipDetailsView: View {
                     onScrollChange: nil
                 )
                 .accessibilityLabel(Text("Content"))
-                .frame(minHeight: 100, maxHeight: .infinity)
+                .frame(height: height)
                 .background(fieldFill, in: fieldShape)
                 .clipShape(fieldShape)
                 .overlay { fieldShape.strokeBorder(fieldBorder).allowsHitTesting(false) }
@@ -157,21 +176,10 @@ struct ClipDetailsView: View {
             }
 
             Divider()
-            lowerSection(for: item)
+            categoryPicker(for: item)
+            Divider()
+            metadata(for: item)
         }
-    }
-
-    private func lowerSection(for item: ClipItem) -> some View {
-        GeometryReader { geometry in
-            HStack(alignment: .top, spacing: 16) {
-                categoryPicker(for: item)
-                    .frame(width: min(196, geometry.size.width * 0.34), alignment: .leading)
-                Divider()
-                metadata(for: item)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .frame(height: 146)
     }
 
     private func sectionTitle(_ key: LocalizedStringKey) -> some View {
@@ -181,49 +189,53 @@ struct ClipDetailsView: View {
     private func metadata(for item: ClipItem) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Item metadata")
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 7) {
-                GridRow {
-                    metadataLabel("Source")
-                    if let sourceApp = item.sourceApp {
+            VStack(alignment: .leading, spacing: 7) {
+                if let sourceApp = HistoryItemPreviewContent.visibleSourceApp(for: item) {
+                    metadataRow("Source") {
                         Text(verbatim: sourceApp).help(sourceApp)
-                    } else {
-                        Text("Unknown")
                     }
                 }
-                if let windowTitle = HistoryItemPreviewContent.nonempty(item.windowTitle) {
-                    GridRow {
-                        metadataLabel("Source window")
+                if let windowTitle = HistoryItemPreviewContent.visibleWindowTitle(for: item) {
+                    metadataRow("Source window") {
                         Text(verbatim: windowTitle).help(windowTitle)
                     }
                 }
+                if let url = item.metadata?.sourceWebURL {
+                    metadataRow("Source Link") {
+                        HistorySourceLink(url: url, maxLines: nil)
+                    }
+                }
                 if editingItemID != nil, let createdAt = item.metadata?.createdAt {
-                    GridRow {
-                        metadataLabel("Registered")
+                    metadataRow("Registered") {
                         metadataDate(createdAt)
                     }
                 }
                 if editingItemID != nil {
-                    GridRow {
-                        metadataLabel("Copied at")
+                    metadataRow("Copied at") {
                         metadataDate(item.timestamp)
                     }
                 }
-                GridRow {
-                    metadataLabel("Character count")
+                metadataRow("Character count") {
                     Text(content.count, format: .number)
                 }
             }
             .font(.callout)
             .monospacedDigit()
-            .lineLimit(1)
         }
     }
 
-    private func metadataLabel(_ key: LocalizedStringKey) -> some View {
-        Text(key)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: true, vertical: false)
-            .frame(minWidth: 105, alignment: .leading)
+    private func metadataRow<Value: View>(
+        _ key: LocalizedStringKey, @ViewBuilder value: () -> Value
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(key)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 104, alignment: .leading)
+            value()
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func metadataDate(_ date: Date) -> some View {
@@ -239,32 +251,27 @@ struct ClipDetailsView: View {
             + categories.filter { !initialSelection.contains($0.id) }
         return VStack(alignment: .leading, spacing: 8) {
             sectionTitle("Categories")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 3) {
-                    ForEach(ordered) { category in
-                        let isInitiallySelected = currentSelection.contains(category.id)
-                        Toggle(isOn: Binding(
-                            get: { categoryChanges[category.id] ?? isInitiallySelected },
-                            set: { enabled in categoryChanges[category.id] = enabled == isInitiallySelected ? nil : enabled }
-                        )) {
-                            HStack(spacing: 8) {
-                                Image(systemName: categoryStore.iconName(for: category))
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 18)
-                                    .accessibilityHidden(true)
-                                Text(verbatim: category.name).lineLimit(1)
-                            }
-                            .help(category.name)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], alignment: .leading, spacing: 4) {
+                ForEach(ordered) { category in
+                    let isInitiallySelected = currentSelection.contains(category.id)
+                    Toggle(isOn: Binding(
+                        get: { categoryChanges[category.id] ?? isInitiallySelected },
+                        set: { enabled in categoryChanges[category.id] = enabled == isInitiallySelected ? nil : enabled }
+                    )) {
+                        HStack(spacing: 8) {
+                            Image(systemName: categoryStore.iconName(for: category))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18)
+                                .accessibilityHidden(true)
+                            Text(verbatim: category.name).lineLimit(2)
                         }
-                        .toggleStyle(ClipEditorCheckboxStyle(tint: accent, fill: fieldFill, border: fieldBorder))
+                        .help(category.name)
                     }
+                    .toggleStyle(ClipEditorCheckboxStyle(tint: accent, fill: fieldFill, border: fieldBorder))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(2)
             }
-            .frame(height: 105)
-            .scrollBounceBehavior(.basedOnSize)
+            .padding(2)
         }
         .disabled(isSaving)
     }

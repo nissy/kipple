@@ -30,24 +30,35 @@ struct HistoryItemPreviewContent: View {
 
     private var metadataSection: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-            if let sourceApp = Self.nonempty(item.sourceApp) {
+            if let sourceApp = Self.visibleSourceApp(for: item) {
                 GridRow(alignment: .firstTextBaseline) {
                     metadataLabel("Copied from")
-                    Text(verbatim: localizedAppName(sourceApp))
-                        .lineLimit(1)
+                    Text(verbatim: sourceApp)
+                        .lineLimit(2)
                         .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                         .help(sourceApp)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            if let windowTitle = Self.visibleWindowTitle(sourceApp: item.sourceApp, windowTitle: item.windowTitle) {
+            if let windowTitle = Self.visibleWindowTitle(for: item) {
                 GridRow(alignment: .firstTextBaseline) {
                     metadataLabel("Source window")
                     Text(verbatim: localizedWindowTitle(windowTitle))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                         .help(windowTitle)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            if let url = item.metadata?.sourceWebURL {
+                GridRow(alignment: .firstTextBaseline) {
+                    metadataLabel("Source Link")
+                    HistorySourceLink(url: url, maxLines: 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .gridCellUnsizedAxes(.horizontal)
                 }
             }
             GridRow(alignment: .firstTextBaseline) {
@@ -89,10 +100,6 @@ struct HistoryItemPreviewContent: View {
             .fixedSize()
     }
 
-    private func localizedAppName(_ name: String) -> String {
-        name == "External Source" ? String(localized: "External Source", locale: locale) : name
-    }
-
     private func localizedWindowTitle(_ title: String) -> String {
         if title == "Quick Editor" || title == "Live Editor" {
             return String(localized: "Live Editor", locale: locale)
@@ -105,13 +112,36 @@ struct HistoryItemPreviewContent: View {
         return value
     }
 
-    static func visibleWindowTitle(sourceApp: String?, windowTitle: String?) -> String? {
-        guard let windowTitle = nonempty(windowTitle), windowTitle != nonempty(sourceApp) else { return nil }
+    static func visibleSourceApp(for item: ClipItem) -> String? {
+        guard item.sourceApp != "External Source" else { return nil }
+        return nonempty(item.sourceApp)
+    }
+
+    static func visibleWindowTitle(for item: ClipItem) -> String? {
+        guard item.sourceApp != "External Source",
+              let windowTitle = nonempty(item.windowTitle), windowTitle != visibleSourceApp(for: item) else { return nil }
         return windowTitle
     }
 
     static func makePreviewText(for item: ClipItem, maxLength: Int = 500) -> String {
         String(item.content.prefix(maxLength))
+    }
+}
+
+struct HistorySourceLink: View {
+    let url: URL
+    var maxLines: Int? = 1
+
+    var body: some View {
+        Link(destination: url) {
+            Text(verbatim: url.absoluteString)
+                .underline()
+                .foregroundStyle(Color(nsColor: .linkColor))
+                .multilineTextAlignment(.leading)
+                .lineLimit(maxLines)
+                .truncationMode(.tail)
+        }
+        .help(url.absoluteString)
     }
 }
 

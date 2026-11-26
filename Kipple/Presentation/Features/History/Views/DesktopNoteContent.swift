@@ -15,6 +15,18 @@ struct DesktopNoteContent: View {
     var allowsRemoteImages = false
     var openURL: OpenURLAction?
 
+    var sourceLinkHeight: CGFloat { showsBody && item.metadata?.sourceWebURL != nil ? 22 : 0 }
+
+    var sourceLinkVerticalRange: Range<CGFloat> {
+        Self.controlsHeight..<(Self.controlsHeight + sourceLinkHeight)
+    }
+
+    func minimumHeight(startingAt height: CGFloat) -> CGFloat {
+        // Leave reading space even when the title wraps onto two lines.
+        let titleHeight: CGFloat = HistoryItemPreviewContent.nonempty(item.title) == nil ? 0 : 40
+        return height + titleHeight + sourceLinkHeight
+    }
+
     var offersRemoteImages: Bool {
         guard showsBody, displayMode == .markdown, !allowsRemoteImages,
               let markdown = try? AttributedString(markdown: item.content) else { return false }
@@ -31,16 +43,28 @@ struct DesktopNoteContent: View {
                     .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
             }
             if showsBody {
-                ScrollView(.vertical) {
-                    document
-                        .id(selectionRevision)
-                        .modifier(DesktopNoteTextRegions(sourceText: displayMode == .plainText ? item.content : nil))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
-                        .padding(.bottom, 8)
+                VStack(spacing: 0) {
+                    ScrollView(.vertical) {
+                        document
+                            .id(selectionRevision)
+                            .modifier(DesktopNoteTextRegions(
+                                sourceText: displayMode == .plainText ? item.content : nil
+                            ))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+                            .padding(.bottom, 8)
+                    }
+                    .contentMargins(.trailing, Self.windowBorderInset, for: .scrollIndicators)
+                    .scrollIndicators(.visible)
+
+                    if let url = item.metadata?.sourceWebURL {
+                        HistorySourceLink(url: url)
+                            .font(.caption)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+                            .frame(height: sourceLinkHeight)
+                    }
                 }
-                .contentMargins(.trailing, Self.windowBorderInset, for: .scrollIndicators)
-                .scrollIndicators(.visible)
             }
         }
         .padding(.top, HistoryItemPreviewContent.contentPadding)
@@ -64,7 +88,7 @@ struct DesktopNoteContent: View {
         let ideal = sizing.sizeThatFits(in: NSSize(width: maxWidth, height: .infinity))
         let width = min(maxWidth, max(minimumWidth, ceil(ideal.width)))
         let wrapped = sizing.sizeThatFits(in: NSSize(width: width, height: .infinity))
-        let height = min(screenFrame.height, ceil(wrapped.height) + Self.controlsHeight)
+        let height = min(screenFrame.height, ceil(wrapped.height) + Self.controlsHeight + sourceLinkHeight)
         return NSSize(width: width, height: height)
     }
 

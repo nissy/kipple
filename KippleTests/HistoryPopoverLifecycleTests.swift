@@ -11,6 +11,34 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         _ = popover.body
     }
 
+    func testHistoryPreviewWrapsLongWebURLsToTwoLinesAndOmitsAppURIs() {
+        func size(for item: ClipItem) -> NSSize {
+            NSHostingController(rootView: HistoryItemPreviewContent(
+                item: item, categories: [], historyFont: .systemFont(ofSize: 13)
+            ))
+            .sizeThatFits(in: NSSize(width: 320, height: 1000))
+        }
+
+        var item = ClipItem(content: "Selected text from a web page")
+        let original = size(for: item)
+        item.metadata?.sourceURI = "slack://channel?team=T123&id=C456"
+        XCTAssertEqual(size(for: item), original)
+
+        item.metadata?.sourceURI = "https://example.com/"
+        let shortLink = size(for: item)
+        XCTAssertGreaterThan(shortLink.height, original.height)
+
+        let longURL = "https://example.com/" + String(repeating: "path/", count: 80)
+        item.metadata?.sourceURI = longURL
+        let wrappedLink = size(for: item)
+        XCTAssertEqual(wrappedLink.width, original.width)
+        XCTAssertGreaterThan(wrappedLink.height, shortLink.height)
+        XCTAssertLessThan(wrappedLink.height - shortLink.height, 22)
+
+        item.metadata?.sourceURI = longURL + String(repeating: "additional-path/", count: 100)
+        XCTAssertEqual(size(for: item), wrappedLink)
+    }
+
     func testHistoryPopoverManagerShowAndHide() {
         let item = ClipItem(content: "Test")
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),

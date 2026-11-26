@@ -274,6 +274,7 @@
 "Open Edit Item to view all categories." = "右クリックの「履歴を編集」で全カテゴリを確認できます。";
 "Copied from" = "コピー元";
 "Source window" = "ウインドウ";
+"Source Link" = "出典リンク";
 "Copied at" = "コピー日時";
 "Character count" = "文字数";
 "%@ characters" = "%@文字";
