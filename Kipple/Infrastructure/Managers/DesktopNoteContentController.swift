@@ -1,6 +1,74 @@
 import AppKit
 import SwiftUI
 
+enum DesktopNoteColor: String, Codable {
+    case none = "No Note Color"
+    case black = "HTML Black Note Color"
+    case gray = "HTML Gray Note Color"
+    case silver = "HTML Silver Note Color"
+    case white = "HTML White Note Color"
+    case maroon = "HTML Maroon Note Color"
+    case red = "HTML Red Note Color"
+    case olive = "HTML Olive Note Color"
+    case yellow = "HTML Yellow Note Color"
+    case green = "HTML Green Note Color"
+    case lime = "HTML Lime Note Color"
+    case teal = "HTML Teal Note Color"
+    case aqua = "HTML Aqua Note Color"
+    case navy = "HTML Navy Note Color"
+    case blue = "HTML Blue Note Color"
+    case purple = "HTML Purple Note Color"
+    case fuchsia = "HTML Fuchsia Note Color"
+
+    // These identifiers and colors are used by notes saved before the HTML palette.
+    case legacyYellow = "Yellow Note Color"
+    case legacyOrange = "Orange Note Color"
+    case legacyBlue = "Blue Note Color"
+    case legacyGreen = "Green Note Color"
+    case legacyPink = "Pink Note Color"
+
+    static let palette: [Self] = [
+        .black, .gray, .silver, .white, .maroon, .red, .olive, .yellow,
+        .green, .lime, .teal, .aqua, .navy, .blue, .purple, .fuchsia
+    ]
+
+    var fill: NSColor? {
+        switch self {
+        case .none: nil
+        case .black: Self.sRGB(0x000000)
+        case .gray: Self.sRGB(0x808080)
+        case .silver: Self.sRGB(0xC0C0C0)
+        case .white: Self.sRGB(0xFFFFFF)
+        case .maroon: Self.sRGB(0x800000)
+        case .red: Self.sRGB(0xFF0000)
+        case .olive: Self.sRGB(0x808000)
+        case .yellow: Self.sRGB(0xFFFF00)
+        case .green: Self.sRGB(0x008000)
+        case .lime: Self.sRGB(0x00FF00)
+        case .teal: Self.sRGB(0x008080)
+        case .aqua: Self.sRGB(0x00FFFF)
+        case .navy: Self.sRGB(0x000080)
+        case .blue: Self.sRGB(0x0000FF)
+        case .purple: Self.sRGB(0x800080)
+        case .fuchsia: Self.sRGB(0xFF00FF)
+        case .legacyYellow: .systemYellow
+        case .legacyOrange: .systemOrange
+        case .legacyBlue: .systemBlue
+        case .legacyGreen: .systemGreen
+        case .legacyPink: .systemPink
+        }
+    }
+
+    private static func sRGB(_ hex: Int) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
 @MainActor
 final class DesktopNoteContentController: NSViewController {
     let hostingController: NSHostingController<DesktopNoteContent>
@@ -95,14 +163,31 @@ final class DesktopNoteContentController: NSViewController {
 
     func makeColorMenu(selected: DesktopNoteColor, target: AnyObject, action: Selector) -> NSMenu {
         let menu = NSMenu()
-        for color in DesktopNoteColor.allCases {
+        for color in DesktopNoteColor.palette + [.none] {
+            if color == .none { menu.addItem(.separator()) }
             let title = AppSettings.shared.localizedString(color.rawValue)
             let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
             item.target = target
             item.representedObject = color.rawValue
+            if let fill = color.fill {
+                item.image = Self.colorSwatch(fill)
+                if #available(macOS 27.0, *) { item.preferredImageVisibility = .visible }
+            }
             item.state = color == selected ? .on : .off
         }
         return menu
+    }
+
+    private static func colorSwatch(_ color: NSColor) -> NSImage {
+        NSImage(size: NSSize(width: 14, height: 14), flipped: false) { bounds in
+            let circle = NSBezierPath(ovalIn: bounds.insetBy(dx: 1, dy: 1))
+            color.setFill()
+            circle.fill()
+            NSColor.labelColor.withAlphaComponent(0.30).setStroke()
+            circle.lineWidth = 1
+            circle.stroke()
+            return true
+        }
     }
 
     override func loadView() {

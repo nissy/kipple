@@ -473,23 +473,3 @@ struct DesktopNoteCategoryMenu: View {
         .environment(\.locale, appSettings.appLocale)
     }
 }
-
-enum DesktopNoteColor: String, CaseIterable, Codable {
-    case none = "No Note Color"
-    case yellow = "Yellow Note Color"
-    case orange = "Orange Note Color"
-    case blue = "Blue Note Color"
-    case green = "Green Note Color"
-    case pink = "Pink Note Color"
-
-    var fill: NSColor? {
-        switch self {
-        case .none: nil
-        case .yellow: NSColor.systemYellow
-        case .orange: NSColor.systemOrange
-        case .blue: NSColor.systemBlue
-        case .green: NSColor.systemGreen
-        case .pink: NSColor.systemPink
-        }
-    }
-}

@@ -11,7 +11,7 @@ extension DesktopNotePanel {
 
     func installColorStrip(in view: NSView) {
         colorStrip.wantsLayer = true
-        selectedColor = DesktopNoteColor.allCases.filter { $0 != .none }.randomElement() ?? .yellow
+        selectedColor = DesktopNoteColor.palette.randomElement() ?? .yellow
         colorStrip.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(colorStrip)
         NSLayoutConstraint.activate([

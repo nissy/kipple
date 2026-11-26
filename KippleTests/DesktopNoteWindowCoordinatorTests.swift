@@ -114,7 +114,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertNotIdentical(window, original)
         XCTAssertTrue(reopened.isPosted(item.id))
         XCTAssertEqual(window.frame, saved.frame)
-        XCTAssertEqual(window.placement.color, .pink)
+        XCTAssertEqual(window.placement.color, .legacyPink)
 
         let retained = try await repository.load(ids: [item.id])
         XCTAssertEqual(retained.map(\.id), [item.id])
@@ -139,11 +139,11 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(original.frame.origin, NSPoint(x: resized.minX + 35, y: resized.minY - 24))
         XCTAssertEqual(DesktopNotePlacement.load(from: defaults)[itemID]?.frame, original.frame)
         let color = NSMenuItem()
-        color.representedObject = DesktopNoteColor.pink.rawValue
+        color.representedObject = "Pink Note Color"
         XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: original, from: color))
         let saved = try XCTUnwrap(DesktopNotePlacement.load(from: defaults)[itemID])
         XCTAssertEqual(saved.frame, original.frame)
-        XCTAssertEqual(saved.color, .pink)
+        XCTAssertEqual(saved.color, .legacyPink)
         XCTAssertTrue(saved.usesManualSize)
         return saved
     }

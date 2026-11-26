@@ -14,10 +14,8 @@ final class DesktopNoteLayoutTests: XCTestCase {
         let content = try XCTUnwrap(note.contentView)
         note.appearance = NSAppearance(named: .aqua)
         let light = try renderNoteBackground(in: content)
-        let colors = DesktopNoteColor.allCases.compactMap { $0.fill?.cgColor }
-        let strip = try XCTUnwrap(content.subviews.first { view in
-            view.layer?.backgroundColor.map { colors.contains($0) } ?? false
-        })
+        let strip = note.colorStrip
+        XCTAssertTrue(DesktopNoteColor.palette.contains(note.selectedColor))
         XCTAssertFalse(strip.isHidden)
 
         let orange = NSMenuItem()
@@ -38,6 +36,45 @@ final class DesktopNoteLayoutTests: XCTestCase {
         none.representedObject = "No Note Color"
         XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: note, from: none))
         XCTAssertTrue(strip.isHidden)
+    }
+
+    func testColorMenuOffersThe16HTMLColorsAndSavesTheSelection() throws {
+        let expected: [DesktopNoteColor: Int] = [
+            .black: 0x000000, .silver: 0xC0C0C0, .gray: 0x808080, .white: 0xFFFFFF,
+            .maroon: 0x800000, .red: 0xFF0000, .purple: 0x800080, .fuchsia: 0xFF00FF,
+            .green: 0x008000, .lime: 0x00FF00, .olive: 0x808000, .yellow: 0xFFFF00,
+            .navy: 0x000080, .blue: 0x0000FF, .teal: 0x008080, .aqua: 0x00FFFF
+        ]
+        let note = DesktopNotePanel(item: ClipItem(content: "Color sample"), screenFrame: screenFrame)
+        defer { note.close() }
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let itemID = UUID()
+        note.onPlacementChange = { [weak note] in
+            guard let note else { return }
+            DesktopNotePlacement.save([itemID: note.placement], to: defaults)
+        }
+        let action = NSSelectorFromString("changeColor:")
+        let menu = note.noteContentController.makeColorMenu(selected: .aqua, target: note, action: action)
+        let items = menu.items.filter { !$0.isSeparatorItem }
+        let colors = items.compactMap { ($0.representedObject as? String).flatMap(DesktopNoteColor.init(rawValue:)) }
+        XCTAssertEqual(items.count, 17)
+        XCTAssertEqual(Set(colors.dropLast()), Set(expected.keys))
+        XCTAssertEqual(colors.last, DesktopNoteColor.none)
+
+        for (item, color) in zip(items.dropLast(), colors.dropLast()) {
+            let fill = try XCTUnwrap(color.fill)
+            XCTAssertNotNil(item.image)
+            if #available(macOS 27.0, *) { XCTAssertEqual(item.preferredImageVisibility, .visible) }
+            XCTAssertEqual(item.state, color == .aqua ? .on : .off)
+            let rgb = [fill.redComponent, fill.greenComponent, fill.blueComponent]
+                .reduce(0) { ($0 << 8) | Int(($1 * 255).rounded()) }
+            XCTAssertEqual(rgb, expected[color])
+            XCTAssertTrue(NSApp.sendAction(action, to: note, from: item))
+            XCTAssertEqual(note.colorStrip.layer?.backgroundColor, fill.cgColor)
+            XCTAssertEqual(DesktopNotePlacement.load(from: defaults)[itemID]?.color, color)
+        }
     }
 
     private func renderNoteBackground(in content: NSView) throws -> NSColor {
