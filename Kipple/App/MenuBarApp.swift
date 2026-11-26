@@ -104,6 +104,7 @@ final class MenuBarApp: NSObject, ObservableObject {
             self.setupTextCaptureHotkey()
             self.setupPlainTextPasteHotkey()
             self.startServices()
+            Task { await DesktopNoteWindowCoordinator.shared.restoreNotes() }
             DispatchQueue.main.async { [weak self] in
                 self?.windowManager.prewarmMainWindow()
             }
@@ -271,7 +272,7 @@ extension MenuBarApp: NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        
+        DesktopNoteWindowCoordinator.shared.prepareForTermination()
         MCPIntegration.shared.stop()
         // The save work should be finished by this point
     }

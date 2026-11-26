@@ -76,6 +76,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         testRepository: ClipboardRepositoryProtocol,
         loadOnStartup: Bool = false,
         categoryStore: UserCategoryStore? = nil,
+        desktopNoteItemIDs: Set<UUID> = [],
         clipboardWriter: @escaping @MainActor @Sendable (ClipItem) -> Int = writeSystemClipboard,
         clipboardReader: ClipboardReader? = nil
     ) {
@@ -83,6 +84,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         self.clipboardWriter = clipboardWriter
         self.clipboardReader = clipboardReader
         self.categoryStore = categoryStore
+        self.desktopNoteItemIDs = desktopNoteItemIDs
         repository = testRepository
         isRepositoryReady = !loadOnStartup
         if loadOnStartup {
@@ -96,6 +98,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         mutationGate = AsyncMutationGate(initiallyOccupied: true)
         clipboardWriter = Self.writeSystemClipboard
         clipboardReader = nil
+        desktopNoteItemIDs = Set(DesktopNotePlacement.load(from: .standard).keys)
         Task { await initializeService(categoryStore: UserCategoryStore.shared) }
     }
 
@@ -154,7 +157,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 definedCustomCategoryIDs = Set(await categoryStore.userDefined().map(\.id))
             }
             let categorizedItems = try await repository.loadCategorized()
-            let desktopNoteItems = previousHistory.filter { desktopNoteItemIDs.contains($0.id) }
+            let liveNoteItems = previousHistory.filter { desktopNoteItemIDs.contains($0.id) }
+            let storedNoteItems = try await repository.load(ids: desktopNoteItemIDs.subtracting(liveNoteItems.map(\.id)))
+            let desktopNoteItems = storedNoteItems + liveNoteItems
             let protectedByID = Dictionary((categorizedItems + desktopNoteItems).map { ($0.id, $0) }) { _, latest in latest }
             history = protectedByID.values.map(withDefinedCategories)
                 .filter(isProtectedFromHistoryRemoval)
@@ -168,7 +173,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
             let fetchLimit = max(0, maxHistoryItems) + history.count + 10
             let recentItems = try await repository.load(limit: fetchLimit)
-            let loadedByID = Dictionary((categorizedItems + recentItems).map { ($0.id, $0) }) { _, latest in
+            let loadedByID = Dictionary((categorizedItems + storedNoteItems + recentItems).map { ($0.id, $0) }) { _, latest in
                 latest
             }
             let combinedByID = loadedByID.merging(desktopNoteItems.map { ($0.id, $0) }) { _, current in current }
@@ -417,11 +422,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await recopyFromHistory(item) { true }
     }
 
-    func recopyFromHistory(_ item: ClipItem, shouldCopy: @Sendable () async -> Bool) async {
+    @discardableResult
+    func recopyFromHistory(_ item: ClipItem, shouldCopy: @Sendable () async -> Bool) async -> Bool {
         let generation = copyGeneration
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        guard generation == copyGeneration, await shouldCopy() else { return }
+        guard generation == copyGeneration, await shouldCopy() else { return false }
         // Set flags BEFORE updating clipboard to prevent race condition
         await state.setInternalCopy(true)
         await state.setFromEditor(item.isFromEditor ?? false)
@@ -429,7 +435,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         let newItem = recordHistoryRecopy(item)
         // Keep pasteboard access on MainActor; its type cache must not be read concurrently.
         let newChangeCount = await writeClipboardItem(newItem)
-        guard await recordClipboardWrite(newChangeCount) else { return }
+        return await recordClipboardWrite(newChangeCount)
     }
 
     @discardableResult
@@ -496,6 +502,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard let item = history.first(where: { $0.id == itemID }),
               desktopNoteItemIDs.insert(itemID).inserted else { return nil }
         return item
+    }
+
+    func desktopNoteItemsToRestore(_ ids: Set<UUID>) async -> [ClipItem]? {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        guard isRepositoryReady else { return nil }
+        let items = history.filter { ids.contains($0.id) && desktopNoteItemIDs.contains($0.id) }
+        desktopNoteItemIDs.subtract(ids.subtracting(items.map(\.id)))
+        return items
     }
 
     func removeDesktopNoteProtection(_ itemID: UUID) async {

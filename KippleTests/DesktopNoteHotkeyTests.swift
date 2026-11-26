@@ -40,8 +40,7 @@ final class DesktopNoteHotkeyTests: XCTestCase {
         let clear = try desktopNoteKeyEvent(kVK_Escape, characters: "\u{1B}", modifiers: clearModifiers, for: note)
         note.sendEvent(clear)
         XCTAssertFalse(note.firstResponder is LiveEditorTextView)
-        let point = NSPoint(x: 35, y: note.frame.height - 70)
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        try desktopNoteEditButton(in: note).performClick(nil)
         let editor = try XCTUnwrap(note.firstResponder as? LiveEditorTextView)
         XCTAssertEqual(editor.string, original)
         note.sendEvent(clear)
@@ -55,6 +54,9 @@ final class DesktopNoteHotkeyTests: XCTestCase {
         defer { observation.cancel() }
         note.sendEvent(try desktopNoteKeyEvent(kVK_ANSI_A, characters: "a", modifiers: saveModifiers, for: note))
         await fulfillment(of: [saved], timeout: 2)
+        for _ in 0..<20 where note.firstResponder is LiveEditorTextView {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         XCTAssertFalse(note.firstResponder is LiveEditorTextView)
         XCTAssertEqual(adapter.history.map(\.id), [item.id])
         XCTAssertTrue(coordinator.isPosted(item.id))

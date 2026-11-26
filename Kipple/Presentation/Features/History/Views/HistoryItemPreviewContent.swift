@@ -153,13 +153,17 @@ struct HistoryItemPreviewText: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Self.spacing) {
             HistoryItemPreviewTitle(title: item.title)
-            Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
-                .font(Font(historyFont))
-                .lineSpacing(3)
-                .lineLimit(previewLineLimit)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
+            bodyPreview
         }
+    }
+
+    var bodyPreview: some View {
+        Text(verbatim: HistoryItemPreviewContent.makePreviewText(for: item))
+            .font(Font(historyFont))
+            .lineSpacing(3)
+            .lineLimit(previewLineLimit)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var previewLineLimit: Int {

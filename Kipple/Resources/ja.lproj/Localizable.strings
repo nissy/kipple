@@ -21,6 +21,7 @@
 "Close" = "閉じる";
 "Copied" = "コピー時刻";
 "Copy" = "コピー";
+"Copied to clipboard" = "コピーしました";
 "Capture" = "Capture";
 "Data Management" = "データ管理";
 "Modified click" = "修飾キー付きクリック";
@@ -35,6 +36,10 @@
 "Post to Desktop" = "デスクトップに付箋を貼る";
 "Remove Desktop Note" = "デスクトップの付箋を外す";
 "Desktop Note Color" = "付箋の色";
+"Fit Note to Content" = "内容に合わせる";
+"Note Color" = "色";
+"Toggle Display" = "表示切替";
+"Copy URL" = "URLをコピー";
 "Desktop Notes" = "デスクトップ付箋";
 "Default display format" = "既定の表示形式";
 "Plain Text" = "プレーンテキスト";

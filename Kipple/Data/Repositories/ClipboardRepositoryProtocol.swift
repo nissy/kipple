@@ -11,6 +11,7 @@ protocol ClipboardRepositoryProtocol: Sendable {
     func save(_ items: [ClipItem]) async throws
     func replaceAll(with items: [ClipItem]) async throws
     func load(limit: Int) async throws -> [ClipItem]
+    func load(ids: Set<UUID>) async throws -> [ClipItem]
     func loadAll() async throws -> [ClipItem]
     func loadItemIDs() async throws -> Set<UUID>
     func loadCategorized() async throws -> [ClipItem]
@@ -20,6 +21,11 @@ protocol ClipboardRepositoryProtocol: Sendable {
 }
 
 extension ClipboardRepositoryProtocol {
+    func load(ids: Set<UUID>) async throws -> [ClipItem] {
+        guard !ids.isEmpty else { return [] }
+        return try await loadAll().filter { ids.contains($0.id) }
+    }
+
     func loadItemIDs() async throws -> Set<UUID> {
         Set(try await loadAll().map(\.id))
     }

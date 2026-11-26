@@ -160,11 +160,11 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     }
 
     func recopyFromHistory(_ item: ClipItem) {
-        prepareForRecopy(of: item)
-        enqueueClipboardOperation { [self] generation in
-            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
-            await refreshHistory()
-        }
+        enqueueRecopy(item)
+    }
+
+    func recopyFromHistory(_ item: ClipItem, onSuccess: @escaping () -> Void) {
+        enqueueRecopy(item, onSuccess: onSuccess)
     }
 
     func clearSystemClipboard() async {
@@ -190,6 +190,10 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
     func protectHistoryForDesktopNote(_ itemID: UUID) async -> ClipItem? {
         await modernService.protectHistoryForDesktopNote(itemID)
+    }
+
+    func desktopNoteItemsToRestore(_ ids: Set<UUID>) async -> [ClipItem]? {
+        await modernService.desktopNoteItemsToRestore(ids)
     }
 
     func removeDesktopNoteProtection(_ itemID: UUID) async {
@@ -354,11 +358,17 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
 
 extension ModernClipboardServiceAdapter: ClipboardServiceAsyncRecopying {
     func recopyFromHistoryAndWait(_ item: ClipItem) async {
+        await enqueueRecopy(item).value
+    }
+
+    @discardableResult
+    private func enqueueRecopy(_ item: ClipItem, onSuccess: (() -> Void)? = nil) -> Task<Void, Never> {
         prepareForRecopy(of: item)
-        await enqueueClipboardOperation { [self] generation in
-            await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
+        return enqueueClipboardOperation { [self] generation in
+            let copied = await modernService.recopyFromHistory(item) { await self.isCurrentOperation(generation) }
+            if copied, isCurrentOperation(generation), !Task.isCancelled { onSuccess?() }
             await refreshHistory()
-        }.value
+        }
     }
 
     /// pasteboard 書き込みのみ待機する軽量版。history 再同期は後段で finalizeRecopyRefresh() を呼ぶこと

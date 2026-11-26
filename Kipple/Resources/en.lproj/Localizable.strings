@@ -21,6 +21,7 @@
 "Close" = "Close";
 "Copied" = "Copied";
 "Copy" = "Copy";
+"Copied to clipboard" = "Copied to clipboard";
 "Capture" = "Capture";
 "Data Management" = "Data Management";
 "Modified click" = "Modified click";
@@ -35,6 +36,10 @@
 "Post to Desktop" = "Post to Desktop";
 "Remove Desktop Note" = "Remove Desktop Note";
 "Desktop Note Color" = "Desktop Note Color";
+"Fit Note to Content" = "Fit to Content";
+"Note Color" = "Color";
+"Toggle Display" = "Display";
+"Copy URL" = "Copy URL";
 "Desktop Notes" = "Desktop Notes";
 "Default display format" = "Default display format";
 "Plain Text" = "Plain Text";

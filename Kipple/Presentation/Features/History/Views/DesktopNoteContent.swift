@@ -6,25 +6,31 @@ import Textual
 struct DesktopNoteContent: View {
     static let controlsHeight: CGFloat = 32
     static let windowBorderInset: CGFloat = 6
+    static let headerTopInset: CGFloat = 14
+    static let maximumAutomaticWidth: CGFloat = 420
+    private static let closeClearance: CGFloat = 28
 
     let item: ClipItem
     let displayMode: AppSettings.DesktopNoteDisplayMode
+    let copyLink: (String) -> Void
     let historyFont = FontManager.shared.historyFont
     var showsBody = true
     var selectionRevision = 0
     var allowsRemoteImages = false
     var openURL: OpenURLAction?
+    let measurementID = UUID()
+    var onDocumentHeightChange: ((CGFloat, UUID) -> Void)?
+    var onBlockWidthChange: ((CGFloat, UUID) -> Void)?
 
-    var sourceLinkHeight: CGFloat { showsBody && item.metadata?.sourceWebURL != nil ? 22 : 0 }
+    private var sourceApp: String? { HistoryItemPreviewContent.visibleSourceApp(for: item) }
+    private var windowTitle: String? { HistoryItemPreviewContent.visibleWindowTitle(for: item) }
+    private var sourceURL: URL? { item.metadata?.sourceWebURL }
+    private var hasSource: Bool { sourceApp != nil || windowTitle != nil || sourceURL != nil }
+    private var hasTitle: Bool { HistoryItemPreviewContent.nonempty(item.title) != nil }
+    var bodyCloseInset: CGFloat { hasTitle || hasSource ? 0 : Self.closeClearance }
 
-    var sourceLinkVerticalRange: Range<CGFloat> {
-        Self.controlsHeight..<(Self.controlsHeight + sourceLinkHeight)
-    }
-
-    func minimumHeight(startingAt height: CGFloat) -> CGFloat {
-        // Leave reading space even when the title wraps onto two lines.
-        let titleHeight: CGFloat = HistoryItemPreviewContent.nonempty(item.title) == nil ? 0 : 40
-        return height + titleHeight + sourceLinkHeight
+    func minimumHeight(at width: CGFloat) -> CGFloat {
+        ceil(headerHeight(at: width)) + Self.controlsHeight + 40
     }
 
     var offersRemoteImages: Bool {
@@ -34,77 +40,209 @@ struct DesktopNoteContent: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: HistoryItemPreviewText.spacing) {
-            if HistoryItemPreviewContent.nonempty(item.title) != nil {
-                titlePreview
-                    .textSelection(.enabled)
-                    .id(selectionRevision)
-                    .modifier(DesktopNoteTextRegions())
-                    .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
-            }
-            if showsBody {
-                VStack(spacing: 0) {
-                    ScrollView(.vertical) {
-                        document
-                            .id(selectionRevision)
-                            .modifier(DesktopNoteTextRegions(
-                                sourceText: displayMode == .plainText ? item.content : nil
-                            ))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
-                            .padding(.bottom, 8)
-                    }
-                    .contentMargins(.trailing, Self.windowBorderInset, for: .scrollIndicators)
-                    .scrollIndicators(.visible)
-
-                    if let url = item.metadata?.sourceWebURL {
-                        HistorySourceLink(url: url)
-                            .font(.caption)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
-                            .frame(height: sourceLinkHeight)
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .bottom) {
+                    if hasSource {
+                        Divider().padding(.horizontal, HistoryItemPreviewContent.contentPadding).padding(.bottom, 8)
                     }
                 }
+            if showsBody {
+                ScrollView(.vertical) {
+                    document
+                        .id(selectionRevision)
+                        .modifier(DesktopNoteTextRegions())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+                        .padding(.trailing, bodyCloseInset)
+                        .padding(.bottom, 8)
+                        .background {
+                            Color.clear
+                                .onGeometryChange(for: CGSize.self, of: \.size) { size in
+                                    onDocumentHeightChange?(size.height, measurementID)
+                                }
+                                .id(measurementID)
+                        }
+                }
+                .contentMargins(.trailing, Self.windowBorderInset, for: .scrollIndicators)
+                .scrollIndicators(.visible)
+            } else {
+                Spacer(minLength: 0)
             }
+            Divider().padding(.leading, Self.windowBorderInset + 1)
         }
-        .padding(.top, HistoryItemPreviewContent.contentPadding)
-        .padding(.bottom, Self.controlsHeight)
+        .padding(.bottom, Self.controlsHeight - 1)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .foregroundStyle(.primary)
+        .environment(\.locale, AppSettings.shared.appLocale)
         .transformEnvironment(\.openURL) { action in
             if let openURL { action = openURL }
         }
     }
 
-    var titlePreview: some View {
-        HistoryItemPreviewTitle(title: item.title)
+    @ViewBuilder
+    private var header: some View {
+        if hasTitle || hasSource {
+            VStack(alignment: .leading, spacing: 0) {
+                if hasTitle {
+                    HistoryItemPreviewTitle(title: item.title)
+                        .textSelection(.enabled)
+                        .id(selectionRevision)
+                        .modifier(DesktopNoteTextRegions())
+                        .frame(minHeight: 24, alignment: .topLeading)
+                        .padding(.trailing, Self.closeClearance)
+                }
+                if hasSource {
+                    sourceSection
+                        .background(DesktopNoteSourceRegion().allowsHitTesting(false).accessibilityHidden(true))
+                        .padding(.trailing, hasTitle ? 0 : Self.closeClearance)
+                }
+            }
+            .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+            .padding(.top, Self.headerTopInset)
+            .padding(.bottom, hasSource ? 8 : 4)
+        } else {
+            Color.clear.frame(width: 0, height: Self.headerTopInset)
+                .allowsHitTesting(false)
+        }
     }
 
-    // Estimate the initial window size without laying out the whole scrollable document twice.
+    private var sourceSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let sourceApp { sourceText(sourceApp, symbol: "square.grid.2x2", label: "Copied from") }
+            if let windowTitle { sourceText(windowTitle, symbol: "macwindow", label: "Source window", maxLines: 2) }
+            if let sourceURL { sourceLink(sourceURL) }
+        }
+        .font(.system(size: 12))
+        .padding(.top, hasTitle ? 5 : 0)
+        .padding(.bottom, 9)
+    }
+
+    private func sourceText(_ value: String, symbol: String, label: LocalizedStringKey, maxLines: Int = 1) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            sourceIcon(symbol)
+            Text(verbatim: value)
+                .lineLimit(maxLines)
+                .fixedSize(horizontal: false, vertical: true)
+                .help(value)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text(verbatim: value))
+    }
+
+    private func sourceLink(_ url: URL) -> some View {
+        let address = url.absoluteString
+        let displayAddress = String(address.dropFirst((url.scheme?.count ?? 0) + 3))
+        return Link(destination: url) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                sourceIcon("arrow.up.right.square")
+                Text(verbatim: displayAddress)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
+                    .foregroundStyle(Color(nsColor: .linkColor))
+            }
+        }
+        .pointerStyle(.link)
+        .accessibilityLabel(Text("Source Link"))
+        .accessibilityValue(Text(verbatim: address))
+        .help(address)
+        .contextMenu {
+            Button("Copy URL", systemImage: "doc.on.doc") { copyLink(address) }
+        }
+    }
+
+    func headerHeight(at width: CGFloat) -> CGFloat {
+        NSHostingController(rootView: header).sizeThatFits(in: NSSize(width: width, height: .infinity)).height
+    }
+
+    private func sourceIcon(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .foregroundStyle(.secondary)
+            .frame(width: 16)
+            .accessibilityHidden(true)
+    }
+
+    // Markdown is laid out asynchronously, so start with its visible text before measuring the rendered view.
     func estimatedWindowSize(in screenFrame: NSRect, minimumWidth: CGFloat) -> NSSize {
-        let maxWidth = min(420, screenFrame.width)
-        let sizing = NSHostingController(rootView: HistoryItemPreviewText(item: item, historyFont: historyFont)
-            .padding(HistoryItemPreviewContent.contentPadding))
+        let maxWidth = min(Self.maximumAutomaticWidth, screenFrame.width)
+        let sizing = NSHostingController(rootView: VStack(alignment: .leading, spacing: 0) {
+            header
+            plainDocument(sizingText)
+                .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
+                .padding(.trailing, bodyCloseInset)
+                .padding(.bottom, 8)
+        })
         let ideal = sizing.sizeThatFits(in: NSSize(width: maxWidth, height: .infinity))
         let width = min(maxWidth, max(minimumWidth, ceil(ideal.width)))
         let wrapped = sizing.sizeThatFits(in: NSSize(width: width, height: .infinity))
-        let height = min(screenFrame.height, ceil(wrapped.height) + Self.controlsHeight + sourceLinkHeight)
+        let height = min(screenFrame.height, ceil(wrapped.height) + Self.controlsHeight)
         return NSSize(width: width, height: height)
+    }
+
+    private var sizingText: String {
+        guard displayMode == .markdown, let markdown = try? AttributedString(markdown: item.content) else {
+            return item.content
+        }
+        var block: PresentationIntent?
+        var text = ""
+        for run in markdown.runs {
+            let nextBlock = run.presentationIntent
+            if block != nextBlock, !text.isEmpty {
+                // Estimate a table row across its cells, including space for cell padding.
+                let row = tableRow(in: block)
+                text += row != nil && row == tableRow(in: nextBlock) ? "    " : "\n"
+            }
+            block = nextBlock
+            text.append(contentsOf: markdown[run.range].characters)
+        }
+        return text
+    }
+
+    private func tableRow(in intent: PresentationIntent?) -> Int? {
+        intent?.components.first {
+            switch $0.kind {
+            case .tableHeaderRow, .tableRow: true
+            default: false
+            }
+        }?.identity
+    }
+
+    private func plainDocument(_ text: String) -> some View {
+        Text(verbatim: text)
+            .font(Font(historyFont))
+            .lineSpacing(3)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder
     private var document: some View {
         switch displayMode {
         case .plainText:
-            Text(verbatim: item.content)
-                .font(Font(historyFont))
-                .lineSpacing(3)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
+            plainDocument(item.content).textSelection(.enabled)
         case .markdown:
-            DesktopNoteMarkdown(source: item.content, font: Font(historyFont), allowsRemoteImages: allowsRemoteImages)
-                .id(allowsRemoteImages)
+            DesktopNoteMarkdown(source: item.content, font: Font(historyFont), allowsRemoteImages: allowsRemoteImages) {
+                let paddedWidth = $0 + 2 * HistoryItemPreviewContent.contentPadding + bodyCloseInset
+                onBlockWidthChange?(paddedWidth, measurementID)
+            }
+            .id(allowsRemoteImages)
+        }
+    }
+}
+
+private struct DesktopNoteSourceRegion: NSViewRepresentable {
+    func makeNSView(context: Context) -> RegionView { RegionView() }
+
+    func updateNSView(_ view: RegionView, context: Context) {}
+
+    final class RegionView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            (window as? DesktopNotePanel)?.sourceRegion = self
         }
     }
 }
@@ -113,14 +251,15 @@ private struct DesktopNoteMarkdown: View {
     let source: String
     let font: Font
     let allowsRemoteImages: Bool
+    let onBlockWidthChange: (CGFloat) -> Void
 
     var body: some View {
         StructuredText(markdown: source)
             .font(font)
             .textual.headingStyle(HeadingStyle())
             .textual.paragraphStyle(ParagraphStyle())
-            .textual.codeBlockStyle(CodeBlockStyle())
-            .textual.tableStyle(TableStyle())
+            .textual.codeBlockStyle(CodeBlockStyle(onWidthChange: onBlockWidthChange))
+            .textual.tableStyle(TableStyle(onWidthChange: onBlockWidthChange))
             .textual.tableCellStyle(TableCellStyle())
             .textual.overflowMode(.scroll)
             .textual.textSelection(.enabled)
@@ -149,12 +288,15 @@ private struct DesktopNoteMarkdown: View {
     }
 
     private struct TableStyle: StructuredText.TableStyle {
+        let onWidthChange: (CGFloat) -> Void
+
         func makeBody(configuration: Configuration) -> some View {
             Overflow { state in
                 StructuredText.DefaultTableStyle()
                     .makeBody(configuration: configuration)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: state.containerWidth.map { $0 * 3 }, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self, of: \.size.width, action: onWidthChange)
                     .modifier(DesktopNoteTextRegions())
             }
             .textual.tableCellSpacing(horizontal: 1, vertical: 1)
@@ -171,6 +313,7 @@ private struct DesktopNoteMarkdown: View {
             light: Color(red: 210 / 255, green: 210 / 255, blue: 215 / 255),
             dark: Color(red: 66 / 255, green: 66 / 255, blue: 69 / 255)
         )
+        let onWidthChange: (CGFloat) -> Void
 
         func makeBody(configuration: Configuration) -> some View {
             Overflow {
@@ -182,6 +325,7 @@ private struct DesktopNoteMarkdown: View {
                     .modifier(DesktopNoteTextRegions())
                     .padding(.vertical, 8)
                     .padding(.leading, 14)
+                    .onGeometryChange(for: CGFloat.self, of: \.size.width, action: onWidthChange)
             }
             .background(Self.background, in: .rect(cornerRadius: 4))
             .clipShape(.rect(cornerRadius: 4))
@@ -219,8 +363,6 @@ private func isRemoteImage(_ url: URL) -> Bool {
 }
 
 private struct DesktopNoteTextRegions: ViewModifier {
-    var sourceText: String?
-
     func body(content: Content) -> some View {
         content.overlayPreferenceValue(Text.LayoutKey.self) { layouts in
             GeometryReader { geometry in
@@ -230,10 +372,7 @@ private struct DesktopNoteTextRegions: ViewModifier {
                         return anchored.layout.map { line in
                             line.typographicBounds.rect.offsetBy(dx: origin.x, dy: origin.y)
                         }
-                    },
-                    sourceLayout: sourceText != nil && layouts.count == 1 ? layouts.first : nil,
-                    sourceText: sourceText,
-                    sourceOrigin: layouts.first.map { geometry[$0.origin] } ?? .zero
+                    }
                 )
             }
             .allowsHitTesting(false)
@@ -243,17 +382,11 @@ private struct DesktopNoteTextRegions: ViewModifier {
 
     private struct RegionView: NSViewRepresentable {
         let lines: [CGRect]
-        let sourceLayout: Text.LayoutKey.AnchoredLayout?
-        let sourceText: String?
-        let sourceOrigin: CGPoint
 
         func makeNSView(context: Context) -> DesktopNoteTextHitView { DesktopNoteTextHitView() }
 
         func updateNSView(_ view: DesktopNoteTextHitView, context: Context) {
             view.lines = lines
-            view.sourceLayout = sourceLayout?.layout
-            view.sourceText = sourceText
-            view.sourceOrigin = sourceOrigin
         }
     }
 }
@@ -261,9 +394,6 @@ private struct DesktopNoteTextRegions: ViewModifier {
 @MainActor
 final class DesktopNoteTextHitView: NSView {
     var lines: [CGRect] = []
-    var sourceLayout: Text.Layout?
-    var sourceText: String?
-    var sourceOrigin = CGPoint.zero
 
     override var isFlipped: Bool { true }
 
@@ -277,43 +407,11 @@ final class DesktopNoteTextHitView: NSView {
         let point = convert(windowPoint, from: nil)
         return visibleRect.contains(point) && lines.contains { $0.contains(point) }
     }
-
-    func sourceOffset(at windowPoint: NSPoint) -> Int? {
-        let point = convert(windowPoint, from: nil)
-        guard window != nil, !isHiddenOrHasHiddenAncestor, visibleRect.contains(point),
-              let sourceLayout, let sourceText else { return nil }
-        let x = point.x - sourceOrigin.x
-        let y = point.y - sourceOrigin.y
-        let paragraphs = sourceText.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
-        var paragraph = 0
-        var start = sourceLayout.first?.flatMap(\.characterIndices).min()
-        var last: Text.Layout.CharacterIndex?
-        for (lineNumber, line) in sourceLayout.enumerated() {
-            let indices = line.flatMap(\.characterIndices)
-            let first = indices.min()
-            // SwiftUI indices restart after a hard line break, but continue across soft wraps.
-            if lineNumber > 0, first.flatMap({ index in last.map { index <= $0 } }) ?? true {
-                paragraph += 1
-                start = first
-            }
-            if (line.typographicBounds.rect.minY...line.typographicBounds.rect.maxY).contains(y) {
-                guard paragraphs.indices.contains(paragraph) else { return nil }
-                let text = paragraphs[paragraph]
-                let glyph = line.flatMap { $0 }.min {
-                    abs($0.typographicBounds.rect.midX - x) < abs($1.typographicBounds.rect.midX - x)
-                }
-                let offset = glyph?.characterIndices.min().flatMap { index in start?.distance(to: index) } ?? 0
-                guard (0...text.utf16.count).contains(offset) else { return nil }
-                return text.startIndex.utf16Offset(in: sourceText) + offset
-            }
-            last = indices.max()
-        }
-        return nil
-    }
 }
 
 struct DesktopNoteCategoryMenu: View {
     var item: ClipItem
+    var showsTitle = false
     let onChangeCategory: (ClipCategoryChange) async throws -> Void
     let onOpenCategoryManager: () -> Void
     @ObservedObject private var appSettings = AppSettings.shared
@@ -323,13 +421,14 @@ struct DesktopNoteCategoryMenu: View {
             item: item,
             isSelected: false,
             onChangeCategory: onChangeCategory,
-            onOpenCategoryManager: onOpenCategoryManager
+            onOpenCategoryManager: onOpenCategoryManager,
+            showsTitle: showsTitle
         )
         .environment(\.locale, appSettings.appLocale)
     }
 }
 
-enum DesktopNoteColor: String, CaseIterable {
+enum DesktopNoteColor: String, CaseIterable, Codable {
     case none = "No Note Color"
     case yellow = "Yellow Note Color"
     case orange = "Orange Note Color"
@@ -351,8 +450,9 @@ enum DesktopNoteColor: String, CaseIterable {
 
 @MainActor
 final class DesktopNoteEditor: NSObject {
-    private static let spacing: CGFloat = 3
-    static let actionsHeight = DesktopNoteEditActions.height + spacing
+    private static let spacing: CGFloat = 6
+    private static let toolbarGap: CGFloat = 8
+    static let actionsHeight = DesktopNoteEditActions.height + spacing + toolbarGap
 
     let originalText: String
     let view: NSStackView
@@ -361,6 +461,8 @@ final class DesktopNoteEditor: NSObject {
     private let coordinator: SimpleLineNumberCoordinator
     private let actionsView: NSHostingView<DesktopNoteEditActions>
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
+    private let scrollTrailingConstraint: NSLayoutConstraint
+    private var topConstraint: NSLayoutConstraint?
     private var asksToSaveAsPlainText = false
 
     var isConfirmingPlainTextSave: Bool { asksToSaveAsPlainText && !errorLabel.isHidden }
@@ -386,7 +488,18 @@ final class DesktopNoteEditor: NSObject {
         errorLabel.isHidden = true
         errorLabel.setContentCompressionResistancePriority(.defaultHigh, for: .vertical)
         scroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        view = NSStackView(views: [scroll, errorLabel, actionsView])
+        let scrollContainer = NSView()
+        scrollContainer.addSubview(scroll)
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        let trailing = scroll.trailingAnchor.constraint(equalTo: scrollContainer.trailingAnchor)
+        scrollTrailingConstraint = trailing
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: scrollContainer.leadingAnchor),
+            trailing,
+            scroll.topAnchor.constraint(equalTo: scrollContainer.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: scrollContainer.bottomAnchor)
+        ])
+        view = NSStackView(views: [scrollContainer, errorLabel, actionsView])
         super.init()
         view.orientation = .vertical
         view.alignment = .width
@@ -394,15 +507,25 @@ final class DesktopNoteEditor: NSObject {
         view.translatesAutoresizingMaskIntoConstraints = false
     }
 
-    func install(in container: NSView, headingHeight: CGFloat) {
+    func install(in container: NSView, headerHeight: CGFloat, bodyCloseInset: CGFloat) {
         let padding = HistoryItemPreviewContent.contentPadding
         container.addSubview(view)
+        let top = view.topAnchor.constraint(equalTo: container.topAnchor, constant: headerHeight)
+        topConstraint = top
+        scrollTrailingConstraint.constant = -bodyCloseInset
         NSLayoutConstraint.activate([
             view.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
             view.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -padding),
-            view.topAnchor.constraint(equalTo: container.topAnchor, constant: padding + headingHeight),
-            view.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -DesktopNoteContent.controlsHeight)
+            top,
+            view.bottomAnchor.constraint(
+                equalTo: container.bottomAnchor, constant: -(DesktopNoteContent.controlsHeight + Self.toolbarGap)
+            )
         ])
+    }
+
+    func updateHeader(height: CGFloat, bodyCloseInset: CGFloat) {
+        topConstraint?.constant = height
+        scrollTrailingConstraint.constant = -bodyCloseInset
     }
 
     func setSaving(_ isSaving: Bool) {
@@ -410,24 +533,17 @@ final class DesktopNoteEditor: NSObject {
         actionsView.rootView.isSaving = isSaving
     }
 
-    func focus(at screenPoint: NSPoint, in window: NSWindow, sourceOffset: Int?, scrollProgress: CGFloat) {
-        if sourceOffset == nil, scrollProgress > 0 {
-            // The Markdown preview can reflow or omit syntax, so its coordinates cannot place a source caret.
-            scrollTo(progress: scrollProgress)
-            window.makeFirstResponder(nil)
-            return
-        }
+    func focus(in window: NSWindow, scrollProgress: CGFloat) {
         window.makeFirstResponder(textView)
-        let point = textView.convert(window.convertPoint(fromScreen: screenPoint), from: nil)
-        let index = sourceOffset ?? textView.characterIndexForInsertion(at: point)
-        let offset = max(0, min(index, (originalText as NSString).length))
+        let index = scrollProgress > 0 ? scrollTo(progress: scrollProgress) : 0
+        let offset = max(0, min(index, originalText.utf16.count))
         let range = NSRange(location: offset, length: 0)
         textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
     }
 
-    private func scrollTo(progress: CGFloat) {
-        guard let scroll = textView.enclosingScrollView, let container = textView.textContainer else { return }
+    private func scrollTo(progress: CGFloat) -> Int {
+        guard let scroll = textView.enclosingScrollView, let container = textView.textContainer else { return 0 }
         textView.layoutManager?.ensureLayout(for: container)
         scroll.layoutSubtreeIfNeeded()
         let clip = scroll.contentView
@@ -435,6 +551,8 @@ final class DesktopNoteEditor: NSObject {
         let offset = document.minY + progress * max(0, document.height - clip.bounds.height)
         clip.scroll(to: CGPoint(x: clip.bounds.minX, y: offset))
         scroll.reflectScrolledClipView(clip)
+        let point = NSPoint(x: textView.textContainerOrigin.x, y: clip.documentVisibleRect.minY + 1)
+        return textView.characterIndexForInsertion(at: point)
     }
 
     func handleShortcut(_ event: NSEvent) -> Bool {

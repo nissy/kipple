@@ -8,6 +8,165 @@ import XCTest
 final class DesktopNoteWindowCoordinatorTests: XCTestCase {
     private let screenFrame = NSRect(x: 0, y: 0, width: 900, height: 700)
 
+    func testCopyButtonRecopiesTheHistoryItemWithItsFormatting() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let entry = NSPasteboardItem()
+        entry.setString("Sample note", forType: .string)
+        entry.setString("<strong>Sample note</strong>", forType: .html)
+        pasteboard.writeObjects([entry])
+        let richText = try XCTUnwrap(ClipboardRichText(pasteboard: pasteboard))
+        pasteboard.clearContents()
+
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let title = UUID().uuidString
+        let item = ClipItem(content: "Sample note", metadata: ClipMetadata(title: title), richText: richText)
+        try await repository.save([item, ClipItem(content: "Newer item")])
+        let service = ModernClipboardService(testRepository: repository, loadOnStartup: true) { item in
+            ClipboardRichText.write(item, to: pasteboard)
+        }
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+        await coordinator.toggle(item.id, on: screen)
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
+        defer { note.close() }
+        let toolbar = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSStackView }.first)
+        let copyButton = try XCTUnwrap(toolbar.views.first as? NSButton)
+        XCTAssertEqual(copyButton.toolTip, AppSettings.shared.localizedString("Copy"))
+        let originalIcon = try XCTUnwrap(copyButton.image)
+        note.setContentSize(NSSize(width: 340, height: 220))
+        note.contentView?.layoutSubtreeIfNeeded()
+        let toolbarFrames = toolbar.views.map(\.frame)
+
+        copyButton.performClick(nil)
+        await adapter.flushPendingSaves()
+
+        XCTAssertEqual(pasteboard.string(forType: .string), item.content)
+        XCTAssertEqual(ClipboardRichText(pasteboard: pasteboard), richText)
+        XCTAssertEqual(adapter.history.first?.id, item.id)
+        XCTAssertEqual(adapter.history.count, 2)
+        XCTAssertTrue(note.isVisible)
+        XCTAssertNotIdentical(try XCTUnwrap(copyButton.image), originalIcon)
+        note.contentView?.layoutSubtreeIfNeeded()
+        XCTAssertEqual(toolbar.views.map(\.frame), toolbarFrames)
+        try await Task.sleep(for: .milliseconds(1_100))
+        XCTAssertIdentical(copyButton.image, originalIcon)
+    }
+
+    func testCopyButtonDoesNotShowSuccessWhenTheClipboardWriteFails() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let service = ModernClipboardService(testRepository: repository) { _ in -1 }
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter)
+        let title = UUID().uuidString
+        try await adapter.createHistoryItem(title: title, content: "Test note", categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: screen)
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
+        defer { note.close() }
+        let toolbar = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSStackView }.first)
+        let button = try XCTUnwrap(toolbar.views.first as? NSButton)
+        let originalIcon = try XCTUnwrap(button.image)
+        button.performClick(nil)
+        await adapter.flushPendingSaves()
+        XCTAssertIdentical(button.image, originalIcon)
+    }
+
+    func testRestoresPositionSizeAndColorFromAnOlderHistoryItem() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let previousLimit = AppSettings.shared.maxHistoryItems
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            AppSettings.shared.maxHistoryItems = previousLimit
+        }
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        let adapter = ModernClipboardServiceAdapter(
+            modernService: ModernClipboardService(testRepository: repository), refreshPeriodically: false
+        )
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter, defaults: defaults)
+        let title = UUID().uuidString
+        try await adapter.createHistoryItem(title: title, content: "Restorable note", categoryChanges: [:])
+        let item = try XCTUnwrap(adapter.history.first)
+        await coordinator.toggle(item.id, on: screen)
+        let original = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
+        original.setFrameTopLeftPoint(NSPoint(x: screen.visibleFrame.minX + 54, y: screen.visibleFrame.maxY - 60))
+        simulateDesktopNoteLiveResize(original, to: NSSize(width: 274, height: 179))
+        let resized = original.frame
+        XCTAssertEqual(DesktopNotePlacement.load(from: defaults)[item.id]?.frame, resized)
+        let point = NSPoint(x: 150, y: 90)
+        let end = NSPoint(x: point.x + 35, y: point.y - 24)
+        original.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: original))
+        original.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: original))
+        original.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: original))
+        XCTAssertEqual(original.frame.origin, NSPoint(x: resized.minX + 35, y: resized.minY - 24))
+        XCTAssertEqual(DesktopNotePlacement.load(from: defaults)[item.id]?.frame, original.frame)
+        let color = NSMenuItem()
+        color.representedObject = DesktopNoteColor.pink.rawValue
+        XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: original, from: color))
+        let saved = try XCTUnwrap(DesktopNotePlacement.load(from: defaults)[item.id])
+        XCTAssertEqual(saved.frame, original.frame)
+        XCTAssertEqual(saved.color, .pink)
+        XCTAssertTrue(saved.usesManualSize)
+        coordinator.prepareForTermination()
+        original.close()
+
+        try await repository.save((1...16).map { ClipItem(content: "Newer item \($0)") })
+        AppSettings.shared.maxHistoryItems = 1
+        let recentItems = try await repository.load(limit: 12)
+        XCTAssertFalse(recentItems.contains { $0.id == item.id })
+        let reopenedService = ModernClipboardService(
+            testRepository: repository, loadOnStartup: true, desktopNoteItemIDs: [item.id]
+        )
+        let reopenedAdapter = ModernClipboardServiceAdapter(modernService: reopenedService, refreshPeriodically: false)
+        let reopened = DesktopNoteWindowCoordinator(adapter: reopenedAdapter, defaults: defaults)
+        await reopened.restoreNotes()
+        let window = try XCTUnwrap(NSApp.windows.first { $0.title == title && $0.isVisible } as? DesktopNotePanel)
+        defer { window.close() }
+        XCTAssertNotIdentical(window, original)
+        XCTAssertTrue(reopened.isPosted(item.id))
+        XCTAssertEqual(window.frame, saved.frame)
+        XCTAssertEqual(window.placement.color, .pink)
+
+        let retained = try await repository.load(ids: [item.id])
+        XCTAssertEqual(retained.map(\.id), [item.id])
+        await reopened.toggle(item.id, on: screen)
+        XCTAssertTrue(DesktopNotePlacement.load(from: defaults).isEmpty)
+        await reopened.restoreNotes()
+        XCTAssertFalse(reopened.isPosted(item.id))
+    }
+
+    func testRestoreKeepsNotesOnScreenAndRemovesMissingHistoryReferences() async throws {
+        let screen = try XCTUnwrap(NSScreen.main)
+        let suite = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let existing = ClipItem(content: "Note from another display", metadata: ClipMetadata(title: UUID().uuidString))
+        let missing = UUID()
+        let placement = DesktopNotePlacement(
+            frame: CGRect(x: 100_000, y: 100_000, width: 250, height: 150), color: .none, usesManualSize: false
+        )
+        DesktopNotePlacement.save([existing.id: placement, missing: placement], to: defaults)
+        let repository = try SwiftDataRepository.make(inMemory: true)
+        try await repository.save([existing])
+        let service = ModernClipboardService(
+            testRepository: repository, loadOnStartup: true, desktopNoteItemIDs: [existing.id, missing]
+        )
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let coordinator = DesktopNoteWindowCoordinator(adapter: adapter, defaults: defaults)
+        await coordinator.restoreNotes()
+        let note = try XCTUnwrap(NSApp.windows.first { $0.title == existing.title } as? DesktopNotePanel)
+        defer { note.close() }
+        XCTAssertTrue(screen.visibleFrame.contains(note.frame))
+        XCTAssertEqual(note.placement.color, .none)
+        XCTAssertNil(DesktopNotePlacement.load(from: defaults)[missing])
+        await coordinator.restoreNotes()
+        XCTAssertEqual(NSApp.windows.filter { $0.title == existing.title && $0.isVisible }.count, 1)
+    }
+
     func testClosingAndTogglingNotesUpdatesOnlyTheMatchingHistoryItem() async throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
@@ -140,13 +299,16 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let content = try XCTUnwrap(note.contentView)
         note.appearance = NSAppearance(named: .aqua)
         let light = try renderNoteBackground(in: content)
+        let colors = DesktopNoteColor.allCases.compactMap { $0.fill?.cgColor }
+        let strip = try XCTUnwrap(content.subviews.first { view in
+            view.layer?.backgroundColor.map { colors.contains($0) } ?? false
+        })
+        XCTAssertFalse(strip.isHidden)
 
         let orange = NSMenuItem()
         orange.representedObject = "Orange Note Color"
         XCTAssertTrue(NSApp.sendAction(NSSelectorFromString("changeColor:"), to: note, from: orange))
-        let strip = try XCTUnwrap(content.subviews.first {
-            $0.layer?.backgroundColor == NSColor.systemOrange.cgColor
-        })
+        XCTAssertEqual(strip.layer?.backgroundColor, NSColor.systemOrange.cgColor)
 
         note.appearance = NSAppearance(named: .darkAqua)
         let dark = try renderNoteBackground(in: content)
@@ -188,9 +350,160 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertLessThan(short.frame.width, wrapped.frame.width)
         XCTAssertLessThan(short.frame.height, wrapped.frame.height)
         XCTAssertLessThan(wrapped.frame.height, long.frame.height)
-        XCTAssertLessThan(long.frame.height, screenFrame.height)
+        XCTAssertEqual(long.frame.height, screenFrame.height)
         XCTAssertTrue(short.title.isEmpty)
         XCTAssertEqual(short.titleVisibility, .hidden)
+    }
+
+    func testMarkdownNoteFitsItsRenderedBodyWithoutMovingItsTopEdge() async throws {
+        let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
+        let content = """
+        # Work items
+
+        ## Release
+
+        | Item | Status |
+        | --- | --- |
+        | Review | Done |
+        | Publish | Waiting |
+
+        ```
+        make run
+        ```
+
+        ## Next steps
+
+        Follow up after the release.
+        """
+        var item = ClipItem(content: content)
+        let note = DesktopNotePanel(item: item, screenFrame: screen, displayMode: .markdown)
+        let topLeft = NSPoint(x: screen.minX + 40, y: screen.maxY - 40)
+        note.setFrameTopLeftPoint(topLeft)
+        let estimatedHeight = note.frame.height
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+
+        let view = try XCTUnwrap(note.contentView)
+        let clip = try XCTUnwrap(firstScrollView(in: view)).contentView
+        for _ in 0..<50 {
+            if note.frame.height > estimatedHeight,
+               clip.documentRect.height <= clip.bounds.height + 1,
+               let table = firstScrollView(in: clip)?.contentView,
+               table.documentRect.width <= table.bounds.width + 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertGreaterThan(note.frame.height, estimatedHeight)
+        XCTAssertGreaterThan(clip.documentRect.height, 150)
+        XCTAssertLessThanOrEqual(clip.documentRect.height, clip.bounds.height + 1)
+        let table = try XCTUnwrap(firstScrollView(in: clip)).contentView
+        XCTAssertLessThanOrEqual(table.documentRect.width, table.bounds.width + 1)
+        XCTAssertEqual(note.frame.minX, topLeft.x)
+        XCTAssertEqual(note.frame.maxY, topLeft.y)
+
+        item = item.replacingContent(with: "[Open](https://example.com/\(String(repeating: "a", count: 400)))")
+        note.update(from: item)
+        XCTAssertEqual(note.frame.width, note.minSize.width)
+        XCTAssertEqual(note.frame.height, note.minSize.height)
+        XCTAssertEqual(note.frame.maxY, topLeft.y)
+    }
+
+    func testRestoredAutomaticNoteKeepsItsSizeUntilTheContentChanges() async throws {
+        let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
+        let text = (1...6).map { "## Step \($0)\n\nReview the release notes." }.joined(separator: "\n\n")
+        let item = ClipItem(content: text)
+        let note = DesktopNotePanel(item: item, screenFrame: screen, displayMode: .markdown, onSave: { _, _ in })
+        let saved = NSRect(x: screen.minX + 40, y: screen.maxY - 220, width: 265, height: 180)
+        note.restorePlacement(DesktopNotePlacement(frame: saved, color: .none, usesManualSize: false), in: screen)
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+
+        let view = try XCTUnwrap(note.contentView)
+        let clip = try XCTUnwrap(firstScrollView(in: view)).contentView
+        for _ in 0..<50 where clip.documentRect.height <= clip.bounds.height {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertGreaterThan(clip.documentRect.height, clip.bounds.height)
+        XCTAssertEqual(note.frame, saved)
+        XCTAssertFalse(note.placement.usesManualSize)
+
+        try desktopNoteEditButton(in: note).performClick(nil)
+        let editor = try XCTUnwrap(note.firstResponder as? LiveEditorTextView)
+        editor.string = "Unsaved draft"
+        let escape = try desktopNoteKeyEvent(kVK_Escape, characters: "\u{1B}", modifiers: [], for: note)
+        note.sendEvent(escape)
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(note.frame, saved)
+        XCTAssertFalse(note.placement.usesManualSize)
+
+        note.update(from: item.replacingContent(with: "Ready"))
+        XCTAssertLessThan(note.frame.height, saved.height)
+        XCTAssertEqual(note.frame.maxY, saved.maxY)
+    }
+
+    func testMovingAScreenLimitedNoteUpGivesTheBodyMoreSpace() async throws {
+        let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
+        let item = ClipItem(content: "Follow-up")
+        let note = DesktopNotePanel(item: item, screenFrame: screen)
+        let top = NSPoint(x: screen.minX + 75, y: screen.minY + 175)
+        note.setFrameTopLeftPoint(top)
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+
+        note.update(from: item.replacingContent(with: (1...20).map { "Item \($0)" }.joined(separator: "\n")))
+        let view = try XCTUnwrap(note.contentView)
+        let clip = try XCTUnwrap(firstScrollView(in: view)).contentView
+        try await Task.sleep(for: .milliseconds(100))
+        let before = note.frame
+        XCTAssertEqual(before.minY, screen.minY)
+        XCTAssertGreaterThan(clip.documentRect.height, clip.bounds.height)
+
+        let start = NSPoint(x: before.width - 32, y: before.height - 48)
+        let distance = screen.maxY - 40 - top.y
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: NSPoint(x: start.x, y: start.y + distance), for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
+
+        XCTAssertGreaterThan(note.frame.height, before.height)
+        XCTAssertEqual(note.frame.minX, before.minX)
+        XCTAssertEqual(note.frame.maxY, screen.maxY - 40)
+        XCTAssertFalse(note.placement.usesManualSize)
+    }
+
+    func testFitToContentMenuResumesAutomaticSizing() async throws {
+        let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
+        let item = ClipItem(content: "Short note")
+        let note = DesktopNotePanel(item: item, screenFrame: screen)
+        defer { note.close() }
+        let saved = NSRect(x: screen.minX + 75, y: screen.maxY - 280, width: 295, height: 200)
+        note.restorePlacement(DesktopNotePlacement(frame: saved, color: .yellow, usesManualSize: true), in: screen)
+        note.makeKeyAndOrderFront(nil)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let text = try desktopNoteBodyPoint(in: note, x: 29)
+        XCTAssertNil(note.automaticSizeMenu(at: text))
+        let blank = NSPoint(x: 120, y: 65)
+        let menu = try XCTUnwrap(note.automaticSizeMenu(at: blank))
+        XCTAssertEqual(menu.items.first?.title, AppSettings.shared.localizedString("Fit Note to Content"))
+        menu.performActionForItem(at: 0)
+
+        XCTAssertFalse(note.placement.usesManualSize)
+        XCTAssertEqual(note.placement.color, .yellow)
+        XCTAssertEqual(note.frame.minX, saved.minX)
+        XCTAssertEqual(note.frame.maxY, saved.maxY)
+        XCTAssertLessThan(note.frame.height, saved.height)
+        XCTAssertNil(note.automaticSizeMenu(at: blank))
+
+        let height = note.frame.height
+        note.update(from: item.replacingContent(with: String(repeating: "Longer note content.\n", count: 12)))
+        XCTAssertGreaterThan(note.frame.height, height)
+    }
+
+    private func firstScrollView(in view: NSView) -> NSScrollView? {
+        if let scrollView = view as? NSScrollView { return scrollView }
+        for child in view.subviews {
+            if let scrollView = firstScrollView(in: child) { return scrollView }
+        }
+        return nil
     }
 
     func testNoteDisplaysTheHistoryTitle() {
@@ -238,18 +551,19 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         note.setFrameTopLeftPoint(NSPoint(x: 40, y: 600))
         defer { note.close() }
 
+        note.setContentSize(NSSize(width: 240, height: 160))
         simulateDesktopNoteLiveResize(note, to: note.minSize)
         let untitled = note.frame
-        XCTAssertEqual(untitled.height, 120)
+        XCTAssertEqual(untitled.height, 86)
 
         item.metadata = ClipMetadata(title: "A long history title that wraps onto two lines")
         note.update(from: item)
         let titled = note.frame
-        XCTAssertEqual(titled.height, 160)
+        XCTAssertGreaterThan(titled.height, untitled.height)
         XCTAssertEqual(titled.width, untitled.width)
         XCTAssertEqual(titled.maxY, untitled.maxY)
 
-        XCTAssertEqual(note.minSize.height, 160)
+        XCTAssertEqual(titled.height, note.minSize.height)
     }
 
     func testSwitchingFromTheEditorSavesTheOriginalMarkdownSource() async throws {
@@ -276,8 +590,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertNotNil(button.image)
         XCTAssertEqual(adapter.history.first?.content, source)
 
-        let point = NSPoint(x: 35, y: note.frame.height - 50)
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        try desktopNoteEditButton(in: note).performClick(nil)
         let editor = try XCTUnwrap(note.firstResponder as? NSTextView)
         XCTAssertEqual(editor.string, source)
 
@@ -325,7 +638,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let contentView = try XCTUnwrap(note.contentView)
         contentView.layoutSubtreeIfNeeded()
         try await Task.sleep(for: .milliseconds(50))
-        let start = NSPoint(x: 180, y: note.frame.height - 28)
+        let start = try desktopNoteBodyPoint(in: note, x: 180)
         let origin = note.frame.origin
         let end = NSPoint(x: start.x + 100, y: start.y + 80)
 
@@ -340,14 +653,14 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         let note = DesktopNotePanel(
             item: ClipItem(content: "Select this Markdown text"), screenFrame: screenFrame, displayMode: .markdown
         )
-        note.setContentSize(NSSize(width: 260, height: 160))
+        simulateDesktopNoteLiveResize(note, to: NSSize(width: 260, height: 160))
         note.makeKeyAndOrderFront(nil)
         defer { note.close() }
         let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
         controller.view.layoutSubtreeIfNeeded()
         try await Task.sleep(for: .milliseconds(50))
         let initialFrame = note.frame
-        let start = NSPoint(x: 27, y: note.frame.height - 28)
+        let start = try desktopNoteBodyPoint(in: note, x: 27)
         let end = NSPoint(x: 122, y: start.y)
 
         func selectPreviewText() throws {
@@ -382,21 +695,19 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
 
     func testDraggingAMarkdownLinkSelectsTextWithoutMovingTheNoteOrOpeningTheLink() async throws {
         var opened: [URL] = []
+        let openLink: (URL) -> Void = { opened.append($0) }
         let note = DesktopNotePanel(
             item: ClipItem(content: "[Open the example](https://example.com)"),
             screenFrame: screenFrame,
             displayMode: .markdown,
-            onSave: nil,
-            onChangeCategory: nil
-        ) { url in
-            opened.append(url)
-        }
+            openLink: openLink
+        )
         note.makeKeyAndOrderFront(nil)
         defer { note.close() }
         let contentView = try XCTUnwrap(note.contentView)
         contentView.layoutSubtreeIfNeeded()
         try await Task.sleep(for: .milliseconds(50))
-        let start = NSPoint(x: 29, y: note.frame.height - 28)
+        let start = try desktopNoteBodyPoint(in: note, x: 29)
         let origin = note.frame.origin
 
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
@@ -412,7 +723,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(note.frame.origin, origin)
     }
 
-    func testDoubleClickEditsFullTextAndFocusLossSavesItToHistory() async throws {
+    func testDoubleClickKeepsPreviewAndEditButtonOpensFullText() async throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let service = ModernClipboardService(testRepository: try SwiftDataRepository.make(inMemory: true))
         let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
@@ -424,13 +735,24 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         await coordinator.toggle(item.id, on: screen)
         let note = try XCTUnwrap(NSApp.windows.first { $0.title == title } as? DesktopNotePanel)
         defer { note.close() }
-        let point = NSPoint(x: 35, y: note.frame.height - 70)
+        note.makeKeyAndOrderFront(nil)
+        note.contentView?.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let point = try desktopNoteBodyPoint(in: note)
 
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note))
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note))
         XCTAssertFalse(note.firstResponder is NSTextView)
 
         note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note, clickCount: 2))
+        XCTAssertFalse(note.firstResponder is LiveEditorTextView)
+        let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
+        XCTAssertTrue(controller.selectionMayExist)
+
+        let editButton = try desktopNoteEditButton(in: note)
+        editButton.performClick(nil)
+        XCTAssertTrue(editButton.isHidden)
         let editor = try XCTUnwrap(note.firstResponder as? LiveEditorTextView)
         XCTAssertTrue(editor.enclosingScrollView?.verticalRulerView is SimpleLineNumberRulerView)
         XCTAssertEqual(editor.font, FontManager.shared.editorFont)
@@ -446,6 +768,7 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         await fulfillment(of: [saved], timeout: 2)
         XCTAssertEqual(adapter.history.first?.title, title)
         XCTAssertEqual(adapter.history.first?.categoryIDs, [BuiltInCategory.ocr])
+        XCTAssertFalse(editButton.isHidden)
     }
 }
 
@@ -464,8 +787,7 @@ extension DesktopNoteWindowCoordinatorTests {
         defer { note.close() }
         simulateDesktopNoteLiveResize(note, to: note.minSize)
         let viewingFrame = note.frame
-        let point = NSPoint(x: 35, y: note.frame.height - 70)
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
+        try desktopNoteEditButton(in: note).performClick(nil)
         let editor = try XCTUnwrap(note.firstResponder as? LiveEditorTextView)
         XCTAssertGreaterThan(note.minSize.height, viewingFrame.height)
         XCTAssertGreaterThanOrEqual(note.frame.height, note.minSize.height)
@@ -533,6 +855,20 @@ func desktopNoteKeyEvent(
         windowNumber: note.windowNumber, context: nil, characters: characters,
         charactersIgnoringModifiers: characters, isARepeat: false, keyCode: UInt16(keyCode)
     ))
+}
+
+@MainActor
+func desktopNoteEditButton(in note: DesktopNotePanel) throws -> NSButton {
+    let toolbar = try XCTUnwrap(note.contentView?.subviews.compactMap { $0 as? NSStackView }.first)
+    let title = AppSettings.shared.localizedString("editor.mode.startEditing")
+    return try XCTUnwrap(toolbar.views.compactMap { $0 as? NSButton }.first { $0.toolTip == title })
+}
+
+@MainActor
+func desktopNoteBodyPoint(in note: DesktopNotePanel, x: CGFloat = 35) throws -> NSPoint {
+    let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
+    let content = controller.hostingController.rootView
+    return NSPoint(x: x, y: note.frame.height - content.headerHeight(at: note.frame.width) - 8)
 }
 
 @MainActor

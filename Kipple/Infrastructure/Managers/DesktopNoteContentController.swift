@@ -40,6 +40,7 @@ final class DesktopNoteContentController: NSViewController {
         guard content.offersRemoteImages else { return }
         content.allowsRemoteImages = true
         setContent(content)
+        (view.window as? DesktopNotePanel)?.didLoadRemoteImages()
     }
 
     func clearSelection() {
@@ -66,7 +67,9 @@ final class DesktopNoteContentController: NSViewController {
         return (view as? NSScrollView).map { [$0] + descendants } ?? descendants
     }
 
-    func makeButton(_ symbol: String, labelKey: String, target: AnyObject, action: Selector) -> NSButton {
+    func makeButton(
+        _ symbol: String, labelKey: String, titleKey: String? = nil, target: AnyObject, action: Selector
+    ) -> NSButton {
         let button = NSButton(frame: .zero)
         let label = AppSettings.shared.localizedString(labelKey)
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
@@ -78,8 +81,13 @@ final class DesktopNoteContentController: NSViewController {
         button.action = action
         button.toolTip = label
         button.setAccessibilityLabel(label)
+        if let titleKey {
+            button.title = AppSettings.shared.localizedString(titleKey)
+            button.font = .systemFont(ofSize: 12)
+        }
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 24),
+            titleKey == nil ? button.widthAnchor.constraint(equalToConstant: 24)
+                : button.widthAnchor.constraint(greaterThanOrEqualToConstant: 24),
             button.heightAnchor.constraint(equalToConstant: 24)
         ])
         return button
