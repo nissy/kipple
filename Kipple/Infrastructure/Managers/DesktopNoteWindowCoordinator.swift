@@ -216,6 +216,22 @@ final class DesktopNotePanel: NSPanel {
     private static let toolbarItemSpace: CGFloat = 28
     private static let copyImage = makeCopyImage("doc.on.doc")
     private static let copiedImage = makeCopyImage("checkmark", tint: .controlAccentColor)
+    private static let contextClickMonitor = NSEvent.addLocalMonitorForEvents(
+        matching: [.rightMouseDown, .leftMouseDown]
+    ) { event in
+        guard isContextClick(event), !(event.window is DesktopNotePanel) else { return event }
+        // Context clicks can arrive without the note as their event window.
+        let point = event.window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
+        guard let (note, location) = noteUnderPointer(at: point),
+              let click = note.contextEvent(event, at: location) else { return event }
+        note.handleContextClick(click)
+        return nil
+    }
+    private static let pointerNotes = NSHashTable<DesktopNotePanel>.weakObjects()
+    private static var pointerTimer: DispatchSourceTimer?
+    private static var lastPolledPointer: NSPoint?
+    private static var pointerSettleDeadline: TimeInterval = 0
+    private static var pointerRefreshPending = false
     static let moveCursor: NSCursor = {
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
         guard let glyph = NSImage(systemSymbolName: "arrow.up.and.down.and.arrow.left.and.right",
@@ -265,6 +281,8 @@ final class DesktopNotePanel: NSPanel {
     private let textHitViews = NSHashTable<DesktopNoteTextHitView>.weakObjects()
     private var pointerGesture: PointerGesture?
     private var pointerCursor: NSCursor?
+    private var pointerLocation: NSPoint?
+    private var showingContextMenu = false
     private var pendingLink: URL?
     private var sourceLinkOpenTask: Task<Void, Never>?
     private var manualSize: NSSize?
@@ -340,6 +358,8 @@ final class DesktopNotePanel: NSPanel {
         contentViewController = noteContentController
         configureNativeFrame()
         acceptsMouseMovedEvents = true
+        _ = Self.contextClickMonitor
+        Self.observePointer(for: self)
         noteContentController.view.addTrackingArea(NSTrackingArea(
             rect: .zero, options: [.activeAlways, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
             owner: self, userInfo: nil
@@ -435,29 +455,13 @@ final class DesktopNotePanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
-        let isContextClick = event.type == .rightMouseDown ||
-            (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
-        let point = event.locationInWindow
-        if isContextClick, let contentView, let menu = sourceLinkMenu(at: point) ?? automaticSizeMenu(at: point) {
-            if isPoint(point, in: sourceLinkRegion) { cancelSourceLinkOpen() }
-            setPointerCursor(nil)
-            NSMenu.popUpContextMenu(menu, with: event, for: contentView)
+        if Self.isContextClick(event) {
+            handleContextClick(event)
             return
         }
         switch event.type {
         case .mouseMoved, .mouseEntered, .mouseExited, .cursorUpdate:
-            super.sendEvent(event)
-            if event.type == .mouseExited, event.trackingArea?.owner as AnyObject? === self {
-                if case .move = pointerGesture { return }
-                setPointerCursor(nil)
-            } else {
-                // Resolve the cursor after child views have handled their tracking events.
-                let location = event.type == .mouseMoved ? event.locationInWindow : mouseLocationOutsideOfEventStream
-                updatePointerCursor(at: location)
-                if event.type == .mouseEntered || event.type == .mouseExited || isPoint(location, in: sourceLinkRegion) {
-                    refreshPointerCursorAfterTracking()
-                }
-            }
+            handlePointerTracking(event)
             return
         case .leftMouseDown:
             if !isKeyWindow { makeKey() }
@@ -484,8 +488,9 @@ final class DesktopNotePanel: NSPanel {
             }
         case .leftMouseUp:
             if finishPointerGesture(event) { return }
-        case .rightMouseDown:
-            if editor == nil { noteContentController.selectionMayExist = true }
+            Self.refreshPointerCursorAfterTracking()
+        case .scrollWheel:
+            Self.refreshPointerCursorAfterTracking()
         case .keyDown:
             if handleNoteShortcut(event) { return }
             if editor == nil, firstResponder !== self { noteContentController.selectionMayExist = true }
@@ -495,12 +500,118 @@ final class DesktopNotePanel: NSPanel {
         super.sendEvent(event)
     }
 
+    private func handlePointerTracking(_ event: NSEvent) {
+        defer { Self.refreshPointerCursorAfterTracking() }
+        let location = event.type == .mouseMoved ? event.locationInWindow : mouseLocationOutsideOfEventStream
+        if displayMode == .markdown, let pointerLocation, isPoint(pointerLocation, in: sourceLinkRegion),
+           !isPoint(location, in: sourceLinkRegion), NSCursor.current === NSCursor.pointingHand {
+            // Textual should not inherit the cursor from the separately hosted source link.
+            setPointerCursor(.iBeam)
+        }
+        super.sendEvent(event)
+        if event.type == .mouseExited, event.trackingArea?.owner as AnyObject? === self {
+            if case .move = pointerGesture { return }
+            if Self.noteUnderPointer()?.note === self {
+                updatePointerCursor(at: location)
+            } else {
+                clearPointerCursor()
+            }
+        } else {
+            updatePointerCursor(at: location)
+        }
+    }
+
+    private static func isContextClick(_ event: NSEvent) -> Bool {
+        event.type == .rightMouseDown || (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
+    }
+
+    private func handleContextClick(_ event: NSEvent) {
+        guard !showingContextMenu else { return }
+        cancelSourceLinkOpen()
+        pendingLink = nil
+        clearPointerCursor()
+        showingContextMenu = true
+        defer {
+            showingContextMenu = false
+            Self.refreshPointerCursorAfterTracking()
+        }
+
+        if let context = contextMenu(for: event) {
+            let location = context.view.convert(event.locationInWindow, from: nil)
+            context.menu.popUp(positioning: nil, at: location, in: context.view)
+        } else if event.type == .rightMouseDown {
+            super.sendEvent(event)
+        } else if let click = contextEvent(event, at: event.locationInWindow) {
+            super.sendEvent(click)
+        }
+    }
+
+    func contextMenu(for event: NSEvent) -> (menu: NSMenu, view: NSView)? {
+        let point = event.locationInWindow
+        guard let contentView else { return nil }
+        if let menu = sourceLinkMenu(at: point) { return (menu, contentView) }
+        if let menu = automaticSizeMenu(at: point) {
+            addCopyNoteItem(to: menu)
+            return (menu, contentView)
+        }
+
+        let gesture = initialPointerGesture(at: point, textInset: 5)
+        let anchor: NSPoint
+        if case .select(_, _, let margin)? = gesture, let margin {
+            anchor = margin
+        } else {
+            anchor = point
+        }
+        let hitPoint = contentView.superview?.convert(anchor, from: nil) ?? anchor
+        if let click = contextEvent(event, at: anchor) {
+            var view = contentView.hitTest(hitPoint)
+            while let target = view {
+                if let nativeMenu = target.menu(for: click), !nativeMenu.items.isEmpty {
+                    if editor == nil, gesture != nil, let menu = nativeMenu.copy() as? NSMenu {
+                        noteContentController.selectionMayExist = true
+                        let copy = #selector(NSText.copy(_:))
+                        if target.responds(to: copy) {
+                            for item in menu.items where item.action == copy && item.target == nil {
+                                item.target = target
+                            }
+                        }
+                        addCopyNoteItem(to: menu)
+                        return (menu, target)
+                    }
+                    return (nativeMenu, target)
+                }
+                if target === contentView { break }
+                view = target.superview
+            }
+        }
+        guard editor == nil, gesture != nil else { return nil }
+        let menu = NSMenu()
+        addCopyNoteItem(to: menu)
+        return (menu, contentView)
+    }
+
+    private func addCopyNoteItem(to menu: NSMenu) {
+        let action = #selector(copyNote)
+        guard menu.items.allSatisfy({ $0.action != action }) else { return }
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        let title = AppSettings.shared.localizedString("Copy Entire Note")
+        menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
+    }
+
+    private func contextEvent(_ event: NSEvent, at point: NSPoint) -> NSEvent? {
+        NSEvent.mouseEvent(
+            with: .rightMouseDown, location: point, modifierFlags: event.modifierFlags,
+            timestamp: event.timestamp, windowNumber: windowNumber, context: nil,
+            eventNumber: event.eventNumber, clickCount: event.clickCount, pressure: event.pressure
+        )
+    }
+
     func registerTextHitView(_ view: DesktopNoteTextHitView) {
         textHitViews.add(view)
     }
 
     func automaticSizeMenu(at point: NSPoint) -> NSMenu? {
-        guard editor == nil, manualSize != nil, isNoteBody(at: point), !containsPreviewText(at: point) else { return nil }
+        guard editor == nil, manualSize != nil, case .move = initialPointerGesture(at: point) else { return nil }
         let menu = NSMenu()
         let title = AppSettings.shared.localizedString("Fit Note to Content")
         menu.addItem(withTitle: title, action: #selector(fitNoteToContent), keyEquivalent: "").target = self
@@ -538,13 +649,16 @@ final class DesktopNotePanel: NSPanel {
         textHitViews.allObjects.contains { $0.containsText(at: point) }
     }
 
-    private func initialPointerGesture(at point: NSPoint) -> PointerGesture? {
+    private func initialPointerGesture(at point: NSPoint, textInset: CGFloat = 0.5) -> PointerGesture? {
         let isSourceLink = isPoint(point, in: sourceLinkRegion)
         let selectsText = (editor == nil || isSourceLink) && containsPreviewText(at: point)
         guard isNoteBody(at: point, includingSource: selectsText || isSourceLink) else { return nil }
         if selectsText { return .select(start: point, didDrag: false) }
         if isSourceLink { return .sourceLink(didDrag: false) }
-        if editor == nil, let anchor = textHitViews.allObjects.compactMap({ $0.nearbySelectionStart(at: point) }).min(by: {
+        let anchors = editor == nil ? textHitViews.allObjects.compactMap {
+            $0.nearbySelectionStart(at: point, horizontalInset: textInset)
+        } : []
+        if let anchor = anchors.min(by: {
             hypot($0.x - point.x, $0.y - point.y) < hypot($1.x - point.x, $1.y - point.y)
         }) {
             return .select(start: point, didDrag: false, anchor: anchor)
@@ -552,29 +666,38 @@ final class DesktopNotePanel: NSPanel {
         return .move(start: point, didDrag: false)
     }
 
-    private func updatePointerCursor(at point: NSPoint) {
-        if case .move = pointerGesture {
-            setPointerCursor(Self.moveCursor)
-        } else {
-            setPointerCursor(pointerGesture == nil ? hoverCursor(at: point) : nil)
+    private func updatePointerCursor(at point: NSPoint, useNativeMarkdownCursor: Bool = true) {
+        guard !showingContextMenu else { return }
+        pointerLocation = point
+        switch pointerGesture {
+        case .move: setPointerCursor(Self.moveCursor)
+        case .select: setPointerCursor(.iBeam)
+        case .sourceLink: setPointerCursor(.pointingHand)
+        case nil: setPointerCursor(hoverCursor(at: point, useNativeMarkdownCursor: useNativeMarkdownCursor))
         }
     }
 
-    private func hoverCursor(at point: NSPoint) -> NSCursor? {
+    private func hoverCursor(at point: NSPoint, useNativeMarkdownCursor: Bool) -> NSCursor? {
+        guard NSRect(origin: .zero, size: frame.size).contains(point) else { return nil }
         if isPoint(point, in: sourceLinkRegion) { return .pointingHand }
-        let gesture = initialPointerGesture(at: point)
-        if case .move = gesture { return Self.moveCursor }
-        if case .select(_, _, .some) = gesture { return .iBeam }
-        #if !KIPPLE_APP_STORE
-        if needsBackgroundCursor {
-            if case .select = gesture {
-                // Textual provides a pointing hand for a Markdown link when available.
-                let inlineLink = displayMode == .markdown && !isPoint(point, in: sourceRegion)
-                    && NSCursor.current === NSCursor.pointingHand
-                return inlineLink ? .pointingHand : .iBeam
-            }
-            return resizeCursor(at: point)
+        if let textView = editor?.textView, textView.visibleRect.contains(textView.convert(point, from: nil)) {
+            return .iBeam
         }
+        if controls.contains(where: { isPoint(point, in: $0) }) { return .arrow }
+        switch initialPointerGesture(at: point) {
+        case .move: return Self.moveCursor
+        case .select(_, _, .some): return .iBeam
+        case .select:
+            if useNativeMarkdownCursor, editor == nil, displayMode == .markdown, !isPoint(point, in: sourceRegion),
+               NSCursor.current === NSCursor.pointingHand {
+                return .pointingHand
+            }
+            return .iBeam
+        case .sourceLink: return .pointingHand
+        case nil: break
+        }
+        #if !KIPPLE_APP_STORE
+        if needsBackgroundCursor { return resizeCursor(at: point) ?? .arrow }
         #endif
         return nil
     }
@@ -619,13 +742,64 @@ final class DesktopNotePanel: NSPanel {
         pointerCursor = cursor
     }
 
-    private func refreshPointerCursorAfterTracking() {
-        guard pointerGesture == nil, pointerCursor != nil else { return }
-        // SwiftUI can reset a link's cursor after the tracking event returns.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, isVisible, pointerGesture == nil, pointerCursor != nil,
-                  DesktopNotePointerCursor.isOwned(by: self) else { return }
-            updatePointerCursor(at: mouseLocationOutsideOfEventStream)
+    private func clearPointerCursor() {
+        pointerLocation = nil
+        setPointerCursor(nil)
+    }
+
+    private static func noteUnderPointer(at position: NSPoint = NSEvent.mouseLocation) -> (note: DesktopNotePanel, point: NSPoint)? {
+        guard pointerNotes.allObjects.contains(where: { $0.isVisible && $0.frame.contains(position) }) else { return nil }
+        let number = NSWindow.windowNumber(at: position, belowWindowWithWindowNumber: 0)
+        guard let note = NSApp.window(withWindowNumber: number) as? DesktopNotePanel,
+              note.isVisible, !note.ignoresMouseEvents, note.frame.contains(position) else { return nil }
+        return (note, note.convertPoint(fromScreen: position))
+    }
+
+    private static func observePointer(for note: DesktopNotePanel) {
+        pointerNotes.add(note)
+        guard pointerTimer == nil else { return }
+        // AppKit can defer tracking events during a transition between windows or after a menu.
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(40), leeway: .milliseconds(8))
+        timer.setEventHandler {
+            MainActor.assumeIsolated {
+                let position = NSEvent.mouseLocation
+                let now = ProcessInfo.processInfo.systemUptime
+                if position != lastPolledPointer {
+                    lastPolledPointer = position
+                    pointerSettleDeadline = now + 0.25
+                } else {
+                    // Menu dismissal or a deferred exit can replace the cursor at a stationary point.
+                    let owner = DesktopNotePointerCursor.owner
+                    let cursorChanged = owner?.pointerCursor.map { NSCursor.current !== $0 } ?? false
+                    guard cursorChanged || (owner == nil && now < pointerSettleDeadline) else { return }
+                }
+                refreshPointerCursor(at: position)
+            }
+        }
+        pointerTimer = timer
+        timer.activate()
+    }
+
+    private static func refreshPointerCursor(at position: NSPoint) {
+        // An active gesture keeps its cursor even when the pointer leaves that note.
+        let owner = DesktopNotePointerCursor.owner
+        guard owner?.pointerGesture == nil, owner?.showingContextMenu != true else { return }
+        guard let (note, point) = noteUnderPointer(at: position) else {
+            owner?.clearPointerCursor()
+            return
+        }
+        guard note.pointerGesture == nil else { return }
+        note.updatePointerCursor(at: point, useNativeMarkdownCursor: note.pointerLocation == point)
+    }
+
+    private static func refreshPointerCursorAfterTracking() {
+        guard !pointerRefreshPending else { return }
+        pointerRefreshPending = true
+        // An exit from one note can be delivered after the enter on another note.
+        DispatchQueue.main.async {
+            pointerRefreshPending = false
+            refreshPointerCursor(at: NSEvent.mouseLocation)
         }
     }
 
@@ -638,7 +812,7 @@ final class DesktopNotePanel: NSPanel {
             setPointerCursor(Self.moveCursor)
             return true
         }
-        setPointerCursor(nil)
+        updatePointerCursor(at: point)
         // Handle a press in the link's icon or spacing without starting native button tracking.
         if case .sourceLink = pointerGesture { return true }
         if case .select(_, _, let anchor) = pointerGesture {
@@ -676,6 +850,7 @@ final class DesktopNotePanel: NSPanel {
                let url = sourceWebURL(at: point) {
                 openSourceLinkAfterSingleClick(url)
             }
+            updatePointerCursor(at: point)
         } else if case .sourceLink(let didDrag) = pointerGesture {
             self.pointerGesture = nil
             if isSingleClick, !didDrag, !event.modifierFlags.contains(.control), let url = sourceWebURL(at: point) {
@@ -695,6 +870,7 @@ final class DesktopNotePanel: NSPanel {
             }
             updatePointerCursor(at: convertPoint(fromScreen: pointer))
         }
+        Self.refreshPointerCursorAfterTracking()
         return true
     }
 
@@ -730,25 +906,36 @@ final class DesktopNotePanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
-        setPointerCursor(nil)
+        clearPointerCursor()
         if case .move(_, let didDrag) = pointerGesture {
-            pointerGesture = nil
             if didDrag { onPlacementChange?() }
         }
+        pointerGesture = nil
+        pendingLink = nil
         if editor == nil { noteContentController.clearSelection() }
         saveEditing()
+        Self.refreshPointerCursorAfterTracking()
     }
 
     override func close() {
         cancelSourceLinkOpen()
-        setPointerCursor(nil)
+        clearPointerCursor()
+        Self.pointerNotes.remove(self)
+        if Self.pointerNotes.allObjects.isEmpty {
+            Self.pointerTimer?.cancel()
+            Self.pointerTimer = nil
+            Self.lastPolledPointer = nil
+            Self.pointerSettleDeadline = 0
+        }
         super.close()
+        Self.refreshPointerCursorAfterTracking()
     }
 
     override func orderOut(_ sender: Any?) {
         cancelSourceLinkOpen()
-        setPointerCursor(nil)
+        clearPointerCursor()
         super.orderOut(sender)
+        Self.refreshPointerCursorAfterTracking()
     }
 
     private func isNoteBody(at point: NSPoint, includingSource: Bool = false) -> Bool {
@@ -1059,15 +1246,11 @@ final class DesktopNotePanel: NSPanel {
 
 @MainActor
 private enum DesktopNotePointerCursor {
-    private static weak var owner: DesktopNotePanel?
+    private(set) static weak var owner: DesktopNotePanel?
     #if !KIPPLE_APP_STORE
     private static let connection = BackgroundCursorConnection()
     private static var previousBackgroundSetting: Bool?
     #endif
-
-    static func isOwned(by note: DesktopNotePanel) -> Bool {
-        owner === note
-    }
 
     static func set(_ cursor: NSCursor, for note: DesktopNotePanel) {
         owner = note

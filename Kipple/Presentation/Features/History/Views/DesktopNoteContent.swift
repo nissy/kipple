@@ -432,7 +432,7 @@ final class DesktopNoteTextHitView: NSView {
         return visibleRect.contains(point) && lines.contains { $0.contains(point) }
     }
 
-    func nearbySelectionStart(at windowPoint: NSPoint) -> NSPoint? {
+    func nearbySelectionStart(at windowPoint: NSPoint, horizontalInset: CGFloat) -> NSPoint? {
         guard allowsSelectionMargin, window != nil, !isHiddenOrHasHiddenAncestor else { return nil }
         if let clip = enclosingScrollView?.contentView,
            !clip.visibleRect.contains(clip.convert(windowPoint, from: nil)) { return nil }
@@ -445,7 +445,10 @@ final class DesktopNoteTextHitView: NSView {
         var nearest: NSPoint?
         var nearestDistance = CGFloat.infinity
         for line in lines where line.insetBy(dx: -dx, dy: -dy).contains(point) {
-            let selectable = line.intersection(visible).insetBy(dx: 0.5, dy: 0.5)
+            let clipped = line.intersection(visible)
+            guard !clipped.isEmpty else { continue }
+            let inset = min(horizontalInset, clipped.width / 4)
+            let selectable = clipped.insetBy(dx: inset, dy: 0.5)
             guard !selectable.isEmpty else { continue }
             let start = NSPoint(x: min(max(point.x, selectable.minX), selectable.maxX),
                                 y: min(max(point.y, selectable.minY), selectable.maxY))

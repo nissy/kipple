@@ -894,6 +894,144 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         }
     }
 
+    func testSourceContextMenuSupportsRightClickAndControlClick() async throws {
+        let url = "https://example.com/tasks/42"
+        var copied: [String] = []
+        var opened: [URL] = []
+        let note = DesktopNotePanel(
+            item: ClipItem(content: "Note body", metadata: ClipMetadata(sourceURI: url)),
+            screenFrame: screenFrame,
+            copyLink: { copied.append($0) },
+            openLink: { opened.append($0) }
+        )
+        note.orderFrontRegardless()
+        defer { note.close() }
+        note.contentView?.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let link = try XCTUnwrap(note.sourceLinkRegion)
+        let point = link.convert(NSPoint(x: link.bounds.midX, y: link.bounds.midY), to: nil)
+        let position = note.frame
+
+        for (type, modifiers): (NSEvent.EventType, NSEvent.ModifierFlags) in [
+            (.rightMouseDown, []), (.leftMouseDown, .control)
+        ] {
+            let click = try desktopNoteMouseEvent(type, at: point, for: note, modifiers: modifiers)
+            let menu = try XCTUnwrap(note.contextMenu(for: click)?.menu)
+            let copyURL = try XCTUnwrap(menu.items.firstIndex { $0.representedObject as? String == url })
+            menu.performActionForItem(at: copyURL)
+        }
+
+        XCTAssertEqual(copied, [url, url])
+        XCTAssertTrue(opened.isEmpty)
+        XCTAssertFalse(note.isKeyWindow)
+        XCTAssertEqual(note.frame, position)
+    }
+
+    func testMarkdownContextMenuAtTextAndSelectionMarginsUsesTheTextMenu() async throws {
+        let note = DesktopNotePanel(
+            item: ClipItem(content: "Select this Markdown text"), screenFrame: screenFrame, displayMode: .markdown
+        )
+        simulateDesktopNoteLiveResize(note, to: NSSize(width: 300, height: 160))
+        note.orderFrontRegardless()
+        defer { note.close() }
+        let view = try XCTUnwrap(note.contentView)
+        view.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let row = try XCTUnwrap(textBounds(in: view).first)
+
+        for x in [row.minX - 5, row.midX, row.maxX + 5] {
+            let point = NSPoint(x: x, y: row.midY)
+            let click = try desktopNoteMouseEvent(.rightMouseDown, at: point, for: note)
+            let context = try XCTUnwrap(note.contextMenu(for: click), "x: \(x)")
+            let copy = try XCTUnwrap(context.menu.items.first { $0.action == #selector(NSText.copy(_:)) })
+            XCTAssertIdentical(copy.target, context.view)
+            XCTAssertNil(note.automaticSizeMenu(at: point))
+        }
+
+        let blank = NSPoint(x: 170, y: 60)
+        let click = try desktopNoteMouseEvent(.leftMouseDown, at: blank, for: note, modifiers: .control)
+        let menu = try XCTUnwrap(note.contextMenu(for: click)?.menu)
+        XCTAssertEqual(menu.items.first?.title, AppSettings.shared.localizedString("Fit Note to Content"))
+    }
+
+    func testAutomaticNoteBlankSpaceOffersCopyWithoutTakingFocus() async throws {
+        let content = "Copy the entire note"
+        var copies: [String] = []
+        let note = DesktopNotePanel(item: ClipItem(content: content), screenFrame: screenFrame, copyItem: { item, _ in
+            copies.append(item.content)
+        })
+        note.restorePlacement(.init(frame: NSRect(x: 50, y: 80, width: 300, height: 160),
+                                    color: .none, usesManualSize: false), in: screenFrame)
+        note.orderFrontRegardless()
+        defer { note.close() }
+        note.contentView?.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let point = NSPoint(x: 210, y: 60)
+        let title = AppSettings.shared.localizedString("Copy Entire Note")
+
+        for (type, modifiers): (NSEvent.EventType, NSEvent.ModifierFlags) in [
+            (.rightMouseDown, []), (.leftMouseDown, .control)
+        ] {
+            let click = try desktopNoteMouseEvent(type, at: point, for: note, modifiers: modifiers)
+            let menu = try XCTUnwrap(note.contextMenu(for: click)?.menu)
+            XCTAssertEqual(menu.items.map(\.title), [title])
+            menu.performActionForItem(at: 0)
+        }
+
+        XCTAssertEqual(copies, [content, content])
+        XCTAssertFalse(note.isKeyWindow)
+    }
+
+    func testPlainTextSelectionOffersCopyOnContextClick() async throws {
+        let note = DesktopNotePanel(item: ClipItem(content: "Select this text"), screenFrame: screenFrame)
+        simulateDesktopNoteLiveResize(note, to: NSSize(width: 280, height: 160))
+        note.makeKeyAndOrderFront(nil)
+        defer { note.close() }
+        let view = try XCTUnwrap(note.contentView)
+        view.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let row = try XCTUnwrap(textBounds(in: view).first)
+        let start = NSPoint(x: row.minX + 2, y: row.midY)
+        let end = NSPoint(x: row.maxX - 2, y: row.midY)
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
+        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+        let click = try desktopNoteMouseEvent(.rightMouseDown, at: NSPoint(x: row.midX, y: row.midY), for: note)
+        let menu = try XCTUnwrap(note.contextMenu(for: click)?.menu)
+        XCTAssertTrue(menu.items.contains { $0.action == #selector(NSText.copy(_:)) })
+    }
+
+    func testHoverTransitionsBetweenSourceLinkMarkdownTextBlankAndToolbar() async throws {
+        let previousCursor = NSCursor.current
+        defer { previousCursor.set() }
+        let note = DesktopNotePanel(
+            item: ClipItem(content: "Ordinary Markdown text", metadata: ClipMetadata(sourceURI: "https://example.com")),
+            screenFrame: screenFrame,
+            displayMode: .markdown
+        )
+        simulateDesktopNoteLiveResize(note, to: NSSize(width: 320, height: 230))
+        note.orderFrontRegardless()
+        defer { note.close() }
+        let view = try XCTUnwrap(note.contentView)
+        view.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let link = try XCTUnwrap(note.sourceLinkRegion)
+        let address = link.convert(NSPoint(x: link.bounds.midX, y: link.bounds.midY), to: nil)
+        let text = try desktopNoteBodyPoint(in: note, x: 29)
+        let blank = NSPoint(x: 210, y: 65)
+        let toolbar = try XCTUnwrap(view.subviews.compactMap { $0 as? NSStackView }.first)
+        let button = try XCTUnwrap(toolbar.views.compactMap { $0 as? NSButton }.first { !$0.isHidden })
+        let control = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil)
+
+        for (point, expected) in [
+            (address, NSCursor.pointingHand), (text, .iBeam), (blank, DesktopNotePanel.moveCursor),
+            (control, .arrow), (address, .pointingHand), (text, .iBeam)
+        ] {
+            note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: point, for: note))
+            XCTAssertIdentical(NSCursor.current, expected, "Cursor at \(point)")
+        }
+    }
+
     func testDraggingAMarkdownLinkSelectsTextWithoutMovingTheNoteOrOpeningTheLink() async throws {
         var opened: [URL] = []
         let openLink: (URL) -> Void = { opened.append($0) }
@@ -1216,12 +1354,16 @@ func desktopNoteBodyPoint(in note: DesktopNotePanel, x: CGFloat = 35) throws -> 
 
 @MainActor
 func desktopNoteMouseEvent(
-    _ type: NSEvent.EventType, at point: NSPoint, for note: NSWindow, clickCount: Int = 1
+    _ type: NSEvent.EventType,
+    at point: NSPoint,
+    for note: NSWindow,
+    clickCount: Int = 1,
+    modifiers: NSEvent.ModifierFlags = []
 ) throws -> NSEvent {
     try XCTUnwrap(NSEvent.mouseEvent(
         with: type,
         location: point,
-        modifierFlags: [],
+        modifierFlags: modifiers,
         timestamp: 0,
         windowNumber: note.windowNumber,
         context: nil,
