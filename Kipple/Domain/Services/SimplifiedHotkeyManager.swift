@@ -13,6 +13,7 @@ final class SimplifiedHotkeyManager {
 
     private var keyCode: UInt16 = 46 // M key default
     private var modifiers: NSEvent.ModifierFlags = [.control, .option]
+    private let defaults: UserDefaults
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
     private var isEnabled: Bool = true
@@ -25,7 +26,8 @@ final class SimplifiedHotkeyManager {
 
     // MARK: - Initialization
 
-    private init() {
+    private init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         loadSettings()
         setupNotificationObservers()
         startMonitoring()
@@ -61,8 +63,7 @@ final class SimplifiedHotkeyManager {
     /// Enable or disable the hotkey
     func setEnabled(_ enabled: Bool) {
         isEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "enableHotkey")
-        UserDefaults.standard.set(enabled, forKey: "KippleHotkeyEnabled")
+        saveEnabledSetting()
 
         if enabled {
             startMonitoring()
@@ -277,20 +278,20 @@ final class SimplifiedHotkeyManager {
 
     private func loadSettings() {
         // Use the same keys as HotkeyManager for compatibility
-        if let savedKeyCode = (UserDefaults.standard.object(forKey: "hotkeyKeyCode")
-            ?? UserDefaults.standard.object(forKey: "KippleHotkeyCode")) as? Int {
+        if let savedKeyCode = (defaults.object(forKey: "hotkeyKeyCode")
+            ?? defaults.object(forKey: "KippleHotkeyCode")) as? Int {
             keyCode = UInt16(savedKeyCode)
         }
 
-        if let savedModifiers = (UserDefaults.standard.object(forKey: "hotkeyModifierFlags")
-            ?? UserDefaults.standard.object(forKey: "KippleHotkeyModifiers")) as? UInt {
+        if let savedModifiers = (defaults.object(forKey: "hotkeyModifierFlags")
+            ?? defaults.object(forKey: "KippleHotkeyModifiers")) as? UInt {
             modifiers = NSEvent.ModifierFlags(rawValue: savedModifiers)
         }
 
         // If either keyCode or modifiers are cleared, treat as disabled regardless of saved flag
         let cleared = (keyCode == 0) || modifiers.isEmpty
-        if let savedEnabled = (UserDefaults.standard.object(forKey: "enableHotkey")
-            ?? UserDefaults.standard.object(forKey: "KippleHotkeyEnabled")) as? Bool {
+        if let savedEnabled = (defaults.object(forKey: "enableHotkey")
+            ?? defaults.object(forKey: "KippleHotkeyEnabled")) as? Bool {
             isEnabled = savedEnabled && !cleared
         } else {
             isEnabled = !cleared
@@ -299,12 +300,17 @@ final class SimplifiedHotkeyManager {
 
     private func saveSettings() {
         // Use the same keys as HotkeyManager for compatibility
-        UserDefaults.standard.set(Int(keyCode), forKey: "hotkeyKeyCode")
-        UserDefaults.standard.set(Int(keyCode), forKey: "KippleHotkeyCode")
-        UserDefaults.standard.set(modifiers.rawValue, forKey: "hotkeyModifierFlags")
-        UserDefaults.standard.set(modifiers.rawValue, forKey: "KippleHotkeyModifiers")
-        UserDefaults.standard.set(isEnabled, forKey: "enableHotkey")
-        UserDefaults.standard.set(isEnabled, forKey: "KippleHotkeyEnabled")
+        defaults.set(Int(keyCode), forKey: "hotkeyKeyCode")
+        defaults.set(Int(keyCode), forKey: "KippleHotkeyCode")
+        defaults.set(modifiers.rawValue, forKey: "hotkeyModifierFlags")
+        defaults.set(modifiers.rawValue, forKey: "KippleHotkeyModifiers")
+        saveEnabledSetting()
+    }
+
+    private func saveEnabledSetting() {
+        for key in ["enableHotkey", "KippleHotkeyEnabled"] where (defaults.object(forKey: key) as? Bool) != isEnabled {
+            defaults.set(isEnabled, forKey: key)
+        }
     }
 
     // MARK: - Notification Observers
@@ -387,6 +393,10 @@ final class SimplifiedHotkeyManager {
     }
 
     #if DEBUG
+    static func makeForTesting(defaults: UserDefaults) -> SimplifiedHotkeyManager {
+        SimplifiedHotkeyManager(defaults: defaults)
+    }
+
     func debug_processCarbonHotKeyEvent(signature: OSType, identifier: UInt32) -> OSStatus {
         SimplifiedHotkeyManager.processCarbonHotKeyEvent(signature: signature, identifier: identifier)
     }

@@ -315,17 +315,17 @@ final class ModernClipboardServiceComprehensiveTests: XCTestCase, @unchecked Sen
         }
     }
 
-    func testVeryLongContent() async throws {
-        // Given
-        let longContent = String(repeating: "A", count: 100000)
+    func testCopyToHistoryEnforcesTheTextLimit() async {
+        let boundary = String(repeating: "A", count: 80_000)
+        let accepted = await service.copyToClipboard(boundary, fromEditor: false) { true }
+        XCTAssertTrue(accepted)
 
-        // When
-        await service.copyToClipboard(longContent, fromEditor: false)
-
-        // Then
+        let rejected = await service.copyToClipboard(boundary + "A", fromEditor: false) { true }
+        XCTAssertFalse(rejected)
         let history = await service.getHistory()
-        XCTAssertFalse(history.isEmpty)
-        XCTAssertEqual(history.first?.content.count, 100000)
+        XCTAssertEqual(history.map(\.content), [boundary])
+        let clipboard = await service.getCurrentClipboardContent()
+        XCTAssertEqual(clipboard, boundary)
     }
 
     func testSpecialCharacters() async throws {

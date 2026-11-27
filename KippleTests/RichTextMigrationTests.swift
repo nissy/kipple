@@ -30,5 +30,16 @@ final class RichTextMigrationTests: XCTestCase {
         XCTAssertEqual(items.count, 1)
         XCTAssertEqual(items.first, original)
         XCTAssertNil(items.first?.richText)
+
+        let missingPreviews = try await repository.loadStartupPreviews(limit: 50)
+        XCTAssertTrue(missingPreviews.isEmpty)
+        try await repository.backfillHistoryPreviews()
+        try await repository.backfillHistoryPreviews()
+        let previews = try await repository.loadStartupPreviews(limit: 50)
+        XCTAssertEqual(previews.map(\.id), [original.id])
+        XCTAssertEqual(previews.first?.title, original.title)
+        XCTAssertEqual(previews.first?.text, original.content)
+        let fullItem = try await repository.load(ids: [original.id])
+        XCTAssertEqual(fullItem, [original])
     }
 }

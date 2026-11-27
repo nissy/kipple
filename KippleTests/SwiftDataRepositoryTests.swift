@@ -55,6 +55,68 @@ final class SwiftDataRepositoryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(loaded.last?.content, "Item 6")
     }
 
+    func testStartupPreviewsTrackFullRowsAcrossUpdatesAndDeletion() async throws {
+        let original = ClipItem(content: String(repeating: "あ", count: 700) + "全文の末尾", userCategoryId: savedHistoryCategoryID)
+        let recent = ClipItem(content: "newest")
+        try await repository.save([original, recent])
+
+        let firstPage = try await repository.loadStartupPreviews(limit: 1)
+        XCTAssertEqual(firstPage.map(\.id), [recent.id])
+        let rows = try await repository.loadStartupPreviews(limit: 2)
+        let preview = try XCTUnwrap(rows.last)
+        XCTAssertEqual(preview.id, original.id)
+        XCTAssertEqual(preview.text, String(repeating: "あ", count: 512) + "…")
+        XCTAssertEqual(preview.categoryIDs, [savedHistoryCategoryID])
+        let full = try await repository.load(ids: [preview.id])
+        XCTAssertEqual(full.first?.content, original.content)
+        XCTAssertTrue(full[0].matchesSearch("全文の末尾"))
+
+        let revised = original.replacingContent(with: "更新後\n続き")
+        try await repository.update(revised)
+        let revisedPreviews = try await repository.loadStartupPreviews(limit: 10)
+        XCTAssertEqual(revisedPreviews.first { $0.id == original.id }?.text, "更新後…")
+
+        try await repository.delete(revised)
+        let remaining = try await repository.loadStartupPreviews(limit: 10)
+        XCTAssertEqual(remaining.map(\.id), [recent.id])
+        try await repository.clear()
+        let cleared = try await repository.loadStartupPreviews(limit: 10)
+        XCTAssertTrue(cleared.isEmpty)
+        let context = ModelContext(modelContainer)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<StoredHistoryRowPreview>()), 0)
+    }
+
+    func testRowsWithEqualTimestampsKeepTheirOrderWhenFullHistoryArrives() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString, directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let schema = Schema([ClipItemModel.self])
+        let configuration = ModelConfiguration(
+            schema: schema, url: directory.appending(path: "history.sqlite"), cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let repository = try SwiftDataRepository.make(container: container)
+        let context = ModelContext(container)
+        let sharedTimestamp = Date(timeIntervalSince1970: 1_700_000_000)
+        for index in (0..<12).reversed() {
+            let model = ClipItemModel(content: "Identical timestamp \(index)", timestamp: sharedTimestamp)
+            context.insert(model)
+        }
+        try context.save()
+        try await repository.backfillHistoryPreviews()
+
+        let previews = try await repository.loadStartupPreviews(limit: 5)
+        let service = ModernClipboardService(testRepository: repository)
+        await service.loadHistoryFromRepository()
+        let full = await service.getHistory()
+
+        XCTAssertEqual(full.count, 12)
+        XCTAssertEqual(previews.count, 5)
+        XCTAssertEqual(full.prefix(5).map(\.id), previews.map(\.id))
+    }
+
     func testLoadAll() async throws {
         // Given
         let items = (1...20).map { ClipItem(content: "Item \($0)") }

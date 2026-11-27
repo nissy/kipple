@@ -4,10 +4,13 @@ import Carbon
 import SwiftUI
 
 private final class ComparisonWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, event.keyCode == kVK_Escape,
            event.modifierFlags.isDisjoint(with: [.command, .control, .option, .shift]) {
-            performClose(nil)
+            close()
             return
         }
         super.sendEvent(event)
@@ -15,13 +18,15 @@ private final class ComparisonWindow: NSWindow {
 }
 
 @MainActor
-final class TextComparisonWindow {
+final class TextComparisonWindow: NSObject, NSWindowDelegate {
     enum Content {
         case comparison(TextComparison)
         case accessibilityRequired
         case clipboardUnavailable
+        case clipboardBackupUnavailable
         case noClipboardText
         case noSelection
+        case selectionCopyFailed
         case unsupportedSelection
         case textTooLong
     }
@@ -31,10 +36,23 @@ final class TextComparisonWindow {
 
     private var window: NSWindow?
     private var task: Task<Void, Never>?
+    private var deferredComparison: (() -> Void)?
+    private var previousFocus: ComparisonFocusTarget?
+    private var restoreFocusTask: Task<Void, Never>?
+    private var localClickMonitor: Any?
+    private var globalClickMonitor: Any?
 
     func compareCurrentSelection(reader: ClipboardReader = .shared, service: ModernClipboardService = .shared) {
-        guard task == nil else { return }
+        if NSApp.isActive, window?.isKeyWindow == true { return }
         let app = NSWorkspace.shared.frontmostApplication
+        if task != nil {
+            let requestedProcess = app?.processIdentifier
+            deferredComparison = { [weak self] in
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier == requestedProcess else { return }
+                self?.compareCurrentSelection(reader: reader, service: service)
+            }
+            return
+        }
         let placement = TextComparisonWindowPlacement.capture(for: app)
         guard AXIsProcessTrusted() else {
             show(.accessibilityRequired, placement: placement)
@@ -57,50 +75,79 @@ final class TextComparisonWindow {
             return
         }
         let stamp = snapshot.stamp
-        let targetID = app.processIdentifier
         task = Task { [weak self] in
-            guard let self else { return }
-            defer { task = nil }
-            let input = await ClipboardReader.comparisonInput(in: app)
-            guard reader.observation == stamp,
-                  NSWorkspace.shared.frontmostApplication?.processIdentifier == targetID else { return }
-            guard let input else {
-                show(.noSelection, placement: placement)
-                return
-            }
-            let result = await service.performClipboardComparison(at: stamp) {
-                await ComparisonClipboardCopy.capture(reader: reader, stamp: stamp, input: input, target: targetID)
-            }
-            let target = placement.withWindowBounds(input.windowBounds)
-            await showResult(result, clipboard: clipboard, placement: target, reader: reader)
+            await self?.compare(
+                in: app, clipboard: clipboard, stamp: stamp, reader: reader, service: service, placement: placement
+            )
         }
     }
 
-    private func showResult(
-        _ result: ComparisonClipboardCopy.Result, clipboard: String, placement: TextComparisonWindowPlacement, reader: ClipboardReader
+    private func compare(
+        in app: NSRunningApplication,
+        clipboard: String,
+        stamp: ClipboardReader.Stamp,
+        reader: ClipboardReader,
+        service: ModernClipboardService,
+        placement: TextComparisonWindowPlacement
     ) async {
+        defer { finishComparison() }
+        let targetID = app.processIdentifier
+        let input = await ClipboardReader.comparisonInput(in: app)
+        guard reader.observation == stamp,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == targetID else { return }
+        guard let input else {
+            show(.noSelection, placement: placement)
+            return
+        }
+        let result = await service.performClipboardComparison(at: stamp) {
+            await ComparisonClipboardCopy.capture(reader: reader, stamp: stamp, input: input, target: targetID)
+        }
+        let target = placement.withWindowBounds(input.windowBounds)
+        await showResult(result, clipboard: clipboard, placement: target, sourceID: targetID, reader: reader, input: input)
+    }
+
+    private func finishComparison() {
+        task = nil
+        let next = deferredComparison
+        deferredComparison = nil
+        next?()
+    }
+
+    private func showResult(
+        _ result: ComparisonClipboardCopy.Result,
+        clipboard: String,
+        placement: TextComparisonWindowPlacement,
+        sourceID: pid_t,
+        reader: ClipboardReader,
+        input: ClipboardReader.ComparisonInput
+    ) async {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == sourceID else { return }
+        let content: Content
         switch result {
         case let .restored(selection, stamp, interrupted):
             guard !interrupted, reader.observation == stamp else { return }
-            guard ClipboardTextLimit.allows(selection) else {
-                show(.textTooLong, placement: placement)
-                return
-            }
-            let comparison = await Task.detached(priority: .userInitiated) {
-                TextComparison(clipboard: clipboard, selection: selection)
-            }.value
-            if reader.observation == stamp {
-                show(.comparison(comparison), placement: placement)
+            if ClipboardTextLimit.allows(selection) {
+                let comparison = await Task.detached(priority: .userInitiated) {
+                    TextComparison(clipboard: clipboard, selection: selection)
+                }.value
+                content = .comparison(comparison)
+            } else {
+                content = .textTooLong
             }
         case .clipboardUnavailable:
-            show(.clipboardUnavailable, placement: placement)
+            content = .clipboardUnavailable
+        case .clipboardBackupUnavailable:
+            content = .clipboardBackupUnavailable
         case .noSelection:
-            show(.noSelection, placement: placement)
+            content = .selectionCopyFailed
         case .unsupportedSelection:
-            show(.unsupportedSelection, placement: placement)
+            content = .unsupportedSelection
         case .interrupted:
-            break
+            return
         }
+        guard await ClipboardReader.comparisonFocusIsCurrent(input, processID: sourceID) else { return }
+        if case let .restored(_, stamp, _) = result, reader.observation != stamp { return }
+        show(content, placement: placement)
     }
 
     func show(
@@ -108,12 +155,21 @@ final class TextComparisonWindow {
         placement: TextComparisonWindowPlacement = .capture(for: NSWorkspace.shared.frontmostApplication)
     ) {
         let window = window ?? makeWindow()
+        restoreFocusTask?.cancel()
+        if !NSApp.isActive || !window.isKeyWindow {
+            previousFocus = ComparisonFocusTarget.capture(excluding: window)
+        }
         window.title = AppSettings.shared.localizedString("Compare Text")
         let controller = NSHostingController(rootView: TextComparisonView(content: content) { [weak self] in
-            self?.openPermissions?()
+            guard let self, let openPermissions else { return }
+            previousFocus = nil
+            self.window?.close()
+            openPermissions()
+        } closeAfterCopy: { [weak window] in
+            window?.close()
         })
         controller.sizingOptions = []
-        let size = window.contentLayoutRect.size
+        let size = window.frame.size
         window.contentViewController = controller
         window.setContentSize(size)
         let screens = NSScreen.screens
@@ -121,22 +177,114 @@ final class TextComparisonWindow {
         if let screen = index.map({ screens[$0] }) ?? NSScreen.main {
             window.setFrame(placement.frame(size: window.frame.size, in: screen.visibleFrame), display: false)
         }
+        if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
+        observeOutsideClicks()
+    }
+
+    private func observeOutsideClicks() {
+        guard localClickMonitor == nil, globalClickMonitor == nil else { return }
+        let events: NSEvent.EventTypeMask = [.leftMouseUp, .rightMouseUp, .otherMouseUp]
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
+            if let self, let window, event.window !== window, event.window?.sheetParent !== window {
+                dismissAfterOutsideClick()
+            }
+            return event
+        }
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self] _ in
+            self?.dismissAfterOutsideClick()
+        }
+    }
+
+    private func dismissAfterOutsideClick() {
+        guard let window, window.isVisible, !window.isMiniaturized else { return }
+        if !NSApp.isActive || (NSApp.keyWindow != nil && !window.isKeyWindow) {
+            previousFocus = nil
+        }
+        window.close()
+    }
+
+    private func stopObservingOutsideClicks() {
+        if let localClickMonitor { NSEvent.removeMonitor(localClickMonitor) }
+        if let globalClickMonitor { NSEvent.removeMonitor(globalClickMonitor) }
+        localClickMonitor = nil
+        globalClickMonitor = nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        stopObservingOutsideClicks()
+        guard let target = previousFocus else { return }
+        previousFocus = nil
+        restoreFocusTask = Task {
+            guard !Task.isCancelled else { return }
+            target.restore()
+        }
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        stopObservingOutsideClicks()
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        observeOutsideClicks()
     }
 
     private func makeWindow() -> NSWindow {
         let window = ComparisonWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 460),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.borderless, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.contentMinSize = NSSize(width: 520, height: 280)
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .canJoinAllApplications]
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
+        window.delegate = self
         self.window = window
         return window
+    }
+}
+
+@MainActor
+private enum ComparisonFocusTarget {
+    case local(NSWindow)
+    case external(NSRunningApplication, AXUIElement?)
+
+    static func capture(excluding comparisonWindow: NSWindow) -> Self? {
+        if NSApp.isActive {
+            guard let window = NSApp.keyWindow, window !== comparisonWindow else { return nil }
+            return .local(window)
+        }
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return nil }
+        guard AXIsProcessTrusted() else { return .external(app, nil) }
+        let application = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(application, 0.10)
+        let window = ClipboardReader.accessibilityElement(kAXFocusedWindowAttribute, on: application)
+        return .external(app, window)
+    }
+
+    func restore() {
+        switch self {
+        case .local(let window):
+            guard NSApp.windows.contains(window) else { return }
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
+        case let .external(app, window):
+            guard !app.isTerminated else { return }
+            if !app.isActive {
+                if NSApp.isActive { NSApp.yieldActivation(to: app) }
+                app.activate(options: [])
+            }
+            if let window {
+                AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+            }
+        }
     }
 }
 

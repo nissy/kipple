@@ -10,12 +10,18 @@ options:
   indentWidth: 4
   tabWidth: 4
 
+configs:
+  Debug: debug
+  Test: debug
+  Release: release
+
 settings:
   base:
     DEVELOPMENT_TEAM: R7LKF73J2W
     MARKETING_VERSION: 2.2.8
     CURRENT_PROJECT_VERSION: 1
     PRODUCT_NAME: Kipple
+    APP_PRODUCT_NAME: Kipple
     APP_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.Kipple
     TEST_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.KippleTests
     MACOSX_DEPLOYMENT_TARGET: 26.0
@@ -24,6 +30,10 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
     COMBINE_HIDPI_IMAGES: YES
+  configs:
+    Test:
+      APP_PRODUCT_NAME: KippleTestHost
+      APP_PRODUCT_BUNDLE_IDENTIFIER: com.nissy.Kipple.TestHost
 
 packages:
   MCP:
@@ -65,12 +75,14 @@ targets:
         INFOPLIST_KEY_NSHumanReadableCopyright: Copyright © 2025 Kipple. All rights reserved.
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_LSUIElement: YES
+        PRODUCT_NAME: $(APP_PRODUCT_NAME)
+        PRODUCT_MODULE_NAME: Kipple
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_PRODUCT_BUNDLE_IDENTIFIER)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: Kipple/Kipple.entitlements
         ENABLE_PREVIEWS: YES
       configs:
-        Debug:
+        Debug: &developmentAppSigning
           # Use a stable identity so TCC permissions survive development rebuilds.
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
@@ -78,6 +90,7 @@ targets:
           CODE_SIGNING_ALLOWED: YES
           # Keep the existing development storage and local MCP socket outside the sandbox.
           CODE_SIGN_ENTITLEMENTS: ""
+        Test: *developmentAppSigning
         Release:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
@@ -113,12 +126,13 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES
       configs:
-        Debug:
+        Debug: &developmentHelperSigning
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
           CODE_SIGNING_REQUIRED: YES
           CODE_SIGNING_ALLOWED: YES
           CODE_SIGN_ENTITLEMENTS: ""
+        Test: *developmentHelperSigning
 
   KippleTests:
     type: bundle.unit-test
@@ -132,7 +146,7 @@ targets:
     settings:
       base:
         BUNDLE_LOADER: $(TEST_HOST)
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Kipple.app/Contents/MacOS/Kipple
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/$(APP_PRODUCT_NAME).app/Contents/MacOS/$(APP_PRODUCT_NAME)
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: $(TEST_PRODUCT_BUNDLE_IDENTIFIER)
         PRODUCT_MODULE_NAME: KippleTests
@@ -140,6 +154,17 @@ targets:
         CODE_SIGN_IDENTITY: "Developer ID Application"
         CODE_SIGNING_REQUIRED: YES
         CODE_SIGNING_ALLOWED: YES
+    preBuildScripts:
+      - name: Verify isolated test host
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/$(APP_PRODUCT_NAME).app/Contents/Info.plist
+        script: |
+          if [ "$CONFIGURATION" != "Test" ] ||
+             [ "$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$SCRIPT_INPUT_FILE_0")" != "com.nissy.Kipple.TestHost" ]; then
+            echo 'error: KippleTests requires the isolated Test configuration. Run make test or use the Kipple scheme Test action.'
+            exit 1
+          fi
 
 
 schemes:
@@ -151,7 +176,7 @@ schemes:
     run:
       config: Debug
     test:
-      config: Debug
+      config: Test
       targets:
         - KippleTests
         # UI tests are temporarily disabled due to runner crash

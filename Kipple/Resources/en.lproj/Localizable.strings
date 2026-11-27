@@ -35,6 +35,7 @@
 "Delete from History" = "Delete from History";
 "Post to Desktop" = "Post to Desktop";
 "Remove Desktop Note" = "Remove Desktop Note";
+"Show Only Desktop Notes" = "Show Only Desktop Notes";
 "Desktop Note Color" = "Desktop Note Color";
 "Fit Note to Content" = "Fit to Content";
 "Note Color" = "Color";
@@ -599,11 +600,13 @@
 "Compare the clipboard text with text selected in the frontmost app." = "Compare the clipboard text with text selected in the frontmost app.";
 "The comparison shortcut is unavailable. Choose a different shortcut." = "The comparison shortcut is unavailable. Choose a different shortcut.";
 "Comparison Clipboard" = "Clipboard";
-"Comparison Selection" = "Selection";
-"Comparison change count" = "Changes: %lld";
+"Comparison Selection" = "Selected Text";
+"Copy Selected Text" = "Copy Selected Text";
+"Could Not Copy Text" = "Could not copy the text";
+"The comparison copy did not complete. Close this window and try again." = "The comparison copy did not complete. Close this window and try again.";
 "The Text Matches" = "The Text Matches";
-"Previous Change" = "Previous Change";
-"Next Change" = "Next Change";
+"Previous Difference" = "Previous Difference";
+"Next Difference" = "Next Difference";
 "Inserted Line" = "Inserted Line";
 "Removed Line" = "Removed Line";
 "Inserted Line Break" = "Inserted Line Break";
@@ -611,6 +614,8 @@
 "Selection Access Required" = "Selection Access Required";
 "Allow %@ to read selected text." = "Allow %@ to read selected text.";
 "Clipboard Unavailable" = "Clipboard Unavailable";
+"Could Not Back Up the Clipboard" = "Could not back up the clipboard";
+"A clipboard format could not be backed up. The comparison was stopped." = "A clipboard format could not be backed up. The comparison was stopped.";
 "Check Clipboard Access in Settings → Permission." = "Check Clipboard Access in Settings → Permission.";
 "No Clipboard Text" = "No Clipboard Text";
 "Copy some text before comparing." = "Copy some text before comparing.";

@@ -8,20 +8,26 @@ enum ComparisonClipboardCopy {
         case noSelection
         case unsupportedSelection
         case clipboardUnavailable
+        case clipboardBackupUnavailable
         case interrupted
     }
 
     private static let copyTag: Int64 = 0x4B50_4443 // KPDC
     private static let pollInterval = Duration.milliseconds(10)
+    private static let copyTimeout = Duration.milliseconds(750)
 
     static func capture(
         reader: ClipboardReader, stamp: ClipboardReader.Stamp, input: ClipboardReader.ComparisonInput, target: pid_t
     ) async -> Result {
         let interruption = ComparisonCopyInterruption(copyTag: copyTag)
         defer { interruption.stop() }
-        return await capture(reader: reader, stamp: stamp, input: input, isCurrent: {
-            !interruption.didInteract && NSWorkspace.shared.frontmostApplication?.processIdentifier == target
-        }, sendCopy: { ClipboardCommand.send(CGKeyCode(kVK_ANSI_C), to: target, tag: copyTag) })
+        guard await ClipboardReader.comparisonFocusIsCurrent(input, processID: target) else { return .interrupted }
+        return await capture(
+            reader: reader, stamp: stamp, input: input,
+            isCurrent: { NSWorkspace.shared.frontmostApplication?.processIdentifier == target },
+            hasCompetingInteraction: { interruption.didInteract },
+            sendCopy: { ClipboardCommand.send(CGKeyCode(kVK_ANSI_C), to: target, tag: copyTag) }
+        )
     }
 
     static func capture(
@@ -29,33 +35,44 @@ enum ComparisonClipboardCopy {
         stamp: ClipboardReader.Stamp,
         input: ClipboardReader.ComparisonInput,
         isCurrent: () -> Bool,
+        hasCompetingInteraction: () -> Bool = { false },
         sendCopy: () -> Bool
     ) async -> Result {
         let pasteboard = reader.pasteboard
-        guard reader.observation == stamp, isCurrent(), !Task.isCancelled else { return .interrupted }
+        guard reader.observation == stamp, isCurrent(), !hasCompetingInteraction(), !Task.isCancelled else {
+            return .interrupted
+        }
         guard !input.hasEmbeddedObjects else { return .unsupportedSelection }
         guard let backup = PasteboardSnapshot(pasteboard: pasteboard, changeCount: stamp.changeCount) else {
-            return reader.observation == stamp ? .clipboardUnavailable : .interrupted
+            return reader.observation == stamp ? .clipboardBackupUnavailable : .interrupted
         }
-        guard reader.observation == stamp, isCurrent(), !Task.isCancelled else { return .interrupted }
+        guard reader.observation == stamp, isCurrent(), !hasCompetingInteraction(), !Task.isCancelled else {
+            return .interrupted
+        }
         guard sendCopy() else { return .noSelection }
 
-        let deadline = ContinuousClock.now + .milliseconds(250)
+        let deadline = ContinuousClock.now + copyTimeout
+        var sourceChanged = false
         while ContinuousClock.now < deadline {
-            guard isCurrent(), !Task.isCancelled else { return .interrupted }
+            guard !hasCompetingInteraction(), !Task.isCancelled else { return .interrupted }
+            // A dispatched copy can still arrive after the user switches apps.
+            sourceChanged = sourceChanged || !isCurrent()
             let incoming = reader.observation
             guard incoming.accessRevision == stamp.accessRevision,
                   incoming.changeCount <= stamp.changeCount + 1 else { return .interrupted }
             if incoming.changeCount != stamp.changeCount, pasteboard.types?.contains(.string) == true {
                 guard let copy = reader.read(), copy.stamp == incoming, let text = copy.text,
-                      input.matches(copy), isCurrent(), reader.observation == incoming else { return .interrupted }
+                      input.matches(copy), !hasCompetingInteraction(), reader.observation == incoming
+                else { return .interrupted }
                 // Give a second clipboard writer an opportunity to publish its new revision.
                 try? await Task.sleep(for: pollInterval)
-                return restore(backup, replacing: incoming, text: text, reader: reader, isCurrent: isCurrent)
+                return restore(backup, replacing: incoming, text: text, reader: reader) {
+                    !sourceChanged && isCurrent() && !hasCompetingInteraction()
+                }
             }
             try? await Task.sleep(for: pollInterval)
         }
-        return reader.observation == stamp ? .noSelection : .interrupted
+        return !sourceChanged && isCurrent() && reader.observation == stamp ? .noSelection : .interrupted
     }
 
     private static func restore(

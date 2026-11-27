@@ -232,6 +232,7 @@ private final class SelectionOverlayWindow: NSWindow {
 
         isReleasedWhenClosed = false
         ignoresMouseEvents = false
+        acceptsMouseMovedEvents = true
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
@@ -393,7 +394,10 @@ private final class SelectionOverlayView: NSView {
         super.updateTrackingAreas()
         discardTrackingArea()
         guard shouldEnforceCursor else { return }
-        let options: NSTrackingArea.Options = [.activeAlways, .mouseEnteredAndExited, .mouseMoved, .inVisibleRect, .cursorUpdate]
+        // AppKit does not deliver cursor updates to tracking areas marked activeAlways.
+        let options: NSTrackingArea.Options = [
+            .activeInActiveApp, .mouseEnteredAndExited, .mouseMoved, .inVisibleRect, .cursorUpdate
+        ]
         let area = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
         addTrackingArea(area)
         trackingArea = area

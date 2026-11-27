@@ -119,6 +119,85 @@ final class ModernClipboardColdStartupTests: XCTestCase {
         XCTAssertEqual(store.orderedForFiltering().map(\.id), originalOrder)
     }
 
+    func testStartupPreviewAllowsResolvingFullItemBeforeBulkLoadCompletes() async {
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: board) { .alwaysAllow }
+        let repository = MockClipboardRepository()
+        let item = ClipItem(content: String(repeating: "本", count: 600) + "末尾")
+        let preview = HistoryRowPreview(
+            id: item.id, text: String(repeating: "本", count: 512) + "…", title: nil, categoryIDs: [], isActionable: false
+        )
+        await repository.configure(items: [item], loadDelay: 0)
+        await repository.configureStartupPreviews([preview])
+        let loadStarted = expectation(description: "bulk history load suspended")
+        await repository.suspendLoad { loadStarted.fulfill() }
+        let service = ModernClipboardService(testRepository: repository, loadOnStartup: true, clipboardReader: reader)
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let viewModel = MainViewModel(clipboardService: adapter)
+
+        await fulfillment(of: [loadStarted], timeout: 1)
+        await adapter.refreshHistoryForTesting()
+        XCTAssertEqual(viewModel.visibleStartupPreviews, [preview])
+        XCTAssertTrue(viewModel.history.isEmpty)
+        let resolved = await adapter.resolveStartupItem(id: preview.id)
+        XCTAssertEqual(resolved, item)
+
+        await repository.resumeLoad()
+        await service.flushPendingSaves()
+        await adapter.refreshHistoryForTesting()
+        XCTAssertTrue(viewModel.visibleStartupPreviews.isEmpty)
+        XCTAssertEqual(viewModel.history, [item])
+    }
+
+    func testCopyFromStartupPreviewWritesTheWholeFormattedItemAfterHandoff() async throws {
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: board) { .alwaysAllow }
+        let content = String(repeating: "👩🏽‍💻", count: 540) + "検索できる末尾"
+        let html = "<p><b>書式付き本文</b></p>"
+        board.declareTypes([.string, .html], owner: nil)
+        XCTAssertTrue(board.setString(content, forType: .string))
+        XCTAssertTrue(board.setString(html, forType: .html))
+        let rich = try XCTUnwrap(ClipboardRichText(pasteboard: board))
+        board.clearContents()
+        let item = ClipItem(content: content, richText: rich)
+        let preview = HistoryRowPreview(
+            id: item.id, text: HistoryRowPreview.displayText(from: content).text,
+            title: nil, categoryIDs: [], isActionable: false
+        )
+
+        let repository = MockClipboardRepository()
+        await repository.configure(items: [item], loadDelay: 0)
+        await repository.configureStartupPreviews([preview])
+        let loadStarted = expectation(description: "bulk history suspended during copy")
+        await repository.suspendLoad { loadStarted.fulfill() }
+        let service = ModernClipboardService(
+            testRepository: repository, loadOnStartup: true,
+            clipboardWriter: { ClipboardRichText.write($0, to: board) }, clipboardReader: reader
+        )
+        let adapter = ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false)
+        let model = MainViewModel(clipboardService: adapter)
+        await fulfillment(of: [loadStarted], timeout: 1)
+        await adapter.refreshHistoryForTesting()
+        let resolved = await model.resolveStartupItem(id: preview.id)
+        guard let resolved else {
+            await repository.resumeLoad()
+            XCTFail("Starting preview did not resolve to a full item")
+            return
+        }
+        model.searchText = "検索できる末尾"
+        XCTAssertTrue(model.visibleStartupPreviews.isEmpty)
+        let recopy = Task { await service.recopyFromHistory(resolved) }
+        await repository.resumeLoad()
+        await recopy.value
+        await adapter.refreshHistoryForTesting()
+
+        XCTAssertEqual(board.string(forType: .string), content)
+        XCTAssertEqual(ClipboardRichText(pasteboard: board), rich)
+        XCTAssertEqual(model.history.map(\.id), [item.id])
+    }
+
     private func makeService(repository: MockClipboardRepository, pasteboard: NSPasteboard) -> ModernClipboardService {
         ModernClipboardService(testRepository: repository, loadOnStartup: true) { content in
             pasteboard.clearContents()

@@ -99,35 +99,28 @@ final class AppInfoRecordingTests: XCTestCase {
     }
 
     func testMonitoringCapturesAppInfo() async throws {
-        // Given: Start monitoring
-        await service.startMonitoring()
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        let monitoredService = ModernClipboardService(testRepository: MockClipboardRepository(), clipboardReader: reader)
+        let bundleID = "com.apple.finder"
+        let entry = NSPasteboardItem()
+        XCTAssertTrue(entry.setString("Monitored Content", forType: .string))
+        XCTAssertTrue(entry.setString(bundleID, forType: NSPasteboard.PasteboardType("org.nspasteboard.source")))
 
-        // When: Add content to clipboard
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("Monitored Content", forType: .string)
+        await monitoredService.startMonitoring()
+        pasteboard.clearContents()
+        XCTAssertTrue(pasteboard.writeObjects([entry]))
+        await monitoredService.checkClipboardForTesting()
+        await monitoredService.stopMonitoring()
 
-        // Wait for monitoring to detect
-        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-
-        await service.flushPendingSaves()
-
-        // Then: Should have captured app info
-        let history = await service.getHistory()
-        XCTAssertGreaterThan(history.count, 0)
-
-        if !history.isEmpty {
-            let item = history[0]
-            XCTAssertNotNil(item.sourceApp, "Source app should be captured")
-            XCTAssertNotNil(item.bundleIdentifier, "Bundle ID should be captured")
-            XCTAssertNotNil(item.processID, "Process ID should be captured")
-
-            // Log what was captured for debugging
-            Logger.shared.log("Captured app: \(item.sourceApp ?? "nil")")
-            Logger.shared.log("Bundle ID: \(item.bundleIdentifier ?? "nil")")
-            Logger.shared.log("Window title: \(item.windowTitle ?? "nil")")
-        }
-
-        await service.stopMonitoring()
+        let history = await monitoredService.getHistory()
+        let item = try XCTUnwrap(history.first)
+        XCTAssertEqual(item.content, "Monitored Content")
+        XCTAssertNotNil(item.sourceApp)
+        XCTAssertEqual(item.bundleIdentifier, bundleID)
+        XCTAssertNil(item.processID)
+        XCTAssertNil(item.windowTitle)
     }
 
     func testLastActiveAppTracking() async throws {

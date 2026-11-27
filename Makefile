@@ -13,6 +13,7 @@ DESTINATION = "platform=macOS"
 
 # Build configurations
 CONFIGURATION_DEBUG = Debug
+CONFIGURATION_TEST = Test
 CONFIGURATION_RELEASE = Release
 
 # Build directories
@@ -212,12 +213,13 @@ test: generate ## Run all tests
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
+		-configuration $(CONFIGURATION_TEST) \
 		-destination $(DESTINATION) \
 		-resultBundlePath build/TestResults \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		-only-testing:KippleTests
-	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/Debug/Kipple.app/Contents/Helpers/KippleMCP"
+	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/$(CONFIGURATION_TEST)/KippleTestHost.app/Contents/Helpers/KippleMCP"
 
 .PHONY: test-release check-release-macos-version test-mcp-release
 test-release: check-release-macos-version ## Verify the release bundle and MCP helper
@@ -252,6 +254,7 @@ test-coverage: generate ## Run tests with coverage report
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
+		-configuration $(CONFIGURATION_TEST) \
 		-destination $(DESTINATION) \
 		-resultBundlePath build/TestResults \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
@@ -269,6 +272,7 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
+		-configuration $(CONFIGURATION_TEST) \
 		-destination $(DESTINATION) \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \

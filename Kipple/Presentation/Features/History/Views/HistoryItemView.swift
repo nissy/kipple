@@ -8,26 +8,69 @@
 import SwiftUI
 import AppKit
 
+enum HistoryListEntry: Identifiable {
+    case full(ClipItem)
+    case startup(HistoryRowPreview)
+
+    var id: UUID {
+        switch self {
+        case let .full(item): item.id
+        case let .startup(preview): preview.id
+        }
+    }
+
+    var fullItem: ClipItem? {
+        if case let .full(item) = self { return item }
+        return nil
+    }
+
+    var title: String? {
+        switch self {
+        case let .full(item): item.title
+        case let .startup(preview): preview.title
+        }
+    }
+
+    var categoryIDs: Set<UUID> {
+        switch self {
+        case let .full(item): item.categoryIDs
+        case let .startup(preview): preview.categoryIDs
+        }
+    }
+
+    var hasCustomCategory: Bool {
+        fullItem?.hasCustomCategory ?? categoryIDs.contains(where: BuiltInCategory.isCustom)
+    }
+
+    var isActionable: Bool {
+        switch self {
+        case let .full(item): item.isActionable
+        case let .startup(preview): preview.isActionable
+        }
+    }
+}
+
 struct HistoryItemView: View {
-    let item: ClipItem
+    let entry: HistoryListEntry
+    let resolveStartupItem: ((UUID) async -> ClipItem?)?
     let isSelected: Bool
     let isCurrentClipboardItem: Bool
     let queueBadge: Int?
     let isQueuePreviewed: Bool
     let isScrollLocked: Bool
-    let onTap: () -> Void
+    let onTap: (ClipItem) -> Void
     let onQueueDrag: ((CGSize) -> Void)?
     let onQueueLongPress: (() -> Void)?
-    let onDelete: (() -> Void)?
+    let onDelete: ((ClipItem) -> Void)?
     // ユーザカテゴリ変更/管理
     let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let historyFont: Font
-    let onOpenItem: (() -> Void)?
+    let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
     let hoverResetSignal: UUID
     let hoverCoordinator: HistoryHoverCoordinator
-    private let displayContent: String
+    private let displayPreview: (text: String, isLengthLimited: Bool)
 
     @EnvironmentObject private var actionKeyMonitor: HistoryActionKeyMonitor
     @ObservedObject private var desktopNotes = DesktopNoteWindowCoordinator.shared
@@ -40,27 +83,30 @@ struct HistoryItemView: View {
     @State private var currentAnchorView: NSView?
     @GestureState private var isQueueDragGestureActive = false
     @State private var hasStartedQueueDrag = false
+    private static let initialPopoverDelay: TimeInterval = 0.1
 
     init(
-        item: ClipItem,
+        entry: HistoryListEntry,
+        resolveStartupItem: ((UUID) async -> ClipItem?)? = nil,
         isSelected: Bool,
         isCurrentClipboardItem: Bool,
         queueBadge: Int?,
         isQueuePreviewed: Bool,
         isScrollLocked: Bool,
-        onTap: @escaping () -> Void,
+        onTap: @escaping (ClipItem) -> Void,
         onQueueDrag: ((CGSize) -> Void)? = nil,
         onQueueLongPress: (() -> Void)? = nil,
-        onDelete: (() -> Void)?,
+        onDelete: ((ClipItem) -> Void)?,
         onChangeCategory: ((ClipCategoryChange) async throws -> Void)?,
         onOpenCategoryManager: (() -> Void)?,
         historyFont: Font,
-        onOpenItem: (() -> Void)?,
+        onOpenItem: ((ClipItem) -> Void)?,
         onSplitEditorIntoHistory: ((ClipItem) -> Void)?,
         hoverResetSignal: UUID,
         hoverCoordinator: HistoryHoverCoordinator
     ) {
-        self.item = item
+        self.entry = entry
+        self.resolveStartupItem = resolveStartupItem
         self.isSelected = isSelected
         self.isCurrentClipboardItem = isCurrentClipboardItem
         self.queueBadge = queueBadge
@@ -77,8 +123,12 @@ struct HistoryItemView: View {
         self.onSplitEditorIntoHistory = onSplitEditorIntoHistory
         self.hoverResetSignal = hoverResetSignal
         self.hoverCoordinator = hoverCoordinator
-        let preview = HistoryItemView.makeDisplayContent(from: item.content)
-        self.displayContent = item.title ?? preview
+        switch entry {
+        case let .full(item):
+            displayPreview = item.title.map { ($0, false) } ?? HistoryRowPreview.displayText(from: item.content)
+        case let .startup(row):
+            displayPreview = (row.title ?? row.text, false)
+        }
     }
 
     var body: some View {
@@ -87,11 +137,12 @@ struct HistoryItemView: View {
             handleHoverChange(hovering, anchor: anchor)
         }, isScrollLocked: isScrollLocked)
         .onDisappear {
+            cancelPopoverTask()
             if let anchor = currentAnchorView {
                 HistoryPopoverManager.shared.hide(ifAnchoredTo: anchor)
             }
             currentAnchorView = nil
-            hoverCoordinator.clearHover(ifMatches: item.id)
+            hoverCoordinator.clearHover(ifMatches: entry.id)
         }
 
         return Group {
@@ -115,7 +166,7 @@ struct HistoryItemView: View {
             }
         }
         .onReceive(hoverCoordinator.$hoveredItemID) { hoveredID in
-            let shouldHover = hoveredID == item.id
+            let shouldHover = hoveredID == entry.id
             if isHovered != shouldHover {
                 isHovered = shouldHover
                 if !shouldHover {
@@ -138,10 +189,10 @@ struct HistoryItemView: View {
                 queueBadgeView
             } content: {
                 historyText
-            } pin: {
-                desktopNoteButton
             } category: {
                 categoryMenuView
+            } pin: {
+                desktopNoteButton
             }
             .padding(.vertical, 4)
         }
@@ -207,11 +258,18 @@ struct HistoryItemView: View {
     }
 
     private var historyText: some View {
-        let isLinkActive = actionKeyMonitor.isActionKeyActive && item.isActionable
+        let isLinkActive = actionKeyMonitor.isActionKeyActive && entry.isActionable
         return HStack(spacing: 4) {
-            if item.title != nil { titleBadge }
-            Text(verbatim: displayContent)
+            if entry.title != nil { titleBadge }
+            let preview = Text(verbatim: displayPreview.text)
                 .underline(isLinkActive, color: linkColor)
+            if displayPreview.isLengthLimited, let item = entry.fullItem {
+                preview.accessibilityRepresentation {
+                    HistoryAccessiblePreview(content: item.content)
+                }
+            } else {
+                preview
+            }
         }
             .font(historyFont)
             .lineLimit(1)
@@ -270,13 +328,13 @@ struct HistoryItemView: View {
     }
 
     private var desktopNoteButton: some View {
-        let isPosted = desktopNotes.isPosted(item.id)
+        let isPosted = desktopNotes.isPosted(entry.id)
         let label = Text(LocalizedStringKey(isPosted ? "Remove Desktop Note" : "Post to Desktop"))
 
         return Button {
             closePopover()
             let screen = currentAnchorView?.window?.screen
-            Task { await desktopNotes.toggle(item.id, on: screen) }
+            Task { await desktopNotes.toggle(entry.id, on: screen) }
         } label: {
             Image(systemName: isPosted ? "pin.fill" : "pin")
                 .font(MainViewMetrics.HistoryFilterIcon.defaultFont)
@@ -294,20 +352,27 @@ struct HistoryItemView: View {
         .help(label)
     }
 
-    static func makeDisplayContent(from content: String) -> String {
-        if let newlineIndex = content.firstIndex(of: "\n") {
-            return String(content[..<newlineIndex]) + "…"
+    private func withFullItem(_ action: @escaping (ClipItem) -> Void) {
+        if let item = entry.fullItem {
+            action(item)
+        } else if let resolveStartupItem {
+            Task { @MainActor in
+                if let item = await resolveStartupItem(entry.id) { action(item) }
+            }
         }
-        return content
     }
 
-    private func schedulePopoverPresentation(anchor: NSView, after delay: TimeInterval = 0.3) {
+    private func schedulePopoverPresentation(anchor: NSView, after delay: TimeInterval = Self.initialPopoverDelay) {
         guard !isEditingCategories else { return }
         cancelPopoverTask()
         let workItem = DispatchWorkItem {
             if isHovered && !isScrollLocked {
                 let trailing = windowPosition ?? true
-                HistoryPopoverManager.shared.show(item: item, from: anchor, trailingEdge: trailing)
+                withFullItem { item in
+                    guard isHovered, hoverCoordinator.hoveredItemID == entry.id, currentAnchorView === anchor,
+                          !isScrollLocked, !isEditingCategories, anchor.window?.isKeyWindow == true else { return }
+                    HistoryPopoverManager.shared.show(item: item, from: anchor, trailingEdge: trailing)
+                }
             }
         }
         popoverTask = workItem
@@ -328,7 +393,7 @@ struct HistoryItemView: View {
         if isHovered {
             isHovered = false
         }
-        hoverCoordinator.clearHover(ifMatches: item.id)
+        hoverCoordinator.clearHover(ifMatches: entry.id)
         currentAnchorView = nil
         cancelPopoverTask()
         HistoryPopoverManager.shared.hide()
@@ -346,11 +411,20 @@ struct HistoryItemView: View {
     }
 }
 
+private struct HistoryAccessiblePreview: View {
+    let content: String
+
+    var body: some View {
+        Text(verbatim: HistoryRowPreview.firstLine(from: content))
+    }
+}
+
 // MARK: - Action helpers
 private extension HistoryItemView {
     var categoryMenuView: some View {
         HistoryCategoryMenu(
-            item: item,
+            itemID: entry.id,
+            categoryIDs: entry.categoryIDs,
             isSelected: isSelected,
             onChangeCategory: onChangeCategory,
             onOpenCategoryManager: onOpenCategoryManager
@@ -366,13 +440,13 @@ private extension HistoryItemView {
     var contextMenuContent: some View {
         Button("Edit Item") {
             closePopover()
-            openHistoryItemEditor(item)
+            withFullItem { openHistoryItemEditor($0) }
         }
-        if let onOpenItem, item.isActionable {
+        if let onOpenItem, entry.isActionable {
             Divider()
             Button {
                 closePopover()
-                onOpenItem()
+                withFullItem(onOpenItem)
             } label: {
                 Label(openMenuTitle, systemImage: "arrow.up.right.square")
             }
@@ -381,7 +455,7 @@ private extension HistoryItemView {
             Divider()
             Button {
                 closePopover()
-                onSplitEditorIntoHistory(item)
+                withFullItem(onSplitEditorIntoHistory)
             } label: {
                 Label {
                     Text("editor.splitCopy.menu")
@@ -390,11 +464,11 @@ private extension HistoryItemView {
                 }
             }
         }
-        if let onDelete, !item.hasCustomCategory, !desktopNotes.isPosted(item.id) {
+        if let onDelete, !entry.hasCustomCategory, !desktopNotes.isPosted(entry.id) {
             Divider()
             Button("Delete from History", role: .destructive) {
                 closePopover()
-                onDelete()
+                withFullItem(onDelete)
             }
         }
     }
@@ -403,7 +477,7 @@ private extension HistoryItemView {
 
     func handleHoverChange(_ hovering: Bool, anchor: NSView) {
         if isScrollLocked {
-            hoverCoordinator.clearHover(ifMatches: item.id)
+            hoverCoordinator.clearHover(ifMatches: entry.id)
             cancelPopoverTask()
             HistoryPopoverManager.shared.scheduleHide(ifAnchoredTo: anchor)
             return
@@ -411,14 +485,14 @@ private extension HistoryItemView {
 
         if hovering {
             let switchedRow = HistoryPopoverManager.shared.prepareForRowHover(anchor)
-            hoverCoordinator.setHovered(itemID: item.id)
+            hoverCoordinator.setHovered(itemID: entry.id)
             if let window = anchor.window, let screen = window.screen {
                 windowPosition = window.frame.midX < screen.frame.midX
             }
-            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.25 : 0.3)
+            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.25 : Self.initialPopoverDelay)
         } else {
             cancelPopoverTask()
-            hoverCoordinator.clearHover(ifMatches: item.id)
+            hoverCoordinator.clearHover(ifMatches: entry.id)
         }
     }
 
@@ -428,20 +502,15 @@ private extension HistoryItemView {
         let requiredBase = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
         let required = requiredBase.intersection(.deviceIndependentFlagsMask)
 
-        if required.isEmpty {
-            onTap()
-            return
-        }
-
-        if item.isActionable && current == required {
-            item.performAction()
+        if entry.isActionable && !required.isEmpty && current == required {
+            withFullItem { $0.performAction() }
         } else {
-            onTap()
+            withFullItem(onTap)
         }
     }
 
     var actionHelpText: String {
-        guard item.isActionable else { return "" }
+        guard entry.isActionable else { return "" }
         let required = NSEvent.ModifierFlags(rawValue: UInt(AppSettings.shared.actionClickModifiers))
         let key: String
         switch required {
@@ -451,7 +520,7 @@ private extension HistoryItemView {
         case .shift: key = "⇧"
         default: key = "⌘"
         }
-        let actionTitle = item.actionTitle ?? NSLocalizedString("Open", comment: "Default action title")
+        let actionTitle = entry.fullItem?.actionTitle ?? NSLocalizedString("Open", comment: "Default action title")
         return String(
             format: NSLocalizedString(
                 "%@+Click to %@",

@@ -507,6 +507,19 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentClipboardItemID, targetItem.id)
     }
 
+    func testCurrentClipboardMatchUsesTheFirstItemAndRefreshesAfterInPlaceEdit() {
+        let first = ClipItem(content: "Copied text")
+        let second = ClipItem(content: first.content)
+        mockClipboardService.history = [first, second]
+        viewModel.loadHistory()
+        viewModel.currentClipboardContent = first.content
+        XCTAssertEqual(viewModel.currentClipboardItemID, first.id)
+
+        mockClipboardService.history = [first.replacingContent(with: "Edited text"), second]
+        viewModel.loadHistory()
+        XCTAssertEqual(viewModel.currentClipboardItemID, second.id)
+    }
+
     func testSelectHistoryItemAndWaitUsesAsyncRecopy() async {
         let item = ClipItem(content: "Waited")
         mockClipboardService.history = [item]
@@ -577,6 +590,33 @@ class MainViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.hasMoreHistory)
         XCTAssertEqual(viewModel.history.count, viewModel.filteredHistory.count)
         XCTAssertTrue(viewModel.history.allSatisfy { $0.content.contains("Item 2") })
+    }
+
+    func testDesktopNoteFilterUpdatesAndCombinesWithSearchAndCategory() {
+        let categoryID = UUID()
+        let pinnedRelease = ClipItem(content: "Release notes", userCategoryId: categoryID)
+        let pinnedDraft = ClipItem(content: "Draft notes", userCategoryId: categoryID)
+        let pinnedOtherCategory = ClipItem(content: "Release checklist")
+        let unpinnedRelease = ClipItem(content: "Release schedule", userCategoryId: categoryID)
+        mockClipboardService.history = [pinnedRelease, pinnedDraft, pinnedOtherCategory, unpinnedRelease]
+        let postedIDs = CurrentValueSubject<Set<UUID>, Never>([pinnedRelease.id, pinnedDraft.id, pinnedOtherCategory.id])
+        viewModel = MainViewModel(clipboardService: mockClipboardService, postedDesktopNoteIDs: postedIDs.eraseToAnyPublisher())
+
+        viewModel.showOnlyDesktopNotes = true
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedRelease.id, pinnedDraft.id, pinnedOtherCategory.id])
+
+        viewModel.searchText = "Release"
+        viewModel.categoryFilter.select(categoryID)
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedRelease.id])
+
+        postedIDs.send([pinnedDraft.id, pinnedOtherCategory.id, unpinnedRelease.id])
+        XCTAssertEqual(viewModel.history.map(\.id), [unpinnedRelease.id])
+
+        postedIDs.send([])
+        XCTAssertTrue(viewModel.history.isEmpty)
+
+        viewModel.showOnlyDesktopNotes = false
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedRelease.id, unpinnedRelease.id])
     }
     
     // MARK: - Performance Tests

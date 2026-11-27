@@ -19,6 +19,16 @@ final class HistoryQueueDragController: ObservableObject {
     private var timer: Timer?
     private var cursorPushed = false
     private weak var scrollView: NSScrollView?
+    private let pointerLocation: () -> CGPoint
+    private let isPrimaryButtonPressed: () -> Bool
+
+    init(
+        pointerLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation },
+        isPrimaryButtonPressed: @escaping () -> Bool = { NSEvent.pressedMouseButtons & 1 != 0 }
+    ) {
+        self.pointerLocation = pointerLocation
+        self.isPrimaryButtonPressed = isPrimaryButtonPressed
+    }
 
     func register(_ view: NSView, for id: UUID) {
         rows.setObject(view, forKey: id as NSUUID)
@@ -31,7 +41,7 @@ final class HistoryQueueDragController: ObservableObject {
     }
 
     func begin(itemID: UUID, translation: CGSize) {
-        guard session == nil, NSEvent.pressedMouseButtons & 1 != 0,
+        guard session == nil, isPrimaryButtonPressed(),
               NSEvent.modifierFlags.isDisjoint(with: [.shift, .command, .option, .control]),
               let surface, let window = surface.window, window.isKeyWindow,
               let row = rows.object(forKey: itemID as NSUUID),
@@ -111,7 +121,7 @@ final class HistoryQueueDragController: ObservableObject {
             cancel()
             return
         }
-        guard NSEvent.pressedMouseButtons & 1 != 0 else {
+        guard isPrimaryButtonPressed() else {
             finish()
             return
         }
@@ -122,7 +132,7 @@ final class HistoryQueueDragController: ObservableObject {
 
     private func mousePoint(in view: NSView) -> CGPoint {
         guard let window = view.window else { return .zero }
-        return view.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        return view.convert(window.convertPoint(fromScreen: pointerLocation()), from: nil)
     }
 
     private func updatePosition() {
@@ -147,7 +157,7 @@ final class HistoryQueueDragController: ObservableObject {
         if insertionFrame != line { insertionFrame = line }
     }
 
-    private func finish() {
+    func finish() {
         updatePosition()
         let pending = session
         let destination = target

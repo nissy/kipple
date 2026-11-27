@@ -30,15 +30,16 @@ extension MainView {
             onDelete: { item in
                 viewModel.deleteItemSync(item)
             },
-            onChangeUserCategory: { item, change in
+            onChangeUserCategory: { id, change in
                 guard let adapter = viewModel.clipboardService as? ModernClipboardServiceAdapter else {
                     throw MCPFailure.unavailable
                 }
-                try await adapter.updateCategories(itemID: item.id, change: change)
+                try await adapter.updateCategories(itemID: id, change: change)
             },
             onOpenCategoryManager: { presentCategoryManager() },
             categoryFilter: $viewModel.categoryFilter,
             historyCategoryIDs: viewModel.historyCategoryIDs,
+            showOnlyDesktopNotes: $viewModel.showOnlyDesktopNotes,
             searchText: $viewModel.searchText,
             onLoadMore: { item in
                 viewModel.loadMoreHistoryIfNeeded(currentItem: item)
@@ -56,7 +57,9 @@ extension MainView {
                     _ = viewModel.commitQueueReorder(session, target: target)
                 }
                 syncTitleBarState()
-            }
+            },
+            startupPreviews: viewModel.visibleStartupPreviews,
+            resolveStartupItem: viewModel.resolveStartupItem(id:)
         )
         .id(historyRefreshID)
         .environment(\.categoryPopoverChanged, CategoryPopoverAction { itemID, presented in

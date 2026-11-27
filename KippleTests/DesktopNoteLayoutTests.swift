@@ -107,6 +107,30 @@ final class DesktopNoteLayoutTests: XCTestCase {
         XCTAssertEqual(short.titleVisibility, .hidden)
     }
 
+    func testLongUnbrokenEmojiNoteKeepsAllTextSelectableInBothModes() throws {
+        let text = String(repeating: "😀", count: 80_000)
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        for mode: AppSettings.DesktopNoteDisplayMode in [.plainText, .markdown] {
+            let note = DesktopNotePanel(item: ClipItem(content: text), screenFrame: screenFrame, displayMode: mode)
+            defer { note.close() }
+            let content = try XCTUnwrap(note.contentView)
+            content.layoutSubtreeIfNeeded()
+            let scroll = try XCTUnwrap(firstScrollView(in: content) as? DesktopNoteLongText.ScrollView)
+            let textView = try XCTUnwrap(scroll.documentView as? NSTextView)
+            XCTAssertEqual(textView.string, text)
+            XCTAssertLessThanOrEqual(note.frame.height, screenFrame.height)
+
+            let fullRange = NSRange(location: 0, length: text.utf16.count)
+            textView.scrollRangeToVisible(NSRange(location: fullRange.upperBound - 2, length: 2))
+            XCTAssertGreaterThan(scroll.contentView.bounds.minY, 0)
+            textView.setSelectedRange(fullRange)
+            XCTAssertEqual(textView.selectedRange(), fullRange)
+            XCTAssertTrue(textView.writeSelection(to: pasteboard, types: textView.writablePasteboardTypes))
+            XCTAssertTrue(pasteboard.string(forType: .string) == text)
+        }
+    }
+
     func testMarkdownNoteFitsItsRenderedBodyWithoutMovingItsTopEdge() async throws {
         let screen = try XCTUnwrap(NSScreen.main?.visibleFrame)
         let content = """

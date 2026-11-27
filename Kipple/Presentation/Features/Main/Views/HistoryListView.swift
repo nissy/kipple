@@ -21,7 +21,7 @@ struct HistoryListView: View {
     let historyFont: Font
     let onSelectItem: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
-    let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
+    let onChangeUserCategory: ((UUID, ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     let onOpenItem: ((ClipItem) -> Void)?
     let onSplitEditorIntoHistory: ((ClipItem) -> Void)?
@@ -34,76 +34,56 @@ struct HistoryListView: View {
     let highlightRequest: HistoryHighlightRequest?
     let onHighlightFinished: (UUID) -> Void
     var queueReorder: QueueReorderActions?
+    var startupPreviews: [HistoryRowPreview] = []
+    var resolveStartupItem: ((UUID) async -> ClipItem?)?
+    @Environment(\.openHistoryItemEditor) private var openHistoryItemEditor
+    @Environment(\.categoryPopoverChanged) private var categoryPopoverChanged
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var highlightedRequestID: UUID?
     @State private var highlightOpacity = 0.0
     @State private var hoverResetSignal = UUID()
     @State private var isScrollLocked = false
+    @State private var tableProxy = HistoryTableProxy()
     @StateObject private var hoverCoordinator = HistoryHoverCoordinator()
     @StateObject private var actionKeyMonitor = HistoryActionKeyMonitor()
     @StateObject private var queueDrag = HistoryQueueDragController()
 
+    private var entries: HistoryListEntries {
+        startupPreviews.isEmpty ? .full(history) : .startup(startupPreviews)
+    }
+
+    private var firstEntryID: UUID? { entries.first?.id }
+
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: MainViewMetrics.HistoryRows.spacing) {
-                    ForEach(history, id: \.id) { item in
-                        historyRow(item)
-                        .frame(height: MainViewMetrics.HistoryRows.height)
-                        .overlay {
-                            if let highlightRequest, highlightRequest.itemID == item.id,
-                               highlightRequest.id == highlightedRequestID {
-                                historyHighlight.opacity(highlightOpacity)
-                            }
-                        }
-                        .opacity(queueDrag.itemID == item.id ? 0 : 1)
-                        .background(HistoryQueueDragAnchor(controller: queueDrag, itemID: item.id))
-                        .transition(.opacity)
-                        .onAppear {
-                            onLoadMore(item)
-                        }
-                    }
-                    if hasMoreItems && isLoadingMore {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                    }
-                }
-                .padding(.vertical, MainViewMetrics.HistoryRows.verticalPadding)
-                .background {
-                    ScrollPositionObserver(
-                        canScrollToTop: $canScrollToTop,
-                        isScrollLocked: $isScrollLocked
-                    )
-                    .allowsHitTesting(false)
-                }
-            }
-            .contentMargins(.horizontal, 0, for: .scrollContent)
-            .overlay {
-                GeometryReader { _ in queueDragOverlay }
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-                    .clipped()
-            }
-            .onChange(of: copyScrollRequest?.id) { _, _ in
-                handleCopyScrollRequest(with: proxy)
-            }
-            .task(id: highlightRequest?.id) {
-                guard let highlightRequest else { return }
-                await animateHighlight(highlightRequest, with: proxy)
-            }
-            .onChange(of: hoverResetRequest?.id) { _, _ in
-                handleHoverResetRequest()
-            }
-            .onChange(of: history.first?.id) { _, _ in
-                canScrollToTop = false
-            }
-            .onChange(of: isScrollLocked) { _, locked in
-                if locked {
-                    hoverCoordinator.clearHover()
-                }
-            }
+        HistoryTableView(
+            entries: entries,
+            hasMoreItems: hasMoreItems,
+            showsProgress: hasMoreItems && isLoadingMore,
+            proxy: tableProxy,
+            canScrollToTop: $canScrollToTop,
+            isScrollLocked: $isScrollLocked,
+            onLoadMore: onLoadMore
+        ) { entry in
+            displayedRow(entry)
+                .id(entry.id)
+                .environmentObject(actionKeyMonitor)
+                .environment(\.openHistoryItemEditor, openHistoryItemEditor)
+                .environment(\.categoryPopoverChanged, categoryPopoverChanged)
+        }
+        .overlay {
+            GeometryReader { _ in queueDragOverlay }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                .clipped()
+        }
+        .onChange(of: copyScrollRequest?.id) { _, _ in handleCopyScrollRequest() }
+        .task(id: highlightRequest?.id) {
+            guard let highlightRequest else { return }
+            await animateHighlight(highlightRequest)
+        }
+        .onChange(of: hoverResetRequest?.id) { _, _ in handleHoverResetRequest() }
+        .onChange(of: isScrollLocked) { _, locked in
+            if locked { hoverCoordinator.clearHover() }
         }
         .environmentObject(actionKeyMonitor)
         .onChange(of: queueDrag.itemID) { _, _ in
@@ -113,32 +93,46 @@ struct HistoryListView: View {
         .onDisappear { queueDrag.cancel() }
     }
 
-    private func historyRow(_ item: ClipItem) -> some View {
+    private func displayedRow(_ entry: HistoryListEntry) -> some View {
+        historyRow(entry)
+            .frame(height: MainViewMetrics.HistoryRows.height)
+            .overlay {
+                if let highlightRequest, highlightRequest.itemID == entry.id,
+                   highlightRequest.id == highlightedRequestID {
+                    historyHighlight.opacity(highlightOpacity)
+                }
+            }
+            .opacity(queueDrag.itemID == entry.id ? 0 : 1)
+            .background(HistoryQueueDragAnchor(controller: queueDrag, itemID: entry.id))
+    }
+
+    private func historyRow(_ entry: HistoryListEntry) -> some View {
         HistoryItemView(
-            item: item,
-            isSelected: selectedHistoryItem?.id == item.id,
-            isCurrentClipboardItem: Self.isCurrentClipboardItem(item, currentID: currentClipboardItemID),
-            queueBadge: HistoryQueueBadgeCalculator.queueBadgeValue(
-                for: item, pasteMode: pasteMode, provider: queueBadgeProvider
-            ),
-            isQueuePreviewed: queueSelectionPreview.contains(item.id),
-            isScrollLocked: isScrollLocked || queueDrag.itemID != nil,
-            onTap: { onSelectItem(item) },
-            onQueueDrag: { translation in
-                queueDrag.begin(itemID: item.id, translation: translation)
+            entry: entry,
+            resolveStartupItem: resolveStartupItem,
+            isSelected: selectedHistoryItem?.id == entry.id,
+            isCurrentClipboardItem: currentClipboardItemID == entry.id,
+            queueBadge: entry.fullItem.flatMap {
+                HistoryQueueBadgeCalculator.queueBadgeValue(for: $0, pasteMode: pasteMode, provider: queueBadgeProvider)
             },
-            onQueueLongPress: pasteMode == .clipboard ? {
-                queueReorder?.startQueue(itemID: item.id)
+            isQueuePreviewed: queueSelectionPreview.contains(entry.id),
+            isScrollLocked: isScrollLocked || queueDrag.itemID != nil,
+            onTap: onSelectItem,
+            onQueueDrag: entry.fullItem != nil ? { translation in
+                queueDrag.begin(itemID: entry.id, translation: translation)
             } : nil,
-            onDelete: onDelete != nil ? {
+            onQueueLongPress: pasteMode == .clipboard && entry.fullItem != nil ? {
+                queueReorder?.startQueue(itemID: entry.id)
+            } : nil,
+            onDelete: onDelete != nil ? { item in
                 withAnimation(.spring(response: 0.3)) { onDelete?(item) }
             } : nil,
             onChangeCategory: onChangeUserCategory != nil ? { change in
-                try await onChangeUserCategory?(item, change)
+                try await onChangeUserCategory?(entry.id, change)
             } : nil,
             onOpenCategoryManager: onOpenCategoryManager,
             historyFont: historyFont,
-            onOpenItem: onOpenItem.map { handler in { handler(item) } },
+            onOpenItem: onOpenItem,
             onSplitEditorIntoHistory: onSplitEditorIntoHistory,
             hoverResetSignal: hoverResetSignal,
             hoverCoordinator: hoverCoordinator
@@ -154,7 +148,7 @@ struct HistoryListView: View {
                     .position(x: line.midX, y: line.midY)
             }
             if let item = history.first(where: { $0.id == queueDrag.itemID }) {
-                historyRow(item)
+                historyRow(.full(item))
                     .frame(width: queueDrag.previewFrame.width, height: queueDrag.previewFrame.height)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
                     .shadow(color: .black.opacity(0.15), radius: 5, y: 2)
@@ -163,11 +157,18 @@ struct HistoryListView: View {
         }
     }
 
-    private func handleCopyScrollRequest(with proxy: ScrollViewProxy) {
+    private func handleCopyScrollRequest() {
         guard copyScrollRequest != nil else { return }
         copyScrollRequest = nil
         guard highlightRequest == nil else { return }
-        scrollToTop(with: proxy, animated: false)
+        guard let firstEntryID else {
+            canScrollToTop = false
+            return
+        }
+        DispatchQueue.main.async {
+            tableProxy.scrollTo(firstEntryID)
+            canScrollToTop = false
+        }
     }
 
     private var historyHighlight: some View {
@@ -180,10 +181,10 @@ struct HistoryListView: View {
     }
 
     @MainActor
-    private func animateHighlight(_ request: HistoryHighlightRequest, with proxy: ScrollViewProxy) async {
+    private func animateHighlight(_ request: HistoryHighlightRequest) async {
         await Task.yield()
         guard !Task.isCancelled else { return }
-        proxy.scrollTo(request.itemID, anchor: .top)
+        tableProxy.scrollTo(request.itemID)
         withTransaction(Transaction(animation: nil)) {
             highlightedRequestID = request.id
             highlightOpacity = 1
@@ -203,28 +204,31 @@ struct HistoryListView: View {
         onHighlightFinished(request.id)
     }
 
-    private func scrollToTop(with proxy: ScrollViewProxy, animated: Bool) {
-        guard let topID = history.first?.id else {
-            canScrollToTop = false
-            return
-        }
-
-        DispatchQueue.main.async {
-            if animated {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(topID, anchor: .top)
-                }
-            } else {
-                proxy.scrollTo(topID, anchor: .top)
-            }
-            canScrollToTop = false
-        }
-    }
-
     private func handleHoverResetRequest() {
         guard hoverResetRequest != nil else { return }
         hoverResetRequest = nil
         hoverResetSignal = UUID()
+    }
+}
+
+enum HistoryListEntries: RandomAccessCollection {
+    case full([ClipItem])
+    case startup([HistoryRowPreview])
+
+    var startIndex: Int { 0 }
+
+    var endIndex: Int {
+        switch self {
+        case let .full(items): items.count
+        case let .startup(previews): previews.count
+        }
+    }
+
+    subscript(index: Int) -> HistoryListEntry {
+        switch self {
+        case let .full(items): .full(items[index])
+        case let .startup(previews): .startup(previews[index])
+        }
     }
 }
 
@@ -257,170 +261,6 @@ final class HistoryHoverCoordinator: ObservableObject {
         }
         hoveredItemID = nil
     }
-}
-
-private struct ScrollPositionObserver: NSViewRepresentable {
-    @Binding var canScrollToTop: Bool
-    @Binding var isScrollLocked: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(canScrollToTop: $canScrollToTop, isScrollLocked: $isScrollLocked)
-    }
-
-    func makeNSView(context: Context) -> ScrollPositionObserverView {
-        let view = ScrollPositionObserverView()
-        view.coordinator = context.coordinator
-        return view
-    }
-
-    func updateNSView(_ nsView: ScrollPositionObserverView, context: Context) {
-        nsView.coordinator = context.coordinator
-        nsView.attachIfNeeded()
-    }
-
-    final class Coordinator {
-        private var canScrollToTop: Binding<Bool>
-        private var isScrollLocked: Binding<Bool>
-
-        init(canScrollToTop: Binding<Bool>, isScrollLocked: Binding<Bool>) {
-            self.canScrollToTop = canScrollToTop
-            self.isScrollLocked = isScrollLocked
-        }
-
-        func setCanScrollToTop(_ canScroll: Bool) {
-            if canScrollToTop.wrappedValue != canScroll {
-                canScrollToTop.wrappedValue = canScroll
-            }
-        }
-
-        func setLocked(_ locked: Bool) {
-            if isScrollLocked.wrappedValue != locked {
-                isScrollLocked.wrappedValue = locked
-            }
-        }
-    }
-}
-
-private final class ScrollPositionObserverView: NSView {
-    weak var coordinator: ScrollPositionObserver.Coordinator?
-    private var observers: [NSObjectProtocol] = []
-    private weak var observedScrollView: NSScrollView?
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        attachIfNeeded()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        attachIfNeeded()
-    }
-
-    func attachIfNeeded() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            let target = self.findEnclosingScrollView()
-            if self.observedScrollView === target {
-                self.updateScrollState()
-                return
-            }
-            self.detachObservers()
-            guard let scrollView = target else { return }
-            self.observedScrollView = scrollView
-            self.attachObservers(to: scrollView)
-            self.updateScrollState()
-        }
-    }
-
-    private func findEnclosingScrollView() -> NSScrollView? {
-        var current: NSView? = self
-        while let view = current {
-            if let scrollView = view as? NSScrollView {
-                return scrollView
-            }
-            current = view.superview
-        }
-        return nil
-    }
-
-    private func attachObservers(to scrollView: NSScrollView) {
-        scrollView.contentView.postsBoundsChangedNotifications = true
-
-        let center = NotificationCenter.default
-        let bounds = center.addObserver(
-            forName: NSView.boundsDidChangeNotification,
-            object: scrollView.contentView,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.updateScrollState()
-            }
-        }
-        let will = center.addObserver(
-            forName: NSScrollView.willStartLiveScrollNotification,
-            object: scrollView,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.coordinator?.setLocked(true)
-                HistoryPopoverManager.shared.scheduleHide()
-                self?.updateScrollState()
-            }
-        }
-        let did = center.addObserver(
-            forName: NSScrollView.didEndLiveScrollNotification,
-            object: scrollView,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.coordinator?.setLocked(false)
-                self?.updateScrollState()
-            }
-        }
-        observers = [bounds, will, did]
-    }
-
-    private func updateScrollState() {
-        guard let scrollView = observedScrollView else {
-            coordinator?.setCanScrollToTop(false)
-            return
-        }
-
-        let visibleBounds = scrollView.contentView.bounds
-        let documentBounds = scrollView.documentView?.bounds ?? .zero
-        let topOffset: CGFloat
-        if scrollView.documentView?.isFlipped == true {
-            topOffset = visibleBounds.minY
-        } else {
-            topOffset = max(0, documentBounds.maxY - visibleBounds.maxY)
-        }
-        coordinator?.setCanScrollToTop(topOffset > Self.topTolerance)
-    }
-
-    private func detachObservers() {
-        for observer in observers {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        observers.removeAll()
-        if observedScrollView != nil {
-            coordinator?.setCanScrollToTop(false)
-            coordinator?.setLocked(false)
-        }
-        observedScrollView = nil
-    }
-
-    override func removeFromSuperview() {
-        detachObservers()
-        super.removeFromSuperview()
-    }
-
-    deinit {
-        MainActor.assumeIsolated {
-            detachObservers()
-        }
-    }
-
-    private static let topTolerance: CGFloat = 8
 }
 
 enum HistoryQueueBadgeCalculator {

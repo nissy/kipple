@@ -14,7 +14,7 @@ final class HistoryPopoverManager {
     static let shared = HistoryPopoverManager()
 
     private var panel: NSPanel?
-    private var hostingController: NSHostingController<ClipboardItemPopover>?
+    private lazy var hostingController = NSHostingController<ClipboardItemPopover?>(rootView: nil)
     private weak var anchorView: NSView?
     private var hideWorkItem: DispatchWorkItem?
     private var isPointerOverPanel = false
@@ -36,21 +36,11 @@ final class HistoryPopoverManager {
         cancelScheduledHide()
         self.anchorView = anchorView
 
-        let controller: NSHostingController<ClipboardItemPopover>
-        if let existing = hostingController {
-            controller = existing
-            controller.rootView = ClipboardItemPopover(item: item)
-        } else {
-            let newController = NSHostingController(rootView: ClipboardItemPopover(item: item))
-            hostingController = newController
-            controller = newController
-        }
-
         let panel = panel ?? makePanel()
-        install(controller, in: panel)
-        hostingController = controller
         self.panel = panel
 
+        let controller = hostingController
+        controller.rootView = ClipboardItemPopover(item: item)
         controller.view.layoutSubtreeIfNeeded()
         let fittingSize = controller.view.fittingSize
         let anchorRectInWindow = anchorView.convert(anchorView.bounds, to: nil)
@@ -72,7 +62,7 @@ final class HistoryPopoverManager {
     }
 
     func prepareForRowHover(_ anchor: NSView) -> Bool {
-        guard panel != nil else { return false }
+        guard panel?.isVisible == true else { return false }
         if anchorView === anchor {
             cancelScheduledHide()
             return false
@@ -84,7 +74,7 @@ final class HistoryPopoverManager {
     }
 
     func scheduleHide(after interval: TimeInterval = 0.35, ifAnchoredTo anchor: NSView? = nil) {
-        guard panel != nil, !isPointerInsidePanel, anchor == nil || anchorView === anchor else { return }
+        guard panel?.isVisible == true, !isPointerInsidePanel, anchor == nil || anchorView === anchor else { return }
         cancelScheduledHide()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, !self.isPointerInsidePanel else { return }
@@ -98,10 +88,11 @@ final class HistoryPopoverManager {
         guard anchor == nil || anchorView === anchor else { return }
         cancelScheduledHide()
         isPointerOverPanel = false
-        panel?.orderOut(nil)
-        panel = nil
-        hostingController = nil
         anchorView = nil
+        if let panel, hostingController.rootView != nil {
+            panel.orderOut(nil)
+            hostingController.rootView = nil
+        }
     }
 
     func forceClose() {
@@ -141,6 +132,7 @@ final class HistoryPopoverManager {
         panel.backgroundColor = .clear
         panel.collectionBehavior = [.transient, .ignoresCycle]
         panel.ignoresMouseEvents = false
+        installGlass(hostingController.view, in: panel)
         return panel
     }
 
@@ -220,21 +212,17 @@ final class HistoryPopoverManager {
         return origin
     }
 
-    private func install(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
-        controller.view.wantsLayer = true
-        controller.view.layer?.backgroundColor = NSColor.clear.cgColor
-        controller.view.layer?.cornerRadius = HistoryItemPreviewContent.cornerRadius
-        controller.view.layer?.cornerCurve = .continuous
-        controller.view.layer?.masksToBounds = true
-        controller.view.translatesAutoresizingMaskIntoConstraints = false
-
-        installGlass(controller, in: panel)
-    }
-
-    private func installGlass(_ controller: NSHostingController<ClipboardItemPopover>, in panel: NSPanel) {
+    private func installGlass(_ content: NSView, in panel: NSPanel) {
         let cornerRadius = HistoryItemPreviewContent.cornerRadius
+        content.wantsLayer = true
+        content.layer?.backgroundColor = NSColor.clear.cgColor
+        content.layer?.cornerRadius = cornerRadius
+        content.layer?.cornerCurve = .continuous
+        content.layer?.masksToBounds = true
+        content.translatesAutoresizingMaskIntoConstraints = false
+
         let container = GlassContainerView(cornerRadius: cornerRadius) { [weak self] hovering, source in
-            guard let self, self.panel?.contentView === source else { return }
+            guard let self, let panel = self.panel, panel.isVisible, panel.contentView === source else { return }
             self.updatePanelHover(hovering)
         }
         let glassView = NSGlassEffectView()
@@ -246,7 +234,7 @@ final class HistoryPopoverManager {
         glassView.layer?.cornerRadius = cornerRadius
         glassView.layer?.cornerCurve = .continuous
         glassView.layer?.masksToBounds = true
-        glassView.contentView = controller.view
+        glassView.contentView = content
         container.addSubview(glassView)
         pin(glassView, to: container)
         panel.contentView = container

@@ -33,6 +33,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private struct PaginationFilterState: Equatable {
         let searchText: String
         let showOnlyURLs: Bool
+        let showOnlyDesktopNotes: Bool
         let categoryFilter: CategoryFilter
     }
 
@@ -47,6 +48,17 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var serviceCancellables = Set<AnyCancellable>()
     
     @Published var history: [ClipItem] = []
+    private var startupPreviews: [HistoryRowPreview] = []
+
+    var visibleStartupPreviews: [HistoryRowPreview] {
+        guard searchText.isEmpty, categoryFilter.ids.isEmpty,
+              !showOnlyURLs, !showOnlyDesktopNotes, !isQueueModeActive else { return [] }
+        return startupPreviews
+    }
+
+    func resolveStartupItem(id: UUID) async -> ClipItem? {
+        await (clipboardService as? ModernClipboardServiceAdapter)?.resolveStartupItem(id: id)
+    }
     @Published private(set) var historyCategoryIDs: Set<UUID> = []
     private var lastLoadedCategoryIDs: Set<UUID>?
     @Published private(set) var historyHighlightRequest: HistoryHighlightRequest?
@@ -61,6 +73,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     private var searchCoalesceTask: Task<Void, Never>?
     @Published var showOnlyURLs: Bool = false
+    @Published var showOnlyDesktopNotes = false {
+        didSet { if oldValue != showOnlyDesktopNotes { applyFilters() } }
+    }
+    private var desktopNoteItemIDs: Set<UUID> = []
     @Published var categoryFilter = CategoryFilter() {
         didSet { if !isFilterMutating { applyFilters() } }
     }
@@ -81,7 +97,9 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     // 現在のクリップボードコンテンツを公開
     @Published var currentClipboardContent: String? {
         didSet {
-            updateCurrentClipboardItemID()
+            if oldValue != currentClipboardContent {
+                updateCurrentClipboardItemID(in: clipboardService.history)
+            }
         }
     }
     @Published private(set) var currentClipboardItemID: UUID?
@@ -106,13 +124,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private var pendingShiftSelection: [ClipItem] = []
     private var shiftSelectionInitialQueue: [UUID] = []
     private var expectedQueueHeadID: UUID?
-    private var historyIDByContent: [String: UUID] = [:]
-    private var historyLookupIDs: [UUID] = []
     private static let newlineSet = CharacterSet.newlines
 
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
         categoryStore: UserCategoryStore? = nil,
+        postedDesktopNoteIDs: AnyPublisher<Set<UUID>, Never>? = nil,
         pageSize: Int = 50,
         pasteMonitor: any PasteCommandMonitoring = PasteCommandMonitor(),
         screenCapturePermissionCheck: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }
@@ -128,6 +145,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         
         subscribeToClipboardService()
         observeClipboardActions()
+        postedDesktopNoteIDs?.sink { [weak self] itemIDs in
+            guard let self else { return }
+            self.desktopNoteItemIDs = itemIDs
+            if self.showOnlyDesktopNotes { self.applyFilters(animated: false) }
+        }
+        .store(in: &cancellables)
 
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
         // 注: UserDefaultsの変更通知は特定のキーを識別できないため、
@@ -147,6 +170,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             loadHistory()
         }
         currentClipboardContent = resolvedService.currentClipboardContent
+        updateCurrentClipboardItemID(in: resolvedService.history)
     }
 
     private func observeClipboardActions() {
@@ -182,6 +206,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         service.$history
             .sink { [weak self] items in
                 guard let self = self else { return }
+                self.startupPreviews = service.startupPreviews
                 let headChange = service.publishedQueueHeadChange
                 self.handleHistoryUpdateForQueue(items, newTopID: headChange?.itemID, checkNewTop: headChange != nil)
                 self.updateHistory(items, isLoaded: service.isHistoryLoaded)
@@ -201,6 +226,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
 
     private func updateHistory(_ items: [ClipItem], isLoaded: Bool = true) {
+        updateCurrentClipboardItemID(in: items)
         let categoryIDs = items.reduce(into: Set<UUID>()) { ids, item in
             let itemIDs = item.categoryIDs
             if itemIDs.isEmpty {
@@ -287,18 +313,18 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let startedAt = PerformanceTrace.nowMicros()
         let tracedContent = items.first?.content
         PerformanceTrace.event("viewmodel_update_started", content: tracedContent, count: items.count)
-        rebuildHistoryLookups(using: items)
-        updateCurrentClipboardItemID()
 
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let requireURLsOnly = showOnlyURLs
+        let requiredDesktopNoteIDs = showOnlyDesktopNotes ? desktopNoteItemIDs : nil
         let highlightedItemID = historyHighlightRequest?.itemID
 
         // Fast-path: no filters and no queue ordering → avoid O(n) filter
         let noFiltersActive = !hasSearchQuery &&
                               categoryFilter.ids.isEmpty &&
-                              !requireURLsOnly
+                              !requireURLsOnly &&
+                              requiredDesktopNoteIDs == nil
 
         let filteredStartedAt = PerformanceTrace.nowMicros()
         let filtered: [ClipItem]
@@ -309,6 +335,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             // 安価な判定（Bool/UUID 比較）で早期 return し、最後に expensive な
             // localizedCaseInsensitiveContains を評価して総コストを下げる
             filtered = items.filter { item in
+                if let requiredDesktopNoteIDs, !requiredDesktopNoteIDs.contains(item.id),
+                   item.id != highlightedItemID { return false }
                 if queuedIDs.contains(item.id) || item.id == categoryEditingItemID || item.id == highlightedItemID {
                     return true
                 }
@@ -327,6 +355,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let paginationFilterState = PaginationFilterState(
             searchText: searchText,
             showOnlyURLs: showOnlyURLs,
+            showOnlyDesktopNotes: showOnlyDesktopNotes,
             categoryFilter: categoryFilter
         )
         let shouldResetPagination = lastPaginationFilterState != paginationFilterState || currentHistoryLimit == 0
@@ -366,43 +395,13 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         }
     }
 
-    private func rebuildHistoryLookups(using items: [ClipItem]) {
-        guard !historyLookupMatches(items) else { return }
-
-        var lookup: [String: UUID] = [:]
-        var ids: [UUID] = []
-        lookup.reserveCapacity(items.count)
-        ids.reserveCapacity(items.count)
-        for item in items {
-            ids.append(item.id)
-            if lookup[item.content] == nil {
-                lookup[item.content] = item.id
-            }
+    private func updateCurrentClipboardItemID(in items: [ClipItem]) {
+        let matchedID: UUID?
+        if let content = currentClipboardContent, !content.isEmpty {
+            matchedID = items.first { $0.content == content }?.id
+        } else {
+            matchedID = nil
         }
-        historyIDByContent = lookup
-        historyLookupIDs = ids
-    }
-
-    private func historyLookupMatches(_ items: [ClipItem]) -> Bool {
-        guard historyLookupIDs.count == items.count else {
-            return false
-        }
-
-        for (index, item) in items.enumerated() where historyLookupIDs[index] != item.id {
-            return false
-        }
-        return true
-    }
-
-    private func updateCurrentClipboardItemID() {
-        guard let currentContent = currentClipboardContent,
-              !currentContent.isEmpty else {
-            if currentClipboardItemID != nil {
-                currentClipboardItemID = nil
-            }
-            return
-        }
-        let matchedID = historyIDByContent[currentContent]
         if currentClipboardItemID != matchedID {
             currentClipboardItemID = matchedID
         }
@@ -679,6 +678,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             showOnlyURLs = false
             didMutate = true
         }
+        if showOnlyDesktopNotes {
+            showOnlyDesktopNotes = false
+            didMutate = true
+        }
         if !categoryFilter.ids.isEmpty {
             categoryFilter.ids = []
             didMutate = true
@@ -708,7 +711,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             copyEpoch: (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch,
             pasteboardChangeCount: NSPasteboard.general.changeCount, mode: pasteMode,
             searchText: searchText, categoryFilter: categoryFilter,
-            showOnlyURLs: showOnlyURLs,
+            showOnlyURLs: showOnlyURLs, showOnlyDesktopNotes: showOnlyDesktopNotes,
             filteredIDs: filteredHistory.map(\.id)
         )
     }

@@ -2,12 +2,24 @@ import AppKit
 import ApplicationServices
 
 extension ClipboardReader {
+    // Use the AX references only as immutable identities. Each lookup uses a fresh app element.
+    struct ComparisonFocus: @unchecked Sendable {
+        let window: AXUIElement?
+        let element: AXUIElement
+
+        func matches(_ app: AXUIElement) -> Bool {
+            window == ClipboardReader.accessibilityElement(kAXFocusedWindowAttribute, on: app)
+                && element == ClipboardReader.accessibilityElement(kAXFocusedUIElementAttribute, on: app)
+        }
+    }
+
     struct ComparisonInput: Sendable {
         let text: String
         let bundleID: String?
         let webPageURL: URL?
         let windowBounds: CGRect?
         var listMarkers: Set<Character> = []
+        var focus: ComparisonFocus?
 
         var hasEmbeddedObjects: Bool { text.unicodeScalars.contains("\u{FFFC}") }
 
@@ -55,17 +67,29 @@ extension ClipboardReader {
             let window = accessibilityElement(kAXFocusedWindowAttribute, on: app)
             guard let focused = accessibilityElement(kAXFocusedUIElementAttribute, on: app),
                   let selection = selectedText(on: focused), !selection.isEmpty else { return nil }
+            let focus = ComparisonFocus(window: window, element: focused)
             let decorations = listDecorations(in: selection, on: focused)
             let url = decorations.isEmpty ? webPageURL(on: focused) : enclosingPageURL(on: focused)
             let bounds = window.flatMap { windowBounds(on: $0) }
-            guard window == accessibilityElement(kAXFocusedWindowAttribute, on: app),
-                  focused == accessibilityElement(kAXFocusedUIElementAttribute, on: app) else { return nil }
+            guard focus.matches(app) else { return nil }
             return ComparisonInput(
-                text: selection, bundleID: bundleID, webPageURL: url, windowBounds: bounds, listMarkers: decorations
+                text: selection, bundleID: bundleID, webPageURL: url, windowBounds: bounds,
+                listMarkers: decorations, focus: focus
             )
         }.value
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == processID else { return nil }
         return input
+    }
+
+    static func comparisonFocusIsCurrent(_ input: ComparisonInput, processID: pid_t) async -> Bool {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == processID,
+              let focus = input.focus else { return false }
+        let matches = await Task.detached(priority: .userInitiated) {
+            let app = AXUIElementCreateApplication(processID)
+            AXUIElementSetMessagingTimeout(app, 0.10)
+            return focus.matches(app)
+        }.value
+        return matches && NSWorkspace.shared.frontmostApplication?.processIdentifier == processID
     }
 
     private nonisolated static func listDecorations(in text: String, on element: AXUIElement) -> Set<Character> {

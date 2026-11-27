@@ -74,6 +74,99 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         window.orderOut(nil)
     }
 
+    func testScrollingAReusableHistoryRowOutOfViewDismissesItsDetails() async throws {
+        let manager = HistoryPopoverManager.shared
+        manager.forceClose()
+        let items = (0..<40).map { ClipItem(content: "Row \($0)") }
+        let proxy = HistoryTableProxy()
+        let hover = HistoryHoverCoordinator()
+        let keys = HistoryActionKeyMonitor()
+        let history = HistoryTableView(
+            entries: .full(items), hasMoreItems: false, showsProgress: false, proxy: proxy,
+            canScrollToTop: .constant(false), isScrollLocked: .constant(false), onLoadMore: { _ in },
+            row: { entry in
+                HistoryItemView(
+                    entry: entry, isSelected: false, isCurrentClipboardItem: false, queueBadge: nil,
+                    isQueuePreviewed: false, isScrollLocked: false, onTap: { _ in }, onDelete: nil,
+                    onChangeCategory: nil, onOpenCategoryManager: nil, historyFont: .body, onOpenItem: nil,
+                    onSplitEditorIntoHistory: nil, hoverResetSignal: UUID(), hoverCoordinator: hover
+                )
+                .id(entry.id)
+                .environmentObject(keys)
+            }
+        )
+        let coordinator = history.makeCoordinator()
+        let scroll = coordinator.makeScrollView()
+        let window = HoverTestWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 170),
+                                     styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = scroll
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            manager.forceClose()
+            coordinator.detach(from: scroll)
+            window.orderOut(nil)
+        }
+        coordinator.update(history, in: scroll)
+        try await Task.sleep(for: .milliseconds(50))
+        let table = try XCTUnwrap(scroll.documentView as? NSTableView)
+        let first = try XCTUnwrap(table.view(atColumn: 0, row: 0, makeIfNecessary: true))
+        scroll.layoutSubtreeIfNeeded()
+        let anchor = try XCTUnwrap(trackingOverlay(in: first))
+        XCTAssertTrue(anchor.window === window)
+        anchor.mouseEntered(with: try hoverEvent(.mouseEntered, for: window))
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(hover.hoveredItemID, items[0].id)
+        let panel = try XCTUnwrap(NSApp.windows.first { $0 is NSPanel && $0.isVisible })
+
+        proxy.scrollTo(try XCTUnwrap(items.last).id)
+        scroll.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertFalse(panel.isVisible)
+    }
+
+    private func trackingOverlay(in view: NSView) -> TrackingOverlayView? {
+        if let overlay = view as? TrackingOverlayView { return overlay }
+        return view.subviews.lazy.compactMap { self.trackingOverlay(in: $0) }.first
+    }
+
+    private final class HoverTestWindow: NSWindow {
+        override var isKeyWindow: Bool { true }
+    }
+
+    func testReopeningReusesThePanelAndResizesForTheNewItem() throws {
+        let manager = HistoryPopoverManager { .zero }
+        let originalWindows = NSApp.windows
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let firstRow = NSView(frame: NSRect(x: 0, y: 220, width: 200, height: 32))
+        let secondRow = NSView(frame: NSRect(x: 0, y: 180, width: 200, height: 32))
+        window.contentView?.addSubview(firstRow)
+        window.contentView?.addSubview(secondRow)
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            manager.forceClose()
+            window.orderOut(nil)
+        }
+
+        manager.show(item: ClipItem(content: "First row"), from: firstRow, trailingEdge: true)
+        let panel = try XCTUnwrap(NSApp.windows.first {
+            $0 is NSPanel && $0.isVisible && !originalWindows.contains($0)
+        })
+        let container = try XCTUnwrap(panel.contentView)
+        let firstHeight = panel.frame.height
+        manager.hide()
+        XCTAssertFalse(panel.isVisible)
+        XCTAssertFalse(manager.prepareForRowHover(secondRow))
+
+        let secondItem = ClipItem(content: "Second row\nMore details\nA third preview line")
+        manager.show(item: secondItem, from: secondRow, trailingEdge: true)
+        XCTAssertTrue(panel.isVisible)
+        XCTAssertTrue(panel.contentView === container)
+        XCTAssertGreaterThan(panel.frame.height, firstHeight)
+        manager.hide(ifAnchoredTo: firstRow)
+        XCTAssertTrue(panel.isVisible)
+    }
+
     func testCrossingAnotherRowKeepsThePanelUntilTheNewRowSettles() async throws {
         let manager = HistoryPopoverManager { .zero }
         let originalWindows = NSApp.windows
