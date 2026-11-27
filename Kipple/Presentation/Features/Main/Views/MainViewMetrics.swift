@@ -58,6 +58,7 @@ enum MainViewMetrics {
         static let toolbarBottomPadding: CGFloat = 6
         static let rowLeadingInset: CGFloat = 8
         static let controlColumnWidth: CGFloat = KippleButtonMetrics.historyCategoryButtonSize
+        static let rowTrailingInset = (HistoryFilterIcon.diameter - controlColumnWidth) / 2
         static let rowControlSize: CGFloat = KippleButtonMetrics.historyRowSize
         static let rowCategoryWidth = HistoryFilterIcon.diameter
     }

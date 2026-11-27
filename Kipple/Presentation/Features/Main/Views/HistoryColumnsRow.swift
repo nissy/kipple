@@ -15,6 +15,7 @@ struct HistoryColumnsRow<Queue: View, Content: View, Category: View, Pin: View>:
             pin
         }
         .padding(.leading, MainViewMetrics.HistoryColumns.rowLeadingInset)
+        .padding(.trailing, MainViewMetrics.HistoryColumns.rowTrailingInset)
         .frame(maxWidth: .infinity)
     }
 }
