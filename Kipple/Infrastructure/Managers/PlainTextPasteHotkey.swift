@@ -102,7 +102,9 @@ final class PlainTextPasteHotkey: ObservableObject {
         guard candidate == .disabled || !candidate.modifiers.isDisjoint(with: [.command, .control, .option]) else {
             return .modifierRequired
         }
-        guard !conflictsWithBuiltInShortcut(candidate) else { return .shortcutUnavailable }
+        guard !conflictsWithBuiltInShortcut(candidate),
+              !TextComparisonHotkey.shared.uses(keyCode: candidate.keyCode, modifiers: candidate.modifiers)
+        else { return .shortcutUnavailable }
         unregister()
         guard candidate == .disabled || registerShortcut(candidate) else {
             register()

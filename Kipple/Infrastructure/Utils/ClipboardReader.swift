@@ -59,7 +59,7 @@ final class ClipboardReader: ObservableObject {
 
     @Published private(set) var accessBehavior: NSPasteboard.AccessBehavior
     @Published private(set) var readFailed = false
-    private let pasteboard: NSPasteboard
+    let pasteboard: NSPasteboard
     private let readAccess: () -> NSPasteboard.AccessBehavior
     private let readText: () -> String?
     private let readSelection: (@MainActor (Int, URL?) async -> Selection?)?
@@ -134,7 +134,8 @@ final class ClipboardReader: ObservableObject {
     func readForHistory(changeCount: Int) async -> Snapshot? {
         guard var snapshot = read(), snapshot.stamp.changeCount == changeCount else { return nil }
         guard !snapshot.shouldExcludeFromHistory, !snapshot.hasSourceDeclaration, snapshot.source == nil,
-              let text = snapshot.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let text = snapshot.text, ClipboardTextLimit.allows(text),
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let readSelection else { return snapshot }
 
         guard let images = ClipboardImages.read(htmlByItem: snapshot.htmlByItem, sourceURI: snapshot.sourceURI)
@@ -210,11 +211,7 @@ final class ClipboardReader: ObservableObject {
         let window = accessibilityElement(kAXFocusedWindowAttribute, on: app)
         guard let focused = accessibilityElement(kAXFocusedUIElementAttribute, on: app) else { return nil }
         let title = window.flatMap { accessibilityValue(kAXTitleAttribute, on: $0) as? String }
-        let webPageURL: URL? = if readsPageURL, accessibilityValue(kAXRoleAttribute, on: focused) as? String == "AXWebArea" {
-            accessibilityValue(kAXURLAttribute, on: focused) as? URL
-        } else {
-            nil
-        }
+        let webPageURL = readsPageURL ? Self.webPageURL(on: focused) : nil
         let text: String
         var selectedImageURLs: [URL]?
         if let imagePageURL {
@@ -235,7 +232,7 @@ final class ClipboardReader: ObservableObject {
         )
     }
 
-    private nonisolated static func selectedText(on element: AXUIElement) -> String? {
+    nonisolated static func selectedText(on element: AXUIElement) -> String? {
         if let text = accessibilityValue(kAXSelectedTextAttribute, on: element) as? String, !text.isEmpty {
             return text
         }
@@ -244,7 +241,12 @@ final class ClipboardReader: ObservableObject {
         return accessibilityParameter("AXStringForTextMarkerRange", on: element, with: range) as? String
     }
 
-    private nonisolated static func accessibilityElement(_ attribute: String, on element: AXUIElement) -> AXUIElement? {
+    nonisolated static func webPageURL(on element: AXUIElement) -> URL? {
+        guard accessibilityValue(kAXRoleAttribute, on: element) as? String == "AXWebArea" else { return nil }
+        return accessibilityValue(kAXURLAttribute, on: element) as? URL
+    }
+
+    nonisolated static func accessibilityElement(_ attribute: String, on element: AXUIElement) -> AXUIElement? {
         accessibilityElement(accessibilityValue(attribute, on: element))
     }
 
@@ -255,7 +257,7 @@ final class ClipboardReader: ObservableObject {
         return result
     }
 
-    private nonisolated static func accessibilityValue(_ attribute: String, on element: AXUIElement) -> CFTypeRef? {
+    nonisolated static func accessibilityValue(_ attribute: String, on element: AXUIElement) -> CFTypeRef? {
         var value: CFTypeRef?
         return AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success ? value : nil
     }
@@ -326,8 +328,8 @@ final class ClipboardReader: ObservableObject {
     }
 }
 
-private extension ClipboardReader {
-    nonisolated static func accessibilityParameter(
+extension ClipboardReader {
+    private nonisolated static func accessibilityParameter(
         _ attribute: String, on element: AXUIElement, with input: CFTypeRef
     ) -> CFTypeRef? {
         var result: CFTypeRef?
@@ -335,7 +337,7 @@ private extension ClipboardReader {
         return status == .success ? result : nil
     }
 
-    nonisolated static func markerRange(_ value: CFTypeRef?) -> AXTextMarkerRange? {
+    private nonisolated static func markerRange(_ value: CFTypeRef?) -> AXTextMarkerRange? {
         guard let value, CFGetTypeID(value) == AXTextMarkerRangeGetTypeID() else { return nil }
         return unsafeDowncast(value, to: AXTextMarkerRange.self)
     }
@@ -344,7 +346,7 @@ private extension ClipboardReader {
         markerRange(accessibilityValue("AXSelectedTextMarkerRange", on: element))
     }
 
-    nonisolated static func precedes(_ lhs: AXTextMarker, _ rhs: AXTextMarker, on web: AXUIElement) -> Bool? {
+    private nonisolated static func precedes(_ lhs: AXTextMarker, _ rhs: AXTextMarker, on web: AXUIElement) -> Bool? {
         if CFEqual(lhs, rhs) { return false }
         let input = [lhs, rhs] as CFArray
         guard let ordered = markerRange(accessibilityParameter("AXTextMarkerRangeForUnorderedTextMarkers", on: web, with: input))
@@ -355,7 +357,7 @@ private extension ClipboardReader {
         return CFEqual(start, rhs) && CFEqual(end, lhs) ? false : nil
     }
 
-    nonisolated static func imageURLs(in range: AXTextMarkerRange, on web: AXUIElement) -> [URL]? {
+    private nonisolated static func imageURLs(in range: AXTextMarkerRange, on web: AXUIElement) -> [URL]? {
         let start = AXTextMarkerRangeCopyStartMarker(range)
         let end = AXTextMarkerRangeCopyEndMarker(range)
         guard precedes(start, end, on: web) == true else { return nil }
@@ -403,7 +405,7 @@ private extension ClipboardReader {
         return children.count == values.count ? children : nil
     }
 
-    nonisolated static func selectionContainer(from start: AXTextMarker, to end: AXTextMarker, on web: AXUIElement) -> AXUIElement {
+    private nonisolated static func selectionContainer(from start: AXTextMarker, to end: AXTextMarker, on web: AXUIElement) -> AXUIElement {
         // Start with the parent so an image between two text positions can be visited.
         let startParents = selectionAncestors(of: start, on: web).dropFirst()
         let endParents = selectionAncestors(of: end, on: web).dropFirst()

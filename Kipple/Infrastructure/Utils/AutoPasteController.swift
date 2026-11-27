@@ -61,11 +61,17 @@ final class AutoPasteController {
 
     @discardableResult
     static func sendPasteCommand(to processID: pid_t) -> Bool {
+        ClipboardCommand.send(9, to: processID, tag: SyntheticPasteEvent.sourceUserData)
+    }
+}
+
+@MainActor
+enum ClipboardCommand {
+    static func send(_ keyCode: CGKeyCode, to processID: pid_t, tag: Int64) -> Bool {
         guard AXIsProcessTrusted(),
               NSWorkspace.shared.frontmostApplication?.processIdentifier == processID,
               let source = CGEventSource(stateID: .hidSystemState) else { return false }
 
-        let keyCode = CGKeyCode(9) // Virtual key for "v"
         guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
             return false
@@ -73,8 +79,8 @@ final class AutoPasteController {
 
         keyDown.flags = [.maskCommand]
         keyUp.flags = [.maskCommand]
-        keyDown.setIntegerValueField(.eventSourceUserData, value: SyntheticPasteEvent.sourceUserData)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: SyntheticPasteEvent.sourceUserData)
+        keyDown.setIntegerValueField(.eventSourceUserData, value: tag)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: tag)
         keyDown.postToPid(processID)
         keyUp.postToPid(processID)
         return true

@@ -284,6 +284,7 @@
 "MCP settings (JSON) copied" = "MCP設定（JSON）をコピーしました";
 "Paste this JSON into an AI client's MCP configuration." = "JSON形式でMCPを設定するAIクライアントに貼り付けてください。";
 "Up to 80,000 characters per item." = "本文は1件あたり8万文字まで登録できます。";
+"History items can contain up to 80,000 characters." = "本文は1件8万文字までです。履歴に保存できませんでした。";
 "Local programs running as your user can add text while MCP is enabled." = "有効にすると、このMacで同じユーザーとして動くプログラムから登録できます。";
 "Uncategorized" = "未分類";
 "Edit categories" = "カテゴリを編集";
@@ -592,3 +593,31 @@
 "category.icon.figure.walk" = "散歩";
 "category.icon.dumbbell" = "筋トレ";
 "category.icon.sportscourt" = "スポーツ";
+
+/* Text comparison */
+"Compare Text" = "テキストを比較";
+"Compare the clipboard text with text selected in the frontmost app." = "クリップボードの内容と、前面のアプリで選択中のテキストを比較します。";
+"The comparison shortcut is unavailable. Choose a different shortcut." = "比較のショートカットを使用できません。別のキーの組み合わせを選んでください。";
+"Comparison Clipboard" = "クリップボード";
+"Comparison Selection" = "選択範囲";
+"Comparison change count" = "変更 %lld か所";
+"The Text Matches" = "テキストは一致しています";
+"Previous Change" = "前の変更";
+"Next Change" = "次の変更";
+"Inserted Line" = "追加された行";
+"Removed Line" = "削除された行";
+"Inserted Line Break" = "改行を追加";
+"Removed Line Break" = "改行を削除";
+"Selection Access Required" = "選択範囲の取得に権限が必要です";
+"Allow %@ to read selected text." = "選択範囲を読み取るには、「権限」で「%@」を許可してください。";
+"Clipboard Unavailable" = "クリップボードを読み取れません";
+"Check Clipboard Access in Settings → Permission." = "「設定」の「権限」でクリップボードへのアクセスを確認してください。";
+"No Clipboard Text" = "クリップボードにテキストがありません";
+"Copy some text before comparing." = "比較するテキストを先にコピーしてください。";
+"No Selected Text" = "選択範囲のテキストを取得できません";
+"Text Too Long to Compare" = "文字数の上限を超えています";
+"Comparison supports up to 80,000 characters on each side." = "比較するテキストは、左右それぞれ8万文字までです。";
+"Selection Includes an Embedded Object" = "選択範囲に画像などが含まれています";
+"Select text without embedded images or emoji and try again." = "埋め込まれた画像や絵文字を含まない範囲を選択して、もう一度お試しください。";
+"Select text in the frontmost app and try the shortcut again." = "前面のアプリでテキストを選択して、ショートカットをもう一度押してください。";
+"Open Permissions" = "権限設定を開く";

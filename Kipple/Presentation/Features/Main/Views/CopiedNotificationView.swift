@@ -16,6 +16,7 @@ struct CopiedNotificationView: View {
         case trimmed
         case formatted
         case formatFailed(String)
+        case historyTextTooLong
         
         var icon: String {
             switch self {
@@ -25,12 +26,12 @@ struct CopiedNotificationView: View {
                 return "scissors"
             case .formatted:
                 return "text.alignleft"
-            case .formatFailed:
+            case .formatFailed, .historyTextTooLong:
                 return "exclamationmark.triangle.fill"
             }
         }
         
-        var text: String {
+        @MainActor var text: String {
             switch self {
             case .copied:
                 return "Copied"
@@ -40,6 +41,8 @@ struct CopiedNotificationView: View {
                 return NSLocalizedString("editor.format.success", comment: "Format success notification")
             case .formatFailed(let message):
                 return message
+            case .historyTextTooLong:
+                return AppSettings.shared.localizedString("History items can contain up to 80,000 characters.")
             }
         }
         
@@ -49,7 +52,7 @@ struct CopiedNotificationView: View {
                 return Color(NSColor.controlAccentColor)
             case .formatted:
                 return Color.green
-            case .formatFailed:
+            case .formatFailed, .historyTextTooLong:
                 return Color.orange
             }
         }

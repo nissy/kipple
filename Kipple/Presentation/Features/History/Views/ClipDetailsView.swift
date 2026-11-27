@@ -319,6 +319,7 @@ func clipItemEditErrorMessage(_ error: Error) -> String {
     case .itemUnavailable: "Item unavailable"
     case .invalidTitle: "Enter a title of up to 120 characters."
     case .emptyContent: "Enter some content."
+    case .contentTooLong: "History items can contain up to 80,000 characters."
     case .duplicateContent: "Another history item already has this content."
     case .categoryUnavailable: "A selected category is no longer available."
     case .richTextLossRequiresConfirmation: "Saving will remove formatting. Select Save to continue."

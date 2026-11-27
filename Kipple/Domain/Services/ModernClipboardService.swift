@@ -6,6 +6,7 @@ import Combine
 
 extension Notification.Name {
     static let modernClipboardHistoryDidChange = Notification.Name("ModernClipboardServiceHistoryDidChange")
+    static let historyTextLimitExceeded = Notification.Name("KippleHistoryTextLimitExceeded")
     static let desktopNoteRequestedByRepeatedCopy = Notification.Name("DesktopNoteRequestedByRepeatedCopy")
 }
 
@@ -13,6 +14,7 @@ enum ClipItemEditError: Error {
     case itemUnavailable
     case invalidTitle
     case emptyContent
+    case contentTooLong
     case duplicateContent
     case categoryUnavailable
     case richTextLossRequiresConfirmation
@@ -318,6 +320,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         guard generation == copyGeneration, !Task.isCancelled, await shouldCopy() else { return nil }
+        guard ClipboardTextLimit.allows(content) else {
+            await notifyHistoryTextLimitExceeded()
+            return nil
+        }
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedContent.isEmpty else { return nil }
         if !isRepositoryReady {
@@ -407,6 +413,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func addEditorItems(_ contents: [String]) async -> [ClipItem] {
         await mutationGate.acquire()
         defer { mutationGate.release() }
+        guard contents.allSatisfy(ClipboardTextLimit.allows) else {
+            await notifyHistoryTextLimitExceeded()
+            return []
+        }
         let createdItems = contents
             .filter { !$0.isEmpty }
             .map { makeEditorItem(content: $0, windowTitle: "Live Editor") }
@@ -459,12 +469,15 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             newItem = history.remove(at: existingIndex)
         } else if let duplicateIndex = indexOfExistingContent(item.content) {
             let existingItem = history.remove(at: duplicateIndex)
-            if desktopNoteItemIDs.contains(existingItem.id) {
+            if desktopNoteItemIDs.contains(existingItem.id) || !ClipboardTextLimit.allows(item.content) {
                 newItem = existingItem
             } else {
                 newItem.userCategoryId = existingItem.userCategoryId
                 newItem.metadata = (newItem.metadata ?? ClipMetadata()).inheritingDetails(from: existingItem.metadata)
             }
+        } else if !ClipboardTextLimit.allows(item.content) {
+            // Previously saved text can still be copied even if it has since left history.
+            return item
         }
 
         // Add item at the beginning with preserved metadata and new timestamp
@@ -582,6 +595,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         if let index = history.firstIndex(where: { $0.id == item.id }) {
+            guard ClipboardTextLimit.allows(item.content) || history[index].content.utf8.elementsEqual(item.content.utf8) else {
+                await notifyHistoryTextLimitExceeded()
+                return
+            }
             var updated = item
             updated.metadata = (item.metadata ?? ClipMetadata()).inheritingDetails(from: history[index].metadata)
             history[index] = withDefinedCategories(updated)
@@ -605,7 +622,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Status and Configuration
 
     func getCurrentClipboardContent() async -> String? {
-        await MainActor.run { (clipboardReader ?? .shared).read()?.text }
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        return await MainActor.run { (clipboardReader ?? .shared).read()?.text }
     }
 
     func getCurrentInterval() async -> TimeInterval {
@@ -694,7 +713,8 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         guard let captured, captured.stamp.changeCount == changeCount else { return false }
         lastChangeCount = changeCount
         lastClipboardAccessRevision = captured.stamp.accessRevision
-        guard !captured.shouldExcludeFromHistory, let item = await fetchClipboardItem(captured) else {
+        guard !captured.shouldExcludeFromHistory,
+              let item = await fetchClipboardItem(captured, reportsLimit: isNewWrite) else {
             if isNewWrite { repeatedCopySequence = nil }
             return true
         }
@@ -843,7 +863,12 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         return false
     }
 
-    private func fetchClipboardItem(_ captured: ClipboardReader.Snapshot) async -> ClipItem? {
+    private func fetchClipboardItem(_ captured: ClipboardReader.Snapshot, reportsLimit: Bool) async -> ClipItem? {
+        if let text = captured.text, !ClipboardTextLimit.allows(text) {
+            await state.setFromEditor(false)
+            if reportsLimit { await notifyHistoryTextLimitExceeded() }
+            return nil
+        }
         guard let content = captured.text,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             if await state.getInternalCopy() {
@@ -923,6 +948,10 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             PerformanceTrace.event("history_notification_posted", content: content)
             NotificationCenter.default.post(name: .modernClipboardHistoryDidChange, object: nil)
         }
+    }
+
+    private func notifyHistoryTextLimitExceeded() async {
+        await MainActor.run { NotificationCenter.default.post(name: .historyTextLimitExceeded, object: self) }
     }
 
     private func markHistoryChanged(checkQueueHead: Bool = true) {
@@ -1023,6 +1052,27 @@ actor ClipboardState {
 }
 
 extension ModernClipboardService {
+    /// Hold history polling and Kipple writes until the comparison copy is resolved.
+    func performClipboardComparison(
+        at stamp: ClipboardReader.Stamp,
+        _ capture: @MainActor @Sendable () async -> ComparisonClipboardCopy.Result
+    ) async -> ComparisonClipboardCopy.Result {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+        let reader = await MainActor.run { clipboardReader ?? .shared }
+        guard !Task.isCancelled, await reader.observation == stamp else { return .interrupted }
+        if isMonitoringFlag, !(await checkClipboardWhileLocked()) {
+            return await reader.observation == stamp ? .clipboardUnavailable : .interrupted
+        }
+        let result = await capture()
+        if case .restored(_, let restored, _) = result {
+            lastChangeCount = restored.changeCount
+            lastClipboardAccessRevision = restored.accessRevision
+            _ = await recordClipboardWrite(restored.changeCount)
+        }
+        return result
+    }
+
     /// Serialize a paste with pending copies and preserve the current clipboard in history before a queue write.
     /// The operation returns the clipboard revision it used, whether or not it wrote a queued item.
     /// Returns false when history or clipboard contents cannot be read safely.
@@ -1107,6 +1157,7 @@ extension ModernClipboardService {
         await mutationGate.acquire()
         defer { mutationGate.release() }
         guard !content.isEmpty else { throw ClipItemEditError.emptyContent }
+        guard ClipboardTextLimit.allows(content) else { throw ClipItemEditError.contentTooLong }
         guard indexOfExistingContent(content) == nil else { throw ClipItemEditError.duplicateContent }
         let draft = makeEditorItem(content: content, windowTitle: nil)
         let item = try await itemApplyingDetails(draft, title: title, categoryChanges: categoryChanges)
@@ -1134,6 +1185,7 @@ extension ModernClipboardService {
         var item = original
         if let content, content != original.content {
             guard !content.isEmpty else { throw ClipItemEditError.emptyContent }
+            guard ClipboardTextLimit.allows(content) else { throw ClipItemEditError.contentTooLong }
             if let duplicate = indexOfExistingContent(content), duplicate != index {
                 throw ClipItemEditError.duplicateContent
             }

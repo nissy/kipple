@@ -46,7 +46,6 @@ enum MCPProtocolConfig {
     static let appGroup = "R7LKF73J2W.com.nissy.Kipple"
     static let maxInputBytes = 24 * 1024 * 1024
     static let maxFrameBytes = maxInputBytes + 64 * 1024
-    static let maxTextCharacters = 80_000
     static let maxBatchBytes = 16 * 1024 * 1024
 
     static func socketURL() throws -> URL {

@@ -4,6 +4,14 @@ import ApplicationServices
 // MARK: - Hotkey Handling
 
 extension MenuBarApp {
+    func setupTextComparisonHotkey() {
+        let comparison = TextComparisonWindow.shared
+        comparison.openPermissions = { [weak self] in self?.windowManager.openSettings(tab: .permission) }
+        let hotkey = TextComparisonHotkey.shared
+        hotkey.onTrigger = { comparison.compareCurrentSelection() }
+        hotkey.register()
+    }
+
     func setupPlainTextPasteHotkey() {
         guard let adapter = clipboardService as? ModernClipboardServiceAdapter else { return }
         let controller = PlainTextPasteController(clipboardService: adapter)

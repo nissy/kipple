@@ -221,10 +221,8 @@ private struct ScreenTextCaptureSettingsView: View {
                     HotkeyRecorderField(
                         keyCode: $tempCaptureKeyCode,
                         modifierFlags: $tempCaptureModifierFlags
-                    )
+                    ) { _, _ in updateCaptureHotkey() }
                     .disabled(!hasScreenCapturePermission)
-                    .onChange(of: tempCaptureKeyCode) { _, _ in updateCaptureHotkey() }
-                    .onChange(of: tempCaptureModifierFlags) { _, _ in updateCaptureHotkey() }
 
                     if let captureHotkeyErrorKey {
                         Text(captureHotkeyErrorKey)
@@ -296,10 +294,8 @@ private struct ScreenTextCaptureSettingsView: View {
             return
         }
 
-        let success = manager.applyHotKey(
-            keyCode: keyCode,
-            modifiers: modifiers
-        )
+        let success = !TextComparisonHotkey.shared.uses(keyCode: keyCode, modifiers: modifiers)
+            && manager.applyHotKey(keyCode: keyCode, modifiers: modifiers)
 
         if success {
             textCaptureHotkeyKeyCode = Int(keyCode)
@@ -311,6 +307,8 @@ private struct ScreenTextCaptureSettingsView: View {
                 enabled: true
             )
         } else {
+            tempCaptureKeyCode = UInt16(textCaptureHotkeyKeyCode)
+            tempCaptureModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(textCaptureHotkeyModifierFlags))
             captureHotkeyErrorKey = LocalizedStringKey(
                 "The selected shortcut is already taken. Try another combination."
             )

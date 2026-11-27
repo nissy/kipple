@@ -546,6 +546,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     func saveEditorToHistory() async -> Int {
         guard !isQueueModeActive else { return 0 }
         guard canSaveEditorToHistory else { return 0 }
+        guard ClipboardTextLimit.allows(editorText) else {
+            NotificationCenter.default.post(name: .historyTextLimitExceeded, object: nil)
+            return 0
+        }
         if clipboardEditorMode == .editing {
             commitClipboardEditor()
         }
