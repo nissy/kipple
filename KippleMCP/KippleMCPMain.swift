@@ -29,7 +29,7 @@ struct KippleMCPMain {
             "type":"object","additionalProperties":false,
             "required":["content"],
             "properties":{
-              "content":{"type":"string","minLength":1,"maxLength":80000,"description":"Exact text, up to 80,000 Unicode code points. No truncation."},
+              "content":{"type":"string","minLength":1,"maxLength":\#(ClipboardTextLimit.maxCharacters),"description":"Exact text, up to 80,000 Unicode code points. No truncation."},
               "title":{"type":"string","maxLength":120,"description":"Purpose of the text."}
             }
           }}

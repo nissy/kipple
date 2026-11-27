@@ -23,6 +23,7 @@ struct GeneralSettingsView: View {
     @State private var plainTextKeyCode: UInt16 = 9
     @State private var plainTextModifiers: NSEvent.ModifierFlags = [.command, .shift]
     @State private var plainTextHotkeyError: PlainTextPasteHotkey.ConfigurationError?
+    @State private var openHotkeyConflict = false
 
     var body: some View {
         ScrollView {
@@ -30,6 +31,7 @@ struct GeneralSettingsView: View {
                 languageSection
                 startupSection
                 openKippleSection
+                TextComparisonSettingsView()
                 pasteSection
                 windowAnimationSection
             }
@@ -104,10 +106,14 @@ struct GeneralSettingsView: View {
             SettingsRow(label: "Global Hotkey") {
                 HotkeyRecorderField(
                     keyCode: $tempKeyCode,
-                    modifierFlags: $tempModifierFlags
+                    modifierFlags: $tempModifierFlags,
+                    onCommit: updateHotkey
                 )
-                .onChange(of: tempKeyCode) { _, _ in updateHotkey() }
-                .onChange(of: tempModifierFlags) { _, _ in updateHotkey() }
+            }
+            if openHotkeyConflict {
+                Text("This shortcut is already in use. Your previous shortcut has been kept.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
     }
@@ -200,9 +206,15 @@ struct GeneralSettingsView: View {
         }
     }
 
-    private func updateHotkey() {
-        hotkeyKeyCode = Int(tempKeyCode)
-        hotkeyModifierFlags = Int(tempModifierFlags.rawValue)
+    private func updateHotkey(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        openHotkeyConflict = TextComparisonHotkey.shared.uses(keyCode: keyCode, modifiers: modifiers)
+        guard !openHotkeyConflict else {
+            tempKeyCode = UInt16(hotkeyKeyCode)
+            tempModifierFlags = NSEvent.ModifierFlags(rawValue: UInt(hotkeyModifierFlags))
+            return
+        }
+        hotkeyKeyCode = Int(keyCode)
+        hotkeyModifierFlags = Int(modifiers.rawValue)
         let shouldEnable = (hotkeyKeyCode != 0) && (hotkeyModifierFlags != 0)
         UserDefaults.standard.set(shouldEnable, forKey: "enableHotkey")
 

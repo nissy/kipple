@@ -218,6 +218,10 @@ final class TextCaptureCoordinator {
             return
         }
 
+        guard ClipboardTextLimit.allows(trimmed) else {
+            presentErrorAlert(message: AppSettings.shared.localizedString("History items can contain up to 80,000 characters."))
+            return
+        }
         let itemID = await clipboardService.copyRecognizedText(trimmed)
         guard !Task.isCancelled else { return }
         guard let itemID else {

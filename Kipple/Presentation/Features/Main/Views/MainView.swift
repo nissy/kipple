@@ -252,6 +252,9 @@ extension MainView {
         .safeAreaInset(edge: .bottom) {
             bottomBar
         }
+        .onReceive(NotificationCenter.default.publisher(for: .historyTextLimitExceeded)) { _ in
+            showCopiedNotification(.historyTextTooLong)
+        }
         .onReceive(
             NotificationCenter.default.publisher(for: .editorFontSettingsChanged)
                 .debounce(for: .milliseconds(500), scheduler: RunLoop.main)

@@ -284,6 +284,7 @@
 "MCP settings (JSON) copied" = "MCP settings (JSON) copied";
 "Paste this JSON into an AI client's MCP configuration." = "Paste this JSON into an AI client's MCP configuration.";
 "Up to 80,000 characters per item." = "Up to 80,000 characters per item.";
+"History items can contain up to 80,000 characters." = "History items can contain up to 80,000 characters.";
 "Local programs running as your user can add text while MCP is enabled." = "Local programs running as your user can add text while MCP is enabled.";
 "Uncategorized" = "Uncategorized";
 "Edit categories" = "Edit categories";
@@ -592,3 +593,31 @@
 "category.icon.figure.walk" = "Walking";
 "category.icon.dumbbell" = "Strength training";
 "category.icon.sportscourt" = "Sports";
+
+/* Text comparison */
+"Compare Text" = "Compare Text";
+"Compare the clipboard text with text selected in the frontmost app." = "Compare the clipboard text with text selected in the frontmost app.";
+"The comparison shortcut is unavailable. Choose a different shortcut." = "The comparison shortcut is unavailable. Choose a different shortcut.";
+"Comparison Clipboard" = "Clipboard";
+"Comparison Selection" = "Selection";
+"Comparison change count" = "Changes: %lld";
+"The Text Matches" = "The Text Matches";
+"Previous Change" = "Previous Change";
+"Next Change" = "Next Change";
+"Inserted Line" = "Inserted Line";
+"Removed Line" = "Removed Line";
+"Inserted Line Break" = "Inserted Line Break";
+"Removed Line Break" = "Removed Line Break";
+"Selection Access Required" = "Selection Access Required";
+"Allow %@ to read selected text." = "Allow %@ to read selected text.";
+"Clipboard Unavailable" = "Clipboard Unavailable";
+"Check Clipboard Access in Settings → Permission." = "Check Clipboard Access in Settings → Permission.";
+"No Clipboard Text" = "No Clipboard Text";
+"Copy some text before comparing." = "Copy some text before comparing.";
+"No Selected Text" = "No Selected Text";
+"Text Too Long to Compare" = "Text Too Long to Compare";
+"Comparison supports up to 80,000 characters on each side." = "Comparison supports up to 80,000 characters on each side.";
+"Selection Includes an Embedded Object" = "Selection Includes an Embedded Object";
+"Select text without embedded images or emoji and try again." = "Select text without embedded images or emoji and try again.";
+"Select text in the frontmost app and try the shortcut again." = "Select text in the frontmost app and try the shortcut again.";
+"Open Permissions" = "Open Permissions";

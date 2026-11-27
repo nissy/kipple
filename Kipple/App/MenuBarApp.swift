@@ -11,6 +11,7 @@ import Combine
 final class MenuBarApp: NSObject, ObservableObject {
     private var statusBarItem: NSStatusItem?
     private var isRecognizingText = false
+    private var historyLimitNotice: Task<Void, Never>?
     private let appSettings = AppSettings.shared
     private var cancellables = Set<AnyCancellable>()
     internal let clipboardService: any ClipboardServiceProtocol
@@ -97,12 +98,14 @@ final class MenuBarApp: NSObject, ObservableObject {
 
         // 初回クリック取りこぼし対策: ステータスバーは同期セットアップ
         self.setupMenuBar()
+        observeHistoryTextLimit()
 
         // その他は非同期初期化
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.setupTextCaptureHotkey()
             self.setupPlainTextPasteHotkey()
+            self.setupTextComparisonHotkey()
             let desktopNotes = DesktopNoteWindowCoordinator.shared
             self.startServices()
             Task { await desktopNotes.restoreNotes() }
@@ -158,24 +161,55 @@ final class MenuBarApp: NSObject, ObservableObject {
         appSettings.localizedString(key)
     }
 
+    private func observeHistoryTextLimit() {
+        NotificationCenter.default.publisher(for: .historyTextLimitExceeded)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.showHistoryTextLimit() }
+            .store(in: &cancellables)
+    }
+
+    private func showHistoryTextLimit() {
+        historyLimitNotice?.cancel()
+        historyLimitNotice = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, !Task.isCancelled else { return }
+            self.historyLimitNotice = nil
+            self.updateStatusBarImage()
+        }
+        updateStatusBarImage()
+    }
+
     private func updateStatusBarDescription() {
         guard let button = statusBarItem?.button else { return }
-        let status = isRecognizingText ? localizedMenuString("Recognizing text…") : nil
+        let status: String? = if isRecognizingText {
+            localizedMenuString("Recognizing text…")
+        } else if historyLimitNotice != nil {
+            localizedMenuString("History items can contain up to 80,000 characters.")
+        } else {
+            nil
+        }
         button.toolTip = status
         button.setAccessibilityLabel(status ?? localizedMenuString("Kipple"))
     }
 
     private func updateStatusBarImage() {
         guard let button = statusBarItem?.button else { return }
-        let image = NSImage(
-            systemSymbolName: isRecognizingText ? "hourglass" : "doc.on.clipboard", accessibilityDescription: nil
-        )
+        let symbol: String
+        let fallback: String
+        if isRecognizingText {
+            (symbol, fallback) = ("hourglass", "⌛")
+        } else if historyLimitNotice != nil {
+            (symbol, fallback) = ("exclamationmark.triangle", "⚠")
+        } else {
+            (symbol, fallback) = ("doc.on.clipboard", "📋")
+        }
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         image?.size = NSSize(width: 18, height: 18)
         image?.isTemplate = true
         button.image = image
         let imagePosition: NSControl.ImagePosition = image == nil ? .noImage : .imageOnly
         if button.imagePosition != imagePosition { button.imagePosition = imagePosition }
-        let title = image == nil ? (isRecognizingText ? "⌛" : "📋") : ""
+        let title = image == nil ? fallback : ""
         if button.title != title { button.title = title }
         updateStatusBarDescription()
     }

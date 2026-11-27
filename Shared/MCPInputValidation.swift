@@ -29,8 +29,7 @@ enum MCPInputValidation {
 
     static func text(_ content: String) throws -> String {
         guard !content.isEmpty, !content.contains("\0") else { throw MCPFailure.invalidInput }
-        // JSON Schema maxLength counts Unicode code points, not UTF-8 bytes or grapheme clusters.
-        guard content.unicodeScalars.count <= MCPProtocolConfig.maxTextCharacters else { throw MCPFailure.tooLarge }
+        guard ClipboardTextLimit.allows(content) else { throw MCPFailure.tooLarge }
         return content
     }
 }

@@ -1,7 +1,7 @@
 import AppKit
 
 /// One in-memory copy of every original representation, including app-specific types.
-/// Nothing is restored on a timer; restoration requires an explicit paste request.
+/// Restore only when the caller still owns the clipboard revision it intends to replace.
 struct PasteboardSnapshot {
     let items: [[NSPasteboard.PasteboardType: Data]]
 
@@ -17,7 +17,7 @@ struct PasteboardSnapshot {
             }
             captured.append(contents)
         }
-        guard !captured.isEmpty, pasteboard.changeCount == changeCount else { return nil }
+        guard pasteboard.changeCount == changeCount else { return nil }
         items = captured
     }
 
@@ -30,7 +30,9 @@ struct PasteboardSnapshot {
         }
         // Building thousands of items can take time. Check ownership immediately before the write.
         guard shouldWrite() else { return -1 }
-        pasteboard.clearContents()
-        return pasteboard.writeObjects(entries) ? pasteboard.changeCount : -1
+        let revision = pasteboard.clearContents()
+        guard pasteboard.changeCount == revision else { return -1 }
+        if entries.isEmpty { return revision }
+        return pasteboard.writeObjects(entries) ? revision : -1
     }
 }
