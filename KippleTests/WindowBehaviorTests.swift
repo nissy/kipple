@@ -4,7 +4,7 @@
 //
 //  Created by Kipple on 2025/07/11.
 //
-//  SPECS.md準拠: ウィンドウ動作のテスト
+//  ウィンドウ動作のテスト
 //  注意: TEST_HOST環境でのメインスレッド競合を避けるため、
 //  実際のウィンドウインスタンスを作成せずにロジックのみをテスト
 //
@@ -52,7 +52,7 @@ final class WindowBehaviorTests: XCTestCase {
     // MARK: - Window Level Tests
     
     func testFloatingWindowLevel() {
-        // SPECS.md: フローティングウィンドウ（常に最前面レベル）
+        // フローティングウィンドウ（常に最前面レベル）
         // ウィンドウレベルの値の関係性をテスト
         
         let floatingLevel = NSWindow.Level.floating
@@ -65,7 +65,7 @@ final class WindowBehaviorTests: XCTestCase {
     // MARK: - Window Size Tests
     
     func testDefaultWindowSize() {
-        // SPECS.md: デフォルト420×600
+        // デフォルト420×600
         // UserDefaultsから直接値を確認
         let width = UserDefaults.standard.object(forKey: "windowWidth") as? Double
         let height = UserDefaults.standard.object(forKey: "windowHeight") as? Double
@@ -80,7 +80,7 @@ final class WindowBehaviorTests: XCTestCase {
     }
     
     func testWindowSizeConstraints() {
-        // SPECS.md: 最小300×300、最大800×1200
+        // 最小300×300、最大800×1200
         // 制約値の妥当性をテスト
         
         let minWidth: CGFloat = 300
@@ -106,7 +106,7 @@ final class WindowBehaviorTests: XCTestCase {
     // MARK: - Always on Top Tests
     
     func testAlwaysOnTopToggle() {
-        // SPECS.md: Always on Topトグル
+        // Always on Topトグル
         // ロジックのみをテスト
         
         var isAlwaysOnTop = false
@@ -133,7 +133,7 @@ final class WindowBehaviorTests: XCTestCase {
     // MARK: - Animation Tests
     
     func testWindowAnimationSettings() {
-        // SPECS.md: fade、scale、slide、none
+        // fade、scale、slide、none
         // 注意: デフォルトアニメーションは "none" に設定されている（AppSettings.swift参照）
 
         // デフォルトアニメーションの確認
@@ -157,7 +157,7 @@ final class WindowBehaviorTests: XCTestCase {
     // MARK: - Focus Behavior Tests
     
     func testAutoCloseOnFocusLoss() {
-        // SPECS.md: フォーカスを失うと自動的に閉じる（Always on Top無効時）
+        // フォーカスを失うと自動的に閉じる（Always on Top無効時）
         // ロジックのみをテスト
         
         // When: 通常レベルのウィンドウ
@@ -178,7 +178,7 @@ final class WindowBehaviorTests: XCTestCase {
     // MARK: - Window Persistence Tests
     
     func testWindowSizePersistence() {
-        // SPECS.md: サイズ変更時に自動保存
+        // サイズ変更時に自動保存
         // UserDefaultsへの永続化をテスト
         
         let newWidth: Double = 500

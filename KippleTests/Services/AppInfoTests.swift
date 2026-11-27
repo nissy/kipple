@@ -4,7 +4,7 @@
 //
 //  Created by Kipple on 2025/07/11.
 //
-//  SPECS.md準拠: アプリ情報取得機能の統合テスト
+//  アプリ情報取得機能の統合テスト
 //  - コピー元アプリ名の取得
 //  - ウィンドウタイトルの取得
 //  - バンドルID、プロセスIDの取得
@@ -38,7 +38,7 @@ final class AppInfoTests: XCTestCase {
     // MARK: - 基本的なアプリ情報取得
     
     func testFrontmostApplicationInfo() {
-        // SPECS.md: アプリ情報取得機能
+        // アプリ情報取得機能
         let frontApp = NSWorkspace.shared.frontmostApplication
         
         XCTAssertNotNil(frontApp)
@@ -48,7 +48,7 @@ final class AppInfoTests: XCTestCase {
     }
     
     func testClipboardItemAppInfo() {
-        // SPECS.md: クリップボード監視でアプリ情報を記録
+        // クリップボード監視でアプリ情報を記録
         // テスト用のアイテムを追加
         let uuid = UUID().uuidString
         let testContent = "KIPPLE_TEST_\(uuid)"
@@ -76,7 +76,7 @@ final class AppInfoTests: XCTestCase {
     // MARK: - CGWindowList APIテスト
     
     func testCGWindowListFallback() {
-        // SPECS.md: アクセシビリティ権限なしでの代替（CGWindowList API使用）
+        // アクセシビリティ権限なしでの代替（CGWindowList API使用）
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as NSArray?
                 as? [[String: Any]] else {

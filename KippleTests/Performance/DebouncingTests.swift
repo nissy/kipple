@@ -4,7 +4,7 @@
 //
 //  Created by Kipple on 2025/07/11.
 //
-//  SPECS.md準拠: デバウンス機能のテスト
+//  デバウンス機能のテスト
 //  - エディター保存: 500ms
 //  - 履歴保存: 1秒
 //  - 検索: 300ms
@@ -35,7 +35,7 @@ final class DebouncingTests: XCTestCase {
     // MARK: - Editor Save Debouncing (500ms)
     
     func testEditorSaveDebouncing() {
-        // SPECS.md: エディター保存のデバウンス（500ms）
+        // エディター保存のデバウンス（500ms）
         let expectation = XCTestExpectation(description: "Editor save debouncing")
         var saveCount = 0
         
@@ -99,7 +99,7 @@ final class DebouncingTests: XCTestCase {
     // MARK: - History Save Debouncing (1s)
     
     func testHistorySaveDebouncing() {
-        // SPECS.md: 履歴保存のデバウンス（1秒）
+        // 履歴保存のデバウンス（1秒）
         let expectation = XCTestExpectation(description: "History save debouncing")
         var saveCount = 0
         
@@ -193,7 +193,7 @@ final class DebouncingTests: XCTestCase {
     // MARK: - Font Change Debouncing (500ms)
     
     func testFontChangeDebouncing() {
-        // SPECS.md: フォント変更のデバウンス（500ms）
+        // フォント変更のデバウンス（500ms）
         let expectation = XCTestExpectation(description: "Font change debouncing")
         var notificationCount = 0
         
