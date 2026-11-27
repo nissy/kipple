@@ -4,6 +4,9 @@ import Carbon
 import SwiftUI
 
 private final class ComparisonWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, event.keyCode == kVK_Escape,
            event.modifierFlags.isDisjoint(with: [.command, .control, .option, .shift]) {
@@ -122,14 +125,15 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
             previousFocus = ComparisonFocusTarget.capture(excluding: window)
         }
         window.title = AppSettings.shared.localizedString("Compare Text")
-        let controller = NSHostingController(rootView: TextComparisonView(content: content) { [weak self] in
+        let controller = KippleGlassContentController(rootView: TextComparisonView(content: content) { [weak self] in
             guard let self, let openPermissions else { return }
             previousFocus = nil
             self.window?.close()
             openPermissions()
+        } closeAfterCopy: { [weak window] in
+            window?.close()
         })
-        controller.sizingOptions = []
-        let size = window.contentLayoutRect.size
+        let size = window.frame.size
         window.contentViewController = controller
         window.setContentSize(size)
         let screens = NSScreen.screens
@@ -190,15 +194,16 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
     private func makeWindow() -> NSWindow {
         let window = ComparisonWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 460),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.borderless, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.contentMinSize = NSSize(width: 520, height: 280)
         window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .canJoinAllApplications]
-        window.standardWindowButton(.closeButton)?.isHidden = true
-        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.delegate = self
         self.window = window

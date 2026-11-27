@@ -2,12 +2,22 @@ import SwiftDiff
 
 struct TextComparison: Sendable {
     struct Line: Sendable {
+        struct Change: Sendable {
+            let range: Range<String.Index>
+            let difference: Int
+        }
+
         let number: Int
         let text: String
-        var changes: [Range<String.Index>] = []
-        var lineBreakChanged = false
+        var changes: [Change] = []
+        var lineBreakDifference: Int?
 
+        var lineBreakChanged: Bool { lineBreakDifference != nil }
         var hasChanges: Bool { !changes.isEmpty || lineBreakChanged }
+
+        func containsDifference(_ difference: Int) -> Bool {
+            lineBreakDifference == difference || changes.contains { $0.difference == difference }
+        }
     }
 
     struct Row: Sendable {
@@ -20,14 +30,22 @@ struct TextComparison: Sendable {
         let kind: Kind
     }
 
+    struct Difference: Sendable {
+        let id: Int
+        let row: Int
+    }
+
     let rows: [Row]
-    let changeRows: [Int]
+    let differences: [Difference]
+    let selection: String
 
     init(clipboard: String, selection: String) {
+        self.selection = selection
         let left = SourceLine.split(clipboard)
         let right = SourceLine.split(selection)
         let changes = Changes(from: left, to: right)
         var rows: [Row] = []
+        var differenceCount = 0
         var leftIndex = 0
         var rightIndex = 0
         while leftIndex < left.count || rightIndex < right.count {
@@ -35,7 +53,8 @@ struct TextComparison: Sendable {
             let rightEnd = changes.insertions.endOfRun(startingAt: rightIndex)
             if leftEnd > leftIndex || rightEnd > rightIndex {
                 rows.append(contentsOf: Self.changedRows(
-                    left: left[leftIndex..<leftEnd], right: right[rightIndex..<rightEnd]
+                    left: left[leftIndex..<leftEnd], right: right[rightIndex..<rightEnd],
+                    differenceCount: &differenceCount
                 ))
                 leftIndex = leftEnd
                 rightIndex = rightEnd
@@ -50,9 +69,22 @@ struct TextComparison: Sendable {
             }
         }
         self.rows = rows
-        changeRows = rows.indices.filter { index in
-            rows[index].kind != .equal && (index == 0 || rows[index - 1].kind == .equal)
+        var firstRows = Array(repeating: 0, count: differenceCount)
+        for index in rows.indices.reversed() where rows[index].kind != .equal {
+            Self.assignChangeRows(for: rows[index].left, at: index, in: &firstRows)
+            Self.assignChangeRows(for: rows[index].right, at: index, in: &firstRows)
         }
+        // Line alignment can place related edits on different rows. Navigate in display order.
+        differences = firstRows
+            .enumerated()
+            .map { Difference(id: $0.offset, row: $0.element) }
+            .sorted { ($0.row, $0.id) < ($1.row, $1.id) }
+    }
+
+    private static func assignChangeRows(for line: Line?, at index: Int, in changeRows: inout [Int]) {
+        guard let line else { return }
+        for change in line.changes { changeRows[change.difference] = index }
+        if let difference = line.lineBreakDifference { changeRows[difference] = index }
     }
 
     private struct SourceLine: Hashable {
@@ -65,29 +97,43 @@ struct TextComparison: Sendable {
         }
     }
 
-    private static func changedRows(left: ArraySlice<SourceLine>, right: ArraySlice<SourceLine>) -> [Row] {
+    private static func changedRows(
+        left: ArraySlice<SourceLine>, right: ArraySlice<SourceLine>, differenceCount: inout Int
+    ) -> [Row] {
         var before = Projection(left)
         var after = Projection(right)
         var matches: [LineMatch] = []
+        var currentDifference: Int?
         let diff = blockDiff(before.text, after.text)
         for change in diff {
             switch change {
             case .equal(let text):
+                guard !text.isEmpty else { continue }
+                currentDifference = nil
                 var remaining = text.count
                 while remaining > 0 {
                     let count = min(remaining, before.remaining, after.remaining)
                     let match = LineMatch(left: before.lineIndex, right: after.lineIndex)
-                    let leftHasText = before.advance(count, changed: false)
-                    let rightHasText = after.advance(count, changed: false)
+                    let leftHasText = before.advance(count, difference: nil)
+                    let rightHasText = after.advance(count, difference: nil)
                     if leftHasText && rightHasText, matches.last != match {
                         matches.append(match)
                     }
                     remaining -= count
                 }
-            case .delete(let text):
-                before.markChanges(text.count)
-            case .insert(let text):
-                after.markChanges(text.count)
+            case .delete(let text), .insert(let text):
+                guard !text.isEmpty else { continue }
+                // Adjacent deletions and insertions are the two sides of one difference.
+                let difference = currentDifference ?? differenceCount
+                if currentDifference == nil {
+                    currentDifference = difference
+                    differenceCount += 1
+                }
+                if case .delete = change {
+                    before.markChanges(text.count, difference: difference)
+                } else {
+                    after.markChanges(text.count, difference: difference)
+                }
             }
         }
         return alignedRows(before, after, matches: matches)
@@ -163,25 +209,25 @@ struct TextComparison: Sendable {
             !matchedLines.contains(index) && (source[index].hasLineBreak || !source[index].text.isEmpty)
         }
 
-        mutating func markChanges(_ length: Int) {
+        mutating func markChanges(_ length: Int, difference: Int) {
             var remainingLength = length
             while remainingLength > 0 {
                 let count = min(remainingLength, remaining)
-                _ = advance(count, changed: true)
+                _ = advance(count, difference: difference)
                 remainingLength -= count
             }
         }
 
-        mutating func advance(_ count: Int, changed: Bool) -> Bool {
+        mutating func advance(_ count: Int, difference: Int?) -> Bool {
             let text = source[lineIndex].text
             let start = textOffset ?? text.startIndex
             let textCount = min(count, remainingText)
             let end = text.index(start, offsetBy: textCount)
-            let matched = !changed && text[start..<end].contains { !$0.isWhitespace }
+            let matched = difference == nil && text[start..<end].contains { !$0.isWhitespace }
             if matched { matchedLines.insert(lineIndex) }
-            if changed {
-                if start < end { lines[lineIndex].changes.append(start..<end) }
-                if count > textCount { lines[lineIndex].lineBreakChanged = true }
+            if let difference {
+                if start < end { lines[lineIndex].changes.append(.init(range: start..<end, difference: difference)) }
+                if count > textCount { lines[lineIndex].lineBreakDifference = difference }
             }
             if count == remaining {
                 lineIndex += 1

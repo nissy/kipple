@@ -7,6 +7,32 @@ final class ComparisonClipboardCopyTests: XCTestCase {
     private let sourceType = NSPasteboard.PasteboardType("org.chromium.source-url")
     private let amazon = URL(string: "https://www.amazon.co.jp/dp/B0DM5V6R8G/")!
 
+    func testCopyingTheComparisonSelectionPreservesTheOriginalTextWithoutAddingHistory() async throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        let service = ModernClipboardService(
+            testRepository: MockClipboardRepository(),
+            clipboardWriter: { ClipboardRichText.write($0, to: pasteboard) }, clipboardReader: reader
+        )
+        write("Original", to: pasteboard)
+        await service.checkClipboardForTesting()
+
+        let selected = "\t予定 👩🏽‍💻\r\n\r\n 末尾 \u{2028}\r"
+        let comparison = TextComparison(clipboard: "Original", selection: selected)
+        write(selected, to: pasteboard)
+        XCTAssertTrue(pasteboard.setData(Data("<b>Existing markup</b>".utf8), forType: .html))
+        let copied = await service.writeToClipboardOnly(comparison.selection, preservingRichText: false) { true }
+
+        XCTAssertTrue(copied)
+        let text = try XCTUnwrap(pasteboard.string(forType: .string))
+        XCTAssertEqual(Array(text.utf8), Array(selected.utf8))
+        XCTAssertNil(pasteboard.data(forType: .html))
+        await service.checkClipboardForTesting()
+        let history = await service.getHistory()
+        XCTAssertEqual(history.map(\.content), ["Original"])
+    }
+
     func testCopiesAmazonSelectionWithItsNativeNewlineAndPreservesOriginalFormatsAndHistory() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
@@ -32,7 +58,7 @@ final class ComparisonClipboardCopyTests: XCTestCase {
 
         guard case .restored(let selection, let restored, false) = result else { return XCTFail("Expected a comparison") }
         XCTAssertEqual(selection, text)
-        XCTAssertTrue(TextComparison(clipboard: text, selection: selection).changeRows.isEmpty)
+        XCTAssertTrue(TextComparison(clipboard: text, selection: selection).differences.isEmpty)
         XCTAssertEqual(reader.observation, restored)
         let after = try XCTUnwrap(PasteboardSnapshot(pasteboard: pasteboard, changeCount: restored.changeCount))
         XCTAssertEqual(after.items, backup.items)

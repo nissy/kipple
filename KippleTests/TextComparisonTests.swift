@@ -7,42 +7,70 @@ final class TextComparisonTests: XCTestCase {
             clipboard: "見出し\n削除\n共通\n最後",
             selection: "見出し\n共通\n追加\n最後"
         )
-        XCTAssertEqual(comparison.changeRows, [1, 3])
+        XCTAssertEqual(comparison.differences.map(\.row), [1, 3])
         XCTAssertEqual(comparison.rows.map(\.kind), [.equal, .removed, .equal, .inserted, .equal])
         XCTAssertEqual(comparison.rows.map { $0.left?.number }, [1, 2, 3, nil, 4])
         XCTAssertEqual(comparison.rows.map { $0.right?.number }, [1, nil, 2, 3, 4])
     }
 
-    func testHighlightsMultipleChangesWithinTheSameLine() throws {
+    func testNavigatesToEachReplacementWithinTheSameLine() throws {
         let comparison = TextComparison(clipboard: "赤 と 👩🏽‍💻 を選ぶ", selection: "青 と 👩🏻‍🎨 を選ぶ")
         let row = try XCTUnwrap(comparison.rows.first)
         let left = try XCTUnwrap(row.left)
         let right = try XCTUnwrap(row.right)
-        XCTAssertEqual(comparison.changeRows, [0])
-        XCTAssertEqual(left.changes.map { String(left.text[$0]) }, ["赤", "👩🏽‍💻"])
-        XCTAssertEqual(right.changes.map { String(right.text[$0]) }, ["青", "👩🏻‍🎨"])
+        XCTAssertEqual(comparison.differences.map(\.row), [0, 0])
+        XCTAssertEqual(left.changes.map(\.difference), [0, 1])
+        XCTAssertEqual(right.changes.map(\.difference), [0, 1])
+        XCTAssertEqual(left.changes.map { String(left.text[$0.range]) }, ["赤", "👩🏽‍💻"])
+        XCTAssertEqual(right.changes.map { String(right.text[$0.range]) }, ["青", "👩🏻‍🎨"])
+    }
+
+    func testNavigatesOneSidedEditsAndReplacementsInOrderWithinTheSameLine() throws {
+        let common = "［左右に共通する長めの見出し］"
+        let comparison = TextComparison(
+            clipboard: "削除\(common)赤\(common)", selection: "\(common)青\(common)追記"
+        )
+        let row = try XCTUnwrap(comparison.rows.first)
+        let left = try XCTUnwrap(row.left)
+        let right = try XCTUnwrap(row.right)
+        XCTAssertEqual(comparison.differences.map(\.row), [0, 0, 0])
+        XCTAssertEqual(left.changes.map(\.difference), [0, 1])
+        XCTAssertEqual(right.changes.map(\.difference), [1, 2])
+        XCTAssertEqual(left.changes.map { String(left.text[$0.range]) }, ["削除", "赤"])
+        XCTAssertEqual(right.changes.map { String(right.text[$0.range]) }, ["青", "追記"])
+    }
+
+    func testNavigatesDifferencesInDisplayedRowOrderAfterAlignment() {
+        let comparison = TextComparison(clipboard: "b\n\nr2👩🏽‍💻3\n3 👩🏽‍💻2deb", selection: "r ea\nr ")
+        XCTAssertEqual(comparison.differences.map(\.row), [0, 2, 2, 3])
+        XCTAssertEqual(comparison.differences.map(\.id), [0, 1, 3, 2])
+        for difference in comparison.differences {
+            let row = comparison.rows[difference.row]
+            XCTAssertTrue(row.left?.containsDifference(difference.id) == true
+                          || row.right?.containsDifference(difference.id) == true)
+        }
     }
 
     func testPreservesBlankLinesAndRepeatedText() {
         let comparison = TextComparison(clipboard: "項目\n\n項目\n末尾", selection: "項目\n項目\n追記\n末尾\n")
         XCTAssertEqual(comparison.rows.compactMap { $0.left?.text }, ["項目", "", "項目", "末尾"])
         XCTAssertEqual(comparison.rows.compactMap { $0.right?.text }, ["項目", "項目", "追記", "末尾", ""])
-        XCTAssertEqual(comparison.changeRows, [1, 3])
-        XCTAssertTrue(comparison.rows.first { $0.right?.text == "末尾" }?.right?.lineBreakChanged == true)
+        XCTAssertEqual(comparison.differences.map(\.row), [1, 3, 4])
+        XCTAssertEqual(comparison.rows.first { $0.right?.text == "末尾" }?.right?.lineBreakDifference, 2)
     }
 
     func testTreatsLineEndingsConsistentlyAndKeepsWhitespaceEdits() {
         let same = TextComparison(clipboard: "行1\r\n行2\r\n", selection: "行1\n行2\n")
-        XCTAssertTrue(same.changeRows.isEmpty)
+        XCTAssertTrue(same.differences.isEmpty)
         let different = TextComparison(clipboard: "行1\n行2", selection: "行1\n 行2")
-        XCTAssertEqual(different.changeRows, [1])
+        XCTAssertEqual(different.differences.map(\.row), [1])
     }
 
     func testSplittingAndJoiningALineMarksOnlyTheLineBreak() {
         let oneLine = "案内\n東京に行きます\n以上"
         let twoLines = "案内\n東京に\n行きます\n以上"
         let split = TextComparison(clipboard: oneLine, selection: twoLines)
-        XCTAssertEqual(split.changeRows, [1])
+        XCTAssertEqual(split.differences.map(\.row), [1])
         XCTAssertEqual(split.rows.map(\.kind), [.equal, .replaced, .equal, .equal])
         XCTAssertEqual(split.rows.map { $0.left?.number }, [1, 2, nil, 3])
         XCTAssertEqual(split.rows.map { $0.right?.number }, [1, 2, 3, 4])
@@ -51,7 +79,7 @@ final class TextComparisonTests: XCTestCase {
         XCTAssertTrue(split.rows.compactMap(\.right).allSatisfy { $0.changes.isEmpty })
 
         let joined = TextComparison(clipboard: twoLines, selection: oneLine)
-        XCTAssertEqual(joined.changeRows, [1])
+        XCTAssertEqual(joined.differences.map(\.row), [1])
         XCTAssertEqual(joined.rows.map { $0.right?.number }, [1, 2, nil, 3])
         XCTAssertEqual(joined.rows.compactMap(\.left).filter(\.lineBreakChanged).map(\.number), [2])
         XCTAssertTrue(joined.rows.compactMap(\.left).allSatisfy { $0.changes.isEmpty })
@@ -66,8 +94,11 @@ final class TextComparisonTests: XCTestCase {
         let first = try XCTUnwrap(comparison.rows.first)
         let left = try XCTUnwrap(first.left)
         let right = try XCTUnwrap(first.right)
-        XCTAssertEqual(left.changes.map { String(left.text[$0]) }, ["0"])
-        XCTAssertEqual(right.changes.map { String(right.text[$0]) }, ["1"])
+        XCTAssertEqual(comparison.differences.map(\.row), [0, 0])
+        XCTAssertEqual(left.changes.map { String(left.text[$0.range]) }, ["0"])
+        XCTAssertEqual(right.changes.map { String(right.text[$0.range]) }, ["1"])
+        XCTAssertEqual(right.changes.map(\.difference), [0])
+        XCTAssertEqual(right.lineBreakDifference, 1)
         XCTAssertTrue(right.lineBreakChanged)
         XCTAssertEqual(comparison.rows.last?.kind, .equal)
         XCTAssertEqual(comparison.rows.last?.right?.text, "受付は玄関です。")
@@ -84,12 +115,14 @@ final class TextComparisonTests: XCTestCase {
         XCTAssertTrue(right.allSatisfy { $0.changes.isEmpty })
         XCTAssertEqual(left.filter(\.lineBreakChanged).map(\.number), [2])
         XCTAssertEqual(right.filter(\.lineBreakChanged).map(\.number), [2])
-        XCTAssertEqual(comparison.changeRows, [1])
+        XCTAssertEqual(comparison.differences.map(\.row), [1, 1])
+        XCTAssertEqual(left.compactMap(\.lineBreakDifference), [0])
+        XCTAssertEqual(right.compactMap(\.lineBreakDifference), [1])
     }
 
     func testMarkingAnEndOfTextNewlineKeepsTheTextAndFinalEmptyLine() {
         let comparison = TextComparison(clipboard: "本文", selection: "本文\n")
-        XCTAssertEqual(comparison.changeRows, [0])
+        XCTAssertEqual(comparison.differences.map(\.row), [0])
         XCTAssertEqual(comparison.rows.map(\.kind), [.replaced, .equal])
         XCTAssertEqual(comparison.rows.compactMap(\.right).map(\.text), ["本文", ""])
         XCTAssertTrue(comparison.rows[0].right?.lineBreakChanged == true)
@@ -112,8 +145,11 @@ final class TextComparisonTests: XCTestCase {
         let comparison = TextComparison(clipboard: "A\(middle)B", selection: "B\(middle)A")
         let left = try XCTUnwrap(comparison.rows.first?.left)
         let right = try XCTUnwrap(comparison.rows.first?.right)
-        XCTAssertEqual(left.changes.map { String(left.text[$0]) }, ["A", "B"])
-        XCTAssertEqual(right.changes.map { String(right.text[$0]) }, ["B", "A"])
+        XCTAssertEqual(comparison.differences.map(\.row), [0, 0])
+        XCTAssertEqual(left.changes.map(\.difference), [0, 1])
+        XCTAssertEqual(right.changes.map(\.difference), [0, 1])
+        XCTAssertEqual(left.changes.map { String(left.text[$0.range]) }, ["A", "B"])
+        XCTAssertEqual(right.changes.map { String(right.text[$0.range]) }, ["B", "A"])
     }
 
     func testPreservesBothSequencesWhenReorderingManyRepeatedLines() {

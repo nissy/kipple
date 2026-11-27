@@ -50,14 +50,14 @@ struct MainViewEditorSection: View {
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: KippleGlassMetrics.editorCornerRadius, style: .continuous)
                     .fill(editorFieldFillColor)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: KippleGlassMetrics.editorCornerRadius, style: .continuous)
                     .stroke(editorFieldStrokeColor, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: KippleGlassMetrics.editorCornerRadius, style: .continuous))
             .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
             .padding(.top, 8)
             .padding(.bottom, 8)
@@ -105,7 +105,7 @@ struct MainViewEditorSection: View {
             return Color(NSColor.textBackgroundColor).opacity(0.42)
         }
 
-        return Color.primary.opacity(0.014)
+        return KippleGlassAppearance.readOnlyEditorFill
     }
 
     private var editorFieldStrokeColor: Color {
@@ -113,7 +113,7 @@ struct MainViewEditorSection: View {
             return Color.accentColor.opacity(0.16)
         }
 
-        return Color.primary.opacity(0.025)
+        return KippleGlassAppearance.readOnlyEditorStroke
     }
 
     private var clearEditorButton: some View {

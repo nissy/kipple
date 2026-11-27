@@ -3,6 +3,7 @@ import SwiftUI
 struct TextComparisonView: View {
     let content: TextComparisonWindow.Content
     let openPermissions: () -> Void
+    let closeAfterCopy: () -> Void
 
     @ObservedObject private var settings = AppSettings.shared
 
@@ -10,7 +11,7 @@ struct TextComparisonView: View {
         Group {
             switch content {
             case let .comparison(comparison):
-                ComparisonEditor(comparison: comparison)
+                ComparisonEditor(comparison: comparison, closeAfterCopy: closeAfterCopy)
             case .accessibilityRequired:
                 notice(
                     "Selection Access Required",
@@ -46,6 +47,7 @@ struct TextComparisonView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(Color(nsColor: .labelColor))
         .environment(\.locale, settings.appLocale)
     }
 
@@ -66,59 +68,112 @@ struct TextComparisonView: View {
 }
 
 private struct ComparisonEditor: View {
+    private struct DifferenceHighlight {
+        let background: Color
+        let foreground: Color
+
+        static let standard = Self(background: Color(red: 1, green: 0.68, blue: 0.30), foreground: .black)
+        static let current = Self(background: Color(red: 0.42, green: 0.81, blue: 1), foreground: .black)
+    }
+
     let comparison: TextComparison
+    let closeAfterCopy: () -> Void
 
     @State private var currentChange = 0
-    @Environment(\.colorScheme) private var colorScheme
+    @State private var scrollPosition = ScrollPosition(idType: Int.self)
+    @State private var copyFailed = false
+    @State private var copyTask: Task<Void, Never>?
 
-    private let gutterWidth: CGFloat = 55
-    private var editorColor: Color { Color(nsColor: .textBackgroundColor) }
-    private var accent: Color { colorScheme == .dark ? .mint : Color(red: 0.05, green: 0.45, blue: 0.4) }
+    private var gutterWidth: CGFloat { 27 + CGFloat(String(comparison.rows.count).count) * 7 }
+    private let editorShape = RoundedRectangle(cornerRadius: KippleGlassMetrics.editorCornerRadius, style: .continuous)
 
     var body: some View {
-        ScrollViewReader { scroll in
-            VStack(spacing: 0) {
-                headers
-                editor
-                footer(scroll)
+        VStack(spacing: 8) {
+            headers
+            editor
+            footer
+        }
+        .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
+        .padding(.vertical, 12)
+        .onAppear {
+            if let first = comparison.differences.first {
+                scrollPosition.scrollTo(id: first.row, anchor: .top)
             }
-            .padding(.horizontal, 8)
-            .background(accent.opacity(0.05))
-            .onAppear {
-                if let first = comparison.changeRows.first {
-                    scroll.scrollTo(first, anchor: .top)
-                }
-            }
+        }
+        .onDisappear {
+            copyTask?.cancel()
+            copyTask = nil
         }
     }
 
     private var headers: some View {
         HStack(spacing: 0) {
             heading("Comparison Clipboard")
-            Divider().frame(height: 38)
+                .padding(.leading, 2)
             heading("Comparison Selection")
+                .padding(.leading, 9)
+                .overlay(alignment: .trailing) { copySelectionButton }
         }
     }
 
     private func heading(_ title: LocalizedStringKey) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold))
-            .padding(.horizontal, 9)
-            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .frame(maxWidth: .infinity, minHeight: KippleButtonMetrics.editorControlHeight, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
+    }
+
+    private var copySelectionButton: some View {
+        Button(action: copySelection) {
+            Label("Copy", systemImage: copyFailed ? "exclamationmark.triangle" : "doc.on.doc")
+                .labelStyle(.titleAndIcon)
+                .frame(
+                    height: KippleButtonMetrics.editorControlHeight - 2 * KippleButtonMetrics.prominentVerticalPadding
+                )
+        }
+        .buttonStyle(ProminentButtonStyle())
+        .disabled(copyTask != nil)
+        .opacity(copyTask != nil ? KippleButtonAppearance.disabledOpacity : 1)
+        .accessibilityLabel("Copy Selected Text")
+        .accessibilityValue(copyFailed ? Text("Could Not Copy Text") : Text(""))
+        .help(copyFailed ? "Could Not Copy Text" : "Copy Selected Text")
+    }
+
+    private func copySelection() {
+        guard copyTask == nil else { return }
+        copyFailed = false
+        copyTask = Task {
+            let copied = await ModernClipboardService.shared.writeToClipboardOnly(
+                comparison.selection, preservingRichText: false
+            ) { !Task.isCancelled }
+            guard !Task.isCancelled else { return }
+            copyTask = nil
+            if copied {
+                closeAfterCopy()
+            } else {
+                copyFailed = true
+            }
+        }
     }
 
     private var editor: some View {
         GeometryReader { geometry in
             let width = geometry.size.width / 2
+            let differences = comparison.differences
+            let activeDifference = differences.count > 1 && differences.indices.contains(currentChange)
+                ? differences[currentChange].id : nil
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(comparison.rows.indices, id: \.self) { index in
-                        row(comparison.rows[index], width: width)
+                        row(comparison.rows[index], width: width, activeDifference: activeDifference)
                             .id(index)
                     }
                 }
+                .scrollTargetLayout()
             }
+            .scrollPosition($scrollPosition)
+            .contentMargins(.vertical, 7, for: .scrollContent)
             .background {
                 HStack(spacing: 0) {
                     paneBackground
@@ -132,116 +187,94 @@ private struct ComparisonEditor: View {
                     .allowsHitTesting(false)
             }
         }
-        .clipShape(.rect(cornerRadius: 6))
-        .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(.separator).allowsHitTesting(false) }
+        .background(KippleGlassAppearance.readOnlyEditorFill)
+        .clipShape(editorShape)
+        .overlay { editorShape.strokeBorder(KippleGlassAppearance.readOnlyEditorStroke).allowsHitTesting(false) }
     }
 
     private var paneBackground: some View {
         HStack(spacing: 0) {
-            (colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.04))
-                .frame(width: gutterWidth)
-            Divider()
-            editorColor
+            Color.clear.frame(width: gutterWidth)
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1)
+            Color.clear
         }
-        .background(editorColor)
+        .allowsHitTesting(false)
     }
 
-    private func row(_ row: TextComparison.Row, width: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            cell(row.left, kind: row.kind, isSelection: false).frame(width: width)
-            cell(row.right, kind: row.kind, isSelection: true).frame(width: width)
+    private func row(_ row: TextComparison.Row, width: CGFloat, activeDifference: Int?) -> some View {
+        let isActive = activeDifference.map { difference in
+            row.left?.containsDifference(difference) == true || row.right?.containsDifference(difference) == true
+        } ?? false
+        return HStack(alignment: .top, spacing: 0) {
+            cell(row.left, kind: row.kind, isSelection: false, activeDifference: activeDifference).frame(width: width)
+            cell(row.right, kind: row.kind, isSelection: true, activeDifference: activeDifference).frame(width: width)
         }
-        .background {
-            HStack(spacing: 0) {
-                cellBackground(row.left, kind: row.kind, isSelection: false)
-                cellBackground(row.right, kind: row.kind, isSelection: true)
-            }
-        }
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
-    private func cell(_ line: TextComparison.Line?, kind: TextComparison.Row.Kind, isSelection: Bool) -> some View {
+    private func cell(
+        _ line: TextComparison.Line?, kind: TextComparison.Row.Kind, isSelection: Bool, activeDifference: Int?
+    ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             HStack(spacing: 5) {
                 if let line {
-                    Text(line.number, format: .number.grouping(.never))
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 11).monospacedDigit())
                     if kind == .inserted || kind == .removed {
-                        Image(systemName: kind == .inserted ? "plus.square.fill" : "minus.square.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(kind == .inserted ? accent : Color.red)
+                        changeMarker(
+                            kind == .inserted ? "plus" : "minus",
+                            isActive: line.text.isEmpty && activeDifference != nil && line.lineBreakDifference == activeDifference
+                        )
                             .accessibilityLabel(kind == .inserted ? Text("Inserted Line") : Text("Removed Line"))
-                    } else if line.lineBreakChanged {
+                    } else if let lineBreakDifference = line.lineBreakDifference {
                         let label: LocalizedStringKey = isSelection ? "Inserted Line Break" : "Removed Line Break"
-                        Image(systemName: "return")
-                            .font(.system(size: 11))
-                            .foregroundStyle(isSelection ? accent : Color.red)
+                        changeMarker("return", isActive: lineBreakDifference == activeDifference)
                             .accessibilityLabel(Text(label))
                             .help(label)
                     }
+                    Text(line.number, format: .number.grouping(.never))
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .font(.system(size: 11).monospacedDigit())
                 }
             }
             .frame(width: gutterWidth - 6, alignment: .trailing)
             .padding(.trailing, 6)
 
             if let line {
-                Text(kind == .replaced ? highlighted(line) : AttributedString(line.text))
-                    .font(.system(size: 14, design: .monospaced))
+                Text(highlighted(line, activeDifference: activeDifference))
+                    .font(.system(size: 13, design: .monospaced))
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 9)
+                    .padding(.horizontal, 7)
             }
         }
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 33, alignment: .topLeading)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, minHeight: 29, alignment: .topLeading)
     }
 
-    private func cellBackground(
-        _ line: TextComparison.Line?,
-        kind: TextComparison.Row.Kind,
-        isSelection: Bool
-    ) -> some View {
-        HStack(spacing: 0) {
-            Color.clear.frame(width: gutterWidth + 1)
-            if let line {
-                changedLineBackground(line, kind: kind, isSelection: isSelection)
-            } else {
-                Color.secondary.opacity(0.10)
-            }
-        }
+    private func changeMarker(_ symbol: String, isActive: Bool) -> some View {
+        let style = isActive ? DifferenceHighlight.current : .standard
+        return Image(systemName: symbol)
+            .font(.system(size: 11))
+            .foregroundStyle(style.foreground)
+            .frame(width: 16, height: 16)
+            .background(style.background, in: .rect(cornerRadius: 3))
     }
 
-    private func changedLineBackground(
-        _ line: TextComparison.Line,
-        kind: TextComparison.Row.Kind,
-        isSelection: Bool
-    ) -> Color {
-        switch kind {
-        case .equal:
-            .clear
-        case .removed:
-            .red.opacity(0.12)
-        case .inserted:
-            accent.opacity(0.14)
-        case .replaced:
-            if !line.hasChanges {
-                .clear
-            } else if !isSelection && line.changes.isEmpty {
-                Color.red.opacity(0.12)
-            } else {
-                accent.opacity(0.14)
-            }
-        }
-    }
-
-    private func highlighted(_ line: TextComparison.Line) -> AttributedString {
+    private func highlighted(_ line: TextComparison.Line, activeDifference: Int?) -> AttributedString {
+        guard !line.changes.isEmpty else { return AttributedString(line.text) }
         var result = AttributedString()
         var start = line.text.startIndex
-        for range in line.changes {
+        for change in line.changes {
+            let range = change.range
+            let isActive = change.difference == activeDifference
+            let style = isActive ? DifferenceHighlight.current : .standard
             result += AttributedString(String(line.text[start..<range.lowerBound]))
             var fragment = AttributedString(String(line.text[range]))
-            fragment.backgroundColor = accent.opacity(0.34)
+            fragment.backgroundColor = style.background
+            fragment.foregroundColor = style.foreground
+            if isActive { fragment.underlineStyle = Text.LineStyle(pattern: .solid, color: style.foreground) }
             result += fragment
             start = range.upperBound
         }
@@ -249,36 +282,37 @@ private struct ComparisonEditor: View {
         return result
     }
 
-    private func footer(_ scroll: ScrollViewProxy) -> some View {
-        HStack(spacing: 8) {
-            if comparison.changeRows.isEmpty {
-                Text("The Text Matches")
-            } else {
-                Text("There Are Differences")
+    @ViewBuilder
+    private var footer: some View {
+        if comparison.differences.isEmpty {
+            Text("The Text Matches")
+                .font(.caption)
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if comparison.differences.count > 1 {
+            HStack(spacing: MainViewMetrics.toolbarItemSpacing) {
+                navigationButton("Previous Difference", icon: "chevron.up", offset: -1)
+                navigationButton("Next Difference", icon: "chevron.down", offset: 1)
             }
-            Spacer()
-            if comparison.changeRows.count > 1 {
-                navigationButton("Previous Difference", icon: "chevron.up", offset: -1, scroll: scroll)
-                navigationButton("Next Difference", icon: "chevron.down", offset: 1, scroll: scroll)
-            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .font(.system(size: 12))
-        .padding(.horizontal, 5)
-        .frame(height: 40)
     }
 
-    private func navigationButton(
-        _ label: LocalizedStringKey, icon: String, offset: Int, scroll: ScrollViewProxy
-    ) -> some View {
+    private func navigationButton(_ label: LocalizedStringKey, icon: String, offset: Int) -> some View {
         let target = currentChange + offset
+        let isEnabled = comparison.differences.indices.contains(target)
         return Button {
-            guard comparison.changeRows.indices.contains(target) else { return }
+            guard isEnabled else { return }
             currentChange = target
-            withAnimation { scroll.scrollTo(comparison.changeRows[target], anchor: .top) }
+            withAnimation { scrollPosition.scrollTo(id: comparison.differences[target].row, anchor: .top) }
         } label: {
-            Label(label, systemImage: icon).labelStyle(.titleAndIcon)
+            Image(systemName: icon)
+                .font(MainViewMetrics.BottomBar.iconFont)
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
         }
+        .kippleSystemCircleButton(isEnabled: isEnabled)
+        .accessibilityLabel(Text(label))
         .help(label)
-        .disabled(!comparison.changeRows.indices.contains(target))
+        .disabled(!isEnabled)
     }
 }

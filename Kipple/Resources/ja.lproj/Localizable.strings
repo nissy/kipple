@@ -600,9 +600,10 @@
 "Compare the clipboard text with text selected in the frontmost app." = "クリップボードの内容と、前面のアプリで選択中のテキストを比較します。";
 "The comparison shortcut is unavailable. Choose a different shortcut." = "比較のショートカットを使用できません。別のキーの組み合わせを選んでください。";
 "Comparison Clipboard" = "クリップボード";
-"Comparison Selection" = "選択範囲";
+"Comparison Selection" = "選択中のテキスト";
+"Copy Selected Text" = "選択中のテキストをコピー";
+"Could Not Copy Text" = "コピーできませんでした";
 "The Text Matches" = "内容は同じです";
-"There Are Differences" = "違いがあります";
 "Previous Difference" = "前の違い";
 "Next Difference" = "次の違い";
 "Inserted Line" = "追加された行";

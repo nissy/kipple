@@ -600,9 +600,10 @@
 "Compare the clipboard text with text selected in the frontmost app." = "Compare the clipboard text with text selected in the frontmost app.";
 "The comparison shortcut is unavailable. Choose a different shortcut." = "The comparison shortcut is unavailable. Choose a different shortcut.";
 "Comparison Clipboard" = "Clipboard";
-"Comparison Selection" = "Selection";
+"Comparison Selection" = "Selected Text";
+"Copy Selected Text" = "Copy Selected Text";
+"Could Not Copy Text" = "Could not copy the text";
 "The Text Matches" = "The Text Matches";
-"There Are Differences" = "There Are Differences";
 "Previous Difference" = "Previous Difference";
 "Next Difference" = "Next Difference";
 "Inserted Line" = "Inserted Line";

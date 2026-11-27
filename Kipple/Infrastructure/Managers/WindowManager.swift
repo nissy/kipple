@@ -79,7 +79,7 @@ private final class RoundedMaskContainerView: NSView {
     }
 }
 
-private final class MainGlassContentController<Content: View>: NSViewController {
+final class KippleGlassContentController<Content: View>: NSViewController {
     private let hostingController: NSHostingController<Content>
 
     init(rootView: Content) {
@@ -450,7 +450,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             self?.openItemEditor(item)
         })
         
-        mainWindow = MainGlassWindow(contentViewController: MainGlassContentController(rootView: contentView))
+        mainWindow = MainGlassWindow(contentViewController: KippleGlassContentController(rootView: contentView))
         return mainWindow
     }
     

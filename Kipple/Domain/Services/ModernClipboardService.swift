@@ -428,14 +428,16 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await writeToClipboardOnly(content) { true }
     }
 
+    @discardableResult
     func writeToClipboardOnly(
         _ content: String,
+        preservingRichText: Bool = true,
         shouldWrite: @Sendable () async -> Bool
-    ) async {
+    ) async -> Bool {
         let generation = copyGeneration
         await mutationGate.acquire()
         defer { mutationGate.release() }
-        guard generation == copyGeneration, await shouldWrite() else { return }
+        guard generation == copyGeneration, !Task.isCancelled, await shouldWrite() else { return false }
         await state.setInternalCopy(true)
         await state.setFromEditor(true)
 
@@ -449,16 +451,21 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 }
             }
         } else {
-            let richText = await MainActor.run {
-                let snapshot = (clipboardReader ?? .shared).read()
-                return snapshot?.text == content ? snapshot?.richText : nil
+            let richText: ClipboardRichText? = if preservingRichText {
+                await MainActor.run {
+                    let snapshot = (clipboardReader ?? .shared).read()
+                    return snapshot?.text == content ? snapshot?.richText : nil
+                }
+            } else {
+                nil
             }
             let draft = ClipItem(content: content, isFromEditor: true, richText: richText)
             newChangeCount = await writeClipboardItem(draft)
         }
 
-        guard await recordClipboardWrite(newChangeCount) else { return }
+        guard await recordClipboardWrite(newChangeCount) else { return false }
         updateLastChangeCount(newChangeCount)
+        return true
     }
 
     @MainActor
