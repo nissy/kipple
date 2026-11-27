@@ -71,10 +71,10 @@ final class DesktopNoteEditorTests: XCTestCase {
         let point = try desktopNoteBodyPoint(in: note)
 
         try sendDesktopNoteMouseGesture(to: note, at: point)
-        XCTAssertFalse(note.firstResponder is NSTextView)
+        XCTAssertNil(note.editor)
 
         try sendDesktopNoteMouseGesture(to: note, at: point, clickCount: 2)
-        XCTAssertFalse(note.firstResponder is LiveEditorTextView)
+        XCTAssertNil(note.editor)
         let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
         XCTAssertTrue(controller.selectionMayExist)
 

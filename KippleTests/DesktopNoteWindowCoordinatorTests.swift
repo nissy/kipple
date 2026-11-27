@@ -423,9 +423,11 @@ func sendDesktopNoteMouseGesture(
     note.sendEvent(down)
     for event in following {
         let mask: NSEvent.EventTypeMask = event.type == .leftMouseUp ? .leftMouseUp : .leftMouseDragged
-        if NSApp.nextEvent(matching: mask, until: .distantPast, inMode: .default, dequeue: false) === event {
-            _ = NSApp.nextEvent(matching: mask, until: .distantPast, inMode: .default, dequeue: true)
-        }
-        note.sendEvent(event)
+        // AppKit returns a new NSEvent for a queued event.
+        guard let queued = NSApp.nextEvent(matching: mask, until: .distantPast, inMode: .default, dequeue: false),
+              queued.windowNumber == event.windowNumber, queued.eventNumber == event.eventNumber,
+              queued.timestamp == event.timestamp, queued.locationInWindow == event.locationInWindow else { continue }
+        _ = NSApp.nextEvent(matching: mask, until: .distantPast, inMode: .default, dequeue: true)
+        note.sendEvent(queued)
     }
 }

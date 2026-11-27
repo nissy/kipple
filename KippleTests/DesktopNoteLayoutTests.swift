@@ -80,10 +80,19 @@ final class DesktopNoteLayoutTests: XCTestCase {
     }
 
     private func renderNoteBackground(in content: NSView) throws -> NSColor {
-        content.layoutSubtreeIfNeeded()
-        let bitmap = try XCTUnwrap(content.bitmapImageRepForCachingDisplay(in: content.bounds))
-        content.cacheDisplay(in: content.bounds, to: bitmap)
-        let sample = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1, bitsPerSample: 8,
+            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0
+        ))
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        content.effectiveAppearance.performAsCurrentDrawingAppearance {
+            content.draw(NSRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        let sample = bitmap.colorAt(x: 0, y: 0)
         return try XCTUnwrap(sample?.usingColorSpace(.deviceRGB))
     }
 
