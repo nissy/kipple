@@ -601,10 +601,10 @@
 "The comparison shortcut is unavailable. Choose a different shortcut." = "比較のショートカットを使用できません。別のキーの組み合わせを選んでください。";
 "Comparison Clipboard" = "クリップボード";
 "Comparison Selection" = "選択範囲";
-"Comparison change count" = "変更 %lld か所";
-"The Text Matches" = "テキストは一致しています";
-"Previous Change" = "前の変更";
-"Next Change" = "次の変更";
+"The Text Matches" = "内容は同じです";
+"There Are Differences" = "違いがあります";
+"Previous Difference" = "前の違い";
+"Next Difference" = "次の違い";
 "Inserted Line" = "追加された行";
 "Removed Line" = "削除された行";
 "Inserted Line Break" = "改行を追加";

@@ -254,11 +254,13 @@ private struct ComparisonEditor: View {
             if comparison.changeRows.isEmpty {
                 Text("The Text Matches")
             } else {
-                Text(verbatim: AppSettings.shared.localizedFormat("Comparison change count", comparison.changeRows.count))
+                Text("There Are Differences")
             }
             Spacer()
-            navigationButton("Previous Change", icon: "chevron.up", offset: -1, scroll: scroll)
-            navigationButton("Next Change", icon: "chevron.down", offset: 1, scroll: scroll)
+            if comparison.changeRows.count > 1 {
+                navigationButton("Previous Difference", icon: "chevron.up", offset: -1, scroll: scroll)
+                navigationButton("Next Difference", icon: "chevron.down", offset: 1, scroll: scroll)
+            }
         }
         .font(.system(size: 12))
         .padding(.horizontal, 5)
@@ -274,7 +276,7 @@ private struct ComparisonEditor: View {
             currentChange = target
             withAnimation { scroll.scrollTo(comparison.changeRows[target], anchor: .top) }
         } label: {
-            Label(label, systemImage: icon).labelStyle(.iconOnly).frame(width: 20)
+            Label(label, systemImage: icon).labelStyle(.titleAndIcon)
         }
         .help(label)
         .disabled(!comparison.changeRows.indices.contains(target))

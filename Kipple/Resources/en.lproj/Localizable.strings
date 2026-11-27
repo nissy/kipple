@@ -601,10 +601,10 @@
 "The comparison shortcut is unavailable. Choose a different shortcut." = "The comparison shortcut is unavailable. Choose a different shortcut.";
 "Comparison Clipboard" = "Clipboard";
 "Comparison Selection" = "Selection";
-"Comparison change count" = "Changes: %lld";
 "The Text Matches" = "The Text Matches";
-"Previous Change" = "Previous Change";
-"Next Change" = "Next Change";
+"There Are Differences" = "There Are Differences";
+"Previous Difference" = "Previous Difference";
+"Next Difference" = "Next Difference";
 "Inserted Line" = "Inserted Line";
 "Removed Line" = "Removed Line";
 "Inserted Line Break" = "Inserted Line Break";
