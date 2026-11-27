@@ -103,7 +103,7 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
             await ComparisonClipboardCopy.capture(reader: reader, stamp: stamp, input: input, target: targetID)
         }
         let target = placement.withWindowBounds(input.windowBounds)
-        await showResult(result, clipboard: clipboard, placement: target, sourceID: targetID, reader: reader)
+        await showResult(result, clipboard: clipboard, placement: target, sourceID: targetID, reader: reader, input: input)
     }
 
     private func finishComparison() {
@@ -118,33 +118,36 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
         clipboard: String,
         placement: TextComparisonWindowPlacement,
         sourceID: pid_t,
-        reader: ClipboardReader
+        reader: ClipboardReader,
+        input: ClipboardReader.ComparisonInput
     ) async {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == sourceID else { return }
+        let content: Content
         switch result {
         case let .restored(selection, stamp, interrupted):
             guard !interrupted, reader.observation == stamp else { return }
-            guard ClipboardTextLimit.allows(selection) else {
-                show(.textTooLong, placement: placement)
-                return
-            }
-            let comparison = await Task.detached(priority: .userInitiated) {
-                TextComparison(clipboard: clipboard, selection: selection)
-            }.value
-            if reader.observation == stamp, NSWorkspace.shared.frontmostApplication?.processIdentifier == sourceID {
-                show(.comparison(comparison), placement: placement)
+            if ClipboardTextLimit.allows(selection) {
+                let comparison = await Task.detached(priority: .userInitiated) {
+                    TextComparison(clipboard: clipboard, selection: selection)
+                }.value
+                content = .comparison(comparison)
+            } else {
+                content = .textTooLong
             }
         case .clipboardUnavailable:
-            show(.clipboardUnavailable, placement: placement)
+            content = .clipboardUnavailable
         case .clipboardBackupUnavailable:
-            show(.clipboardBackupUnavailable, placement: placement)
+            content = .clipboardBackupUnavailable
         case .noSelection:
-            show(.selectionCopyFailed, placement: placement)
+            content = .selectionCopyFailed
         case .unsupportedSelection:
-            show(.unsupportedSelection, placement: placement)
+            content = .unsupportedSelection
         case .interrupted:
-            break
+            return
         }
+        guard await ClipboardReader.comparisonFocusIsCurrent(input, processID: sourceID) else { return }
+        if case let .restored(_, stamp, _) = result, reader.observation != stamp { return }
+        show(content, placement: placement)
     }
 
     func show(
@@ -157,7 +160,7 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
             previousFocus = ComparisonFocusTarget.capture(excluding: window)
         }
         window.title = AppSettings.shared.localizedString("Compare Text")
-        let controller = KippleGlassContentController(rootView: TextComparisonView(content: content) { [weak self] in
+        let controller = NSHostingController(rootView: TextComparisonView(content: content) { [weak self] in
             guard let self, let openPermissions else { return }
             previousFocus = nil
             self.window?.close()
@@ -165,6 +168,7 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
         } closeAfterCopy: { [weak window] in
             window?.close()
         })
+        controller.sizingOptions = []
         let size = window.frame.size
         window.contentViewController = controller
         window.setContentSize(size)
@@ -195,6 +199,9 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
 
     private func dismissAfterOutsideClick() {
         guard let window, window.isVisible, !window.isMiniaturized else { return }
+        if !NSApp.isActive || (NSApp.keyWindow != nil && !window.isKeyWindow) {
+            previousFocus = nil
+        }
         window.close()
     }
 

@@ -59,6 +59,8 @@ struct TextComparisonView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: KippleGlassMetrics.windowCornerRadius, style: .continuous))
         .foregroundStyle(Color(nsColor: .labelColor))
         .environment(\.locale, settings.appLocale)
     }
@@ -199,7 +201,7 @@ private struct ComparisonEditor: View {
                     .allowsHitTesting(false)
             }
         }
-        .background(KippleGlassAppearance.readOnlyEditorFill)
+        .background(Color(nsColor: .textBackgroundColor))
         .clipShape(editorShape)
         .overlay { editorShape.strokeBorder(KippleGlassAppearance.readOnlyEditorStroke).allowsHitTesting(false) }
     }

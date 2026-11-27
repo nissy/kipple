@@ -21,6 +21,7 @@ enum ComparisonClipboardCopy {
     ) async -> Result {
         let interruption = ComparisonCopyInterruption(copyTag: copyTag)
         defer { interruption.stop() }
+        guard await ClipboardReader.comparisonFocusIsCurrent(input, processID: target) else { return .interrupted }
         return await capture(
             reader: reader, stamp: stamp, input: input,
             isCurrent: { NSWorkspace.shared.frontmostApplication?.processIdentifier == target },
