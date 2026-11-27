@@ -33,6 +33,31 @@ enum ClipItemCategory: String, CaseIterable {
     }
 }
 
+struct HistoryRowPreview: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let text: String
+    let title: String?
+    var categoryIDs: Set<UUID>
+    let isActionable: Bool
+
+    static func displayText(from content: String) -> (text: String, isLengthLimited: Bool) {
+        // Leave enough text for a single line at the widest panel and smallest history font.
+        var remaining = 512
+        let prefix = content.prefix { character in
+            guard remaining > 0, !character.isNewline else { return false }
+            remaining -= 1
+            return true
+        }
+        guard prefix.endIndex != content.endIndex else { return (content, false) }
+        return (String(prefix) + "…", !content[prefix.endIndex].isNewline)
+    }
+
+    static func firstLine(from content: String) -> String {
+        guard let newline = content.rangeOfCharacter(from: .newlines) else { return content }
+        return String(content[..<newline.lowerBound]) + "…"
+    }
+}
+
 struct ClipItem: Identifiable, Codable, Equatable {
     var id: UUID
     private(set) var content: String

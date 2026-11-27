@@ -11,7 +11,8 @@ extension EnvironmentValues {
 }
 
 struct HistoryCategoryMenu: View {
-    let item: ClipItem
+    let itemID: UUID
+    let categoryIDs: Set<UUID>
     let isSelected: Bool
     let onChangeCategory: ((ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
@@ -23,9 +24,9 @@ struct HistoryCategoryMenu: View {
     @State private var saveError = false
 
     var body: some View {
-        let categories = store.categories(for: item)
+        let categories = store.categories(forIDs: categoryIDs)
         Button {
-            presentationChanged(item.id, true)
+            presentationChanged(itemID, true)
             isPresented = true
         } label: {
             HStack(spacing: 4) {
@@ -69,7 +70,7 @@ struct HistoryCategoryMenu: View {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(store.assignable()) { category in
                             Toggle(isOn: Binding(
-                                get: { item.categoryIDs.contains(category.id) },
+                                get: { categoryIDs.contains(category.id) },
                                 set: { enabled in update(.set(category.id, enabled: enabled)) }
                             )) {
                                 Label(category.name, systemImage: store.iconName(for: category))
@@ -90,14 +91,14 @@ struct HistoryCategoryMenu: View {
                     }
                     Spacer()
                     Button("Clear") { update(.clear) }
-                        .disabled(item.categoryIDs.isEmpty || isSaving || onChangeCategory == nil)
+                        .disabled(categoryIDs.isEmpty || isSaving || onChangeCategory == nil)
                 }
             }.padding(16).frame(width: 300)
         }
         .onChange(of: isPresented) { _, presented in
-            if !presented { presentationChanged(item.id, false) }
+            if !presented { presentationChanged(itemID, false) }
         }
-        .onDisappear { if isPresented { presentationChanged(item.id, false) } }
+        .onDisappear { if isPresented { presentationChanged(itemID, false) } }
     }
 
     private func update(_ change: ClipCategoryChange) {

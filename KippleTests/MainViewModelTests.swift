@@ -507,6 +507,19 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentClipboardItemID, targetItem.id)
     }
 
+    func testCurrentClipboardMatchUsesTheFirstItemAndRefreshesAfterInPlaceEdit() {
+        let first = ClipItem(content: "Copied text")
+        let second = ClipItem(content: first.content)
+        mockClipboardService.history = [first, second]
+        viewModel.loadHistory()
+        viewModel.currentClipboardContent = first.content
+        XCTAssertEqual(viewModel.currentClipboardItemID, first.id)
+
+        mockClipboardService.history = [first.replacingContent(with: "Edited text"), second]
+        viewModel.loadHistory()
+        XCTAssertEqual(viewModel.currentClipboardItemID, second.id)
+    }
+
     func testSelectHistoryItemAndWaitUsesAsyncRecopy() async {
         let item = ClipItem(content: "Waited")
         mockClipboardService.history = [item]

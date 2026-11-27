@@ -89,14 +89,14 @@ final class SwiftUIViewPerformanceTests: XCTestCase, @unchecked Sendable {
             for _ in 0..<10 {
                 _ = MainView()
                 _ = HistoryItemView(
-                    item: ClipItem(content: "Test"),
+                    entry: .full(ClipItem(content: "Test")),
                     isSelected: false,
                     isCurrentClipboardItem: false,
                     queueBadge: nil,
                     isQueuePreviewed: false,
                     isScrollLocked: false,
-                    onTap: {},
-                    onDelete: {},
+                    onTap: { _ in },
+                    onDelete: { _ in },
                     onChangeCategory: { _ in },
                     onOpenCategoryManager: {},
                     historyFont: .system(size: 13),

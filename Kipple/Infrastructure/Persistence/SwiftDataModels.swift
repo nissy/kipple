@@ -15,6 +15,8 @@ final class ClipItemModel {
     var userCategoryId: UUID?
     var metadataData: Data?
     @Attribute(.externalStorage) var richTextData: Data?
+    @Relationship(deleteRule: .cascade, inverse: \StoredHistoryRowPreview.item)
+    var listPreview: StoredHistoryRowPreview?
 
     init(
         id: UUID = UUID(),
@@ -80,7 +82,7 @@ final class ClipItemModel {
         metadataData.flatMap { try? JSONDecoder().decode(ClipMetadata.self, from: $0) }
     }
 
-    private func toClipItem(metadata: ClipMetadata?) -> ClipItem {
+    private func toClipItem(metadata: ClipMetadata?, includesRichText: Bool = true) -> ClipItem {
         ClipItem(
             id: id,
             content: content,
@@ -93,12 +95,50 @@ final class ClipItemModel {
             isFromEditor: isFromEditor,
             userCategoryId: userCategoryId,
             metadata: metadata,
-            richText: richTextData.flatMap { try? JSONDecoder().decode(ClipboardRichText.self, from: $0) }
+            richText: includesRichText ? richTextData.flatMap { try? JSONDecoder().decode(ClipboardRichText.self, from: $0) } : nil
         )
     }
 
     func toDomainModel() -> ClipItem {
         return toClipItem()
+    }
+
+    func refreshListPreview(from item: ClipItem) {
+        let preview = listPreview ?? StoredHistoryRowPreview(id: id)
+        preview.timestamp = timestamp
+        preview.title = item.title
+        preview.text = HistoryRowPreview.displayText(from: item.content).text
+        preview.categoryIDs = Array(item.categoryIDs)
+        preview.hasCustomCategory = item.hasCustomCategory
+        preview.isActionable = item.isActionable
+        if listPreview == nil { listPreview = preview }
+    }
+
+    func backfillListPreview() {
+        refreshListPreview(from: toClipItem(metadata: decodedMetadata, includesRichText: false))
+    }
+}
+
+@Model
+final class StoredHistoryRowPreview {
+    @Attribute(.unique) var id: UUID
+    var timestamp = Date.distantPast
+    var text: String = ""
+    var title: String?
+    var categoryIDs: [UUID] = []
+    var hasCustomCategory: Bool = false
+    var isActionable: Bool = false
+    var item: ClipItemModel?
+
+    init(id: UUID) {
+        self.id = id
+    }
+
+    var header: HistoryRowPreview {
+        HistoryRowPreview(
+            id: id, text: HistoryRowPreview.firstLine(from: text), title: title,
+            categoryIDs: Set(categoryIDs), isActionable: isActionable
+        )
     }
 }
 

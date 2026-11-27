@@ -37,6 +37,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     struct HistorySnapshot {
         let items: [ClipItem]
+        let startupPreviews: [HistoryRowPreview]
         let revision: UInt64
         let isLoaded: Bool
         let lastQueueHeadChange: QueueHeadChange?
@@ -45,6 +46,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Properties
 
     private var history: [ClipItem] = []
+    private var startupPreviews: [HistoryRowPreview] = []
     private let mutationGate: AsyncMutationGate
     private let clipboardComparisonGate = AsyncMutationGate()
     private let clipboardWriter: @MainActor @Sendable (ClipItem) -> Int
@@ -126,8 +128,17 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             await initializeRepository()
         }
         setupSavePipeline()
-        await loadHistoryWhileLocked()
+        await loadHistoryWhileLocked(publishStartupPreviews: true)
         await setupAppTracking()
+        if let repository, isRepositoryReady {
+            Task(priority: .utility) {
+                do {
+                    try await repository.backfillHistoryPreviews()
+                } catch {
+                    Logger.shared.error("Failed to prepare history previews: \(error)")
+                }
+            }
+        }
     }
 
     private func initializeRepository() async {
@@ -138,6 +149,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     func setRepository(_ repo: ClipboardRepositoryProtocol) {
         self.repository = repo
         isRepositoryReady = false
+        startupPreviews = []
         persistedSnapshot = [:]
         itemIDByContent = [:]
     }
@@ -159,15 +171,14 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
         await loadHistoryWhileLocked()
     }
 
-    private func loadHistoryWhileLocked() async {
+    private func loadHistoryWhileLocked(publishStartupPreviews: Bool = false) async {
         isRepositoryReady = false
         guard let repository = repository else { return }
         let previousHistory = history
+        defer { startupPreviews = [] }
+        await prepareHistoryLoad(from: repository, showPreviews: publishStartupPreviews && previousHistory.isEmpty)
 
         do {
-            if let categoryStore {
-                definedCustomCategoryIDs = Set(await categoryStore.userDefined().map(\.id))
-            }
             let categorizedItems = try await repository.loadCategorized()
             let liveNoteItems = previousHistory.filter { desktopNoteItemIDs.contains($0.id) }
             let storedNoteItems = try await repository.load(ids: desktopNoteItemIDs.subtracting(liveNoteItems.map(\.id)))
@@ -175,7 +186,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             let protectedByID = Dictionary((categorizedItems + desktopNoteItems).map { ($0.id, $0) }) { _, latest in latest }
             history = protectedByID.values.map(withDefinedCategories)
                 .filter(isProtectedFromHistoryRemoval)
-                .sorted { $0.timestamp > $1.timestamp }
+                .sorted(by: Self.mostRecentFirst)
 
             if !history.isEmpty {
                 rebuildContentLookup()
@@ -189,7 +200,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
                 latest
             }
             let combinedByID = loadedByID.merging(desktopNoteItems.map { ($0.id, $0) }) { _, current in current }
-            let combinedItems = combinedByID.values.sorted { $0.timestamp > $1.timestamp }
+            let combinedItems = combinedByID.values.sorted(by: Self.mostRecentFirst)
 
             history = combinedItems.map(withDefinedCategories)
             let wasTrimmed = trimHistory()
@@ -212,6 +223,37 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
             markHistoryChanged()
             notifyHistoryObservers()
             Logger.shared.error("Failed to load history: \(error)")
+        }
+    }
+
+    private func prepareHistoryLoad(from repository: ClipboardRepositoryProtocol, showPreviews: Bool) async {
+        if let categoryStore {
+            definedCustomCategoryIDs = Set(await categoryStore.userDefined().map(\.id))
+        }
+        if showPreviews { await loadStartupPreviews(from: repository) }
+    }
+
+    private static func mostRecentFirst(_ left: ClipItem, _ right: ClipItem) -> Bool {
+        if left.timestamp == right.timestamp { return left.id < right.id }
+        return left.timestamp > right.timestamp
+    }
+
+    private func loadStartupPreviews(from repository: ClipboardRepositoryProtocol) async {
+        do {
+            startupPreviews = try await repository.loadStartupPreviews(limit: min(maxHistoryItems, 50)).map { preview in
+                guard let definedCustomCategoryIDs else { return preview }
+                var row = preview
+                row.categoryIDs = preview.categoryIDs.filter {
+                    !BuiltInCategory.isCustom($0) || definedCustomCategoryIDs.contains($0)
+                }
+                return row
+            }
+            if !startupPreviews.isEmpty {
+                markHistoryChanged(checkQueueHead: false)
+                notifyHistoryObservers()
+            }
+        } catch {
+            Logger.shared.error("Failed to read startup history previews: \(error)")
         }
     }
 
@@ -264,8 +306,23 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     func getHistorySnapshot() -> HistorySnapshot {
         HistorySnapshot(
-            items: history, revision: historyRevision, isLoaded: isRepositoryReady, lastQueueHeadChange: lastQueueHeadChange
+            items: history, startupPreviews: startupPreviews, revision: historyRevision,
+            isLoaded: isRepositoryReady, lastQueueHeadChange: lastQueueHeadChange
         )
+    }
+
+    func resolveStartupItem(id: UUID) async -> ClipItem? {
+        if let current = history.first(where: { $0.id == id }) { return current }
+        guard let repository, startupPreviews.contains(where: { $0.id == id }) else { return nil }
+        do {
+            let item = try await repository.loadFullStartupItem(id: id)
+            if let current = history.first(where: { $0.id == id }) { return current }
+            guard startupPreviews.contains(where: { $0.id == id }) else { return nil }
+            return item.map(withDefinedCategories)
+        } catch {
+            Logger.shared.error("Failed to resolve startup history item: \(error)")
+            return nil
+        }
     }
 
     func startMonitoring() async {

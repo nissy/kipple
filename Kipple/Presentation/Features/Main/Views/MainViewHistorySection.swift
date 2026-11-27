@@ -22,7 +22,7 @@ struct MainViewHistorySection: View {
     let onSplitEditorIntoHistory: (ClipItem) -> Void
     let onDelete: ((ClipItem) -> Void)?
     // 追加: ユーザカテゴリ変更/管理
-    let onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)?
+    let onChangeUserCategory: ((UUID, ClipCategoryChange) async throws -> Void)?
     let onOpenCategoryManager: (() -> Void)?
     @Binding var categoryFilter: CategoryFilter
     let historyCategoryIDs: Set<UUID>
@@ -35,6 +35,8 @@ struct MainViewHistorySection: View {
     let queueBadgeProvider: (ClipItem) -> Int?
     let queueSelectionPreview: Set<UUID>
     let queueReorder: QueueReorderActions?
+    let startupPreviews: [HistoryRowPreview]
+    let resolveStartupItem: ((UUID) async -> ClipItem?)?
     @ObservedObject private var fontManager = FontManager.shared
     @State private var canScrollToTop = false
 
@@ -51,7 +53,7 @@ struct MainViewHistorySection: View {
         onOpenItem: ((ClipItem) -> Void)? = nil,
         onSplitEditorIntoHistory: @escaping (ClipItem) -> Void,
         onDelete: ((ClipItem) -> Void)?,
-        onChangeUserCategory: ((ClipItem, ClipCategoryChange) async throws -> Void)? = nil,
+        onChangeUserCategory: ((UUID, ClipCategoryChange) async throws -> Void)? = nil,
         onOpenCategoryManager: (() -> Void)? = nil,
         categoryFilter: Binding<CategoryFilter>,
         historyCategoryIDs: Set<UUID>,
@@ -63,7 +65,9 @@ struct MainViewHistorySection: View {
         pasteMode: MainViewModel.PasteMode,
         queueBadgeProvider: @escaping (ClipItem) -> Int?,
         queueSelectionPreview: Set<UUID>,
-        queueReorder: QueueReorderActions? = nil
+        queueReorder: QueueReorderActions? = nil,
+        startupPreviews: [HistoryRowPreview] = [],
+        resolveStartupItem: ((UUID) async -> ClipItem?)? = nil
     ) {
         self.history = history
         self.currentClipboardContent = currentClipboardContent
@@ -90,6 +94,8 @@ struct MainViewHistorySection: View {
         self.queueBadgeProvider = queueBadgeProvider
         self.queueSelectionPreview = queueSelectionPreview
         self.queueReorder = queueReorder
+        self.startupPreviews = startupPreviews
+        self.resolveStartupItem = resolveStartupItem
     }
 
     var body: some View {
@@ -155,7 +161,9 @@ struct MainViewHistorySection: View {
             hoverResetRequest: $hoverResetRequest,
             highlightRequest: highlightRequest,
             onHighlightFinished: onHighlightFinished,
-            queueReorder: queueReorder
+            queueReorder: queueReorder,
+            startupPreviews: startupPreviews,
+            resolveStartupItem: resolveStartupItem
         )
     }
 

@@ -147,6 +147,7 @@ final class ModernClipboardServiceInitialLoadTests: XCTestCase {
 
 actor MockClipboardRepository: ClipboardRepositoryProtocol {
     private var storage: [ClipItem] = []
+    private var startupPreviews: [HistoryRowPreview] = []
     private var requestedLimitHistory: [Int] = []
     private var loadDelayNanoseconds: UInt64 = 0
     private var remainingLoadFailures = 0
@@ -154,6 +155,14 @@ actor MockClipboardRepository: ClipboardRepositoryProtocol {
     private var onLoad: (@Sendable () -> Void)?
     private var shouldSuspendLoad = false
     private var loadContinuation: CheckedContinuation<Void, Never>?
+
+    func configureStartupPreviews(_ rows: [HistoryRowPreview]) {
+        startupPreviews = rows
+    }
+
+    func loadStartupPreviews(limit: Int) async throws -> [HistoryRowPreview] {
+        Array(startupPreviews.prefix(limit))
+    }
 
     func failNextLoads(_ count: Int) {
         remainingLoadFailures = count

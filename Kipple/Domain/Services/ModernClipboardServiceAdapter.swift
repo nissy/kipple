@@ -25,6 +25,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
     private var lastKnownQueueHeadRevision: UInt64?
     private(set) var publishedQueueHeadChange: ModernClipboardService.QueueHeadChange?
     private(set) var isHistoryLoaded = false
+    private(set) var startupPreviews: [HistoryRowPreview] = []
 
     // ClipboardServiceProtocol requirement
     var onHistoryChanged: ((ClipItem) -> Void)?
@@ -66,6 +67,10 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         Task {
             await modernService.startMonitoring()
         }
+    }
+
+    func resolveStartupItem(id: UUID) async -> ClipItem? {
+        await modernService.resolveStartupItem(id: id)
     }
 
     func stopMonitoring() {
@@ -292,6 +297,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
                 count: newHistory.count
             )
             isHistoryLoaded = snapshot.isLoaded
+            startupPreviews = snapshot.startupPreviews
             // A refresh can include both a clipboard copy and a manual history addition.
             let queueHeadChange = snapshot.lastQueueHeadChange
             publishedQueueHeadChange = queueHeadChange?.revision == lastKnownQueueHeadRevision ? nil : queueHeadChange
@@ -332,6 +338,7 @@ final class ModernClipboardServiceAdapter: ObservableObject, ClipboardServicePro
         pendingOperationTask?.cancel()
         pendingOperationTask = nil
         isHistoryLoaded = false
+        startupPreviews = []
         publishedQueueHeadChange = nil
         lastKnownQueueHeadRevision = nil
         history = []

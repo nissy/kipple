@@ -3,6 +3,9 @@ import SwiftData
 
 actor SwiftDataRepository: ClipboardRepositoryProtocol {
     private let container: ModelContainer
+    private static let mostRecentFirst: [SortDescriptor<ClipItemModel>] = [
+        SortDescriptor(\.timestamp, order: .reverse), SortDescriptor(\.id)
+    ]
 
     // MARK: - Factory
 
@@ -68,7 +71,7 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
     func load(limit: Int) async throws -> [ClipItem] {
         let context = makeContext()
         var descriptor = FetchDescriptor<ClipItemModel>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            sortBy: Self.mostRecentFirst
         )
         descriptor.fetchLimit = limit
         let models = try context.fetch(descriptor)
@@ -78,7 +81,7 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
     func loadAll() async throws -> [ClipItem] {
         let context = makeContext()
         let descriptor = FetchDescriptor<ClipItemModel>(
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            sortBy: Self.mostRecentFirst
         )
         let models = try context.fetch(descriptor)
         return models.map { $0.toClipItem() }
@@ -89,6 +92,39 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         let itemIDs = Array(ids)
         let descriptor = FetchDescriptor<ClipItemModel>(predicate: #Predicate { itemIDs.contains($0.id) })
         return try makeContext().fetch(descriptor).map { $0.toClipItem() }
+    }
+
+    func loadStartupPreviews(limit: Int) async throws -> [HistoryRowPreview] {
+        guard limit > 0 else { return [] }
+        let context = makeContext()
+        guard try hasCompletePreviewIndex(in: context) else { return [] }
+        var descriptor = FetchDescriptor<StoredHistoryRowPreview>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse), SortDescriptor(\.id)]
+        )
+        descriptor.fetchLimit = limit
+        return try context.fetch(descriptor).map(\.header)
+    }
+
+    func backfillHistoryPreviews() async throws {
+        let context = makeContext()
+        guard try !hasCompletePreviewIndex(in: context) else { return }
+        let missing = FetchDescriptor<ClipItemModel>(predicate: #Predicate { $0.listPreview == nil })
+        for model in try context.fetch(missing) {
+            model.backfillListPreview()
+        }
+        try saveIfNeeded(context)
+    }
+
+    private func hasCompletePreviewIndex(in context: ModelContext) throws -> Bool {
+        try context.fetchCount(FetchDescriptor<StoredHistoryRowPreview>()) == context.fetchCount(FetchDescriptor<ClipItemModel>())
+    }
+
+    nonisolated func loadFullStartupItem(id: UUID) async throws -> ClipItem? {
+        // Use a separate read context so a row action can fetch its item during the bulk startup fetch.
+        let context = ModelContext(container)
+        var descriptor = FetchDescriptor<ClipItemModel>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first?.toClipItem()
     }
 
     func loadItemIDs() async throws -> Set<UUID> {
@@ -120,9 +156,19 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
 
     func loadCategorized() async throws -> [ClipItem] {
         let context = makeContext()
+        if try hasCompletePreviewIndex(in: context) {
+            let previews = FetchDescriptor<StoredHistoryRowPreview>(predicate: #Predicate { $0.hasCustomCategory })
+            let ids = try context.fetch(previews).map(\.id)
+            guard !ids.isEmpty else { return [] }
+            let categorized = FetchDescriptor<ClipItemModel>(
+                predicate: #Predicate { ids.contains($0.id) },
+                sortBy: Self.mostRecentFirst
+            )
+            return try context.fetch(categorized).compactMap { $0.toCustomCategorizedClipItem() }
+        }
         let descriptor = FetchDescriptor<ClipItemModel>(
             predicate: #Predicate { $0.userCategoryId != nil || $0.metadataData != nil },
-            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            sortBy: Self.mostRecentFirst
         )
         let models = try context.fetch(descriptor)
         return models.compactMap { $0.toCustomCategorizedClipItem() }
@@ -206,6 +252,7 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 metadata: item.metadata,
                 richText: item.richText
             )
+            model.refreshListPreview(from: item)
             context.insert(model)
         }
     }
@@ -225,7 +272,7 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
         }
         for (offset, item) in map.values.enumerated() {
             let adjustedTimestamp = item.timestamp.addingTimeInterval(TimeInterval(offset) * 1e-6)
-            context.insert(ClipItemModel(
+            let model = ClipItemModel(
                 id: item.id,
                 content: item.content,
                 timestamp: adjustedTimestamp,
@@ -238,7 +285,9 @@ actor SwiftDataRepository: ClipboardRepositoryProtocol {
                 userCategoryId: item.userCategoryId,
                 metadata: item.metadata,
                 richText: item.richText
-            ))
+            )
+            model.refreshListPreview(from: item)
+            context.insert(model)
         }
     }
 
@@ -267,5 +316,6 @@ private extension ClipItemModel {
         userCategoryId = item.userCategoryId
         metadataData = item.metadata.flatMap { try? JSONEncoder().encode($0) }
         richTextData = item.richText.flatMap { try? JSONEncoder().encode($0) }
+        refreshListPreview(from: item)
     }
 }

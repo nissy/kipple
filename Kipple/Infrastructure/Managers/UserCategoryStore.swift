@@ -160,7 +160,10 @@ final class UserCategoryStore: ObservableObject {
     }
 
     func categories(for item: ClipItem) -> [UserCategory] {
-        let ids = item.categoryIDs
+        categories(forIDs: item.categoryIDs)
+    }
+
+    func categories(forIDs ids: Set<UUID>) -> [UserCategory] {
         return assignable().filter { ids.contains($0.id) }
     }
 

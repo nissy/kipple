@@ -463,7 +463,8 @@ struct DesktopNoteCategoryMenu: View {
 
     var body: some View {
         HistoryCategoryMenu(
-            item: item,
+            itemID: item.id,
+            categoryIDs: item.categoryIDs,
             isSelected: false,
             onChangeCategory: onChangeCategory,
             onOpenCategoryManager: onOpenCategoryManager,

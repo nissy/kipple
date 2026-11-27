@@ -15,12 +15,21 @@ protocol ClipboardRepositoryProtocol: Sendable {
     func loadAll() async throws -> [ClipItem]
     func loadItemIDs() async throws -> Set<UUID>
     func loadCategorized() async throws -> [ClipItem]
+    func loadStartupPreviews(limit: Int) async throws -> [HistoryRowPreview]
+    func loadFullStartupItem(id: UUID) async throws -> ClipItem?
+    func backfillHistoryPreviews() async throws
     func delete(_ item: ClipItem) async throws
     func clear() async throws
     func applyChanges(inserted: [ClipItem], updated: [ClipItem], removed: [UUID]) async throws
 }
 
 extension ClipboardRepositoryProtocol {
+    func loadStartupPreviews(limit: Int) async throws -> [HistoryRowPreview] { [] }
+
+    func loadFullStartupItem(id: UUID) async throws -> ClipItem? { try await load(ids: [id]).first }
+
+    func backfillHistoryPreviews() async throws {}
+
     func load(ids: Set<UUID>) async throws -> [ClipItem] {
         guard !ids.isEmpty else { return [] }
         return try await loadAll().filter { ids.contains($0.id) }
