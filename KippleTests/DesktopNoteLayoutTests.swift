@@ -66,7 +66,9 @@ final class DesktopNoteLayoutTests: XCTestCase {
         for (item, color) in zip(items.dropLast(), colors.dropLast()) {
             let fill = try XCTUnwrap(color.fill)
             XCTAssertNotNil(item.image)
+#if compiler(>=6.4)
             if #available(macOS 27.0, *) { XCTAssertEqual(item.preferredImageVisibility, .visible) }
+#endif
             XCTAssertEqual(item.state, color == .aqua ? .on : .off)
             let rgb = [fill.redComponent, fill.greenComponent, fill.blueComponent]
                 .reduce(0) { ($0 << 8) | Int(($1 * 255).rounded()) }

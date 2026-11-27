@@ -171,7 +171,9 @@ final class DesktopNoteContentController: NSViewController {
             item.representedObject = color.rawValue
             if let fill = color.fill {
                 item.image = Self.colorSwatch(fill)
+#if compiler(>=6.4)
                 if #available(macOS 27.0, *) { item.preferredImageVisibility = .visible }
+#endif
             }
             item.state = color == selected ? .on : .off
         }
