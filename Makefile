@@ -208,7 +208,7 @@ build: generate ## Build production version
 
 TEST_ADHOC_SIGNING ?= 0
 TEST_TIMEOUT ?=
-TEST_VISION_CPU_ONLY ?= 0
+TEST_XCTEST_FLAGS ?= -only-testing:KippleTests
 ifeq ($(TEST_ADHOC_SIGNING),1)
 TEST_SIGNING_SETTINGS = CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
 endif
@@ -220,7 +220,7 @@ test: generate ## Run all tests
 	@echo "$(BLUE)Running tests…$(NC)"
 	@rm -rf build/TestResults.xcresult build/TestResults
 	@mkdir -p $(TEST_DERIVED_DATA_DIR)
-	TEST_RUNNER_KIPPLE_TEST_VISION_CPU_ONLY='$(TEST_VISION_CPU_ONLY)' xcodebuild test \
+	xcodebuild test \
 		-project $(XCODE_PROJECT) \
 		-scheme $(SCHEME) \
 		-configuration $(CONFIGURATION_TEST) \
@@ -230,7 +230,7 @@ test: generate ## Run all tests
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		$(TEST_SIGNING_SETTINGS) \
 		$(TEST_TIMEOUT_SETTINGS) \
-		-only-testing:KippleTests
+		$(TEST_XCTEST_FLAGS)
 	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/$(CONFIGURATION_TEST)/KippleTestHost.app/Contents/Helpers/KippleMCP"
 
 .PHONY: test-release check-release-macos-version test-mcp-release

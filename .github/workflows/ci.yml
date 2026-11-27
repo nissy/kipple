@@ -30,17 +30,30 @@ jobs:
         run: make lint SWIFTLINT_FLAGS=--strict
 
   test:
-    name: Test
-    runs-on: xcode-27
+    name: Test (${{ matrix.suite }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: App
+            runner: xcode-27
+            xcode: '27.2'
+            tests: -only-testing:KippleTests -skip-testing:KippleTests/VisionTextRecognitionServiceTests
+          # Vision document recognition requires the Neural Engine on the macOS 27 hosted VM.
+          - suite: Vision
+            runner: macos-26
+            xcode: '26.6'
+            tests: -only-testing:KippleTests/VisionTextRecognitionServiceTests
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+      TEST_XCTEST_FLAGS: ${{ matrix.tests }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install XcodeGen
         run: brew install xcodegen
-      - name: Run all tests
-        # The hosted VM has no Neural Engine. Exercise Vision via its CPU device.
-        run: make test TEST_ADHOC_SIGNING=1 TEST_TIMEOUT=180 TEST_VISION_CPU_ONLY=1
+      - name: Run tests
+        run: make test TEST_ADHOC_SIGNING=1 TEST_TIMEOUT=180

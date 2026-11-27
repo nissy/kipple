@@ -1,6 +1,5 @@
 import XCTest
 import AppKit
-import CoreML
 import Vision
 @testable import Kipple
 
@@ -8,14 +7,20 @@ import Vision
 final class VisionTextRecognitionServiceTests: XCTestCase {
     func testRecognizesRenderedText() async throws {
         let image = try makeImage()
-        let service = makeService(recognitionLanguages: ["en"])
+        let service = VisionTextRecognitionService(recognitionLanguages: ["en"])
         let text = try await service.recognizeText(from: image)
         XCTAssertTrue(text.contains("Shopping List"), "Unexpected OCR result: \(text)")
     }
 
     func testRecognizesSmallTextInTallSelection() async throws {
-        let image = try makeImage(height: 2160, fontSize: 14)
-        let service = makeService()
+        let height = 2160
+        // The text is below the 1.5% height threshold, with enough pixels for both Vision versions.
+        let image = try makeImage(height: height, fontSize: 24)
+        let performRequest: VisionTextRecognitionService.PerformRequest = { request, image in
+            XCTAssertEqual(request.textRecognitionOptions.minimumTextHeightFraction, 8 / Float(height))
+            return try await request.perform(on: image)
+        }
+        let service = VisionTextRecognitionService(performRequest: performRequest)
 
         let text = try await service.recognizeText(from: image)
 
@@ -61,7 +66,7 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
 
     func testRecognizesTableAsTSVWithSurroundingParagraphs() async throws {
         let image = try makeImage(table: [["Product", "Quantity", "Price"], ["Apples", "Three", "200"], ["Oranges", "Two", "400"]])
-        let service = makeService(recognitionLanguages: ["en"])
+        let service = VisionTextRecognitionService(recognitionLanguages: ["en"])
         let text = try await service.recognizeText(from: image)
         XCTAssertTrue(text.contains("Product\tQuantity\tPrice"), "Missing table structure: \(text)")
         XCTAssertTrue(text.hasPrefix("Shopping List\n\n"), "Missing heading: \(text)")
@@ -80,7 +85,7 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
             )
             ("Thank you for shopping." as NSString).draw(at: NSPoint(x: 50, y: 150), withAttributes: attributes)
         }
-        let text = try await makeService().recognizeText(from: image)
+        let text = try await VisionTextRecognitionService().recognizeText(from: image)
         XCTAssertEqual(text, "在庫確認\n\n品名\tQuantity\tPrice\nりんご\tThree\t200\nOranges\tFour\t400\n\nThank you for shopping.")
     }
 
@@ -117,7 +122,7 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
 
     func testPreservesTextBesideRotatedTable() async throws {
         let image = try makeAdversarialImage(rotatedTable: true)
-        let service = makeService(recognitionLanguages: ["en"])
+        let service = VisionTextRecognitionService(recognitionLanguages: ["en"])
         let text = try await service.recognizeText(from: image)
         XCTAssertTrue(text.contains("Outside note"), "Text outside the table was lost: \(text)")
         XCTAssertTrue(text.contains("Item\tCount\tPrice\nApple\tThree\t200"), "Missing table: \(text)")
@@ -126,7 +131,7 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
 
     func testBulletAndNumberedListsDoNotBecomeTSV() async throws {
         let image = try makeAdversarialImage(rotatedTable: false)
-        let service = makeService(recognitionLanguages: ["en"])
+        let service = VisionTextRecognitionService(recognitionLanguages: ["en"])
         let text = try await service.recognizeText(from: image)
         XCTAssertFalse(text.contains("\t"), "A list was converted into table columns: \(text)")
         for item in ["Shopping List", "• Apples", "• Oranges", "1. Check prices", "2. Pay at checkout"] {
@@ -182,24 +187,6 @@ final class VisionTextRecognitionServiceTests: XCTestCase {
             grid.line(to: CGPoint(x: 300, y: y))
         }
         grid.stroke()
-    }
-
-    private func makeService(recognitionLanguages: [String] = ["ja", "en"]) -> VisionTextRecognitionService {
-        guard ProcessInfo.processInfo.environment["KIPPLE_TEST_VISION_CPU_ONLY"] == "1" else {
-            return VisionTextRecognitionService(recognitionLanguages: recognitionLanguages)
-        }
-        let performOnCPU: VisionTextRecognitionService.PerformRequest = { request, image in
-            var request = request
-            let cpu = try XCTUnwrap(request.supportedComputeStageDevices[.main]?.first { device in
-                if case .cpu = device { return true }
-                return false
-            }, "Vision document recognition must support CPU execution for this test configuration")
-            request.setComputeDevice(cpu, for: .main)
-            // Use the fixture's configured languages for CPU recognition of mixed-language cells.
-            request.textRecognitionOptions.automaticallyDetectLanguage = false
-            return try await request.perform(on: image)
-        }
-        return VisionTextRecognitionService(recognitionLanguages: recognitionLanguages, performRequest: performOnCPU)
     }
 
     private func makeImage(table: [[String]]? = nil, height: Int = 700, fontSize: CGFloat = 30) throws -> CGImage {
