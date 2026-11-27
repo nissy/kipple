@@ -1356,6 +1356,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = FBD22EAAFEF904D0F786CC67 /* Build configuration list for PBXNativeTarget "KippleTests" */;
 			buildPhases = (
+				143C7B08EB32228B5828E706 /* Verify isolated test host */,
 				186455562D142980EEE087B3 /* Sources */,
 			);
 			buildRules = (
@@ -1478,6 +1479,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		143C7B08EB32228B5828E706 /* Verify isolated test host */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(APP_PRODUCT_NAME).app/Contents/Info.plist",
+			);
+			name = "Verify isolated test host";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" != \"Test\" ] ||\n   [ \"$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - \"$SCRIPT_INPUT_FILE_0\")\" != \"com.nissy.Kipple.TestHost\" ]; then\n  echo 'error: KippleTests requires the isolated Test configuration. Run make test or use the Kipple scheme Test action.'\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		060A74D39C8BA3A78C50A17E /* Sources */ = {
@@ -1835,15 +1859,40 @@
 				);
 				OTHER_CODE_SIGN_FLAGS = "--timestamp --options=runtime";
 				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_PRODUCT_BUNDLE_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = Kipple;
+				PRODUCT_NAME = "$(APP_PRODUCT_NAME)";
 				SDKROOT = macosx;
 			};
 			name = Release;
+		};
+		60650D77CCF1166550F3A193 /* Test */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TEST_PRODUCT_BUNDLE_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = KippleTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(APP_PRODUCT_NAME).app/Contents/MacOS/$(APP_PRODUCT_NAME)";
+			};
+			name = Test;
 		};
 		713ECD06FF221F7EA764E82D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				APP_PRODUCT_BUNDLE_IDENTIFIER = com.nissy.Kipple;
+				APP_PRODUCT_NAME = Kipple;
 				ARCHS = arm64;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -1911,6 +1960,79 @@
 			};
 			name = Debug;
 		};
+		74434FC6EDC10483C5BEE0A8 /* Test */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_PRODUCT_BUNDLE_IDENTIFIER = com.nissy.Kipple.TestHost;
+				APP_PRODUCT_NAME = KippleTestHost;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = R7LKF73J2W;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 2.2.8;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = Kipple;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TEST_PRODUCT_BUNDLE_IDENTIFIER = com.nissy.KippleTests;
+			};
+			name = Test;
+		};
 		A18282330D5634BDDD93EE4F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1929,7 +2051,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TEST_PRODUCT_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = KippleTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kipple.app/Contents/MacOS/Kipple";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(APP_PRODUCT_NAME).app/Contents/MacOS/$(APP_PRODUCT_NAME)";
 			};
 			name = Debug;
 		};
@@ -1955,15 +2077,68 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_PRODUCT_BUNDLE_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = Kipple;
+				PRODUCT_NAME = "$(APP_PRODUCT_NAME)";
 				SDKROOT = macosx;
 			};
 			name = Debug;
+		};
+		B896999732E377752E24B0AA /* Test */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.nissy.KippleMCP;
+				PRODUCT_NAME = KippleMCP;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Test;
+		};
+		BC2BE4424E638BA22D729B05 /* Test */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Kipple;
+				INFOPLIST_KEY_CFBundleName = Kipple;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Kipple. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_PRODUCT_BUNDLE_IDENTIFIER)";
+				PRODUCT_MODULE_NAME = Kipple;
+				PRODUCT_NAME = "$(APP_PRODUCT_NAME)";
+				SDKROOT = macosx;
+			};
+			name = Test;
 		};
 		C76A7732EB050C4F8ED8864E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				APP_PRODUCT_BUNDLE_IDENTIFIER = com.nissy.Kipple;
+				APP_PRODUCT_NAME = Kipple;
 				ARCHS = arm64;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
@@ -2042,7 +2217,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "$(TEST_PRODUCT_BUNDLE_IDENTIFIER)";
 				PRODUCT_MODULE_NAME = KippleTests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kipple.app/Contents/MacOS/Kipple";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/$(APP_PRODUCT_NAME).app/Contents/MacOS/$(APP_PRODUCT_NAME)";
 			};
 			name = Release;
 		};
@@ -2076,6 +2251,7 @@
 			buildConfigurations = (
 				713ECD06FF221F7EA764E82D /* Debug */,
 				C76A7732EB050C4F8ED8864E /* Release */,
+				74434FC6EDC10483C5BEE0A8 /* Test */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -2085,6 +2261,7 @@
 			buildConfigurations = (
 				FB4E57D66560E7503A923AFF /* Debug */,
 				0A470F9C21D0ADDABE5BF085 /* Release */,
+				B896999732E377752E24B0AA /* Test */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -2094,6 +2271,7 @@
 			buildConfigurations = (
 				B57B4ACC012E3CC43F364F1B /* Debug */,
 				19891E011B40889E0F4BF586 /* Release */,
+				BC2BE4424E638BA22D729B05 /* Test */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -2103,6 +2281,7 @@
 			buildConfigurations = (
 				A18282330D5634BDDD93EE4F /* Debug */,
 				EA78FCCC4997B1008C04E53F /* Release */,
+				60650D77CCF1166550F3A193 /* Test */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

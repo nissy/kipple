@@ -145,7 +145,8 @@ final class ClipboardRichTextTests: XCTestCase {
     private func makePlainTextController(service: ModernClipboardService) -> PlainTextPasteController {
         PlainTextPasteController(
             clipboardService: ModernClipboardServiceAdapter(modernService: service, refreshPeriodically: false),
-            isTargetActive: { _ in true }, sendPaste: { _ in true }
+            isTargetActive: { _ in true }, sendPaste: { _ in true },
+            normalPasteMonitor: RecoveryPasteMonitor()
         )
     }
 
