@@ -603,6 +603,7 @@
 "Comparison Selection" = "選択中のテキスト";
 "Copy Selected Text" = "選択中のテキストをコピー";
 "Could Not Copy Text" = "コピーできませんでした";
+"The comparison copy did not complete. Close this window and try again." = "比較用のコピーが完了しませんでした。このウインドウを閉じて、もう一度お試しください。";
 "The Text Matches" = "内容は同じです";
 "Previous Difference" = "前の違い";
 "Next Difference" = "次の違い";
@@ -613,6 +614,8 @@
 "Selection Access Required" = "選択範囲の取得に権限が必要です";
 "Allow %@ to read selected text." = "選択範囲を読み取るには、「権限」で「%@」を許可してください。";
 "Clipboard Unavailable" = "クリップボードを読み取れません";
+"Could Not Back Up the Clipboard" = "クリップボードをバックアップできません";
+"A clipboard format could not be backed up. The comparison was stopped." = "元に戻すために必要な形式の一部を保存できなかったため、比較を中止しました。";
 "Check Clipboard Access in Settings → Permission." = "「設定」の「権限」でクリップボードへのアクセスを確認してください。";
 "No Clipboard Text" = "クリップボードにテキストがありません";
 "Copy some text before comparing." = "比較するテキストを先にコピーしてください。";

@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import XCTest
 @testable import Kipple
 
@@ -196,6 +197,72 @@ final class ComparisonClipboardCopyTests: XCTestCase {
         XCTAssertEqual(history.map(\.content), ["History item"])
     }
 
+    func testRestoresAnUnavailableUTF16RepresentationFromTheSameItemsUTF8Text() async throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        let utf16 = NSPasteboard.PasteboardType(UTType.utf16ExternalPlainText.identifier)
+        let original = "元の本文 👩🏽‍💻\n二行目"
+        let utf8 = Data(original.utf8)
+        let htmlText = original.replacingOccurrences(of: "\n", with: "<br>")
+        let html = Data("<b>\(htmlText)</b>".utf8)
+        let attributed = NSAttributedString(string: original)
+        let rtf = try attributed.data(
+            from: NSRange(location: 0, length: attributed.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
+        let provider = UnavailableRepresentationProvider()
+        let item = NSPasteboardItem()
+        XCTAssertTrue(item.setData(utf8, forType: .string))
+        XCTAssertTrue(item.setData(html, forType: .html))
+        XCTAssertTrue(item.setData(rtf, forType: .rtf))
+        XCTAssertTrue(item.setDataProvider(provider, forTypes: [utf16]))
+        XCTAssertTrue(pasteboard.writeObjects([item]))
+        let before = try XCTUnwrap(pasteboard.pasteboardItems?.first)
+        XCTAssertTrue(before.types.contains(utf16))
+        XCTAssertNil(before.data(forType: utf16))
+        XCTAssertEqual(reader.read()?.text, original)
+        let stamp = reader.observation
+
+        let result = await ComparisonClipboardCopy.capture(
+            reader: reader, stamp: stamp, input: comparisonInput("Selected"), isCurrent: { true }, sendCopy: {
+                self.write("Selected", to: pasteboard)
+                return true
+            }
+        )
+
+        guard case .restored("Selected", _, false) = result else { return XCTFail("Expected comparison to finish") }
+        let after = try XCTUnwrap(pasteboard.pasteboardItems?.first)
+        XCTAssertEqual(after.data(forType: .string), utf8)
+        XCTAssertEqual(after.data(forType: .html), html)
+        XCTAssertEqual(after.data(forType: .rtf), rtf)
+        XCTAssertEqual(after.data(forType: utf16).flatMap { String(data: $0, encoding: .utf16) }, original)
+    }
+
+    func testDoesNotOverwriteTheClipboardIfAnUnrelatedRepresentationCannotBeBackedUp() async {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        let unreadable = NSPasteboard.PasteboardType("org.kipple.test.unavailable-representation")
+        let item = NSPasteboardItem()
+        let provider = UnavailableRepresentationProvider()
+        XCTAssertTrue(item.setString("Original", forType: .string))
+        XCTAssertTrue(item.setDataProvider(provider, forTypes: [unreadable]))
+        XCTAssertTrue(pasteboard.writeObjects([item]))
+        let stamp = reader.observation
+
+        let result = await ComparisonClipboardCopy.capture(
+            reader: reader, stamp: stamp, input: comparisonInput("Selected"), isCurrent: { true }, sendCopy: {
+                XCTFail("Expected to stop before writing to the clipboard")
+                return false
+            }
+        )
+
+        guard case .clipboardBackupUnavailable = result else { return XCTFail("Expected a backup failure") }
+        XCTAssertEqual(reader.observation, stamp)
+        XCTAssertEqual(pasteboard.string(forType: .string), "Original")
+    }
+
     func testComparisonMatchesOnlyProvenListDecorationsFromTheSamePage() throws {
         let pasteboard = NSPasteboard.withUniqueName()
         defer { pasteboard.releaseGlobally() }
@@ -221,6 +288,83 @@ final class ComparisonClipboardCopyTests: XCTestCase {
             XCTAssertTrue(pasteboard.setString("https://example.com/other", forType: sourceType))
             XCTAssertFalse(input.matches(try XCTUnwrap(reader.read())))
         }
+    }
+
+    func testWaitsForASlowComparisonCopyAndRestoresTheClipboard() async {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        let service = ModernClipboardService(testRepository: MockClipboardRepository(), clipboardReader: reader)
+        write("Original", to: pasteboard)
+        await service.checkClipboardForTesting()
+        let stamp = reader.observation
+
+        let result = await service.performClipboardComparison(at: stamp) {
+            await ComparisonClipboardCopy.capture(
+                reader: reader, stamp: stamp, input: self.comparisonInput("Selected"), isCurrent: { true }, sendCopy: {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(380))
+                        self.write("Selected", to: pasteboard)
+                    }
+                    return true
+                }
+            )
+        }
+
+        guard case .restored("Selected", _, false) = result else { return XCTFail("Expected the delayed copy") }
+        XCTAssertEqual(pasteboard.string(forType: .string), "Original")
+        await service.checkClipboardForTesting()
+        let history = await service.getHistory()
+        XCTAssertEqual(history.map(\.content), ["Original"])
+    }
+
+    func testRestoresAnAttributedComparisonCopyAfterSwitchingApps() async {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        let service = ModernClipboardService(testRepository: MockClipboardRepository(), clipboardReader: reader)
+        write("Original", to: pasteboard)
+        await service.checkClipboardForTesting()
+        let stamp = reader.observation
+
+        let result = await service.performClipboardComparison(at: stamp) {
+            var sourceIsFrontmost = true
+            return await ComparisonClipboardCopy.capture(
+                reader: reader, stamp: stamp, input: self.comparisonInput("Selected"),
+                isCurrent: { sourceIsFrontmost }, sendCopy: {
+                    sourceIsFrontmost = false
+                    self.write("Selected", to: pasteboard)
+                    return true
+                }
+            )
+        }
+
+        guard case .restored("Selected", _, true) = result else { return XCTFail("Expected cleanup without comparison") }
+        XCTAssertEqual(pasteboard.string(forType: .string), "Original")
+        await service.checkClipboardForTesting()
+        let history = await service.getHistory()
+        XCTAssertEqual(history.map(\.content), ["Original"])
+    }
+
+    func testKeepsACompetingUserCopyEvenWhenItMatchesTheSelection() async {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let reader = ClipboardReader(pasteboard: pasteboard) { .alwaysAllow }
+        write("Original", to: pasteboard)
+        let stamp = reader.observation
+        var didCopyManually = false
+
+        let result = await ComparisonClipboardCopy.capture(
+            reader: reader, stamp: stamp, input: comparisonInput("Selected"), isCurrent: { true },
+            hasCompetingInteraction: { didCopyManually }, sendCopy: {
+                didCopyManually = true
+                self.write("Selected", to: pasteboard)
+                return true
+            }
+        )
+
+        guard case .interrupted = result else { return XCTFail("Expected to keep the competing copy") }
+        XCTAssertEqual(pasteboard.string(forType: .string), "Selected")
     }
 
     func testEmbeddedObjectSelectionIsRejectedBeforeAnyClipboardWrite() async {
@@ -254,4 +398,10 @@ final class ComparisonClipboardCopyTests: XCTestCase {
     private func comparisonInput(_ selection: String, page: URL? = nil) -> ClipboardReader.ComparisonInput {
         .init(text: selection, bundleID: "com.google.Chrome", webPageURL: page, windowBounds: nil)
     }
+}
+
+private final class UnavailableRepresentationProvider: NSObject, NSPasteboardItemDataProvider {
+    func pasteboard(
+        _ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType
+    ) {}
 }

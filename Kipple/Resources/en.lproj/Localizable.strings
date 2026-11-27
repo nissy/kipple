@@ -603,6 +603,7 @@
 "Comparison Selection" = "Selected Text";
 "Copy Selected Text" = "Copy Selected Text";
 "Could Not Copy Text" = "Could not copy the text";
+"The comparison copy did not complete. Close this window and try again." = "The comparison copy did not complete. Close this window and try again.";
 "The Text Matches" = "The Text Matches";
 "Previous Difference" = "Previous Difference";
 "Next Difference" = "Next Difference";
@@ -613,6 +614,8 @@
 "Selection Access Required" = "Selection Access Required";
 "Allow %@ to read selected text." = "Allow %@ to read selected text.";
 "Clipboard Unavailable" = "Clipboard Unavailable";
+"Could Not Back Up the Clipboard" = "Could not back up the clipboard";
+"A clipboard format could not be backed up. The comparison was stopped." = "A clipboard format could not be backed up. The comparison was stopped.";
 "Check Clipboard Access in Settings → Permission." = "Check Clipboard Access in Settings → Permission.";
 "No Clipboard Text" = "No Clipboard Text";
 "Copy some text before comparing." = "Copy some text before comparing.";

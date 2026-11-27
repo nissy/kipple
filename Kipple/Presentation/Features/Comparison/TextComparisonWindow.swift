@@ -23,8 +23,10 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
         case comparison(TextComparison)
         case accessibilityRequired
         case clipboardUnavailable
+        case clipboardBackupUnavailable
         case noClipboardText
         case noSelection
+        case selectionCopyFailed
         case unsupportedSelection
         case textTooLong
     }
@@ -34,14 +36,23 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
     private var task: Task<Void, Never>?
+    private var deferredComparison: (() -> Void)?
     private var previousFocus: ComparisonFocusTarget?
     private var restoreFocusTask: Task<Void, Never>?
     private var localClickMonitor: Any?
     private var globalClickMonitor: Any?
 
     func compareCurrentSelection(reader: ClipboardReader = .shared, service: ModernClipboardService = .shared) {
-        guard task == nil else { return }
+        if NSApp.isActive, window?.isKeyWindow == true { return }
         let app = NSWorkspace.shared.frontmostApplication
+        if task != nil {
+            let requestedProcess = app?.processIdentifier
+            deferredComparison = { [weak self] in
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier == requestedProcess else { return }
+                self?.compareCurrentSelection(reader: reader, service: service)
+            }
+            return
+        }
         let placement = TextComparisonWindowPlacement.capture(for: app)
         guard AXIsProcessTrusted() else {
             show(.accessibilityRequired, placement: placement)
@@ -64,23 +75,42 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
             return
         }
         let stamp = snapshot.stamp
-        let targetID = app.processIdentifier
         task = Task { [weak self] in
-            guard let self else { return }
-            defer { task = nil }
-            let input = await ClipboardReader.comparisonInput(in: app)
-            guard reader.observation == stamp,
-                  NSWorkspace.shared.frontmostApplication?.processIdentifier == targetID else { return }
-            guard let input else {
-                show(.noSelection, placement: placement)
-                return
-            }
-            let result = await service.performClipboardComparison(at: stamp) {
-                await ComparisonClipboardCopy.capture(reader: reader, stamp: stamp, input: input, target: targetID)
-            }
-            let target = placement.withWindowBounds(input.windowBounds)
-            await showResult(result, clipboard: clipboard, placement: target, sourceID: targetID, reader: reader)
+            await self?.compare(
+                in: app, clipboard: clipboard, stamp: stamp, reader: reader, service: service, placement: placement
+            )
         }
+    }
+
+    private func compare(
+        in app: NSRunningApplication,
+        clipboard: String,
+        stamp: ClipboardReader.Stamp,
+        reader: ClipboardReader,
+        service: ModernClipboardService,
+        placement: TextComparisonWindowPlacement
+    ) async {
+        defer { finishComparison() }
+        let targetID = app.processIdentifier
+        let input = await ClipboardReader.comparisonInput(in: app)
+        guard reader.observation == stamp,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == targetID else { return }
+        guard let input else {
+            show(.noSelection, placement: placement)
+            return
+        }
+        let result = await service.performClipboardComparison(at: stamp) {
+            await ComparisonClipboardCopy.capture(reader: reader, stamp: stamp, input: input, target: targetID)
+        }
+        let target = placement.withWindowBounds(input.windowBounds)
+        await showResult(result, clipboard: clipboard, placement: target, sourceID: targetID, reader: reader)
+    }
+
+    private func finishComparison() {
+        task = nil
+        let next = deferredComparison
+        deferredComparison = nil
+        next?()
     }
 
     private func showResult(
@@ -106,8 +136,10 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
             }
         case .clipboardUnavailable:
             show(.clipboardUnavailable, placement: placement)
+        case .clipboardBackupUnavailable:
+            show(.clipboardBackupUnavailable, placement: placement)
         case .noSelection:
-            show(.noSelection, placement: placement)
+            show(.selectionCopyFailed, placement: placement)
         case .unsupportedSelection:
             show(.unsupportedSelection, placement: placement)
         case .interrupted:
@@ -121,7 +153,7 @@ final class TextComparisonWindow: NSObject, NSWindowDelegate {
     ) {
         let window = window ?? makeWindow()
         restoreFocusTask?.cancel()
-        if !window.isVisible && !window.isMiniaturized {
+        if !NSApp.isActive || !window.isKeyWindow {
             previousFocus = ComparisonFocusTarget.capture(excluding: window)
         }
         window.title = AppSettings.shared.localizedString("Compare Text")

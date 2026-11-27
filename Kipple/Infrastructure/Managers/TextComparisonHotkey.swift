@@ -110,7 +110,8 @@ final class TextComparisonHotkey: ObservableObject {
 
     private func installHandler() -> Bool {
         guard handler == nil else { return true }
-        var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        // As with plain-text paste, wait for the shortcut key to be released before sending a copy command.
+        var type = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
         let callback: EventHandlerUPP = { _, event, context in
             guard let context else { return OSStatus(eventNotHandledErr) }
             var id = EventHotKeyID()

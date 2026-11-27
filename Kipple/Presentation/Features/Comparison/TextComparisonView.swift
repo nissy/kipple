@@ -24,6 +24,12 @@ struct TextComparisonView: View {
                     icon: "clipboard",
                     description: "Check Clipboard Access in Settings → Permission."
                 ) { Button("Open Permissions", action: openPermissions) }
+            case .clipboardBackupUnavailable:
+                notice(
+                    "Could Not Back Up the Clipboard",
+                    icon: "clipboard",
+                    description: "A clipboard format could not be backed up. The comparison was stopped."
+                ) {}
             case .noClipboardText:
                 notice("No Clipboard Text", icon: "clipboard", description: "Copy some text before comparing.") {}
             case .noSelection:
@@ -31,6 +37,12 @@ struct TextComparisonView: View {
                     "No Selected Text",
                     icon: "text.cursor",
                     description: "Select text in the frontmost app and try the shortcut again."
+                ) {}
+            case .selectionCopyFailed:
+                notice(
+                    "Could Not Copy Text",
+                    icon: "text.cursor",
+                    description: "The comparison copy did not complete. Close this window and try again."
                 ) {}
             case .unsupportedSelection:
                 notice(
