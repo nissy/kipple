@@ -46,6 +46,7 @@
 		1DF7E8C1106493040EB3A0AD /* SwiftDataRepositoryComprehensiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB0F2C9F3E7E841B7C707C6 /* SwiftDataRepositoryComprehensiveTests.swift */; };
 		1EFC16A8E768C8C2B0831EC5 /* PasteboardSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B47E9E43F523DA4442D942 /* PasteboardSnapshot.swift */; };
 		1F77648DF25DA552B7428D5B /* ClipboardRichTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B738B1A2C5D1200FA250B2C7 /* ClipboardRichTextTests.swift */; };
+		20060033DF59DCEB8748014A /* DesktopNoteLongText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E4DD5DE0AA40957577FBE /* DesktopNoteLongText.swift */; };
 		20C367DB3064914202E02EFC /* UserCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 704FBF789F27F0E1F5DA71F8 /* UserCategory.swift */; };
 		20F3BAF3289C6FFB5F9BB8C2 /* RecopyPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C74C9D7D8CFA7008508FC5C /* RecopyPerformanceTests.swift */; };
 		21E8ABF485231AE29F2B3456 /* SimpleLineNumberRulerView+LineNumbers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC27626F1475139B9F815EB /* SimpleLineNumberRulerView+LineNumbers.swift */; };
@@ -449,6 +450,7 @@
 		8B3D64FF145B7EC3BA4682CF /* HistoryColumnsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryColumnsRow.swift; sourceTree = "<group>"; };
 		8BADBE252C52DB9A52018675 /* TextComparisonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextComparisonTests.swift; sourceTree = "<group>"; };
 		8C5D167446E2D7AC69CFBC50 /* ModifierKeyPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierKeyPicker.swift; sourceTree = "<group>"; };
+		8D4E4DD5DE0AA40957577FBE /* DesktopNoteLongText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopNoteLongText.swift; sourceTree = "<group>"; };
 		8D7DCFE250A4461B1535CAD1 /* FontNameMappings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontNameMappings.swift; sourceTree = "<group>"; };
 		8E28B95A01B6F25BFD3B1697 /* ModernClipboardService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernClipboardService.swift; sourceTree = "<group>"; };
 		8EBA9A787C39F804DFBFC744 /* TextComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextComparisonView.swift; sourceTree = "<group>"; };
@@ -755,6 +757,7 @@
 				D1137BB3FA8320272B443058 /* ClipDetailsView.swift */,
 				E708EB76A129DCB6F6D47B41 /* DesktopNoteContent.swift */,
 				ED75A623E30B9E0D2CC47B24 /* DesktopNoteEditor.swift */,
+				8D4E4DD5DE0AA40957577FBE /* DesktopNoteLongText.swift */,
 				FDFD50081D1B62468650601A /* HistoryCategoryMenu.swift */,
 				05243238D42C5917E20B6BFA /* HistoryItemPopoverComponents.swift */,
 				4F1175F7A3CAFDF9C577A3A2 /* HistoryItemPreviewContent.swift */,
@@ -1509,6 +1512,7 @@
 				E501959FB3DEAC3C9C4E5B5D /* DesktopNoteContent.swift in Sources */,
 				04E751A39C40EFC2B327AA64 /* DesktopNoteContentController.swift in Sources */,
 				3785705B62197C0CC8F84CB8 /* DesktopNoteEditor.swift in Sources */,
+				20060033DF59DCEB8748014A /* DesktopNoteLongText.swift in Sources */,
 				F2AB46233010A6D45F98E7BB /* DesktopNotePanel+ContextMenu.swift in Sources */,
 				18B9DDE0902C8F897C4B91FB /* DesktopNotePanel+Pointer.swift in Sources */,
 				D977C5BCBC8A62320A1BACE6 /* DesktopNotePanel+Toolbar.swift in Sources */,

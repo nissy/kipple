@@ -13,6 +13,7 @@ struct DesktopNoteContent: View {
     let displayMode: AppSettings.DesktopNoteDisplayMode
     let copyLink: (String) -> Void
     let historyFont = FontManager.shared.historyFont
+    private let longText: String?
     var showsBody = true
     var selectionRevision = 0
     var allowsRemoteImages = false
@@ -20,6 +21,13 @@ struct DesktopNoteContent: View {
     let measurementID = UUID()
     var onDocumentHeightChange: ((CGFloat, UUID) -> Void)?
     var onBlockWidthChange: ((CGFloat, UUID) -> Void)?
+
+    init(item: ClipItem, displayMode: AppSettings.DesktopNoteDisplayMode, copyLink: @escaping (String) -> Void) {
+        self.item = item
+        self.displayMode = displayMode
+        self.copyLink = copyLink
+        longText = DesktopNoteLongText.content(for: item.content, displayMode: displayMode)
+    }
 
     private var sourceApp: String? { HistoryItemPreviewContent.visibleSourceApp(for: item) }
     private var windowTitle: String? { HistoryItemPreviewContent.visibleWindowTitle(for: item) }
@@ -32,7 +40,7 @@ struct DesktopNoteContent: View {
     }
 
     var offersRemoteImages: Bool {
-        guard showsBody, displayMode == .markdown, !allowsRemoteImages,
+        guard showsBody, displayMode == .markdown, longText == nil, !allowsRemoteImages,
               let markdown = try? AttributedString(markdown: item.content) else { return false }
         return markdown.runs.contains { $0.imageURL.map(isRemoteImage) == true }
     }
@@ -47,7 +55,13 @@ struct DesktopNoteContent: View {
                         Divider().padding(.horizontal, HistoryItemPreviewContent.contentPadding).padding(.bottom, 8)
                     }
                 }
-            if showsBody {
+            if showsBody, let longText {
+                DesktopNoteLongText(text: longText, font: historyFont) { height in
+                    onDocumentHeightChange?(height, measurementID)
+                }
+                .id(selectionRevision)
+                .padding(.trailing, Self.windowBorderInset)
+            } else if showsBody {
                 ScrollView(.vertical) {
                     document
                         .id(selectionRevision)
@@ -166,9 +180,10 @@ struct DesktopNoteContent: View {
     // Markdown is laid out asynchronously, so start with its visible text before measuring the rendered view.
     func estimatedWindowSize(in screenFrame: NSRect, minimumWidth: CGFloat) -> NSSize {
         let maxWidth = min(Self.maximumAutomaticWidth, screenFrame.width)
+        let text = String((longText ?? sizingText).prefix(DesktopNoteLongText.sizingCharacterLimit))
         let sizing = NSHostingController(rootView: VStack(alignment: .leading, spacing: 0) {
             header
-            plainDocument(sizingText)
+            plainDocument(text)
                 .padding(.horizontal, HistoryItemPreviewContent.contentPadding)
                 .padding(.bottom, 8)
         })
@@ -402,55 +417,6 @@ private struct DesktopNoteTextRegions: ViewModifier {
             view.lines = lines
             view.allowsSelectionMargin = allowsSelectionMargin
         }
-    }
-}
-
-@MainActor
-final class DesktopNoteTextHitView: NSView {
-    private static let horizontalSelectionMargin: CGFloat = 12
-    private static let verticalSelectionMargin: CGFloat = 4
-    var lines: [CGRect] = []
-    var allowsSelectionMargin = false
-
-    override var isFlipped: Bool { true }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        (window as? DesktopNotePanel)?.registerTextHitView(self)
-    }
-
-    func containsText(at windowPoint: NSPoint) -> Bool {
-        guard window != nil, !isHiddenOrHasHiddenAncestor else { return false }
-        let point = convert(windowPoint, from: nil)
-        return visibleRect.contains(point) && lines.contains { $0.contains(point) }
-    }
-
-    func nearbySelectionStart(at windowPoint: NSPoint) -> NSPoint? {
-        guard allowsSelectionMargin, window != nil, !isHiddenOrHasHiddenAncestor else { return nil }
-        if let clip = enclosingScrollView?.contentView,
-           !clip.visibleRect.contains(clip.convert(windowPoint, from: nil)) { return nil }
-        let point = convert(windowPoint, from: nil)
-        let visible = visibleRect
-        let dx = Self.horizontalSelectionMargin
-        let dy = Self.verticalSelectionMargin
-        guard visible.insetBy(dx: -dx, dy: -dy).contains(point) else { return nil }
-
-        var nearest: NSPoint?
-        var nearestDistance = CGFloat.infinity
-        for line in lines where line.insetBy(dx: -dx, dy: -dy).contains(point) {
-            let clipped = line.intersection(visible)
-            guard !clipped.isEmpty else { continue }
-            let selectable = clipped.insetBy(dx: min(0.5, clipped.width / 4), dy: 0.5)
-            guard !selectable.isEmpty else { continue }
-            let start = NSPoint(x: min(max(point.x, selectable.minX), selectable.maxX),
-                                y: min(max(point.y, selectable.minY), selectable.maxY))
-            let distance = hypot(point.x - start.x, point.y - start.y)
-            if distance < nearestDistance {
-                nearest = start
-                nearestDistance = distance
-            }
-        }
-        return nearest.map { convert($0, to: nil) }
     }
 }
 
