@@ -38,8 +38,7 @@ settings:
 packages:
   MCP:
     url: https://github.com/modelcontextprotocol/swift-sdk.git
-    # Fix nested initialize capabilities (upstream PR #276); use a release once included.
-    revision: f7077e0d5cd57e0b2a497862017aa94ee344252f
+    exactVersion: 0.12.1
   Textual:
     url: https://github.com/gonzalezreal/textual.git
     exactVersion: 0.5.0

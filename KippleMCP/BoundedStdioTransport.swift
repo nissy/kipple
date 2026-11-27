@@ -34,13 +34,31 @@ actor BoundedStdioTransport: Transport {
                 while let newline = pending.firstIndex(of: 10) {
                     let frame = Data(pending[..<newline])
                     guard frame.count <= MCPProtocolConfig.maxInputBytes else { throw MCPFailure.tooLarge }
-                    if !frame.isEmpty, case .dropped = continuation.yield(frame) { throw MCPFailure.tooLarge }
+                    if !frame.isEmpty, case .dropped = continuation.yield(compatibleInitialization(frame)) {
+                        throw MCPFailure.tooLarge
+                    }
                     pending.removeSubrange(...newline)
                 }
                 guard pending.count <= MCPProtocolConfig.maxInputBytes else { throw MCPFailure.tooLarge }
             }
             continuation.finish()
         } catch { continuation.finish(throwing: MCPFailure.invalidInput) }
+    }
+
+    private nonisolated static func compatibleInitialization(_ frame: Data) -> Data {
+        guard var request = (try? JSONSerialization.jsonObject(with: frame)) as? [String: Any],
+              request["method"] as? String == "initialize",
+              var parameters = request["params"] as? [String: Any],
+              var capabilities = parameters["capabilities"] as? [String: Any],
+              let experimental = capabilities["experimental"] as? [String: Any] else { return frame }
+
+        // Swift SDK 0.12.1 decodes experimental capabilities as a string dictionary.
+        let strings = experimental.compactMapValues { $0 as? String }
+        guard strings.count != experimental.count else { return frame }
+        capabilities["experimental"] = strings
+        parameters["capabilities"] = capabilities
+        request["params"] = parameters
+        return (try? JSONSerialization.data(withJSONObject: request)) ?? frame
     }
 
     func disconnect() async { continuation.finish() }
