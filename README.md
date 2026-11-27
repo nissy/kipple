@@ -19,6 +19,8 @@ Kipple is more than a clipboard history list.
 
 - Search copied text and bring it back instantly
 - Keep important clips in custom categories
+- Pin clips to the desktop as notes
+- Compare clipboard text with a selection in another app
 - Edit clipboard text in the Live Editor before saving or pasting
 - Format JSON and YAML directly from the editor
 - Paste multiple clips in order with Queue
@@ -31,12 +33,16 @@ Kipple is more than a clipboard history list.
 
 Kipple automatically saves copied text and shows it in a compact menu bar window. Selecting an item copies it back to the clipboard.
 
-History items can include:
+Each history item can hold up to 80,000 characters. Use **Add History Item** to create an entry manually, or right-click an entry and choose **Edit Item** to update its title, text, and categories.
+
+History items can include the following information.
 
 - copied text
+- title
 - copied time
 - source app
 - source window title
+- source web link, when available
 - URL classification
 - user category
 
@@ -44,9 +50,25 @@ Duplicate copies are moved to the top instead of creating another identical item
 
 ### Search and Categories
 
-Search across clipboard content and source app names. Organize clips with built-in or custom categories. Clips in custom categories stay available when history is trimmed or cleared.
+Search by text, title, or source app. Select multiple category filters and choose whether clips must match all or any of them. Clips in custom categories stay available when history is trimmed or cleared.
 
-Kipple includes built-in `None` and `URL` categories. You can also add your own categories with names and SF Symbol icons.
+Kipple includes built-in `None`, `URL`, `OCR`, and `AI` categories. You can also add your own categories with names and SF Symbol icons. See the [MCP setup guide (Japanese)](MCP.md) for adding clips from an AI client.
+
+### Desktop Notes
+
+Click the pin icon next to a history item to post it to your desktop. Edit or copy the note, switch between Markdown and plain text, and choose from 16 colors. Use **Fit to Content** to resize the note to its text. The note also shows the source app, window title, and a clickable web link when available.
+
+Use **Show Only Desktop Notes** to find posted items in history. Kipple restores open notes with their position, size, and color when you reopen the app. Posted items stay available when history is trimmed or cleared.
+
+In **Settings → Desktop Notes**, choose the default display format and the monitor where new notes appear. With **Create a note on repeated copy** enabled, copy the same text three times in a row within five seconds in another app to post a note.
+
+### Compare Text
+
+Set a shortcut in **Settings → General → Compare Text**. Copy the first text, select the second text in the active app, and press your shortcut. The clipboard appears on the left and the selection appears on the right. Each side supports up to 80,000 characters.
+
+Line numbers and character-level highlights show what changed. When there are multiple differences, use **Previous Difference** and **Next Difference** to jump between them. Click **Copy** in the **Selected Text** header to copy the selection and close the window. Press `Esc` or click outside to dismiss it.
+
+Kipple keeps the temporary comparison copy out of history and restores the original clipboard. A new copy made during the comparison takes precedence and cancels the comparison.
 
 ### Live Editor
 
@@ -64,11 +86,11 @@ You can:
 
 Queue lets you paste multiple history items in a chosen order.
 
-Turn on Queue, select clips from history, then press `Command + V` repeatedly. Kipple advances to the next queued item after each paste. Loop mode can repeat the queue.
+Turn on Queue, select clips from history, then press `Command + V` repeatedly. Kipple advances to the next queued item after each paste. Turn on **Repeat** to loop through the queue.
 
 In normal mode, either hold a history item for half a second or drag and drop it inside the history list to start Queue with that item. Dragging does not require a long press. In Queue mode, drag without waiting: dropping an unqueued item adds it at the insertion line; dragging a queued item changes its position. The area below the last queue entry, including the space below the history rows, appends to the queue. This also works while searching, filtering by category, or scrolling past the queue entries. When the queue is empty or no queue entries are displayed, dropping inside the list appends the item. During a drag, pressing `Esc` or dropping outside the list cancels without changing the mode or queue. Starting Queue with a long press or adding or reordering by dragging does not change the clipboard contents. A short click still copies in normal mode or adds/removes an item in Queue mode.
 
-Use the plain text paste shortcut (default: `Command + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Review the required paste permission in **Settings → Permissions**.
+Use the plain text paste shortcut (default: `Command + Shift + V`) to paste a queued item without formatting. Each shortcut prepares its item before sending the paste command. Kipple leaves that item on the clipboard until the next operation, including after the queue finishes, so delayed paste requests can still read it. Review the required paste permission in **Settings → Permission**.
 
 Change or clear the plain text paste shortcut in **Settings → General → Pasting**. Editing and using this shortcut requires the same permission. The settings show a link when access is missing. Revoking access stops the shortcut and keeps your chosen keys for when access is granted again.
 
@@ -96,7 +118,7 @@ Open **Kipple Settings → Permission** to check access and open the matching pa
 | Permission | Used for |
 | --- | --- |
 | Screen & System Audio Recording | Screen Text Capture (OCR) and retrieving source window names. Kipple captures still images; it does not record audio. |
-| Accessibility (macOS 26) / Device Control and Data Access (macOS 27 or later) | Sending paste commands for Queue, Paste on Selection, and plain text paste. |
+| Accessibility (macOS 26) / Device Control and Data Access (macOS 27 or later) | Reading the selection for Compare Text and sending paste commands for Queue, Paste on Selection, and plain text paste. |
 
 Enable **Kipple** on the corresponding page. Return to Kipple to check the permission status. If macOS requests a restart or the status remains Not Granted, quit and reopen Kipple. If it is still Not Granted, remove the old Kipple entry from that permission list, add the Kipple.app you are currently using, and enable it again. This may be necessary after changing the app's signing identity or switching between installed and development copies.
 
