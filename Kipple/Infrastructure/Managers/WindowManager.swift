@@ -410,7 +410,10 @@ final class WindowManager: NSObject, NSWindowDelegate {
     @MainActor
     private func createMainWindow() -> NSWindow? {
         // MainViewModelを作成または再利用
-        let viewModel = mainViewModel ?? MainViewModel(categoryStore: .shared)
+        let viewModel = mainViewModel ?? MainViewModel(
+            categoryStore: .shared,
+            postedDesktopNoteIDs: DesktopNoteWindowCoordinator.shared.postedItemIDs
+        )
         mainViewModel = viewModel
         if let pasteController { viewModel.connectPasteController(pasteController) }
         syncTitleBarQueueState()

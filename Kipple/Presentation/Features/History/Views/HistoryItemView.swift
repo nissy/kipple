@@ -40,6 +40,7 @@ struct HistoryItemView: View {
     @State private var currentAnchorView: NSView?
     @GestureState private var isQueueDragGestureActive = false
     @State private var hasStartedQueueDrag = false
+    private static let initialPopoverDelay: TimeInterval = 0.1
 
     init(
         item: ClipItem,
@@ -87,6 +88,7 @@ struct HistoryItemView: View {
             handleHoverChange(hovering, anchor: anchor)
         }, isScrollLocked: isScrollLocked)
         .onDisappear {
+            cancelPopoverTask()
             if let anchor = currentAnchorView {
                 HistoryPopoverManager.shared.hide(ifAnchoredTo: anchor)
             }
@@ -138,10 +140,10 @@ struct HistoryItemView: View {
                 queueBadgeView
             } content: {
                 historyText
-            } pin: {
-                desktopNoteButton
             } category: {
                 categoryMenuView
+            } pin: {
+                desktopNoteButton
             }
             .padding(.vertical, 4)
         }
@@ -301,7 +303,7 @@ struct HistoryItemView: View {
         return content
     }
 
-    private func schedulePopoverPresentation(anchor: NSView, after delay: TimeInterval = 0.3) {
+    private func schedulePopoverPresentation(anchor: NSView, after delay: TimeInterval = Self.initialPopoverDelay) {
         guard !isEditingCategories else { return }
         cancelPopoverTask()
         let workItem = DispatchWorkItem {
@@ -415,7 +417,7 @@ private extension HistoryItemView {
             if let window = anchor.window, let screen = window.screen {
                 windowPosition = window.frame.midX < screen.frame.midX
             }
-            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.25 : 0.3)
+            schedulePopoverPresentation(anchor: anchor, after: switchedRow ? 0.25 : Self.initialPopoverDelay)
         } else {
             cancelPopoverTask()
             hoverCoordinator.clearHover(ifMatches: item.id)

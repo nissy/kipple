@@ -33,6 +33,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     private struct PaginationFilterState: Equatable {
         let searchText: String
         let showOnlyURLs: Bool
+        let showOnlyDesktopNotes: Bool
         let categoryFilter: CategoryFilter
     }
 
@@ -61,6 +62,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     }
     private var searchCoalesceTask: Task<Void, Never>?
     @Published var showOnlyURLs: Bool = false
+    @Published var showOnlyDesktopNotes = false {
+        didSet { if oldValue != showOnlyDesktopNotes { applyFilters() } }
+    }
+    private var desktopNoteItemIDs: Set<UUID> = []
     @Published var categoryFilter = CategoryFilter() {
         didSet { if !isFilterMutating { applyFilters() } }
     }
@@ -113,6 +118,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
     init(
         clipboardService: (any ClipboardServiceProtocol)? = nil,
         categoryStore: UserCategoryStore? = nil,
+        postedDesktopNoteIDs: AnyPublisher<Set<UUID>, Never>? = nil,
         pageSize: Int = 50,
         pasteMonitor: any PasteCommandMonitoring = PasteCommandMonitor(),
         screenCapturePermissionCheck: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() }
@@ -128,6 +134,12 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         
         subscribeToClipboardService()
         observeClipboardActions()
+        postedDesktopNoteIDs?.sink { [weak self] itemIDs in
+            guard let self else { return }
+            self.desktopNoteItemIDs = itemIDs
+            if self.showOnlyDesktopNotes { self.applyFilters(animated: false) }
+        }
+        .store(in: &cancellables)
 
         // 特定の設定値の変更のみを監視（パフォーマンス最適化）
         // 注: UserDefaultsの変更通知は特定のキーを識別できないため、
@@ -293,12 +305,14 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let searchQuery = searchText
         let hasSearchQuery = !searchQuery.isEmpty
         let requireURLsOnly = showOnlyURLs
+        let requiredDesktopNoteIDs = showOnlyDesktopNotes ? desktopNoteItemIDs : nil
         let highlightedItemID = historyHighlightRequest?.itemID
 
         // Fast-path: no filters and no queue ordering → avoid O(n) filter
         let noFiltersActive = !hasSearchQuery &&
                               categoryFilter.ids.isEmpty &&
-                              !requireURLsOnly
+                              !requireURLsOnly &&
+                              requiredDesktopNoteIDs == nil
 
         let filteredStartedAt = PerformanceTrace.nowMicros()
         let filtered: [ClipItem]
@@ -309,6 +323,8 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             // 安価な判定（Bool/UUID 比較）で早期 return し、最後に expensive な
             // localizedCaseInsensitiveContains を評価して総コストを下げる
             filtered = items.filter { item in
+                if let requiredDesktopNoteIDs, !requiredDesktopNoteIDs.contains(item.id),
+                   item.id != highlightedItemID { return false }
                 if queuedIDs.contains(item.id) || item.id == categoryEditingItemID || item.id == highlightedItemID {
                     return true
                 }
@@ -327,6 +343,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
         let paginationFilterState = PaginationFilterState(
             searchText: searchText,
             showOnlyURLs: showOnlyURLs,
+            showOnlyDesktopNotes: showOnlyDesktopNotes,
             categoryFilter: categoryFilter
         )
         let shouldResetPagination = lastPaginationFilterState != paginationFilterState || currentHistoryLimit == 0
@@ -679,6 +696,10 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             showOnlyURLs = false
             didMutate = true
         }
+        if showOnlyDesktopNotes {
+            showOnlyDesktopNotes = false
+            didMutate = true
+        }
         if !categoryFilter.ids.isEmpty {
             categoryFilter.ids = []
             didMutate = true
@@ -708,7 +729,7 @@ final class MainViewModel: ObservableObject, MainViewModelProtocol {
             copyEpoch: (clipboardService as? ModernClipboardServiceAdapter)?.copyEpoch,
             pasteboardChangeCount: NSPasteboard.general.changeCount, mode: pasteMode,
             searchText: searchText, categoryFilter: categoryFilter,
-            showOnlyURLs: showOnlyURLs,
+            showOnlyURLs: showOnlyURLs, showOnlyDesktopNotes: showOnlyDesktopNotes,
             filteredIDs: filteredHistory.map(\.id)
         )
     }

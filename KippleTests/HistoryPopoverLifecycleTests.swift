@@ -74,6 +74,40 @@ final class HistoryPopoverLifecycleTests: XCTestCase {
         window.orderOut(nil)
     }
 
+    func testReopeningReusesThePanelAndResizesForTheNewItem() throws {
+        let manager = HistoryPopoverManager { .zero }
+        let originalWindows = NSApp.windows
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let firstRow = NSView(frame: NSRect(x: 0, y: 220, width: 200, height: 32))
+        let secondRow = NSView(frame: NSRect(x: 0, y: 180, width: 200, height: 32))
+        window.contentView?.addSubview(firstRow)
+        window.contentView?.addSubview(secondRow)
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            manager.forceClose()
+            window.orderOut(nil)
+        }
+
+        manager.show(item: ClipItem(content: "First row"), from: firstRow, trailingEdge: true)
+        let panel = try XCTUnwrap(NSApp.windows.first {
+            $0 is NSPanel && $0.isVisible && !originalWindows.contains($0)
+        })
+        let container = try XCTUnwrap(panel.contentView)
+        let firstHeight = panel.frame.height
+        manager.hide()
+        XCTAssertFalse(panel.isVisible)
+        XCTAssertFalse(manager.prepareForRowHover(secondRow))
+
+        let secondItem = ClipItem(content: "Second row\nMore details\nA third preview line")
+        manager.show(item: secondItem, from: secondRow, trailingEdge: true)
+        XCTAssertTrue(panel.isVisible)
+        XCTAssertTrue(panel.contentView === container)
+        XCTAssertGreaterThan(panel.frame.height, firstHeight)
+        manager.hide(ifAnchoredTo: firstRow)
+        XCTAssertTrue(panel.isVisible)
+    }
+
     func testCrossingAnotherRowKeepsThePanelUntilTheNewRowSettles() async throws {
         let manager = HistoryPopoverManager { .zero }
         let originalWindows = NSApp.windows

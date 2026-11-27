@@ -39,6 +39,7 @@ extension MainView {
             onOpenCategoryManager: { presentCategoryManager() },
             categoryFilter: $viewModel.categoryFilter,
             historyCategoryIDs: viewModel.historyCategoryIDs,
+            showOnlyDesktopNotes: $viewModel.showOnlyDesktopNotes,
             searchText: $viewModel.searchText,
             onLoadMore: { item in
                 viewModel.loadMoreHistoryIfNeeded(currentItem: item)

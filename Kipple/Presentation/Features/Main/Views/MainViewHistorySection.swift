@@ -26,6 +26,7 @@ struct MainViewHistorySection: View {
     let onOpenCategoryManager: (() -> Void)?
     @Binding var categoryFilter: CategoryFilter
     let historyCategoryIDs: Set<UUID>
+    @Binding var showOnlyDesktopNotes: Bool
     @Binding var searchText: String
     let onLoadMore: (ClipItem) -> Void
     let hasMoreItems: Bool
@@ -54,6 +55,7 @@ struct MainViewHistorySection: View {
         onOpenCategoryManager: (() -> Void)? = nil,
         categoryFilter: Binding<CategoryFilter>,
         historyCategoryIDs: Set<UUID>,
+        showOnlyDesktopNotes: Binding<Bool>,
         searchText: Binding<String>,
         onLoadMore: @escaping (ClipItem) -> Void,
         hasMoreItems: Bool,
@@ -79,6 +81,7 @@ struct MainViewHistorySection: View {
         self.onOpenCategoryManager = onOpenCategoryManager
         self._categoryFilter = categoryFilter
         self.historyCategoryIDs = historyCategoryIDs
+        self._showOnlyDesktopNotes = showOnlyDesktopNotes
         self._searchText = searchText
         self.onLoadMore = onLoadMore
         self.hasMoreItems = hasMoreItems
@@ -91,12 +94,7 @@ struct MainViewHistorySection: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: MainViewMetrics.HistoryFilterSidebar.contentSpacing) {
-            CategoryFilterControl(
-                selection: $categoryFilter,
-                historyCategoryIDs: historyCategoryIDs,
-                onOpenManager: onOpenCategoryManager
-            )
-            .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
+            historyFilters
 
             VStack(spacing: 0) {
                 historyToolbar
@@ -105,6 +103,25 @@ struct MainViewHistorySection: View {
         }
         .padding(.horizontal, MainViewMetrics.contentHorizontalInset)
         .padding(.vertical, 6)
+    }
+
+    private var historyFilters: some View {
+        VStack(spacing: MainViewMetrics.HistoryRows.spacing) {
+            HistoryFilterButton(
+                systemName: showOnlyDesktopNotes ? "pin.fill" : "pin",
+                label: Text("Show Only Desktop Notes"),
+                isActive: showOnlyDesktopNotes
+            ) {
+                showOnlyDesktopNotes.toggle()
+            }
+
+            CategoryFilterControl(
+                selection: $categoryFilter,
+                historyCategoryIDs: historyCategoryIDs,
+                onOpenManager: onOpenCategoryManager
+            )
+        }
+        .frame(width: MainViewMetrics.HistoryFilterSidebar.width)
     }
 
     private var historyToolbar: some View {

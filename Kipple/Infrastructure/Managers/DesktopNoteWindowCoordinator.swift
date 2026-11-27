@@ -89,6 +89,12 @@ final class DesktopNoteWindowCoordinator: NSObject, ObservableObject, NSWindowDe
         notes[id] != nil
     }
 
+    var postedItemIDs: AnyPublisher<Set<UUID>, Never> {
+        $notes.map { Set($0.keys) }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+    }
+
     func toggle(_ itemID: UUID, on screen: NSScreen?) async {
         if let note = notes[itemID] {
             if closingNotes[itemID] == nil { note.performClose(nil) }

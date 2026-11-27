@@ -578,6 +578,33 @@ class MainViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.history.count, viewModel.filteredHistory.count)
         XCTAssertTrue(viewModel.history.allSatisfy { $0.content.contains("Item 2") })
     }
+
+    func testDesktopNoteFilterUpdatesAndCombinesWithSearchAndCategory() {
+        let categoryID = UUID()
+        let pinnedRelease = ClipItem(content: "Release notes", userCategoryId: categoryID)
+        let pinnedDraft = ClipItem(content: "Draft notes", userCategoryId: categoryID)
+        let pinnedOtherCategory = ClipItem(content: "Release checklist")
+        let unpinnedRelease = ClipItem(content: "Release schedule", userCategoryId: categoryID)
+        mockClipboardService.history = [pinnedRelease, pinnedDraft, pinnedOtherCategory, unpinnedRelease]
+        let postedIDs = CurrentValueSubject<Set<UUID>, Never>([pinnedRelease.id, pinnedDraft.id, pinnedOtherCategory.id])
+        viewModel = MainViewModel(clipboardService: mockClipboardService, postedDesktopNoteIDs: postedIDs.eraseToAnyPublisher())
+
+        viewModel.showOnlyDesktopNotes = true
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedRelease.id, pinnedDraft.id, pinnedOtherCategory.id])
+
+        viewModel.searchText = "Release"
+        viewModel.categoryFilter.select(categoryID)
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedRelease.id])
+
+        postedIDs.send([pinnedDraft.id, pinnedOtherCategory.id, unpinnedRelease.id])
+        XCTAssertEqual(viewModel.history.map(\.id), [unpinnedRelease.id])
+
+        postedIDs.send([])
+        XCTAssertTrue(viewModel.history.isEmpty)
+
+        viewModel.showOnlyDesktopNotes = false
+        XCTAssertEqual(viewModel.history.map(\.id), [pinnedRelease.id, unpinnedRelease.id])
+    }
     
     // MARK: - Performance Tests
     

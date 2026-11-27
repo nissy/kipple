@@ -10,6 +10,7 @@ struct QueueReorderSession: Equatable {
     let searchText: String
     let categoryFilter: CategoryFilter
     let showOnlyURLs: Bool
+    let showOnlyDesktopNotes: Bool
     let filteredIDs: [UUID]
 }
 
