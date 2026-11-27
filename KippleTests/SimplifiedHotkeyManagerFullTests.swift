@@ -337,11 +337,13 @@ final class SimplifiedHotkeyManagerFullTests: XCTestCase, @unchecked Sendable {
 
     // MARK: - Performance Tests
 
-    func testSettingsPerformance() {
-        // Measure time to perform many setting changes
+    func testSettingsPerformance() throws {
+        let suite = "HotkeySettingsPerformance.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let manager = SimplifiedHotkeyManager.makeForTesting(defaults: defaults)
         let iterations = 1000
-
-        let startTime = Date()
+        let start = ContinuousClock.now
 
         for i in 0..<iterations {
             let keyCode = UInt16(i % 47)
@@ -350,10 +352,9 @@ final class SimplifiedHotkeyManagerFullTests: XCTestCase, @unchecked Sendable {
             manager.setEnabled(i % 2 == 0)
         }
 
-        let elapsedTime = Date().timeIntervalSince(startTime)
-
-        // Then
-        XCTAssertLessThan(elapsedTime, 2.0, "1000 setting changes should complete within 2 seconds")
+        XCTAssertLessThan(ContinuousClock.now - start, .seconds(2), "1000 setting changes should complete within 2 seconds")
+        XCTAssertEqual(defaults.integer(forKey: "hotkeyKeyCode"), (iterations - 1) % 47)
+        XCTAssertEqual(defaults.object(forKey: "enableHotkey") as? Bool, false)
     }
 
     func testDescriptionGenerationPerformance() {

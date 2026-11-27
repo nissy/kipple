@@ -46,6 +46,7 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
 
     private var history: [ClipItem] = []
     private let mutationGate: AsyncMutationGate
+    private let clipboardComparisonGate = AsyncMutationGate()
     private let clipboardWriter: @MainActor @Sendable (ClipItem) -> Int
     private let clipboardReader: ClipboardReader?
     private var copyGeneration: UInt64 = 0
@@ -622,8 +623,9 @@ actor ModernClipboardService: ModernClipboardServiceProtocol {
     // MARK: - Status and Configuration
 
     func getCurrentClipboardContent() async -> String? {
-        await mutationGate.acquire()
-        defer { mutationGate.release() }
+        // History can publish partial results while loading. Only a temporary comparison copy blocks this read.
+        await clipboardComparisonGate.acquire()
+        defer { clipboardComparisonGate.release() }
         return await MainActor.run { (clipboardReader ?? .shared).read()?.text }
     }
 
@@ -1064,6 +1066,8 @@ extension ModernClipboardService {
         if isMonitoringFlag, !(await checkClipboardWhileLocked()) {
             return await reader.observation == stamp ? .clipboardUnavailable : .interrupted
         }
+        await clipboardComparisonGate.acquire()
+        defer { clipboardComparisonGate.release() }
         let result = await capture()
         if case .restored(_, let restored, _) = result {
             lastChangeCount = restored.changeCount

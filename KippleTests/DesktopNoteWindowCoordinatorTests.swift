@@ -131,7 +131,8 @@ final class DesktopNoteWindowCoordinatorTests: XCTestCase {
         simulateDesktopNoteLiveResize(original, to: NSSize(width: 274, height: 179))
         let resized = original.frame
         XCTAssertEqual(DesktopNotePlacement.load(from: defaults)[itemID]?.frame, resized)
-        let point = NSPoint(x: 150, y: 90)
+        original.contentView?.layoutSubtreeIfNeeded()
+        let point = try desktopNoteBodyPoint(in: original, x: resized.width - 50)
         let end = NSPoint(x: point.x + 35, y: point.y - 24)
         original.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: original))
         original.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: original))

@@ -69,32 +69,37 @@ final class LastActiveAppTrackingTests: XCTestCase {
     }
     
     func testMonitoringDetectsExternalApp() async throws {
-        // Given: Start monitoring
-        await service.startMonitoring()
-        
-        // Simulate external copy
-        // In real scenario, this would be from another app
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("From External App", forType: .string)
-        
-        // Wait for detection
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
-        // Then: Should detect and record app info
-        let history = await service.getHistory()
-        
-        // At least one item should be detected
-        XCTAssertGreaterThan(history.count, 0)
-        
-        if let latestItem = history.first {
-            XCTAssertNotNil(latestItem.sourceApp)
-            XCTAssertNotNil(latestItem.bundleIdentifier)
-            // processID should be valid
-            if let pid = latestItem.processID {
-                XCTAssertNotEqual(pid, 0)
-            }
-        }
-        
-        await service.stopMonitoring()
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let source = ClipboardReader.Source(
+            name: "External App", bundleID: "com.example.external", processID: 1234, windowTitle: "Selected Document"
+        )
+        let selection = "From External App"
+        let reader = ClipboardReader(pasteboard: pasteboard, readAccess: { .alwaysAllow }, readSelection: { _, _ in
+            ClipboardReader.Selection(text: selection, source: source, webPageURL: nil)
+        })
+        let monitoredService = ModernClipboardService(testRepository: MockClipboardRepository(), clipboardReader: reader)
+
+        await monitoredService.startMonitoring()
+        pasteboard.clearContents()
+        XCTAssertTrue(pasteboard.setString(selection, forType: .string))
+        await monitoredService.checkClipboardForTesting()
+        pasteboard.clearContents()
+        XCTAssertTrue(pasteboard.setString("Unrelated copy", forType: .string))
+        await monitoredService.checkClipboardForTesting()
+        await monitoredService.stopMonitoring()
+
+        let history = await monitoredService.getHistory()
+        XCTAssertEqual(history.map(\.content), ["Unrelated copy", selection])
+        let matched = try XCTUnwrap(history.last)
+        XCTAssertEqual(matched.sourceApp, source.name)
+        XCTAssertEqual(matched.bundleIdentifier, source.bundleID)
+        XCTAssertEqual(matched.processID, source.processID)
+        XCTAssertEqual(matched.windowTitle, source.windowTitle)
+        let unmatched = try XCTUnwrap(history.first)
+        XCTAssertNil(unmatched.sourceApp)
+        XCTAssertNil(unmatched.bundleIdentifier)
+        XCTAssertNil(unmatched.processID)
+        XCTAssertNil(unmatched.windowTitle)
     }
 }

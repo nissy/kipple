@@ -125,16 +125,20 @@ final class ComparisonClipboardCopyTests: XCTestCase {
         let stamp = reader.observation
         let input = comparisonInput("Selected")
         var poll: Task<Void, Never>?
+        var clipboardRead: Task<String?, Never>?
         let result = await service.performClipboardComparison(at: stamp) {
             await ComparisonClipboardCopy.capture(reader: reader, stamp: stamp, input: input, isCurrent: { true }, sendCopy: {
                 self.write("Selected", to: pasteboard)
                 poll = Task { await service.checkClipboardForTesting() }
+                clipboardRead = Task { await service.getCurrentClipboardContent() }
                 return true
             })
         }
 
         guard case .restored("Selected", _, false) = result else { return XCTFail("Expected a comparison") }
         await poll?.value
+        let currentClipboard = await clipboardRead?.value
+        XCTAssertEqual(currentClipboard, "Original")
         let afterComparison = await service.getHistory()
         XCTAssertEqual(afterComparison.map(\.content), ["Original"])
 
