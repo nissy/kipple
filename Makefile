@@ -206,6 +206,11 @@ build: generate ## Build production version
 # TEST TARGETS  
 #===============================================================================
 
+TEST_ADHOC_SIGNING ?= 0
+ifeq ($(TEST_ADHOC_SIGNING),1)
+TEST_SIGNING_SETTINGS = CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+endif
+
 test: generate ## Run all tests
 	@echo "$(BLUE)Running tests…$(NC)"
 	@rm -rf build/TestResults.xcresult build/TestResults
@@ -218,6 +223,7 @@ test: generate ## Run all tests
 		-resultBundlePath build/TestResults \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
+		$(TEST_SIGNING_SETTINGS) \
 		-only-testing:KippleTests
 	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/$(CONFIGURATION_TEST)/KippleTestHost.app/Contents/Helpers/KippleMCP"
 
@@ -260,6 +266,7 @@ test-coverage: generate ## Run tests with coverage report
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		-enableCodeCoverage YES \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
+		$(TEST_SIGNING_SETTINGS) \
 		-only-testing:KippleTests
 
 test-specific: generate ## Run specific test (use TEST=ClassName)
@@ -276,16 +283,19 @@ test-specific: generate ## Run specific test (use TEST=ClassName)
 		-destination $(DESTINATION) \
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
+		$(TEST_SIGNING_SETTINGS) \
 		-only-testing:KippleTests/$(TEST)
 
 #===============================================================================
 # CODE QUALITY
 #===============================================================================
 
+SWIFTLINT_FLAGS ?=
+
 lint: ## Run SwiftLint
 	@if command -v swiftlint >/dev/null 2>&1; then \
 		echo "$(BLUE)Running SwiftLint…$(NC)"; \
-		swiftlint --no-cache; \
+		swiftlint --no-cache $(SWIFTLINT_FLAGS); \
 	else \
 		echo "$(YELLOW)SwiftLint not found. Install with: brew install swiftlint$(NC)"; \
 	fi
