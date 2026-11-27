@@ -86,8 +86,7 @@ final class DesktopNoteResizeTests: XCTestCase {
             } else {
                 XCTAssertNil(note.sourceRegion?.window)
             }
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note))
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note))
+            try sendDesktopNoteMouseGesture(to: note, at: point)
         }
 
         try await clickAtSourceLink()
@@ -123,8 +122,7 @@ final class DesktopNoteResizeTests: XCTestCase {
         let frame = region.convert(region.bounds, to: nil)
         let point = NSPoint(x: frame.minX + 40, y: frame.maxY - 12)
         func click(_ count: Int) throws {
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: count))
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note, clickCount: count))
+            try sendDesktopNoteMouseGesture(to: note, at: point, clickCount: count)
         }
         let clickInterval = Duration.seconds(NSEvent.doubleClickInterval) + .milliseconds(100)
 

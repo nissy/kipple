@@ -398,3 +398,34 @@ func desktopNoteMouseEvent(
         pressure: 1
     ))
 }
+
+@MainActor
+func sendDesktopNoteMouseGesture(
+    to note: NSWindow,
+    at point: NSPoint,
+    draggingTo end: NSPoint? = nil,
+    releasingAt release: NSPoint? = nil,
+    clickCount: Int = 1,
+    modifiers: NSEvent.ModifierFlags = []
+) throws {
+    let down = try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: clickCount, modifiers: modifiers)
+    var following: [NSEvent] = []
+    if let end {
+        following.append(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note, modifiers: modifiers))
+    }
+    let up = try desktopNoteMouseEvent(
+        .leftMouseUp, at: release ?? end ?? point, for: note, clickCount: clickCount, modifiers: modifiers
+    )
+    following.append(up)
+
+    // Native text selection can wait for the remaining events inside mouseDown.
+    for event in following.reversed() { NSApp.postEvent(event, atStart: true) }
+    note.sendEvent(down)
+    for event in following {
+        let mask: NSEvent.EventTypeMask = event.type == .leftMouseUp ? .leftMouseUp : .leftMouseDragged
+        if NSApp.nextEvent(matching: mask, until: .distantPast, inMode: .default, dequeue: false) === event {
+            _ = NSApp.nextEvent(matching: mask, until: .distantPast, inMode: .default, dequeue: true)
+        }
+        note.sendEvent(event)
+    }
+}

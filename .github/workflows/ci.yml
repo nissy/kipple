@@ -43,4 +43,4 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Run all tests
-        run: make test TEST_ADHOC_SIGNING=1
+        run: make test TEST_ADHOC_SIGNING=1 TEST_TIMEOUT=180

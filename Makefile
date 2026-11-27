@@ -207,8 +207,12 @@ build: generate ## Build production version
 #===============================================================================
 
 TEST_ADHOC_SIGNING ?= 0
+TEST_TIMEOUT ?=
 ifeq ($(TEST_ADHOC_SIGNING),1)
 TEST_SIGNING_SETTINGS = CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+endif
+ifneq ($(TEST_TIMEOUT),)
+TEST_TIMEOUT_SETTINGS = -test-timeouts-enabled YES -default-test-execution-time-allowance $(TEST_TIMEOUT)
 endif
 
 test: generate ## Run all tests
@@ -224,6 +228,7 @@ test: generate ## Run all tests
 		-derivedDataPath $(TEST_DERIVED_DATA_DIR) \
 		OTHER_SWIFT_FLAGS='$(inherited) $(SWIFT_PLUGIN_FLAGS)' \
 		$(TEST_SIGNING_SETTINGS) \
+		$(TEST_TIMEOUT_SETTINGS) \
 		-only-testing:KippleTests
 	python3 Scripts/test_mcp_stdio.py "$(TEST_DERIVED_DATA_DIR)/Build/Products/$(CONFIGURATION_TEST)/KippleTestHost.app/Contents/Helpers/KippleMCP"
 

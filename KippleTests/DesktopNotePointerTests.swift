@@ -83,9 +83,7 @@ final class DesktopNotePointerTests: XCTestCase {
                 let start = NSPoint(x: x, y: row.midY)
                 note.sendEvent(try desktopNoteMouseEvent(.mouseMoved, at: start, for: note))
                 XCTAssertIdentical(NSCursor.current, NSCursor.iBeam)
-                note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-                note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-                note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+                try sendDesktopNoteMouseGesture(to: note, at: start, draggingTo: end)
                 let responder = try XCTUnwrap(note.firstResponder)
                 XCTAssertNotIdentical(responder, note)
                 XCTAssertTrue(responder.responds(to: try XCTUnwrap(copy.action)), "\(mode), x: \(x)")
@@ -160,9 +158,7 @@ final class DesktopNotePointerTests: XCTestCase {
         let end = NSPoint(x: 122, y: start.y)
 
         func selectPreviewText() throws {
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+            try sendDesktopNoteMouseGesture(to: note, at: start, draggingTo: end)
             let copyItem = NSMenuItem(title: "Copy", action: NSSelectorFromString("copy:"), keyEquivalent: "")
             let selection = try XCTUnwrap(note.firstResponder as? NSUserInterfaceValidations)
             XCTAssertTrue(selection.validateUserInterfaceItem(copyItem))
@@ -220,9 +216,7 @@ final class DesktopNotePointerTests: XCTestCase {
         for (index, row) in rows.enumerated() {
             let start = NSPoint(x: row.minX + 3, y: row.midY)
             let end = NSPoint(x: row.maxX - 3, y: row.midY)
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-            note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+            try sendDesktopNoteMouseGesture(to: note, at: start, draggingTo: end)
             let responder = try XCTUnwrap(note.firstResponder)
             XCTAssertNotIdentical(responder, note, "Source row \(index + 1)")
             XCTAssertTrue(responder.responds(to: copy), "Source row \(index + 1)")
@@ -344,9 +338,7 @@ final class DesktopNotePointerTests: XCTestCase {
         let row = try XCTUnwrap(textBounds(in: view).first)
         let start = NSPoint(x: row.minX + 2, y: row.midY)
         let end = NSPoint(x: row.midX, y: row.midY)
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+        try sendDesktopNoteMouseGesture(to: note, at: start, draggingTo: end)
         let responder = try XCTUnwrap(note.firstResponder)
         let outsideSelection = NSPoint(x: row.maxX - 2, y: row.midY)
         for (type, modifiers): (NSEvent.EventType, NSEvent.ModifierFlags) in [
@@ -434,15 +426,12 @@ extension DesktopNotePointerTests {
         let start = try desktopNoteBodyPoint(in: note, x: 29)
         let origin = note.frame.origin
 
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
+        try sendDesktopNoteMouseGesture(to: note, at: start)
         XCTAssertEqual(opened.map(\.absoluteString), ["https://example.com"])
         XCTAssertEqual(note.frame.origin, origin)
 
         let end = NSPoint(x: start.x + 60, y: start.y + 45)
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note))
+        try sendDesktopNoteMouseGesture(to: note, at: start, draggingTo: end, releasingAt: start)
         XCTAssertEqual(opened.count, 1)
         XCTAssertEqual(note.frame.origin, origin)
     }
@@ -461,14 +450,11 @@ extension DesktopNotePointerTests {
         let start = try desktopNoteBodyPoint(in: note, x: 29)
         let end = NSPoint(x: start.x + 2, y: start.y)
 
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDragged, at: end, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: end, for: note))
+        try sendDesktopNoteMouseGesture(to: note, at: start, draggingTo: end)
         XCTAssertTrue(opened.isEmpty)
 
         opened.removeAll()
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: start, for: note, modifiers: .shift))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: start, for: note, modifiers: .shift))
+        try sendDesktopNoteMouseGesture(to: note, at: start, modifiers: .shift)
         XCTAssertTrue(opened.isEmpty)
     }
 }

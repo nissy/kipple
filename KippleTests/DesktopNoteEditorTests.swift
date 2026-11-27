@@ -70,12 +70,10 @@ final class DesktopNoteEditorTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(50))
         let point = try desktopNoteBodyPoint(in: note)
 
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note))
+        try sendDesktopNoteMouseGesture(to: note, at: point)
         XCTAssertFalse(note.firstResponder is NSTextView)
 
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseDown, at: point, for: note, clickCount: 2))
-        note.sendEvent(try desktopNoteMouseEvent(.leftMouseUp, at: point, for: note, clickCount: 2))
+        try sendDesktopNoteMouseGesture(to: note, at: point, clickCount: 2)
         XCTAssertFalse(note.firstResponder is LiveEditorTextView)
         let controller = try XCTUnwrap(note.contentViewController as? DesktopNoteContentController)
         XCTAssertTrue(controller.selectionMayExist)
